@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+includedir=@includedir@
+libdir=@libdir@
+
+Name: unserding
+Description: Ubiquitous Network Service to Enquire Real or Deduced Information
+Version: 0.1
+Libs: @LDFLAGS@ -L${libdir} -lc
+Cflags: @CPPFLAGS@ -I${includedir}
+

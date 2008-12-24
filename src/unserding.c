@@ -65,16 +65,24 @@
 	fprintf(stderr, "[unserding/input/tcpudp] " args)
 #define UNLIKELY
 
-ev_io stdin_watcher;
+ev_io tcpudp_watcher;
 ev_timer timeout_watcher;
 ev_idle idle_watcher;
 
 struct addrinfo glob_sa;
 
 
-/* dealers */
+/* this callback is called when data is readable on one of the polled socks */
 static void
-tcpudp_handle_new(int sock)
+tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
+{
+	INPUT_DEBUG_TCPUDP("traffic on %d\n", w->fd);
+	return;
+}
+
+/* this callback is called when data is readable on the main server socket */
+static void
+tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 {
 	volatile int ns;
 	struct sockaddr_in6 sa;
@@ -84,8 +92,11 @@ tcpudp_handle_new(int sock)
 	const char *a;
 	/* the port (in host-byte order) */
 	uint16_t p;
+	ev_io *watcher;
 
-	ns = accept(sock, (struct sockaddr *)&sa, &sa_size);
+	INPUT_DEBUG_TCPUDP("incoming connection\n");
+
+	ns = accept(w->fd, (struct sockaddr *)&sa, &sa_size);
 	if (ns < 0) {
 		INPUT_CRITICAL_TCPUDP("could not handle incoming connection\n");
 		return;
@@ -95,15 +106,11 @@ tcpudp_handle_new(int sock)
 	p = ntohs(sa.sin6_port);
 
 	INPUT_DEBUG_TCPUDP("Server: connect from host %s, port %d.\n", a, p);
-	return;
-}
 
-
-/* this callback is called when data is readable on stdin */
-static void
-stdin_cb(EV_P_ ev_io *w, int revents)
-{
-	INPUT_DEBUG_TCPUDP("incoming connection\n");
+	/* initialise an io watcher, then start it */
+	watcher = malloc(sizeof(ev_io));
+	ev_io_init(watcher, tcpudp_traf_rcb, ns, EV_READ);
+	ev_io_start(loop, watcher);
 	return;
 }
 
@@ -165,8 +172,9 @@ __reuse_sock(int sock)
 static int
 _tcpudp_listener_try(volatile struct addrinfo *lres)
 {
-	volatile int s, port = 0;
+	volatile int s;
 	int retval;
+	char servbuf[NI_MAXSERV];
 
 	s = socket(lres->ai_family, SOCK_STREAM, 0);
 	if (s < 0) {
@@ -188,21 +196,10 @@ _tcpudp_listener_try(volatile struct addrinfo *lres)
 		}
 	}
 
-	if (port == 0) {
-		int gni;
-		char servbuf[NI_MAXSERV];
-
-		gni = getnameinfo(lres->ai_addr,
-				  lres->ai_addrlen, NULL,
-				  0, servbuf,
-				  sizeof(servbuf),
-				  NI_NUMERICSERV);
-
-		if (gni == 0) {
-			port = atoi(servbuf);
-		}
+	if (getnameinfo(lres->ai_addr, lres->ai_addrlen, NULL,
+			0, servbuf, sizeof(servbuf), NI_NUMERICSERV) == 0) {
+		INPUT_DEBUG_TCPUDP("listening on port %s\n", servbuf);
 	}
-	INPUT_DEBUG_TCPUDP("listening on port %d\n", port);
 	return s;
 }
 
@@ -262,10 +259,9 @@ main (void)
 	struct ev_loop *loop = ev_default_loop(0);
 	int lsock = tcpudp_listener_init();
 
-	/* initialise an io watcher, then start it
-	 * this one will watch for stdin to become readable */
-	ev_io_init(&stdin_watcher, stdin_cb, lsock, EV_READ);
-	ev_io_start(loop, &stdin_watcher);
+	/* initialise an io watcher, then start it */
+	ev_io_init(&tcpudp_watcher, tcpudp_inco_cb, lsock, EV_READ);
+	ev_io_start(loop, &tcpudp_watcher);
 
 	/* initialise a timer watcher, then start it
 	 * simple non-repeating 15.5 second timeout */

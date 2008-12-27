@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <ev.h>
 
 #if defined HAVE_SYS_SOCKET_H || 1
@@ -71,6 +72,7 @@
 #if !defined UNLIKELY
 # define UNLIKELY(_x)	__builtin_expect((_x), 0)
 #endif
+#define UNUSED(_x)	__attribute__((unused)) _x
 
 #define countof(x)		(sizeof(x) / sizeof(*x))
 
@@ -125,7 +127,7 @@ ctx_timer(conn_ctx_t ctx)
 static index_t __attribute__((unused)) glob_idx = 0;
 static struct conn_ctx_s glob_ctx[64];
 static struct addrinfo glob_sa;
-static struct sockaddr_in glob_mul;
+static struct sockaddr_in UNUSED(glob_mul);
 
 static ev_io __srv_watcher __attribute__((aligned(16)));
 static ev_io __srvmul_watcher __attribute__((aligned(16)));
@@ -485,6 +487,80 @@ tcpudp_listener_deinit(int sock)
 }
 
 
+#define TICK_CYCLES		256
+#define NWORKER_THREADS		4
+static index_t nworkers = 0;
+static pthread_t workers[NWORKER_THREADS];
+static struct ev_loop *loops[NWORKER_THREADS];
+/* the ticker runs TICK_CYCLES times as fast as the main server tick */
+static ev_periodic worker_watcher[NWORKER_THREADS];
+static ev_async wksig_watcher[NWORKER_THREADS];
+
+static void
+wksig_cb(EV_P_ ev_async *w, int revents)
+{
+	void *self = (void*)(long int)pthread_self();
+	INPUT_DEBUG_TCPUDP("SIGQUIT caught in %p\n", self);
+	ev_unloop(EV_A_ EVUNLOOP_ALL);
+	return;
+}
+
+static void
+worker_cb(EV_P_ ev_periodic *w, int revents)
+{
+	void *self = (void*)(long int)pthread_self();
+	INPUT_DEBUG_TCPUDP("thread %p doing work\n", self);
+	return;
+}
+
+static void*
+worker(void *loop)
+{
+	void *self = (void*)(long int)pthread_self();
+	INPUT_DEBUG_TCPUDP("starting worker thread %p, loop %p\n", self, loop);
+	ev_loop(EV_A_ 0);
+	INPUT_DEBUG_TCPUDP("quitting worker thread %p, loop %p\n", self, loop);
+	return NULL;
+}
+
+static void
+add_worker(void)
+{
+	pthread_attr_t attr;
+	void *loop;
+
+	/* initialise thread attributes */
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	/* new thread-local loop */
+	loop = loops[nworkers] = ev_loop_new(0);
+
+	ev_periodic_init(&worker_watcher[nworkers],
+			 worker_cb, 0, TICK_CYCLES, 0);
+	ev_periodic_start(loop, &worker_watcher[nworkers]);
+
+	ev_async_init(&wksig_watcher[nworkers], wksig_cb);
+	ev_async_start(loop, &wksig_watcher[nworkers]);
+
+	/* start the thread now */
+	pthread_create(&workers[nworkers++], &attr, worker, loop);
+
+	/* destroy locals */
+	pthread_attr_destroy(&attr);
+	return;
+}
+
+static void
+kill_worker(index_t w)
+{
+	void *ignore;
+	ev_async_send(loops[w], wksig_watcher);
+	pthread_join(workers[w], &ignore);
+	return;
+}
+
+
 static void
 init_glob_ctx(void)
 {
@@ -504,7 +580,7 @@ main (void)
 	int msock = tcpudp_mlistener_init();
 #endif
 	ev_io *srv_watcher = &__srv_watcher;
-	ev_io *srvmul_watcher = &__srvmul_watcher;
+	ev_io *UNUSED(srvmul_watcher) = &__srvmul_watcher;
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 
@@ -527,11 +603,21 @@ main (void)
 	ev_signal_init(sigpipe_watcher, sigint_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
 
+	/* set up the worker threads along with their secondary loops */
+	for (index_t i = 0; i < NWORKER_THREADS; i++) {
+		add_worker();
+	}
+
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
 	/* close the socket */
 	tcpudp_listener_deinit(lsock);
+
+	/* kill the workers along with their secondary loops */
+	for (index_t i = 0; i < NWORKER_THREADS; i++) {
+		kill_worker(i);
+	}
 
 	/* unloop was called, so exit */
 	return 0;

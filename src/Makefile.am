@@ -1,7 +1,7 @@
 ### Makefile.am
 
-AM_CPPFLAGS =
-AM_LDFLAGS =
+AM_CPPFLAGS = -pthread
+AM_LDFLAGS = -lpthread
 
 bin_PROGRAMS = unserding
 unserding_LDADD = -lev

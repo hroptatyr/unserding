@@ -60,11 +60,13 @@
 # include <errno.h>
 #endif
 
+#define USE_COROUTINES		0
+
 #define INPUT_CRITICAL_TCPUDP(args...)			\
 	fprintf(stderr, "[unserding/input/tcpudp] CRITICAL " args)
 #define INPUT_DEBUG_TCPUDP(args...)			\
 	fprintf(stderr, "[unserding/input/tcpudp] " args)
-#define TCPUDP_TIMEOUT		5
+#define TCPUDP_TIMEOUT		60
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -80,6 +82,7 @@
 /* The encoded parameter sizes will be rounded up to match pointer alignment. */
 #define ROUND(s, a)		(a * ((s + a - 1) / a))
 #define aligned_sizeof(t)	ROUND(sizeof(t), __alignof(void*))
+
 
 typedef size_t index_t;
 typedef struct conn_ctx_s *conn_ctx_t;
@@ -144,6 +147,52 @@ struct ud_worker_s {
 } __attribute__((aligned(16)));
 
 
+/* job queue magic */
+/* we use a fairly simplistic approach: one vector with two index pointers */
+/* number of simultaneous jobs */
+#define NJOBS		256
+#define NO_JOB		((job_t)-1)
+
+typedef struct job_queue_s *job_queue_t;
+typedef void *job_t;
+
+struct job_queue_s {
+	/* read index, where to read the next job */
+	index_t ri;
+	/* write index, where to put the next job */
+	index_t wi;
+	/* en/de-queuing mutex */
+	pthread_mutex_t mtx;
+	/* the jobs vector */
+	job_t jobs[NJOBS];
+};
+
+static inline void __attribute__((always_inline, gnu_inline))
+enqueue_job(job_queue_t jq, job_t job)
+{
+	pthread_mutex_lock(&jq->mtx);
+	/* dont check if the queue is full, just go assume our pipes are
+	 * always large enough */
+	jq->jobs[jq->wi] = job;
+	jq->wi = (jq->wi + 1) % NJOBS;
+	pthread_mutex_unlock(&jq->mtx);
+	return;
+}
+
+static inline job_t __attribute__((always_inline, gnu_inline))
+dequeue_job(job_queue_t jq)
+{
+	volatile job_t res = NO_JOB;
+	pthread_mutex_lock(&jq->mtx);
+	if (UNLIKELY(jq->ri != jq->wi)) {
+		res = jq->jobs[jq->ri];
+		jq->ri = (jq->ri + 1) % NJOBS;
+	}
+	pthread_mutex_unlock(&jq->mtx);
+	return res;
+}
+
+
 static index_t __attribute__((unused)) glob_idx = 0;
 static struct conn_ctx_s glob_ctx[64];
 static struct addrinfo glob_sa;
@@ -156,9 +205,15 @@ static ev_signal __sigpipe_watcher __attribute__((aligned(16)));
 
 /* worker magic */
 #define NWORKERS		4
-static index_t nworkers = 0;
-
+/* round robin var */
+static index_t rr_wrk = 0;
+/* the workers array */
 static struct ud_worker_s ALGN16(workers)[NWORKERS];
+
+/* the global job queue */
+static struct job_queue_s __glob_jq = {
+	.ri = 0, .wi = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
+}, *glob_jq = &__glob_jq;
 
 /* protos */
 static void tcpudp_listener_deinit(int sock);
@@ -192,7 +247,7 @@ tcpudp_ctx_renew_timer(EV_P_ conn_ctx_t ctx)
 	ev_timer_set(evti, TCPUDP_TIMEOUT, 0.0);
 	ev_timer_start(EV_A_ evti);
 #else
-/* seems libev knows about this use case */
+	/* seems libev knows about this use case */
 	ev_timer_again(EV_A_ evti);
 #endif
 	return;
@@ -217,8 +272,12 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 	tcpudp_ctx_renew_timer(EV_A_ ctx);
 	/* wind the buffer index */
 	ctx->bidx += nread;
+	/* enqueue t3h job */
+	enqueue_job(glob_jq, NULL);
 	/* look what we can do */
-	ev_async_send(workers[0].loop, &workers[0].work_watcher);
+	ev_async_send(workers[rr_wrk].loop, &workers[rr_wrk].work_watcher);
+	/* step the round robin */
+	rr_wrk = (rr_wrk + 1) % NWORKERS;
 	return;
 }
 
@@ -533,7 +592,15 @@ static void
 worker_cb(EV_P_ ev_async *w, int revents)
 {
 	void *self = (void*)(long int)pthread_self();
-	INPUT_DEBUG_TCPUDP("thread %p, loop %p doing work\n", self, loop);
+	job_t j;
+
+	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
+		INPUT_DEBUG_TCPUDP("thread %p, loop %p doing work\n",
+				   self, loop);
+		for (double foo = 1.0, sum = 0.0;
+		     sum < 21.0; sum += 1/foo, foo += 1.0);
+	}
+	INPUT_DEBUG_TCPUDP("no more jobs %p %p\n", self, loop);
 	return;
 }
 
@@ -552,14 +619,19 @@ static void
 add_worker(void)
 {
 	pthread_attr_t attr;
-	ud_worker_t wk = &workers[nworkers++];
+	ud_worker_t wk = &workers[rr_wrk++];
 
 	/* initialise thread attributes */
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
+#if USE_COROUTINES
+	/* use the existing  */
+	wk->loop = workers[0].loop;
+#else  /* !USE_COROUTINES */
 	/* new thread-local loop */
 	wk->loop = ev_loop_new(0);
+#endif	/* USE_COROUTINES */
 
 	ev_async_init(&wk->work_watcher, worker_cb);
 	ev_async_start(wk->loop, &wk->work_watcher);
@@ -627,11 +699,17 @@ main (void)
 	ev_signal_init(sigpipe_watcher, sigint_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
 
+#if USE_COROUTINES
+	/* use the existing  */
+	workers[0].loop = ev_loop_new(0);
+#endif	/* USE_COROUTINES */
 	/* set up the worker threads along with their secondary loops */
 	for (index_t i = 0; i < NWORKERS; i++) {
 		add_worker();
 	}
 
+	/* reset the round robin var */
+	rr_wrk = 0;
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 

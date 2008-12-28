@@ -37,6 +37,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <ev.h>
@@ -60,13 +61,16 @@
 # include <errno.h>
 #endif
 
+/* our master include file */
+#include "unserding.h"
+
 #define USE_COROUTINES		0
 
 #define INPUT_CRITICAL_TCPUDP(args...)			\
 	fprintf(stderr, "[unserding/input/tcpudp] CRITICAL " args)
 #define INPUT_DEBUG_TCPUDP(args...)			\
 	fprintf(stderr, "[unserding/input/tcpudp] " args)
-#define TCPUDP_TIMEOUT		60
+#define TCPUDP_TIMEOUT		10
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -83,7 +87,7 @@
 #define ROUND(s, a)		(a * ((s + a - 1) / a))
 #define aligned_sizeof(t)	ROUND(sizeof(t), __alignof(void*))
 
-
+
 typedef size_t index_t;
 typedef struct conn_ctx_s *conn_ctx_t;
 typedef struct outbuf_s *outbuf_t;
@@ -91,41 +95,60 @@ typedef struct outbuf_s *outbuf_t;
 typedef struct ud_worker_s *ud_worker_t;
 typedef struct ud_ev_async_s ud_ev_async;
 
+#define SIZEOF_CONN_CTX_S	1024
 struct conn_ctx_s {
-	struct ev_io __attribute__((aligned(16))) io;
-	struct ev_timer __attribute__((aligned(16))) ti;
+	/* read io */
+	struct ev_io ALGN16(rio);
+	/* write io */
+	struct ev_io ALGN16(wio);
+	/* timer */
+	struct ev_timer ALGN16(ti);
 	int src;
 	int snk;
+	/* output buffer */
+	size_t obuflen;
+	index_t obufidx;
+	const char *obuf;
+	/* the morning-after pill */
+	void *after_wio_j;
+	/* input buffer */
 	index_t bidx;
-	char buf[1024 - 32 - sizeof(struct ev_timer) - sizeof(struct ev_io)]
-	__attribute__((aligned(16)));
-} __attribute__((aligned(1024)));
-
-struct outbuf_s {
-	struct ev_io __attribute__((aligned(16))) io;
-	size_t buflen;
-	const char *buffer;
-};
+	char ALGN16(buf)[];
+} __attribute__((aligned(SIZEOF_CONN_CTX_S)));
+#define CONN_CTX_BUF_SIZE					\
+	SIZEOF_CONN_CTX_S - offsetof(struct conn_ctx_s, buf)
 
 static inline conn_ctx_t __attribute__((always_inline, gnu_inline))
-ev_io_ctx(void *io)
+ev_rio_ctx(void *rio)
 {
-	return (void*)io;
+	return (void*)((char*)rio - offsetof(struct conn_ctx_s, rio));
+}
+
+static inline conn_ctx_t __attribute__((always_inline, gnu_inline))
+ev_wio_ctx(void *wio)
+{
+	return (void*)((char*)wio - offsetof(struct conn_ctx_s, wio));
 }
 
 static inline conn_ctx_t __attribute__((always_inline, gnu_inline))
 ev_timer_ctx(void *timer)
 {
-	return (void*)((char*)timer - aligned_sizeof(struct ev_io));
+	return (void*)((char*)timer - offsetof(struct conn_ctx_s, ti));
 }
 
-static inline void __attribute__((always_inline, gnu_inline)) *
-ctx_io(conn_ctx_t ctx)
+static inline ev_io __attribute__((always_inline, gnu_inline)) *
+ctx_rio(conn_ctx_t ctx)
 {
-	return (void*)&ctx->io;
+	return (void*)&ctx->rio;
 }
 
-static inline void __attribute__((always_inline, gnu_inline)) *
+static inline ev_io __attribute__((always_inline, gnu_inline)) *
+ctx_wio(conn_ctx_t ctx)
+{
+	return (void*)&ctx->wio;
+}
+
+static inline ev_timer __attribute__((always_inline, gnu_inline)) *
 ctx_timer(conn_ctx_t ctx)
 {
 	return (void*)&ctx->ti;
@@ -154,7 +177,12 @@ struct ud_worker_s {
 #define NO_JOB		((job_t)-1)
 
 typedef struct job_queue_s *job_queue_t;
-typedef void *job_t;
+typedef struct job_s *job_t;
+
+struct job_s {
+	void(*workf)(void*);
+	void *clo;
+};
 
 struct job_queue_s {
 	/* read index, where to read the next job */
@@ -164,7 +192,7 @@ struct job_queue_s {
 	/* en/de-queuing mutex */
 	pthread_mutex_t mtx;
 	/* the jobs vector */
-	job_t jobs[NJOBS];
+	struct job_s jobs[NJOBS];
 };
 
 static inline void __attribute__((always_inline, gnu_inline))
@@ -173,7 +201,11 @@ enqueue_job(job_queue_t jq, job_t job)
 	pthread_mutex_lock(&jq->mtx);
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
-	jq->jobs[jq->wi] = job;
+	if (LIKELY(job != NULL)) {
+		jq->jobs[jq->wi] = *job;
+	} else {
+		memset(&jq->jobs[jq->wi], 0, sizeof(*job));
+	}
 	jq->wi = (jq->wi + 1) % NJOBS;
 	pthread_mutex_unlock(&jq->mtx);
 	return;
@@ -185,11 +217,21 @@ dequeue_job(job_queue_t jq)
 	volatile job_t res = NO_JOB;
 	pthread_mutex_lock(&jq->mtx);
 	if (UNLIKELY(jq->ri != jq->wi)) {
-		res = jq->jobs[jq->ri];
+		if (UNLIKELY((res = &jq->jobs[jq->ri])->workf == NULL)) {
+			res = NULL;
+		}
 		jq->ri = (jq->ri + 1) % NJOBS;
 	}
 	pthread_mutex_unlock(&jq->mtx);
 	return res;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+free_job(job_t j)
+{
+	j->workf = NULL;
+	j->clo = NULL;
+	return;
 }
 
 
@@ -219,16 +261,24 @@ static struct job_queue_s __glob_jq = {
 static void tcpudp_listener_deinit(int sock);
 
 
-static inline void __attribute__((always_inline))
+static inline void __attribute__((always_inline, gnu_inline))
+trigger_job_queue(void)
+{
+	/* look what we can do */
+	ev_async_send(workers[rr_wrk].loop, &workers[rr_wrk].work_watcher);
+	/* step the round robin */
+	rr_wrk = (rr_wrk + 1) % NWORKERS;
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
 tcpudp_kick_ctx(EV_P_ conn_ctx_t ctx)
 {
-	ev_io *evio = ctx_io(ctx);
-	ev_timer *evti = ctx_timer(ctx);
-
 	/* kick the timer */
-	ev_timer_stop(EV_A_ evti);
-	/* kick the io handler */
-	ev_io_stop(EV_A_ evio);
+	ev_timer_stop(EV_A_ ctx_timer(ctx));
+	/* kick the io handlers */
+	ev_io_stop(EV_A_ ctx_rio(ctx));
+	ev_io_stop(EV_A_ ctx_wio(ctx));
 	/* stop the bugger */
 	tcpudp_listener_deinit(ctx->snk);
 	/* finally, give the ctx struct a proper rinse */
@@ -263,7 +313,7 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 
 	INPUT_DEBUG_TCPUDP("traffic on %d\n", w->fd);
 	nread = read(w->fd, &ctx->buf[ctx->bidx],
-		     countof(ctx->buf) - ctx->bidx);
+		     CONN_CTX_BUF_SIZE - ctx->bidx);
 	if (UNLIKELY(nread == 0)) {
 		tcpudp_kick_ctx(EV_A_ ctx);
 		return;
@@ -272,12 +322,9 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 	tcpudp_ctx_renew_timer(EV_A_ ctx);
 	/* wind the buffer index */
 	ctx->bidx += nread;
-	/* enqueue t3h job */
+	/* enqueue t3h job and notify the slaves */
 	enqueue_job(glob_jq, NULL);
-	/* look what we can do */
-	ev_async_send(workers[rr_wrk].loop, &workers[rr_wrk].work_watcher);
-	/* step the round robin */
-	rr_wrk = (rr_wrk + 1) % NWORKERS;
+	trigger_job_queue();
 	return;
 }
 
@@ -285,9 +332,26 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 static void __attribute__((unused))
 tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 {
-	outbuf_t ob = (void*)w;
-	write(w->fd, ob->buffer, ob->buflen);
-	ev_io_stop(EV_A_ w);
+	conn_ctx_t ctx = ev_wio_ctx(w);
+	if (LIKELY(ctx->obufidx < ctx->obuflen)) {
+		const char *buf = ctx->obuf + ctx->obufidx;
+		size_t blen = ctx->obuflen - ctx->obufidx;
+		/* the actual write */
+		ctx->obufidx += write(w->fd, buf, blen);
+	}
+	if (LIKELY(ctx->obufidx >= ctx->obuflen)) {
+		/* if nothing's to be printed just turn it off */
+		ev_io_stop(EV_A_ w);
+		if (LIKELY(ctx->after_wio_j != NULL)) {
+			struct job_s tmp = {
+				.workf = ctx->after_wio_j,
+				.clo = ctx,
+			};
+			enqueue_job(glob_jq, &tmp);
+			ctx->after_wio_j = NULL;
+			trigger_job_queue();
+		}
+	}
 	return;
 }
 
@@ -298,13 +362,25 @@ static void
 tcpudp_idleto_cb(EV_P_ ev_timer *w, int revents)
 {
 	/* our brilliant type pun */
-	struct conn_ctx_s *ctx = ev_timer_ctx(w);
+	conn_ctx_t ctx = ev_timer_ctx(w);
 
 	INPUT_DEBUG_TCPUDP("bitching back at the eejit on %d\n", ctx->snk);
+#if 0
+/* simplistic approach */
 	write(ctx->snk, idle_msg, countof(idle_msg));
+	tcpudp_kick_ctx(EV_A_ ctx);
+#else
+/* callback approach */
+	ctx->obuflen = countof(idle_msg) - 1;
+	ctx->obufidx = 0;
+	ctx->obuf = idle_msg;
+
+	/* start the write watcher */
+	ev_io_start(EV_A_ ctx_wio(ctx));
 
 	/* just finish him off */
-	tcpudp_kick_ctx(EV_A_ ctx);
+	ctx->after_wio_j = tcpudp_kick_ctx_cb;
+#endif
 	return;
 }
 
@@ -370,9 +446,13 @@ tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 	widx = find_ctx();
 
 	/* escrow the socket poller */
-	watcher = ctx_io(&glob_ctx[widx]);
+	watcher = ctx_rio(&glob_ctx[widx]);
 	ev_io_init(watcher, tcpudp_traf_rcb, ns, EV_READ);
 	ev_io_start(EV_A_ watcher);
+
+	/* escrow the writer */
+	watcher = ctx_wio(&glob_ctx[widx]);
+	ev_io_init(watcher, tcpudp_traf_wcb, ns, EV_WRITE);
 
 	/* escrow the connexion idle timeout */
 	to = ctx_timer(&glob_ctx[widx]);
@@ -595,12 +675,15 @@ worker_cb(EV_P_ ev_async *w, int revents)
 	job_t j;
 
 	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
-		INPUT_DEBUG_TCPUDP("thread %p, loop %p doing work\n",
+		INPUT_DEBUG_TCPUDP("thread/loop/ctx %p/%p doing work\n",
 				   self, loop);
-		for (double foo = 1.0, sum = 0.0;
-		     sum < 21.0; sum += 1/foo, foo += 1.0);
+		if (UNLIKELY(j == NULL)) {
+			continue;
+		}
+		j->workf(j->clo);
+		free_job(j);
 	}
-	INPUT_DEBUG_TCPUDP("no more jobs %p %p\n", self, loop);
+	INPUT_DEBUG_TCPUDP("no more jobs %p/%p\n", self, loop);
 	return;
 }
 
@@ -633,11 +716,16 @@ add_worker(void)
 	wk->loop = ev_loop_new(0);
 #endif	/* USE_COROUTINES */
 
-	ev_async_init(&wk->work_watcher, worker_cb);
-	ev_async_start(wk->loop, &wk->work_watcher);
-
-	ev_async_init(&wk->kill_watcher, kill_cb);
-	ev_async_start(wk->loop, &wk->kill_watcher);
+	{
+		ev_async *eva = &wk->work_watcher;
+		ev_async_init(eva, worker_cb);
+		ev_async_start(wk->loop, eva);
+	}
+	{
+		ev_async *eva = &wk->kill_watcher;
+		ev_async_init(eva, kill_cb);
+		ev_async_start(wk->loop, eva);
+	}
 
 	/* start the thread now */
 	pthread_create(&wk->thread, &attr, worker, wk);

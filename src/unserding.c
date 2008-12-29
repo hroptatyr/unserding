@@ -355,6 +355,14 @@ tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 	return;
 }
 
+static void
+tcpudp_kick_ctx_cb(conn_ctx_t ctx)
+{
+	void *loop = EV_DEFAULT_UC;
+	tcpudp_kick_ctx(loop, ctx);
+	return;
+}
+
 static const char idle_msg[] = "Oi shitface, stop wasting my time, will ya!\n";
 static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
 

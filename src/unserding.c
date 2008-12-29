@@ -62,7 +62,7 @@
 /* our private bits */
 #include "unserding-private.h"
 
-#define USE_COROUTINES		0
+#define USE_COROUTINES		1
 
 
 typedef struct outbuf_s *outbuf_t;
@@ -276,10 +276,12 @@ add_worker(void)
 static void
 kill_worker(index_t w)
 {
-	void *ignore;
+	/* send a lethal signal to the workers and detach */
 	ev_async_send(workers[w].loop, &workers[w].kill_watcher);
-	pthread_join(workers[w].thread, &ignore);
+	pthread_join(workers[w].thread, NULL);
+#if !USE_COROUTINES
 	ev_loop_destroy(workers[w].loop);
+#endif
 	return;
 }
 
@@ -324,7 +326,7 @@ main (void)
 	ev_signal_start(EV_A_ sigpipe_watcher);
 
 #if USE_COROUTINES
-	/* use the existing  */
+	/* create one loop for all threads */
 	workers[0].loop = ev_loop_new(0);
 #endif	/* USE_COROUTINES */
 	/* set up the worker threads along with their secondary loops */
@@ -350,9 +352,14 @@ main (void)
 	ud_detach_tcp6(EV_A);
 
 	/* kill the workers along with their secondary loops */
-	for (index_t i = 0; i < NWORKERS; i++) {
-		kill_worker(i);
+	for (index_t i = NWORKERS; i > 0; i--) {
+		UD_DEBUG("killing worker %lu\n", (long unsigned int)i - 1);
+		kill_worker(i-1);
 	}
+#if USE_COROUTINES
+	/* destroy the secondary loop */
+	ev_loop_destroy(workers[0].loop);
+#endif	/* USE_COROUTINES */
 
 	/* unloop was called, so exit */
 	return 0;

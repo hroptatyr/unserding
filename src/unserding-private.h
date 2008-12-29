@@ -89,6 +89,7 @@ struct conn_ctx_s {
 	struct ev_timer ALGN16(ti);
 	int src;
 	int snk;
+	ev_tstamp timeout;
 	/* output buffer */
 	size_t obuflen;
 	index_t obufidx;

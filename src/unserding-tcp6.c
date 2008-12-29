@@ -230,19 +230,25 @@ tcpudp_idleto_cb(EV_P_ ev_timer *w, int revents)
 {
 	/* our brilliant type pun */
 	conn_ctx_t ctx = ev_timer_ctx(w);
+	ev_tstamp now = ev_now (EV_A);
 
-	UD_DEBUG_TCPUDP("bitching back at the eejit on %d\n", ctx->snk);
-	tcpudp_kick_ctx(loop, ctx);
-	//ud_kickprint_tcp6(EV_A_ ctx, idle_msg, countof(idle_msg) - 1);
+	if (ctx->timeout < now) {
+		/* yepp, timed out */
+		UD_DEBUG_TCPUDP("bitching back at the eejit on %d\n", ctx->snk);
+		tcpudp_kick_ctx(loop, ctx);
+		//ud_kickprint_tcp6(EV_A_ ctx, idle_msg, countof(idle_msg) - 1);
+	} else {
+		/* callback was invoked, but there was some activity, re-arm */
+		w->repeat = ctx->timeout - now;
+		ev_timer_again(EV_A_ w);
+	}
 	return;
 }
 
 static inline void
 tcpudp_ctx_renew_timer(EV_P_ conn_ctx_t ctx)
 {
-	ev_timer *evti = ctx_timer(ctx);
-
-	ev_timer_again(EV_A_ evti);
+	ctx->timeout = ev_now(EV_A) + TCPUDP_TIMEOUT;
 	return;
 }
 
@@ -341,6 +347,7 @@ tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 	ev_io_init(watcher, tcpudp_traf_wcb, ns, EV_WRITE);
 
 	/* escrow the connexion idle timeout */
+	lctx->timeout = ev_now(EV_A) + TCPUDP_TIMEOUT;
 	to = ctx_timer(lctx);
 	ev_timer_init(to, tcpudp_idleto_cb, 0.0, TCPUDP_TIMEOUT);
 	ev_timer_again(EV_A_ to);

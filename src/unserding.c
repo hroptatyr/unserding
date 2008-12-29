@@ -121,13 +121,13 @@ static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
 static void
 sigint_cb(EV_P_ ev_signal *w, int revents)
 {
-	UD_DEBUG_TCPUDP("C-c caught, unrolling everything\n");
+	UD_DEBUG("C-c caught, unrolling everything\n");
 	/* kill all open connexions */
 	for (index_t res = 0; res < countof(glob_ctx); res++) {
 		if (LIKELY(glob_ctx[res].snk == -1)) {
 			continue;
 		}
-		UD_DEBUG_TCPUDP("letting %d know\n", glob_ctx[res].snk);
+		UD_DEBUG("letting %d know\n", glob_ctx[res].snk);
 #if 0
 		write(glob_ctx[res].snk, emer_msg, countof(emer_msg));
 		tcpudp_kick_ctx(EV_A_ &glob_ctx[res]);
@@ -175,7 +175,7 @@ tcpudp_mlistener_init(void)
 	/* open a UDP socket */
 	s = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
 	if (s < 0) {
-		UD_CRITICAL_TCPUDP("Unable to open multicast socket\n");
+		UD_CRITICAL("Unable to open multicast socket\n");
 		return -1;
 	}
 
@@ -185,7 +185,7 @@ tcpudp_mlistener_init(void)
 	retval = bind(s, (struct sockaddr*)&saddr, sizeof(struct sockaddr_in));
 
 	if (retval < 1) {
-		UD_CRITICAL_TCPUDP("Unable to bind multicast socket\n");
+		UD_CRITICAL("Unable to bind multicast socket\n");
 		return -1;
 	}
 
@@ -212,7 +212,7 @@ static void
 kill_cb(EV_P_ ev_async *w, int revents)
 {
 	void *self = (void*)(long int)pthread_self();
-	UD_DEBUG_TCPUDP("SIGQUIT caught in %p\n", self);
+	UD_DEBUG("SIGQUIT caught in %p\n", self);
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
 }
@@ -224,7 +224,7 @@ worker_cb(EV_P_ ev_async *w, int revents)
 	job_t j;
 
 	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
-		UD_DEBUG_TCPUDP("thread/loop/ctx %p/%p doing work\n",
+		UD_DEBUG("thread/loop/ctx %p/%p doing work\n",
 				   self, loop);
 		if (UNLIKELY(j == NULL)) {
 			continue;
@@ -232,7 +232,7 @@ worker_cb(EV_P_ ev_async *w, int revents)
 		j->workf(j->clo);
 		free_job(j);
 	}
-	UD_DEBUG_TCPUDP("no more jobs %p/%p\n", self, loop);
+	UD_DEBUG("no more jobs %p/%p\n", self, loop);
 	return;
 }
 
@@ -241,9 +241,9 @@ worker(void *wk)
 {
 	void *self = (void*)(long int)pthread_self();
 	void *loop = ((ud_worker_t)wk)->loop;
-	UD_DEBUG_TCPUDP("starting worker thread %p, loop %p\n", self, loop);
+	UD_DEBUG("starting worker thread %p, loop %p\n", self, loop);
 	ev_loop(EV_A_ 0);
-	UD_DEBUG_TCPUDP("quitting worker thread %p, loop %p\n", self, loop);
+	UD_DEBUG("quitting worker thread %p, loop %p\n", self, loop);
 	return NULL;
 }
 

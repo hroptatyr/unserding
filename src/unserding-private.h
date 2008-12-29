@@ -47,9 +47,13 @@
 
 typedef size_t index_t;
 
+#define UD_CRITICAL(args...)				\
+	fprintf(stderr, "[unserding] CRITICAL " args)
+#define UD_DEBUG(args...)			\
+	fprintf(stderr, "[unserding] " args)
 #define UD_CRITICAL_TCPUDP(args...)					\
 	fprintf(stderr, "[unserding/input/tcpudp] CRITICAL " args)
-#define UD_DEBUG_TCPUDP(args...)					\
+#define UD_DEBUG_TCPUDP(args...)				\
 	fprintf(stderr, "[unserding/input/tcpudp] " args)
 
 #if !defined LIKELY

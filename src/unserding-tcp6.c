@@ -65,7 +65,7 @@
 #include "unserding.h"
 #include "unserding-private.h"
 
-#define TCPUDP_TIMEOUT		10
+#define TCPUDP_TIMEOUT		60
 
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));
@@ -232,7 +232,8 @@ tcpudp_idleto_cb(EV_P_ ev_timer *w, int revents)
 	conn_ctx_t ctx = ev_timer_ctx(w);
 
 	UD_DEBUG_TCPUDP("bitching back at the eejit on %d\n", ctx->snk);
-	ud_kickprint_tcp6(EV_A_ ctx, idle_msg, countof(idle_msg) - 1);
+	tcpudp_kick_ctx(loop, ctx);
+	//ud_kickprint_tcp6(EV_A_ ctx, idle_msg, countof(idle_msg) - 1);
 	return;
 }
 
@@ -269,7 +270,7 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 	if (ctx->buf[ctx->bidx-2] == '\n' &&
 	    ctx->buf[ctx->bidx-1] == '\n') {
 		/* enqueue t3h job and notify the slaves */
-		enqueue_job(glob_jq, NULL);
+		enqueue_job(glob_jq, ud_parse, ctx);
 		trigger_job_queue();
 	}
 	return;
@@ -290,11 +291,7 @@ tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 		/* if nothing's to be printed just turn it off */
 		ev_io_stop(EV_A_ w);
 		if (UNLIKELY(ctx->after_wio_j != NULL)) {
-			struct job_s tmp = {
-				.workf = ctx->after_wio_j,
-				.clo = ctx,
-			};
-			enqueue_job(glob_jq, &tmp);
+			enqueue_job(glob_jq, ctx->after_wio_j, ctx);
 			ctx->after_wio_j = NULL;
 			trigger_job_queue();
 		}

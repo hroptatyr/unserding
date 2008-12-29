@@ -55,6 +55,10 @@ typedef size_t index_t;
 	fprintf(stderr, "[unserding/input/tcpudp] CRITICAL " args)
 #define UD_DEBUG_TCPUDP(args...)				\
 	fprintf(stderr, "[unserding/input/tcpudp] " args)
+#define UD_CRITICAL_PROTO(args...)				\
+	fprintf(stderr, "[unserding/proto] CRITICAL " args)
+#define UD_DEBUG_PROTO(args...)				\
+	fprintf(stderr, "[unserding/proto] " args)
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -172,16 +176,13 @@ struct job_queue_s {
 };
 
 static inline void __attribute__((always_inline, gnu_inline))
-enqueue_job(job_queue_t jq, job_t job)
+enqueue_job(job_queue_t jq, ud_work_f workf, void *clo)
 {
 	pthread_mutex_lock(&jq->mtx);
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
-	if (LIKELY(job != NULL)) {
-		jq->jobs[jq->wi] = *job;
-	} else {
-		memset(&jq->jobs[jq->wi], 0, sizeof(*job));
-	}
+	jq->jobs[jq->wi].workf = workf;
+	jq->jobs[jq->wi].clo = clo;
 	jq->wi = (jq->wi + 1) % NJOBS;
 	pthread_mutex_unlock(&jq->mtx);
 	return;
@@ -213,7 +214,7 @@ free_job(job_t j)
 extern job_queue_t glob_jq;
 
 /* some special work functions */
-extern void ud_parse(void*);
+extern void ud_parse(void *clo);
 
 
 /* worker magic */

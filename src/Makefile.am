@@ -6,7 +6,7 @@ AM_LDFLAGS = -lpthread
 bin_PROGRAMS = unserding
 
 ## the main server binary
-unserding_SOURCES = unserding.c unserding-tcp6.c
+unserding_SOURCES = unserding.c unserding-tcp6.c proto.c
 unserding_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unserding_LDADD = $(LIBEV_LIBS)
 

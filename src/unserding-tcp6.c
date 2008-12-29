@@ -201,6 +201,7 @@ tcpudp_listener_deinit(int sock)
 static inline void __attribute__((always_inline, gnu_inline))
 tcpudp_kick_ctx(EV_P_ conn_ctx_t ctx)
 {
+	UD_DEBUG_TCPUDP("kicking ctx %p :socket %d...\n", ctx, ctx->snk);
 	/* kick the timer */
 	ev_timer_stop(EV_A_ ctx_timer(ctx));
 	/* kick the io handlers */
@@ -231,22 +232,7 @@ tcpudp_idleto_cb(EV_P_ ev_timer *w, int revents)
 	conn_ctx_t ctx = ev_timer_ctx(w);
 
 	UD_DEBUG_TCPUDP("bitching back at the eejit on %d\n", ctx->snk);
-#if 0
-/* simplistic approach */
-	write(ctx->snk, idle_msg, countof(idle_msg));
-	tcpudp_kick_ctx(EV_A_ ctx);
-#else
-/* callback approach */
-	ctx->obuflen = countof(idle_msg) - 1;
-	ctx->obufidx = 0;
-	ctx->obuf = idle_msg;
-
-	/* start the write watcher */
-	ev_io_start(EV_A_ ctx_wio(ctx));
-
-	/* just finish him off */
-	ctx->after_wio_j = tcpudp_kick_ctx_cb;
-#endif
+	ud_kickprint_tcp6(EV_A_ ctx, idle_msg, countof(idle_msg) - 1);
 	return;
 }
 
@@ -255,14 +241,7 @@ tcpudp_ctx_renew_timer(EV_P_ conn_ctx_t ctx)
 {
 	ev_timer *evti = ctx_timer(ctx);
 
-#if 0
-	ev_timer_stop(EV_A_ evti);
-	ev_timer_set(evti, TCPUDP_TIMEOUT, 0.0);
-	ev_timer_start(EV_A_ evti);
-#else
-	/* seems libev knows about this use case */
 	ev_timer_again(EV_A_ evti);
-#endif
 	return;
 }
 
@@ -362,8 +341,8 @@ tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 
 	/* escrow the connexion idle timeout */
 	to = ctx_timer(lctx);
-	ev_timer_init(to, tcpudp_idleto_cb, TCPUDP_TIMEOUT, TCPUDP_TIMEOUT);
-	ev_timer_start(EV_A_ to);
+	ev_timer_init(to, tcpudp_idleto_cb, 0.0, TCPUDP_TIMEOUT);
+	ev_timer_again(EV_A_ to);
 
 	/* put the src and snk sock into glob_ctx */
 	lctx->src = w->fd;
@@ -372,6 +351,47 @@ tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 }
 
 
+void
+ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
+{
+#if 0
+/* simplistic approach */
+	write(ctx->snk, m, mlen);
+#else
+/* callback approach */
+	ctx->obuflen = mlen;
+	ctx->obufidx = 0;
+	ctx->obuf = m;
+
+	/* start the write watcher */
+	ev_io_start(EV_A_ ctx_wio(ctx));
+
+	/* just finish him off */
+	ctx->after_wio_j = NULL;
+#endif
+}
+
+void
+ud_kickprint_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
+{
+#if 0
+/* simplistic approach */
+	write(ctx->snk, m, mlen);
+	tcpudp_kick_ctx(EV_A_ ctx);
+#else
+/* callback approach */
+	ctx->obuflen = mlen;
+	ctx->obufidx = 0;
+	ctx->obuf = m;
+
+	/* start the write watcher */
+	ev_io_start(EV_A_ ctx_wio(ctx));
+
+	/* just finish him off */
+	ctx->after_wio_j = tcpudp_kick_ctx_cb;
+#endif
+}
+
 int
 ud_attach_tcp6(EV_P)
 {
@@ -383,11 +403,6 @@ ud_attach_tcp6(EV_P)
 	/* initialise an io watcher, then start it */
 	ev_io_init(srv_watcher, tcpudp_inco_cb, lsock, EV_READ);
 	ev_io_start(EV_A_ srv_watcher);
-#if 0
-	/* initialise a multicast watcher */
-	ev_io_init(srvmul_watcher, tcpudp_inco_cb, msock, EV_READ);
-	ev_io_start(EV_A_ srvmul_watcher);
-#endif
 	return 0;
 }
 

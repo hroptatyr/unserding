@@ -122,17 +122,6 @@ static void
 sigint_cb(EV_P_ ev_signal *w, int revents)
 {
 	UD_DEBUG("C-c caught, unrolling everything\n");
-	/* kill all open connexions */
-	for (index_t res = 0; res < countof(glob_ctx); res++) {
-		if (LIKELY(glob_ctx[res].snk == -1)) {
-			continue;
-		}
-		UD_DEBUG("letting %d know\n", glob_ctx[res].snk);
-#if 0
-		write(glob_ctx[res].snk, emer_msg, countof(emer_msg));
-		tcpudp_kick_ctx(EV_A_ &glob_ctx[res]);
-#endif
-	}
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
 }
@@ -290,6 +279,7 @@ kill_worker(index_t w)
 	void *ignore;
 	ev_async_send(workers[w].loop, &workers[w].kill_watcher);
 	pthread_join(workers[w].thread, &ignore);
+	ev_loop_destroy(workers[w].loop);
 	return;
 }
 
@@ -346,6 +336,15 @@ main (void)
 	rr_wrk = 0;
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
+
+	/* kill all open connexions */
+	for (index_t res = 0; res < countof(glob_ctx); res++) {
+		if (LIKELY(glob_ctx[res].snk == -1)) {
+			continue;
+		}
+		UD_DEBUG("letting %d know\n", glob_ctx[res].snk);
+		write(glob_ctx[res].snk, emer_msg, countof(emer_msg) - 1);
+	}
 
 	/* close the socket */
 	ud_detach_tcp6(EV_A);

@@ -140,6 +140,8 @@ extern conn_ctx_t find_ctx(void);
 /* socket goodness */
 extern int ud_attach_tcp6(EV_P);
 extern int ud_detach_tcp6(EV_P);
+extern void ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
+extern void ud_kickprint_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
 
 
 /* job queue magic */

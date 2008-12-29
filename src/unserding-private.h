@@ -152,9 +152,11 @@ extern void ud_kickprint_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
 
 typedef struct job_queue_s *job_queue_t;
 typedef struct job_s *job_t;
+/* type for work functions */
+typedef void(*ud_work_f)(void*);
 
 struct job_s {
-	void(*workf)(void*);
+	ud_work_f workf;
 	void *clo;
 };
 
@@ -209,6 +211,9 @@ free_job(job_t j)
 }
 
 extern job_queue_t glob_jq;
+
+/* some special work functions */
+extern void ud_parse(void*);
 
 
 /* worker magic */

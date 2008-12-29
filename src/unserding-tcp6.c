@@ -265,9 +265,13 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 	tcpudp_ctx_renew_timer(EV_A_ ctx);
 	/* wind the buffer index */
 	ctx->bidx += nread;
-	/* enqueue t3h job and notify the slaves */
-	enqueue_job(glob_jq, NULL);
-	trigger_job_queue();
+	/* quickly check if we've seen the \n\n sequence */
+	if (ctx->buf[ctx->bidx-2] == '\n' &&
+	    ctx->buf[ctx->bidx-1] == '\n') {
+		/* enqueue t3h job and notify the slaves */
+		enqueue_job(glob_jq, NULL);
+		trigger_job_queue();
+	}
 	return;
 }
 
@@ -285,7 +289,7 @@ tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 	if (LIKELY(ctx->obufidx >= ctx->obuflen)) {
 		/* if nothing's to be printed just turn it off */
 		ev_io_stop(EV_A_ w);
-		if (LIKELY(ctx->after_wio_j != NULL)) {
+		if (UNLIKELY(ctx->after_wio_j != NULL)) {
 			struct job_s tmp = {
 				.workf = ctx->after_wio_j,
 				.clo = ctx,

@@ -35,31 +35,37 @@
  *
  ***/
 
+#include "config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <ev.h>
 
-#if defined HAVE_SYS_SOCKET_H || 1
+#if defined HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
 #endif
-#if defined HAVE_NETINET_IN_H || 1
+#if defined HAVE_NETINET_IN_H
 # include <netinet/in.h>
 #endif
-#if defined HAVE_ARPA_INET_H || 1
+#if defined HAVE_ARPA_INET_H
 # include <arpa/inet.h>
 #endif
-#if defined HAVE_NETDB_H || 1
+#if defined HAVE_NETDB_H
 # include <netdb.h>
 #endif
-#if defined HAVE_SYS_UN_H || 1
+#if defined HAVE_SYS_UN_H
 # include <sys/un.h>
 #endif
-#if defined HAVE_ERRNO_H || 1
+#if defined HAVE_ERRNO_H
 # include <errno.h>
 #endif
+
+#if defined HAVE_EV_H
+# include <ev.h>
+#else  /* !HAVE_EV_H */
+# error "We need an event loop, give us one."
+#endif	/* HAVE_EV_H */
 
 /* our master include file */
 #include "unserding.h"

@@ -35,8 +35,6 @@ dnl This file is part of SXEmacs.
 
 dnl event drivers
 AC_DEFUN([SXE_CHECK_LIBEVENT], [
-	AC_DEFUN([SXE_CHECK_LIBEVENT], [])
-
 	SXE_CHECK_HEADERS([event.h])
 	SXE_CHECK_LIB_FUNCS([event], [dnl
 		event_init event_loop event_add event_del event_once event_dispatch])
@@ -60,9 +58,6 @@ AC_DEFUN([SXE_CHECK_LIBEVENT], [
 
 AC_DEFUN([SXE_CHECK_LIBEV], [
 	## defines sxe_cv_feat_libev
-
-	AC_DEFUN([SXE_CHECK_LIBEV], [])
-
 	SXE_CHECK_HEADERS([ev.h])
 	SXE_CHECK_LIB_FUNCS([ev], [ev_loop])
 
@@ -88,8 +83,7 @@ AC_DEFUN([SXE_CHECK_LIBEV], [
 ])dnl SXE_CHECK_LIBEVENT
 
 AC_DEFUN([SXE_CHECK_EVENTS], [dnl
-	AC_MSG_CHECKING([for event drivers])
-	AC_MSG_RESULT([])
+	SXE_MSG_CHECKING([for event drivers])
 
 	SXE_CHECK_LIBEVENT
 	SXE_CHECK_SUFFICIENCY([libevent], [libevent])
@@ -98,6 +92,8 @@ AC_DEFUN([SXE_CHECK_EVENTS], [dnl
 	have_events="no"
 
 	have_events="yes"
+
+	SXE_MSG_RESULT([$have_events])
 ])dnl SXE_CHECK_EVENTS
 
 dnl sxe-events.m4 ends here

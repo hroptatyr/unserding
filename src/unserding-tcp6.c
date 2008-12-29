@@ -275,6 +275,8 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 	/* quickly check if we've seen the \n\n sequence */
 	if (ctx->buf[ctx->bidx-2] == '\n' &&
 	    ctx->buf[ctx->bidx-1] == '\n') {
+		/* be generous with the connexion timeout now, 1 day */
+		ctx->timeout = ev_now(EV_A) + 1440*TCPUDP_TIMEOUT;
 		/* enqueue t3h job and notify the slaves */
 		enqueue_job(glob_jq, ud_parse, ctx);
 		trigger_job_queue();
@@ -296,6 +298,9 @@ tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 	if (LIKELY(ctx->obufidx >= ctx->obuflen)) {
 		/* if nothing's to be printed just turn it off */
 		ev_io_stop(EV_A_ w);
+		/* reset the timeout, we want activity on the remote side now */
+		ctx->timeout = ev_now(EV_A) + TCPUDP_TIMEOUT;
+		/* check if we have to do more work */
 		if (UNLIKELY(ctx->after_wio_j != NULL)) {
 			enqueue_job(glob_jq, ctx->after_wio_j, ctx);
 			ctx->after_wio_j = NULL;

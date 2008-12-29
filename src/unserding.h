@@ -38,5 +38,6 @@
 #if !defined INCLUDED_unserding_h_
 #define INCLUDED_unserding_h_
 
+#define UD_NETWORK_SERVICE		"8653"
 
 #endif	/* INCLUDED_unserding_h_ */

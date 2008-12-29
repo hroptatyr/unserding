@@ -4,7 +4,11 @@ AM_CPPFLAGS = -pthread
 AM_LDFLAGS = -lpthread
 
 bin_PROGRAMS = unserding
-unserding_LDADD = -lev
+
+## the main server binary
+unserding_SOURCES = unserding.c unserding-tcp6.c
+unserding_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+unserding_LDADD = $(LIBEV_LIBS)
 
 # 
 # Help the developers get nice post-processed source files

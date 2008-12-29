@@ -32,15 +32,103 @@ SXE_INIT_MSG_LEVEL
 ## the build chain
 with_ridiculously_aggressive_optimisations="yes"
 with_maximum_warning_output="yes"
-with_omp="yes"
+with_omp="no"
 SXE_CHECK_CC
 SXE_CHECK_CFLAGS
 
 ## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
 
+## basic posix stuff
+SXE_CHECK_BASIC_HEADERS
+SXE_CHECK_BASIC_TYPES
+SXE_CHECK_BASIC_FUNS
+
 ## date time
 SXE_CHECK_METRONOME
+
+## event loop
+SXE_CHECK_LIBEV
+
+### Check Input stuff
+with_inputs_file="yes"
+with_inputs_term="yes"
+with_inputs_unix="yes"
+with_inputs_tcpudp="yes"
+with_inputs_multicast="yes"
+
+## now go check the socket goodness
+SXE_CHECK_SOCKETS
+SXE_CHECK_SUFFICIENCY([unix], [unix domain sockets])
+SXE_CHECK_SUFFICIENCY([sockets], [tcp/udp sockets])
+SXE_CHECK_SUFFICIENCY([multicast], [multicast])
+
+## evaluate the results
+if test "$with_inputs_file" = "yes"; then
+	have_inputs_file="yes"
+fi
+if test "$with_inputs_term" = "yes"; then
+	have_inputs_term="yes"
+fi
+if test "$with_inputs_unix" = "yes"; then
+	if test "$have_unix" = "yes"; then
+		have_inputs_unix="yes"
+	else
+		have_inputs_unix="no"
+	fi
+fi
+if test "$with_inputs_tcpudp" = "yes"; then
+	if test "$have_sockets" = "yes"; then
+		have_inputs_tcpudp="yes"
+	else
+		have_inputs_tcpudp="no"
+	fi
+fi
+if test "$with_inputs_multicast" = "yes"; then
+	if test "$have_multicast" = "yes"; then
+		have_inputs_multicast="yes"
+	else
+		have_inputs_multicast="no"
+	fi
+fi
+
+## final checks
+if test "$have_inputs_term" = "yes" -a "$with_ansi_colours" != "no"; then
+	if test "$with_ansi_colours" != "no"; then
+		dnl SXE_CHECK_CURSES
+		have_ansi_colours="yes"
+		AC_DEFINE([HAVE_ANSI_COLOURS], [1], [Description here!])
+	fi
+	AC_DEFINE([WITH_INPUT_TERM], [1],
+		[Whether to support traditional terminal input])
+fi
+AM_CONDITIONAL([WITH_INPUT_TERM],
+	[test "$have_inputs_term" = "yes" -a "$with_inputs_term" = "yes"])
+if test "$have_inputs_file" = "yes"; then
+	AC_DEFINE([WITH_INPUT_FILE], [1],
+		[Whether to support files as input source])
+fi
+AM_CONDITIONAL([WITH_INPUT_FILE],
+	[test "$have_inputs_file" = "yes" -a "$with_inputs_file" = "yes"])
+if test "$have_inputs_unix" = "yes"; then
+	AC_DEFINE([WITH_INPUT_UNIX], [1],
+		[Whether to support reading input from unix domain sockets])
+fi
+AM_CONDITIONAL([WITH_INPUT_UNIX],
+	[test "$have_inputs_unix" = "yes" -a "$with_inputs_unix" = "yes"])
+if test "$have_inputs_tcpudp" = "yes"; then
+	AC_DEFINE([WITH_INPUT_TCPUDP], [1],
+		[Whether to support reading input from TCP/UDP sockets])
+fi
+AM_CONDITIONAL([WITH_INPUT_TCPUDP],
+	[test "$have_inputs_tcpudp" = "yes" -a "$with_inputs_tcpudp" = "yes"])
+if test "$have_inputs_multicast" = "yes"; then
+	AC_DEFINE([WITH_INPUT_MULTICAST], [1],
+		[Whether to support reading input from multicast streams])
+fi
+AM_CONDITIONAL([WITH_INPUT_MULTICAST],
+	[test "$have_inputs_multicast" = "yes" -a "$with_inputs_multicast" = "yes"])
+
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])

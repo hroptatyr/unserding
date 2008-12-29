@@ -215,14 +215,6 @@ tcpudp_kick_ctx(EV_P_ conn_ctx_t ctx)
 	return;
 }
 
-static void
-tcpudp_kick_ctx_cb(conn_ctx_t ctx)
-{
-	void *loop = EV_DEFAULT_UC;
-	tcpudp_kick_ctx(loop, ctx);
-	return;
-}
-
 static const char idle_msg[] = "Oi shitface, stop wasting my time, will ya!\n";
 
 static void
@@ -300,12 +292,6 @@ tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 		ev_io_stop(EV_A_ w);
 		/* reset the timeout, we want activity on the remote side now */
 		ctx->timeout = ev_now(EV_A) + TCPUDP_TIMEOUT;
-		/* check if we have to do more work */
-		if (UNLIKELY(ctx->after_wio_j != NULL)) {
-			enqueue_job(glob_jq, ctx->after_wio_j, ctx);
-			ctx->after_wio_j = NULL;
-			trigger_job_queue();
-		}
 	}
 	return;
 }
@@ -378,30 +364,6 @@ ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
 
 	/* start the write watcher */
 	ev_io_start(EV_A_ ctx_wio(ctx));
-
-	/* just finish him off */
-	ctx->after_wio_j = NULL;
-#endif
-}
-
-void
-ud_kickprint_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
-{
-#if 0
-/* simplistic approach */
-	write(ctx->snk, m, mlen);
-	tcpudp_kick_ctx(EV_A_ ctx);
-#else
-/* callback approach */
-	ctx->obuflen = mlen;
-	ctx->obufidx = 0;
-	ctx->obuf = m;
-
-	/* start the write watcher */
-	ev_io_start(EV_A_ ctx_wio(ctx));
-
-	/* just finish him off */
-	ctx->after_wio_j = tcpudp_kick_ctx_cb;
 #endif
 }
 

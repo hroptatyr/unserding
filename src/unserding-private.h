@@ -94,8 +94,6 @@ struct conn_ctx_s {
 	size_t obuflen;
 	index_t obufidx;
 	const char *obuf;
-	/* the morning-after pill */
-	void *after_wio_j;
 	/* input buffer */
 	index_t bidx;
 	char ALGN16(buf)[];
@@ -146,7 +144,6 @@ extern conn_ctx_t find_ctx(void);
 extern int ud_attach_tcp6(EV_P);
 extern int ud_detach_tcp6(EV_P);
 extern void ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
-extern void ud_kickprint_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
 
 
 /* job queue magic */

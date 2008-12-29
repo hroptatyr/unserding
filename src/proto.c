@@ -46,13 +46,23 @@
 #include "unserding.h"
 #include "unserding-private.h"
 
+static const char inv_cmd[] = "invalid command, better luck next time\n";
+
 void
 ud_parse(void *clo)
 {
 /* clo is expected to be of type conn_ctx_t */
+	conn_ctx_t ctx = clo;
+
 	UD_DEBUG_PROTO("parsing\n");
-	for (double d = 0.0, i = 1.0; d < 22.0; d += 1/i, i += 1.0);
-	UD_DEBUG_PROTO("god that was hard\n");
+	for (double d = 0.0, i = 1.0; d < 18.5; d += 1/i, i += 1.0);
+
+	/* always print an error */
+	ud_print_tcp6(EV_DEFAULT_ ctx, inv_cmd, countof(inv_cmd)-1);
+
+	/* reset the input buffer and unlock the mutex */
+	ctx->bidx = 0;
+	ctx_unlock_ibuf(ctx);
 	return;
 }
 

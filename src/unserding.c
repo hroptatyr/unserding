@@ -402,6 +402,7 @@ main (void)
 		}
 		UD_DEBUG("letting %d know\n", glob_ctx[res].snk);
 		write(glob_ctx[res].snk, emer_msg, countof(emer_msg) - 1);
+		ud_kick_tcp6(EV_A_ &glob_ctx[res]);
 	}
 
 	/* close the socket */

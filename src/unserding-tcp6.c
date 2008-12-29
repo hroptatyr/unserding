@@ -209,6 +209,10 @@ tcpudp_kick_ctx(EV_P_ conn_ctx_t ctx)
 	ev_io_stop(EV_A_ ctx_wio(ctx));
 	/* stop the bugger */
 	tcpudp_listener_deinit(ctx->snk);
+	/* lock and destroy the mutex */
+	ctx_lock_ibuf(ctx);
+	ctx_unlock_ibuf(ctx);
+	pthread_mutex_unlock(&ctx->ibuf_mtx);
 	/* finally, give the ctx struct a proper rinse */
 	ctx->src = ctx->snk = -1;
 	ctx->bidx = 0;
@@ -227,8 +231,8 @@ tcpudp_idleto_cb(EV_P_ ev_timer *w, int revents)
 	if (ctx->timeout < now) {
 		/* yepp, timed out */
 		UD_DEBUG_TCPUDP("bitching back at the eejit on %d\n", ctx->snk);
+		write(ctx->snk, idle_msg, countof(idle_msg)-1);
 		tcpudp_kick_ctx(loop, ctx);
-		//ud_kickprint_tcp6(EV_A_ ctx, idle_msg, countof(idle_msg) - 1);
 	} else {
 		/* callback was invoked, but there was some activity, re-arm */
 		w->repeat = ctx->timeout - now;
@@ -254,6 +258,7 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 	struct conn_ctx_s *ctx = (void*)w;
 
 	UD_DEBUG_TCPUDP("traffic on %d\n", w->fd);
+	ctx_lock_ibuf(ctx);
 	nread = read(w->fd, &ctx->buf[ctx->bidx],
 		     CONN_CTX_BUF_SIZE - ctx->bidx);
 	if (UNLIKELY(nread == 0)) {
@@ -272,6 +277,9 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 		/* enqueue t3h job and notify the slaves */
 		enqueue_job(glob_jq, ud_parse, ctx);
 		trigger_job_queue();
+	} else {
+		/* we aren't finished so unlock the buffer again */
+		ctx_unlock_ibuf(ctx);
 	}
 	return;
 }
@@ -281,6 +289,9 @@ static void __attribute__((unused))
 tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 {
 	conn_ctx_t ctx = ev_wio_ctx(w);
+
+	UD_DEBUG_TCPUDP("writing buffer of length %lu to %d\n",
+			ctx->obuflen, ctx->snk);
 	if (LIKELY(ctx->obufidx < ctx->obuflen)) {
 		const char *buf = ctx->obuf + ctx->obufidx;
 		size_t blen = ctx->obuflen - ctx->obufidx;
@@ -343,6 +354,9 @@ tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 	ev_timer_init(to, tcpudp_idleto_cb, 0.0, TCPUDP_TIMEOUT);
 	ev_timer_again(EV_A_ to);
 
+	/* initialise the input buffer */
+	pthread_mutex_init(&lctx->ibuf_mtx, NULL);
+	lctx->bidx = 0;
 	/* put the src and snk sock into glob_ctx */
 	lctx->src = w->fd;
 	lctx->snk = ns;
@@ -365,6 +379,13 @@ ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
 	/* start the write watcher */
 	ev_io_start(EV_A_ ctx_wio(ctx));
 #endif
+}
+
+void
+ud_kick_tcp6(EV_P_ conn_ctx_t ctx)
+{
+	tcpudp_kick_ctx(EV_A_ ctx);
+	return;
 }
 
 int

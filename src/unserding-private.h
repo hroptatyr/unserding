@@ -95,6 +95,7 @@ struct conn_ctx_s {
 	index_t obufidx;
 	const char *obuf;
 	/* input buffer */
+	pthread_mutex_t ibuf_mtx;
 	index_t bidx;
 	char ALGN16(buf)[];
 } __attribute__((aligned(SIZEOF_CONN_CTX_S)));
@@ -137,6 +138,22 @@ ctx_timer(conn_ctx_t ctx)
 	return (void*)&ctx->ti;
 }
 
+static inline void __attribute__((always_inline, gnu_inline))
+ctx_lock_ibuf(conn_ctx_t ctx)
+{
+	pthread_mutex_lock(&ctx->ibuf_mtx);
+	UD_DEBUG_TCPUDP("%p mutex locked ...\n", ctx);
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+ctx_unlock_ibuf(conn_ctx_t ctx)
+{
+	UD_DEBUG_TCPUDP("%p mutex to be unlocked ...\n", ctx);
+	pthread_mutex_unlock(&ctx->ibuf_mtx);
+	return;
+}
+
 extern conn_ctx_t find_ctx(void);
 
 
@@ -144,6 +161,7 @@ extern conn_ctx_t find_ctx(void);
 extern int ud_attach_tcp6(EV_P);
 extern int ud_detach_tcp6(EV_P);
 extern void ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
+extern void ud_kick_tcp6(EV_P_ conn_ctx_t ctx);
 
 
 /* job queue magic */

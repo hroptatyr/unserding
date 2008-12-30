@@ -333,17 +333,21 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 	}
 	/* untangle the input buffer */
 	for (const char *p;
-	     ctx->bidx &&
 	     (p = boyer_moore(ctx->buf, ctx->bidx, "\n", 1UL)) != NULL; ) {
 		/* be generous with the connexion timeout now, 1 day */
 		ctx->timeout = ev_now(EV_A) + 1440*TCPUDP_TIMEOUT;
 		/* enqueue t3h job and copy the input buffer over to
 		 * the job's work space */
 		enqueue_job_cp_ws(glob_jq, ud_parse, ctx, ctx->buf, p-ctx->buf);
-		/* move the remaining bollocks */
-		memmove(ctx->buf, p+1, ctx->bidx -= (p-ctx->buf) + 1);
 		/* now notify the slaves */
 		trigger_job_queue();
+		/* check if more is to be done */
+		if (LIKELY((ctx->bidx -= (p-ctx->buf) + 1) == 0)) {
+			break;
+		} else {
+			/* move the remaining bollocks */
+			memmove(ctx->buf, p+1, ctx->bidx);
+		}
 	}
 	return;
 }

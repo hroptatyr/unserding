@@ -272,7 +272,7 @@ worker_cb(EV_P_ ev_async *w, int revents)
 		if (UNLIKELY(j == NULL)) {
 			continue;
 		}
-		j->workf(j->clo);
+		j->workf(j);
 		free_job(j);
 	}
 	UD_DEBUG("no more jobs %p/%p\n", self, loop);

@@ -49,20 +49,17 @@
 static const char inv_cmd[] = "invalid command, better luck next time\n";
 
 void
-ud_parse(void *clo)
+ud_parse(job_t j)
 {
 /* clo is expected to be of type conn_ctx_t */
-	conn_ctx_t ctx = clo;
+	conn_ctx_t ctx = j->clo;
 
 	UD_DEBUG_PROTO("parsing\n");
-	for (double d = 0.0, i = 1.0; d < 18.5; d += 1/i, i += 1.0);
+	for (double d = 0.0, i = 1.0; d < 8.5; d += 1/i, i += 1.0);
 
+	UD_DEBUG_PROTO("client gave us: \"%s\"\n", j->work_space);
 	/* always print an error */
 	ud_print_tcp6(EV_DEFAULT_ ctx, inv_cmd, countof(inv_cmd)-1);
-
-	/* reset the input buffer and unlock the mutex */
-	ctx->bidx = 0;
-	ctx_unlock_ibuf(ctx);
 	return;
 }
 

@@ -39,6 +39,8 @@
 #define INCLUDED_unserding_private_h_
 
 #include <pthread.h>
+#include <string.h>
+
 #if defined HAVE_EV_H
 # include <ev.h>
 #else  /* !HAVE_EV_H */
@@ -95,7 +97,6 @@ struct conn_ctx_s {
 	index_t obufidx;
 	const char *obuf;
 	/* input buffer */
-	pthread_mutex_t ibuf_mtx;
 	index_t bidx;
 	char ALGN16(buf)[];
 } __attribute__((aligned(SIZEOF_CONN_CTX_S)));
@@ -138,22 +139,6 @@ ctx_timer(conn_ctx_t ctx)
 	return (void*)&ctx->ti;
 }
 
-static inline void __attribute__((always_inline, gnu_inline))
-ctx_lock_ibuf(conn_ctx_t ctx)
-{
-	pthread_mutex_lock(&ctx->ibuf_mtx);
-	UD_DEBUG_TCPUDP("%p mutex locked ...\n", ctx);
-	return;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-ctx_unlock_ibuf(conn_ctx_t ctx)
-{
-	UD_DEBUG_TCPUDP("%p mutex to be unlocked ...\n", ctx);
-	pthread_mutex_unlock(&ctx->ibuf_mtx);
-	return;
-}
-
 extern conn_ctx_t find_ctx(void);
 
 
@@ -173,12 +158,13 @@ extern void ud_kick_tcp6(EV_P_ conn_ctx_t ctx);
 typedef struct job_queue_s *job_queue_t;
 typedef struct job_s *job_t;
 /* type for work functions */
-typedef void(*ud_work_f)(void*);
+typedef void(*ud_work_f)(job_t);
 
 struct job_s {
 	ud_work_f workf;
 	void *clo;
-};
+	char ALGN16(work_space)[];
+} __attribute__((aligned(1024)));
 
 struct job_queue_s {
 	/* read index, where to read the next job */
@@ -199,6 +185,25 @@ enqueue_job(job_queue_t jq, ud_work_f workf, void *clo)
 	 * always large enough */
 	jq->jobs[jq->wi].workf = workf;
 	jq->jobs[jq->wi].clo = clo;
+	jq->wi = (jq->wi + 1) % NJOBS;
+	pthread_mutex_unlock(&jq->mtx);
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+enqueue_job_cp_ws(job_queue_t jq, ud_work_f workf, void *clo,
+		  const char *stu, size_t len)
+{
+/* enqueue the job and copy stuff over to the job's work space */
+	pthread_mutex_lock(&jq->mtx);
+	/* dont check if the queue is full, just go assume our pipes are
+	 * always large enough */
+	jq->jobs[jq->wi].workf = workf;
+	jq->jobs[jq->wi].clo = clo;
+	/* copy over the baloney in stu
+	 * we dont check the length here, brilliant aye? */
+	memcpy(&jq->jobs[jq->wi].work_space, stu, len);
+	/* inc the job counter */
 	jq->wi = (jq->wi + 1) % NJOBS;
 	pthread_mutex_unlock(&jq->mtx);
 	return;
@@ -230,7 +235,7 @@ free_job(job_t j)
 extern job_queue_t glob_jq;
 
 /* some special work functions */
-extern void ud_parse(void *clo);
+extern void ud_parse(job_t);
 
 
 /* worker magic */

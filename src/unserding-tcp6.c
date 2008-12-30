@@ -70,6 +70,123 @@
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));
 
+
+/* string goodies */
+/**
+ * Find PAT (of length PLEN) inside BUF (of length BLEN). */
+static const char __attribute__((unused)) *
+boyer_moore(const char *buf, size_t blen, const char *pat, size_t plen)
+{
+	long int next[UCHAR_MAX];
+	long int skip[UCHAR_MAX];
+
+	if ((size_t)plen > blen || plen >= UCHAR_MAX) {
+		return NULL;
+	}
+
+	/* calc skip table ("bad rule") */
+	for (index_t i = 0; i <= UCHAR_MAX; i++) {
+		skip[i] = plen;
+	}
+	for (index_t i = 0; i < plen; i++) {
+		skip[(int)pat[i]] = plen - i - 1;
+	}
+
+	for (index_t j = 0, i; j <= plen; j++) {
+		for (i = plen - 1; i >= 1; i--) {
+			for (index_t k = 1; k <= j; k++) {
+				if ((long int)i - (long int)k < 0L) {
+					goto matched;
+				}
+				if (pat[plen - k] != pat[i - k]) {
+					goto nexttry;
+				}
+			}
+			goto matched;
+		nexttry: ;
+		}
+	matched:
+		next[j] = plen - i;
+	}
+
+	plen--;
+	for (index_t i = plen /* position of last p letter */; i < blen; ) {
+		for (index_t j = 0 /* matched letter count */; j <= plen; ) {
+			if (buf[i - j] == pat[plen - j]) {
+				j++;
+				continue;
+			}
+			i += skip[(int)buf[i - j]] > next[j]
+				? skip[(int)buf[i - j]]
+				: next[j];
+			goto newi;
+		}
+		return buf + i - plen;
+	newi:
+		;
+	}
+	return NULL;
+}
+
+/**
+ * Find PAT (of length PLEN) inside BUF (of length BLEN), searching
+ * backwards from the end of BUF. */
+static const char __attribute__((unused)) *
+boyer_moore_rev(const char *buf, size_t blen, const char *pat, size_t plen)
+{
+	long int next[UCHAR_MAX];
+	long int skip[UCHAR_MAX];
+
+	if ((size_t)plen > blen || plen >= UCHAR_MAX) {
+		return NULL;
+	}
+
+	/* calc skip table ("bad rule") */
+	for (index_t i = 0; i <= UCHAR_MAX; i++) {
+		skip[i] = plen;
+	}
+	for (index_t i = 0; i < plen; i++) {
+		skip[(int)pat[i]] = plen - i - 1;
+	}
+
+	for (index_t j = 0, i; j <= plen; j++) {
+		for (i = plen - 1; i >= 1; i--) {
+			for (index_t k = 1; k <= j; k++) {
+				if ((long int)i - (long int)k < 0L) {
+					goto matched;
+				}
+				if (pat[plen - k] != pat[i - k]) {
+					goto nexttry;
+				}
+			}
+			goto matched;
+		nexttry: ;
+		}
+	matched:
+		next[j] = plen - i;
+	}
+
+	plen--;
+	for (index_t i = plen /* position of last p letter */; i < blen; ) {
+		for (index_t j = 0 /* matched letter count */; j <= plen; ) {
+			if (buf[i - j] == pat[plen - j]) {
+				j++;
+				continue;
+			}
+			i += skip[(int)buf[i - j]] > next[j]
+				? skip[(int)buf[i - j]]
+				: next[j];
+			goto newi;
+		}
+		return buf + i - plen;
+	newi:
+		;
+	}
+	return NULL;
+}
+
+
+/* socket goodies */
 static inline void
 __reuse_sock(int sock)
 {
@@ -209,10 +326,6 @@ tcpudp_kick_ctx(EV_P_ conn_ctx_t ctx)
 	ev_io_stop(EV_A_ ctx_wio(ctx));
 	/* stop the bugger */
 	tcpudp_listener_deinit(ctx->snk);
-	/* lock and destroy the mutex */
-	ctx_lock_ibuf(ctx);
-	ctx_unlock_ibuf(ctx);
-	pthread_mutex_unlock(&ctx->ibuf_mtx);
 	/* finally, give the ctx struct a proper rinse */
 	ctx->src = ctx->snk = -1;
 	ctx->bidx = 0;
@@ -258,7 +371,6 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 	struct conn_ctx_s *ctx = (void*)w;
 
 	UD_DEBUG_TCPUDP("traffic on %d\n", w->fd);
-	ctx_lock_ibuf(ctx);
 	nread = read(w->fd, &ctx->buf[ctx->bidx],
 		     CONN_CTX_BUF_SIZE - ctx->bidx);
 	if (UNLIKELY(nread == 0)) {
@@ -269,17 +381,27 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 	tcpudp_ctx_renew_timer(EV_A_ ctx);
 	/* wind the buffer index */
 	ctx->bidx += nread;
+
+	/* check the input */
+	if (ctx->buf[0] == '<') {
+		/* xml is nighing */
+		/* not yet */
+		abort();
+	}
+	/* we should use a boyer-moore search here */
 	/* quickly check if we've seen the \n\n sequence */
-	if (ctx->buf[ctx->bidx-2] == '\n' &&
-	    ctx->buf[ctx->bidx-1] == '\n') {
+	if (ctx->buf[ctx->bidx-1] == '\n') {
 		/* be generous with the connexion timeout now, 1 day */
 		ctx->timeout = ev_now(EV_A) + 1440*TCPUDP_TIMEOUT;
-		/* enqueue t3h job and notify the slaves */
-		enqueue_job(glob_jq, ud_parse, ctx);
+		/* enqueue t3h job and copy the input buffer over to
+		 * the job's work space */
+		enqueue_job_cp_ws(glob_jq, ud_parse, ctx, ctx->buf, ctx->bidx);
+		/* now notify the slaves */
 		trigger_job_queue();
+		/* reset the buffer index */
+		ctx->bidx = 0;
 	} else {
 		/* we aren't finished so unlock the buffer again */
-		ctx_unlock_ibuf(ctx);
 	}
 	return;
 }
@@ -355,7 +477,6 @@ tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 	ev_timer_again(EV_A_ to);
 
 	/* initialise the input buffer */
-	pthread_mutex_init(&lctx->ibuf_mtx, NULL);
 	lctx->bidx = 0;
 	/* put the src and snk sock into glob_ctx */
 	lctx->src = w->fd;

@@ -92,8 +92,10 @@ struct ud_worker_s {
 static index_t __attribute__((unused)) glob_idx = 0;
 static struct conn_ctx_s glob_ctx[64];
 
-static ev_signal __sigint_watcher __attribute__((aligned(16)));
-static ev_signal __sigpipe_watcher __attribute__((aligned(16)));
+static ev_signal ALGN16(__sigint_watcher);
+static ev_signal ALGN16(__sigpipe_watcher);
+static ev_async ALGN16(__wakeup_watcher);
+ev_async *glob_notify;
 
 /* worker magic */
 #define NWORKERS		4
@@ -245,6 +247,12 @@ tcpudp_mlistener_init(void)
 
 
 static void
+triv_cb(EV_P_ ev_async *w, int revents)
+{
+	return;
+}
+
+static void
 kill_cb(EV_P_ ev_async *w, int revents)
 {
 	long int self = (long int)pthread_self();
@@ -366,6 +374,10 @@ main (void)
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigpipe_watcher, sigint_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
+	/* initialise a wakeup handler */
+	glob_notify = &__wakeup_watcher;
+	ev_async_init(glob_notify, triv_cb);
+	ev_async_start(EV_A_ glob_notify);
 
 #if USE_COROUTINES
 	/* create one loop for all threads */

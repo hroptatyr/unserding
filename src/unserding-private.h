@@ -236,5 +236,16 @@ extern void ud_parse(void *clo);
 /* worker magic */
 /* think we keep this private */
 extern void trigger_job_queue(void);
+/* global notification signal */
+extern ev_async *glob_notify;
+/* notify the global event loop */
+extern inline void __attribute__((gnu_inline)) trigger_evloop(EV_P);
+
+extern inline void __attribute__((always_inline, gnu_inline))
+trigger_evloop(EV_P)
+{
+	ev_async_send(EV_A_ glob_notify);
+	return;
+}
 
 #endif	/* INCLUDED_unserding_private_h_ */

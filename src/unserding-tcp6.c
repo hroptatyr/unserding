@@ -378,6 +378,7 @@ ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
 
 	/* start the write watcher */
 	ev_io_start(EV_A_ ctx_wio(ctx));
+	trigger_evloop(EV_A);
 #endif
 }
 

@@ -128,63 +128,6 @@ boyer_moore(const char *buf, size_t blen, const char *pat, size_t plen)
 	return NULL;
 }
 
-/**
- * Find PAT (of length PLEN) inside BUF (of length BLEN), searching
- * backwards from the end of BUF. */
-static const char __attribute__((unused)) *
-boyer_moore_rev(const char *buf, size_t blen, const char *pat, size_t plen)
-{
-	long int next[UCHAR_MAX];
-	long int skip[UCHAR_MAX];
-
-	if ((size_t)plen > blen || plen >= UCHAR_MAX) {
-		return NULL;
-	}
-
-	/* calc skip table ("bad rule") */
-	for (index_t i = 0; i <= UCHAR_MAX; i++) {
-		skip[i] = plen;
-	}
-	for (index_t i = 0; i < plen; i++) {
-		skip[(int)pat[i]] = plen - i - 1;
-	}
-
-	for (index_t j = 0, i; j <= plen; j++) {
-		for (i = plen - 1; i >= 1; i--) {
-			for (index_t k = 1; k <= j; k++) {
-				if ((long int)i - (long int)k < 0L) {
-					goto matched;
-				}
-				if (pat[plen - k] != pat[i - k]) {
-					goto nexttry;
-				}
-			}
-			goto matched;
-		nexttry: ;
-		}
-	matched:
-		next[j] = plen - i;
-	}
-
-	plen--;
-	for (index_t i = plen /* position of last p letter */; i < blen; ) {
-		for (index_t j = 0 /* matched letter count */; j <= plen; ) {
-			if (buf[i - j] == pat[plen - j]) {
-				j++;
-				continue;
-			}
-			i += skip[(int)buf[i - j]] > next[j]
-				? skip[(int)buf[i - j]]
-				: next[j];
-			goto newi;
-		}
-		return buf + i - plen;
-	newi:
-		;
-	}
-	return NULL;
-}
-
 
 /* socket goodies */
 static inline void
@@ -388,20 +331,19 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 		/* not yet */
 		abort();
 	}
-	/* we should use a boyer-moore search here */
-	/* quickly check if we've seen the \n\n sequence */
-	if (ctx->buf[ctx->bidx-1] == '\n') {
+	/* untangle the input buffer */
+	for (const char *p;
+	     ctx->bidx &&
+	     (p = boyer_moore(ctx->buf, ctx->bidx, "\n", 1UL)) != NULL; ) {
 		/* be generous with the connexion timeout now, 1 day */
 		ctx->timeout = ev_now(EV_A) + 1440*TCPUDP_TIMEOUT;
 		/* enqueue t3h job and copy the input buffer over to
 		 * the job's work space */
-		enqueue_job_cp_ws(glob_jq, ud_parse, ctx, ctx->buf, ctx->bidx);
+		enqueue_job_cp_ws(glob_jq, ud_parse, ctx, ctx->buf, p-ctx->buf);
+		/* move the remaining bollocks */
+		memmove(ctx->buf, p+1, ctx->bidx -= (p-ctx->buf) + 1);
 		/* now notify the slaves */
 		trigger_job_queue();
-		/* reset the buffer index */
-		ctx->bidx = 0;
-	} else {
-		/* we aren't finished so unlock the buffer again */
 	}
 	return;
 }

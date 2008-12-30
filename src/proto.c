@@ -46,7 +46,42 @@
 #include "unserding.h"
 #include "unserding-private.h"
 
+/***
+ * The unserding protocol in detail:
+ *
+ * command: oi
+ * replies: oi
+ * purpose: announce yourself, can be used to fool the idle timer
+ *
+ * command: sup
+ * replies: alright
+ * purpose: return a list of cached queries
+ *
+ * command: cheers
+ * replies: no worries
+ * purpose: shows the unserding server how much you appreciated the
+ *          last result set and makes him cache it for you
+ *
+ * command: wtf
+ * replies: nvm
+ * purpose: makes the unserding server forget about the last result
+ *          set immediately
+ *
+ ***/
+
 static const char inv_cmd[] = "invalid command, better luck next time\n";
+
+static const char oi_cmd[] = "oi";
+static const char oi_rpl[] = "oi\n";
+
+static const char sup_cmd[] = "sup";
+static const char sup_rpl[] = "alright\n";
+
+static const char cheers_cmd[] = "cheers";
+static const char cheers_rpl[] = "no worries\n";
+
+static const char wtf_cmd[] = "wtf";
+static const char wtf_rpl[] = "nvm\n";
 
 void
 ud_parse(job_t j)
@@ -54,12 +89,35 @@ ud_parse(job_t j)
 /* clo is expected to be of type conn_ctx_t */
 	conn_ctx_t ctx = j->clo;
 
-	UD_DEBUG_PROTO("parsing\n");
-	for (double d = 0.0, i = 1.0; d < 8.5; d += 1/i, i += 1.0);
+	UD_DEBUG_PROTO("parsing: \"%s\"\n", j->work_space);
 
-	UD_DEBUG_PROTO("client gave us: \"%s\"\n", j->work_space);
-	/* always print an error */
-	ud_print_tcp6(EV_DEFAULT_ ctx, inv_cmd, countof(inv_cmd)-1);
+#define INNIT(_cmd)				\
+	else if (memcmp(j->work_space, _cmd, countof(_cmd)) == 0)
+	/* starting somewhat slowly with a memcmp */
+	if (0) {
+		;
+	} INNIT(sup_cmd) {
+		UD_DEBUG_PROTO("found `sup'\n");
+		ud_print_tcp6(EV_DEFAULT_ ctx, sup_rpl, countof(sup_rpl)-1);
+
+	} INNIT(oi_cmd) {
+		UD_DEBUG_PROTO("found `oi'\n");
+		ud_print_tcp6(EV_DEFAULT_ ctx, oi_rpl, countof(oi_rpl)-1);
+
+	} INNIT(cheers_cmd) {
+		UD_DEBUG_PROTO("found `cheers'\n");
+		ud_print_tcp6(EV_DEFAULT_ ctx,
+			      cheers_rpl, countof(cheers_rpl)-1);
+
+	} INNIT(wtf_cmd) {
+		UD_DEBUG_PROTO("found `wtf'\n");
+		ud_print_tcp6(EV_DEFAULT_ ctx, wtf_rpl, countof(wtf_rpl)-1);
+
+	} else {
+		/* print an error */
+		ud_print_tcp6(EV_DEFAULT_ ctx, inv_cmd, countof(inv_cmd)-1);
+	}
+#undef INNIT
 	return;
 }
 

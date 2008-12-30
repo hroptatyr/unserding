@@ -203,6 +203,7 @@ enqueue_job_cp_ws(job_queue_t jq, ud_work_f workf, void *clo,
 	/* copy over the baloney in stu
 	 * we dont check the length here, brilliant aye? */
 	memcpy(&jq->jobs[jq->wi].work_space, stu, len);
+	jq->jobs[jq->wi].work_space[len] = '\0';
 	/* inc the job counter */
 	jq->wi = (jq->wi + 1) % NJOBS;
 	pthread_mutex_unlock(&jq->mtx);

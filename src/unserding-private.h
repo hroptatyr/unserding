@@ -186,6 +186,23 @@ struct job_queue_s {
 	struct job_s jobs[NJOBS];
 };
 
+static inline index_t __attribute__((always_inline, gnu_inline))
+__next_job(job_queue_t jq)
+{
+	index_t res = (jq->wi + 1) % NJOBS;
+
+	if (LIKELY(jq->jobs[res].workf == NULL)) {
+		return res;
+	}
+	for (; jq->jobs[res].workf == NULL; ) {
+		if (LIKELY(++res < NJOBS));
+		else {
+			res = 0;
+		}
+	}
+	return res;
+}
+
 static inline void __attribute__((always_inline, gnu_inline))
 enqueue_job(job_queue_t jq, ud_work_f workf, void *clo)
 {
@@ -194,7 +211,7 @@ enqueue_job(job_queue_t jq, ud_work_f workf, void *clo)
 	 * always large enough */
 	jq->jobs[jq->wi].workf = workf;
 	jq->jobs[jq->wi].clo = clo;
-	jq->wi = (jq->wi + 1) % NJOBS;
+	jq->wi = __next_job(jq);
 	pthread_mutex_unlock(&jq->mtx);
 	return;
 }

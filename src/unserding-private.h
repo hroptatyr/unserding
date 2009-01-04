@@ -249,6 +249,7 @@ extern void ud_parse(job_t);
 /* jobs to browse the catalogue */
 extern void ud_cat_ls_job(job_t);
 extern void ud_cat_pwd_job(job_t);
+extern void ud_cat_cd_job(job_t);
 
 
 /* worker magic */

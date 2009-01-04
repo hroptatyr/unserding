@@ -65,6 +65,28 @@ static struct ud_cat_s __ud_catalogue = {
 };
 ud_cat_t ud_catalogue = &__ud_catalogue;
 
+
+/* helpers */
+static inline size_t __attribute__((always_inline))
+snprintcat(char *restrict buf, size_t blen, const __cat_t c)
+{
+	size_t len = snprintf(buf, blen, "---- %p %s\n",
+			      c->data, (const char*)c->data);
+	if (ud_cat_justcatp(c)) {
+		buf[3] = 'c';
+	}
+	if (ud_cat_spottablep(c)) {
+		buf[2] = 's';
+	}
+	if (ud_cat_tradablep(c)) {
+		buf[1] = 't';
+	}
+	if (ud_cat_lastp(c)) {
+		buf[0] = 'l';
+	}
+	return len;
+}
+
 /* some jobs to browse the catalogue */
 void
 ud_cat_ls_job(job_t j)
@@ -73,22 +95,8 @@ ud_cat_ls_job(job_t j)
 	char *buf = malloc(4096);
 	size_t idx = 0;
 
-	for (__cat_t c = ud_cat_first_child(ud_catalogue); c; c = c->next) {
-		size_t len = snprintf(buf + idx, 4095 - idx, "---- %p %s\n",
-				      c->data, (const char*)c->data);
-		if (ud_cat_justcatp(c)) {
-			buf[idx + 3] = 'c';
-		}
-		if (ud_cat_spottablep(c)) {
-			buf[idx + 2] = 's';
-		}
-		if (ud_cat_tradablep(c)) {
-			buf[idx + 1] = 't';
-		}
-		if (ud_cat_lastp(c)) {
-			buf[idx + 0] = 'l';
-		}
-		idx += len;
+	for (__cat_t c = ud_cat_first_child(ctx->pwd); c; c = c->next) {
+		idx += snprintcat(buf + idx, 4095 - idx, c);
 	}
 	if (UNLIKELY(idx == 0)) {
 		memcpy(buf, empty_msg, idx = countof(empty_msg));
@@ -102,11 +110,45 @@ void
 ud_cat_pwd_job(job_t j)
 {
 	conn_ctx_t ctx = j->clo;
-	size_t len = strlen((const char*)ud_cat_data(ctx->pwd));
+	size_t len;
 
-	memcpy(j->work_space, ud_cat_data(ctx->pwd), len+1);
-	j->work_space[len] = '\n';
-	ud_print_tcp6(EV_DEFAULT_ ctx, j->work_space, len+1);
+	len = snprintcat(j->work_space, 256, ctx->pwd);
+	ud_print_tcp6(EV_DEFAULT_ ctx, j->work_space, len);
+	return;
+}
+
+
+void
+ud_cat_cd_job(job_t j)
+{
+	conn_ctx_t ctx = j->clo;
+	const char *dir = j->work_space;
+	size_t len = 0;
+	static const char err[] = "No such catalogue entry\n";
+
+	/* check for the special cat symbols `.' and `..' */
+	if (UNLIKELY(dir[0] == '.')) {
+		if (LIKELY(dir[1] == '.')) {
+			ctx->pwd = ud_cat_parent(ctx->pwd);
+			len = snprintcat(j->work_space, 256, ctx->pwd);
+		}
+		len = snprintcat(j->work_space, 256, ctx->pwd);
+		goto out;
+	}
+
+	for (__cat_t c = ud_cat_first_child(ctx->pwd); c; c = c->next) {
+		const char *tmp = ud_cat_data(c);
+		UD_DEBUG("checking \"%s\" \"%s\"\n", dir, tmp);
+		if (UNLIKELY(strcmp(dir, tmp) == 0)) {
+			ctx->pwd = c;
+			len = snprintcat(j->work_space, 256, c);
+			goto out;
+		}
+	}
+	memcpy(j->work_space, err, len = countof_m1(err));
+	
+out:
+	ud_print_tcp6(EV_DEFAULT_ ctx, j->work_space, len);
 	return;
 }
 

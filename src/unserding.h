@@ -110,7 +110,11 @@ ud_cat_last_child(ud_cat_t cat)
 static inline ud_cat_t __attribute__((always_inline, gnu_inline))
 ud_cat_parent(ud_cat_t cat)
 {
-	return ((struct ud_cat_s*)cat)->parent;
+	if (((struct ud_cat_s*)cat)->parent != NULL) {
+		return ((struct ud_cat_s*)cat)->parent;
+	} else {
+		return ud_catalogue;
+	}
 }
 
 static inline ud_cat_t __attribute__((always_inline, gnu_inline))
@@ -153,7 +157,7 @@ ud_cat_free(ud_cat_t cat)
 }
 
 static inline const void __attribute__((always_inline, gnu_inline)) *
-ud_cat_data(ud_cat_t cat)
+ud_cat_data(const ud_cat_t cat)
 {
 	return ((struct ud_cat_s*)cat)->data;
 }

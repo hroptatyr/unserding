@@ -368,6 +368,9 @@ main (void)
 	/* attach a tcp listener */
 	ud_attach_tcp6(EV_A);
 
+	/* initialise instruments */
+	init_instr();
+
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);

@@ -92,9 +92,11 @@ struct conn_ctx_s {
 	int src;
 	int snk;
 	ev_tstamp timeout;
-	/* output buffer */
+	/** Length of the output buffer. */
 	size_t obuflen;
+	/** Index of ... */
 	index_t obufidx;
+	/** Output buffer, | with 1 if buffer must be freed after output. */
 	const char *obuf;
 	/* input buffer */
 	index_t bidx;
@@ -157,11 +159,16 @@ extern void ud_kick_tcp6(EV_P_ conn_ctx_t ctx);
 
 typedef struct job_queue_s *job_queue_t;
 typedef struct job_s *job_t;
-/* type for work functions */
+/**
+ * Type for work functions inside jobs. */
 typedef void(*ud_work_f)(job_t);
+/**
+ * Type for clean up functions inside jobs. */
+typedef void(*ud_free_f)(job_t);
 
 struct job_s {
 	ud_work_f workf;
+	ud_free_f freef;
 	void *clo;
 	char ALGN16(work_space)[];
 } __attribute__((aligned(1024)));
@@ -237,6 +244,8 @@ extern job_queue_t glob_jq;
 
 /* some special work functions */
 extern void ud_parse(job_t);
+/* jobs to browse the catalogue */
+extern void ud_cat_ls_job(job_t);
 
 
 /* worker magic */

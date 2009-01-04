@@ -361,7 +361,8 @@ tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 	UD_DEBUG_TCPUDP("writing buffer of length %lu to %d\n",
 			ctx->obuflen, ctx->snk);
 	if (LIKELY(ctx->obufidx < ctx->obuflen)) {
-		const char *buf = ctx->obuf + ctx->obufidx;
+		const char *buf =
+			(char*)((long int)ctx->obuf & ~1UL) + ctx->obufidx;
 		size_t blen = ctx->obuflen - ctx->obufidx;
 		/* the actual write */
 		ctx->obufidx += write(w->fd, buf, blen);
@@ -371,6 +372,11 @@ tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 		ev_io_stop(EV_A_ w);
 		/* reset the timeout, we want activity on the remote side now */
 		ctx->timeout = ev_now(EV_A) + TCPUDP_TIMEOUT;
+		/* free the buffer */
+		if ((long int)ctx->obuf & 1UL) {
+			free((void*)((long int)ctx->obuf & ~1UL));
+			ctx->obuf = NULL;
+		}
 	}
 	return;
 }
@@ -447,6 +453,7 @@ ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
 	ev_io_start(EV_A_ ctx_wio(ctx));
 	trigger_evloop(EV_A);
 #endif
+	return;
 }
 
 void

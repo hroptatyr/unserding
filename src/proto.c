@@ -68,6 +68,10 @@
  * purpose: makes the unserding server forget about the last result
  *          set immediately
  *
+ * command: ls
+ * replies:
+ * purpose: list the contents of the current catalogue
+ *
  * command: spot
  * replies: spot
  * purpose: returns the spot price
@@ -87,12 +91,14 @@ MAKE_SIMPLE_CMD(sup, "alright\n");
 MAKE_SIMPLE_CMD(cheers, "no worries\n");
 MAKE_SIMPLE_CMD(wtf, "nvm\n");
 MAKE_SIMPLE_CMD(spot, "spot\n");
+static const char ls_cmd[] = "ls";
 
 /* jobs */
 static void ud_sup_job(job_t);
 static void ud_spot_job(job_t);
 /* helpers */
 static void __spot_job(conn_ctx_t ctx, job_t);
+static void __ls_job(conn_ctx_t ctx, job_t);
 
 
 /* the proto glot */
@@ -154,6 +160,13 @@ ud_parse(job_t j)
 		UD_DEBUG_PROTO("found `spot'\n");
 		__spot_job(ctx, j);
 
+	} INNIT_CPL(ls_cmd) {
+		UD_DEBUG_PROTO("found `ls'\n");
+
+		enqueue_job(glob_jq, ud_cat_ls_job, ctx);
+		/* now notify the slaves */
+		trigger_job_queue();
+
 	} else {
 		/* print an error */
 		ud_print_tcp6(EV_DEFAULT_ ctx, inv_rpl, countof(inv_rpl)-1);
@@ -163,13 +176,13 @@ ud_parse(job_t j)
 	return;
 }
 
-static void
+static void __attribute__((unused))
 ud_sup_job_cleanup(job_t j)
 {
 	return;
 }
 
-static void
+static void __attribute__((unused))
 ud_sup_job(job_t j)
 {
 	return;
@@ -291,6 +304,14 @@ __spot_job(conn_ctx_t ctx, job_t j)
 	return;
 }
 
+static void __attribute__((unused))
+__ls_job(conn_ctx_t ctx, job_t j)
+{
+	return;
+}
+
+
+/* alibi definition here, will be sodded */
 static void
 ud_spot_job(job_t j)
 {

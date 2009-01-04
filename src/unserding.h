@@ -38,6 +38,122 @@
 #if !defined INCLUDED_unserding_h_
 #define INCLUDED_unserding_h_
 
+#include <stdbool.h>
+
 #define UD_NETWORK_SERVICE		"8653"
+
+/**
+ * Flags. */
+typedef long unsigned int ud_flags_t;
+
+/**
+ * The catalogue data type. */
+typedef void *ud_cat_t;
+
+/** Flag to indicate this is merely a `branch holder'. */
+#define UD_CF_JUSTCAT		0x01
+/** Flag to indicate a spot value could be obtained (current quote). */
+#define UD_CF_SPOTTABLE		0x02
+/** Flag to indicate a bid and ask price could be obtained. */
+#define UD_CF_TRADABLE		0x04
+/** Flag to indicate a last trade can be obtained. */
+#define UD_CF_LAST		0x08
+/** Flag to indicate */
+
+#define UD_CAT_PREDICATE(_x, _f)					\
+	static inline bool __attribute__((always_inline, gnu_inline))	\
+	ud_cf_##_x##p(ud_flags_t flags)					\
+	{								\
+		return flags & (_f);					\
+	}								\
+	static inline bool __attribute__((always_inline, gnu_inline))	\
+	ud_cat_##_x##p(ud_cat_t cat)					\
+	{								\
+		return ud_cf_##_x##p(((struct ud_cat_s*)cat)->flags);	\
+	}
+
+
+extern ud_cat_t ud_catalogue;
+
+/**
+ * The catalogue data structure.
+ * Naive. */
+struct ud_cat_s {
+	ud_cat_t parent;
+	ud_cat_t fir_child;
+	ud_cat_t las_child;
+	ud_cat_t next;
+	ud_cat_t prev;
+	const void *data;
+	ud_flags_t flags;
+};
+
+/* predicate magic */
+UD_CAT_PREDICATE(justcat, 0x01);
+UD_CAT_PREDICATE(spottable, 0x02);
+UD_CAT_PREDICATE(tradable, 0x04);
+UD_CAT_PREDICATE(last, 0x08);
+
+/* some catalogue functions */
+static inline ud_cat_t __attribute__((always_inline, gnu_inline))
+ud_cat_first_child(ud_cat_t cat)
+{
+	return ((struct ud_cat_s*)cat)->fir_child;
+}
+
+static inline ud_cat_t __attribute__((always_inline, gnu_inline))
+ud_cat_last_child(ud_cat_t cat)
+{
+	return ((struct ud_cat_s*)cat)->las_child;
+}
+
+static inline ud_cat_t __attribute__((always_inline, gnu_inline))
+ud_cat_parent(ud_cat_t cat)
+{
+	return ((struct ud_cat_s*)cat)->parent;
+}
+
+static inline ud_cat_t __attribute__((always_inline, gnu_inline))
+ud_cat_next_child(ud_cat_t cat)
+{
+	return ((struct ud_cat_s*)cat)->next;
+}
+
+static inline ud_cat_t __attribute__((always_inline, gnu_inline))
+ud_cat_prev_child(ud_cat_t cat)
+{
+	return ((struct ud_cat_s*)cat)->prev;
+}
+
+static inline ud_cat_t __attribute__((always_inline, gnu_inline))
+ud_cat_add_child(ud_cat_t cat, const void *data, ud_flags_t flags)
+{
+	struct ud_cat_s *cell = malloc(sizeof(struct ud_cat_s));
+	cell->parent = cat;
+	cell->fir_child = cell->las_child = cell->next = NULL;
+
+	if ((cell->prev = ud_cat_last_child(cat)) != NULL) {
+		((struct ud_cat_s*)cell->prev)->next = cell;
+	} else {
+		/* fix up cell's parent */
+		((struct ud_cat_s*)cat)->fir_child = cell;
+	}
+	cell->data = data;
+	cell->flags = flags;
+	/* fix up the parent of cell */
+	((struct ud_cat_s*)cat)->las_child = cell;
+	return (ud_cat_t)cell;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+ud_cat_free(ud_cat_t cat)
+{
+	free(cat);
+	return;
+}
+
+/* instruments */
+extern void init_instr(void);
+
 
 #endif	/* INCLUDED_unserding_h_ */

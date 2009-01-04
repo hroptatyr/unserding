@@ -138,7 +138,6 @@ ud_cat_cd_job(job_t j)
 
 	for (__cat_t c = ud_cat_first_child(ctx->pwd); c; c = c->next) {
 		const char *tmp = ud_cat_data(c);
-		UD_DEBUG("checking \"%s\" \"%s\"\n", dir, tmp);
 		if (UNLIKELY(strcmp(dir, tmp) == 0)) {
 			ctx->pwd = c;
 			len = snprintcat(j->work_space, 256, c);

@@ -152,6 +152,12 @@ ud_cat_free(ud_cat_t cat)
 	return;
 }
 
+static inline const void __attribute__((always_inline, gnu_inline)) *
+ud_cat_data(ud_cat_t cat)
+{
+	return ((struct ud_cat_s*)cat)->data;
+}
+
 /* instruments */
 extern void init_instr(void);
 

@@ -428,6 +428,9 @@ tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 	ev_timer_init(to, tcpudp_idleto_cb, 0.0, TCPUDP_TIMEOUT);
 	ev_timer_again(EV_A_ to);
 
+	/* initialise the pwd */
+	lctx->pwd = ud_catalogue;
+
 	/* initialise the input buffer */
 	lctx->bidx = 0;
 	/* put the src and snk sock into glob_ctx */

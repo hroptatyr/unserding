@@ -92,6 +92,8 @@ struct conn_ctx_s {
 	int src;
 	int snk;
 	ev_tstamp timeout;
+	/** current pwd */
+	ud_cat_t pwd;
 	/** Length of the output buffer. */
 	size_t obuflen;
 	/** Index of ... */
@@ -246,6 +248,7 @@ extern job_queue_t glob_jq;
 extern void ud_parse(job_t);
 /* jobs to browse the catalogue */
 extern void ud_cat_ls_job(job_t);
+extern void ud_cat_pwd_job(job_t);
 
 
 /* worker magic */

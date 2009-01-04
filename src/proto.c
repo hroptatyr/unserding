@@ -92,6 +92,7 @@ MAKE_SIMPLE_CMD(cheers, "no worries\n");
 MAKE_SIMPLE_CMD(wtf, "nvm\n");
 MAKE_SIMPLE_CMD(spot, "spot\n");
 static const char ls_cmd[] = "ls";
+static const char pwd_cmd[] = "pwd";
 
 /* jobs */
 static void ud_sup_job(job_t);
@@ -164,6 +165,13 @@ ud_parse(job_t j)
 		UD_DEBUG_PROTO("found `ls'\n");
 
 		enqueue_job(glob_jq, ud_cat_ls_job, ctx);
+		/* now notify the slaves */
+		trigger_job_queue();
+
+	} INNIT_CPL(pwd_cmd) {
+		UD_DEBUG_PROTO("found `pwd'\n");
+
+		enqueue_job(glob_jq, ud_cat_pwd_job, ctx);
 		/* now notify the slaves */
 		trigger_job_queue();
 

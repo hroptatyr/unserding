@@ -50,8 +50,12 @@
 void
 init_instr(void)
 {
+	ud_cat_t instr, deriv, secur;
+
 	UD_DEBUG("adding instruments\n");
-	ud_cat_add_child(ud_catalogue, "instruments", UD_CF_JUSTCAT);
+	instr = ud_cat_add_child(ud_catalogue, "instruments", UD_CF_JUSTCAT);
+	secur = ud_cat_add_child(instr, "securities", UD_CF_JUSTCAT);
+	deriv = ud_cat_add_child(instr, "derivatives", UD_CF_JUSTCAT);
 	return;
 }
 

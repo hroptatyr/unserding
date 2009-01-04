@@ -54,7 +54,15 @@ static const char empty_msg[] = "empty";
 #define countof_m1(_x)		(countof(_x) - 1)
 
 /* the global catalogue */
-static struct ud_cat_s __ud_catalogue = {NULL, NULL, NULL, NULL, NULL, NULL};
+static struct ud_cat_s __ud_catalogue = {
+	.parent = NULL,
+	.fir_child = NULL,
+	.las_child = NULL,
+	.next = NULL,
+	.prev = NULL,
+	.data = "catalogue",
+	.flags = UD_CF_JUSTCAT,
+};
 ud_cat_t ud_catalogue = &__ud_catalogue;
 
 /* some jobs to browse the catalogue */
@@ -71,6 +79,15 @@ ud_cat_ls_job(job_t j)
 		if (ud_cat_justcatp(c)) {
 			buf[idx + 3] = 'c';
 		}
+		if (ud_cat_spottablep(c)) {
+			buf[idx + 2] = 's';
+		}
+		if (ud_cat_tradablep(c)) {
+			buf[idx + 1] = 't';
+		}
+		if (ud_cat_lastp(c)) {
+			buf[idx + 0] = 'l';
+		}
 		idx += len;
 	}
 	if (UNLIKELY(idx == 0)) {
@@ -78,6 +95,18 @@ ud_cat_ls_job(job_t j)
 		buf[idx-1] = '\n';
 	}
 	ud_print_tcp6(EV_DEFAULT_ ctx, (void*)((long int)buf | 1UL), idx);
+	return;
+}
+
+void
+ud_cat_pwd_job(job_t j)
+{
+	conn_ctx_t ctx = j->clo;
+	size_t len = strlen((const char*)ud_cat_data(ctx->pwd));
+
+	memcpy(j->work_space, ud_cat_data(ctx->pwd), len+1);
+	j->work_space[len] = '\n';
+	ud_print_tcp6(EV_DEFAULT_ ctx, j->work_space, len+1);
 	return;
 }
 

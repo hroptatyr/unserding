@@ -92,11 +92,12 @@ void
 ud_cat_ls_job(job_t j)
 {
 	conn_ctx_t ctx = j->clo;
-	char *buf = malloc(4096);
-	size_t idx = 0;
+	size_t idx = 0, blen = 4096;
+	char *buf = malloc(blen);
 
+	UD_DEBUG_CAT("ls job\n");
 	for (__cat_t c = ud_cat_first_child(ctx->pwd); c; c = c->next) {
-		idx += snprintcat(buf + idx, 4095 - idx, c);
+		idx += snprintcat(buf + idx, blen - idx, c);
 	}
 	if (UNLIKELY(idx == 0)) {
 		memcpy(buf, empty_msg, idx = countof(empty_msg));
@@ -112,6 +113,7 @@ ud_cat_pwd_job(job_t j)
 	conn_ctx_t ctx = j->clo;
 	size_t len;
 
+	UD_DEBUG_CAT("pwd job\n");
 	len = snprintcat(j->work_space, 256, ctx->pwd);
 	ud_print_tcp6(EV_DEFAULT_ ctx, j->work_space, len);
 	return;
@@ -126,6 +128,7 @@ ud_cat_cd_job(job_t j)
 	size_t len = 0;
 	static const char err[] = "No such catalogue entry\n";
 
+	UD_DEBUG_CAT("cd job\n");
 	/* check for the special cat symbols `.' and `..' */
 	if (UNLIKELY(dir[0] == '.')) {
 		if (LIKELY(dir[1] == '.')) {

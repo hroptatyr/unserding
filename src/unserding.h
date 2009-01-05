@@ -73,7 +73,20 @@ typedef void *ud_cat_t;
 	}
 
 
+/** Global catalogue. */
 extern ud_cat_t ud_catalogue;
+/** Instruments. */
+extern ud_cat_t instr;
+/** Equity instruments. */
+extern ud_cat_t equit;
+/** Commodity instruments. */
+extern ud_cat_t commo;
+/** Currency instruments. */
+extern ud_cat_t curnc;
+/** Interest instruments. */
+extern ud_cat_t intrs;
+/** Derivatives. */
+extern ud_cat_t deriv;
 
 /**
  * The catalogue data structure.

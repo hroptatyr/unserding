@@ -47,15 +47,18 @@
 #include "unserding.h"
 #include "unserding-private.h"
 
+ud_cat_t instr, equit, commo, curnc, intrs, deriv;
+
 void
 init_instr(void)
 {
-	ud_cat_t instr, deriv, secur;
-
 	UD_DEBUG("adding instruments\n");
 	instr = ud_cat_add_child(ud_catalogue, "instruments", UD_CF_JUSTCAT);
-	secur = ud_cat_add_child(instr, "securities", UD_CF_JUSTCAT);
-	deriv = ud_cat_add_child(instr, "derivatives", UD_CF_JUSTCAT);
+	equit = ud_cat_add_child(instr, "equity", UD_CF_JUSTCAT);
+	commo = ud_cat_add_child(instr, "commodity", UD_CF_JUSTCAT);
+	curnc = ud_cat_add_child(instr, "currency", UD_CF_JUSTCAT);
+	intrs = ud_cat_add_child(instr, "interest", UD_CF_JUSTCAT);
+	deriv = ud_cat_add_child(instr, "derivative", UD_CF_JUSTCAT);
 	return;
 }
 

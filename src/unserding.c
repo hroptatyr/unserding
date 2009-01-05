@@ -368,6 +368,8 @@ main (void)
 
 	/* initialise instruments */
 	init_instr();
+	/* initialise interests module */
+	(void)init_interests();
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);

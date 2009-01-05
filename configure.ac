@@ -129,6 +129,43 @@ fi
 AM_CONDITIONAL([WITH_INPUT_MULTICAST],
 	[test "$have_inputs_multicast" = "yes" -a "$with_inputs_multicast" = "yes"])
 
+## database stuff ... does not belong here
+AC_ARG_WITH([mysql], [
+AS_HELP_STRING([--with-mysql], [Which mysql to use])], [], [])
+AC_ARG_WITH([pgsql], [
+AS_HELP_STRING([--with-pgsql], [Which postgres to use])], [], [])
+
+if test "$with_mysql" != "no"; then
+	AC_PATH_PROG([MYSQL_CONFIG], [mysql_config], [:])
+	MYSQL_CPPFLAGS=$(${MYSQL_CONFIG} --include)
+	MYSQL_LDFLAGS=$(${MYSQL_CONFIG} --libs)
+	AC_SUBST([MYSQL_CPPFLAGS])
+	AC_SUBST([MYSQL_LDFLAGS])
+	if test "${MYSQL_CONFIG}" != ":"; then
+		AC_DEFINE([HAVE_MYSQL], [1], [Defined when mysql could be found])
+	fi
+	AC_DEFINE([WITH_MYSQL], [1], [Defined when mysql was desired])
+fi
+AM_CONDITIONAL([USE_MYSQL], [test "$with_mysql" != "no" -a "${MYSQL_CONFIG}" != ":"])
+
+## check for libffff
+AC_ARG_WITH([ffff], [
+AS_HELP_STRING([--with-ffff], [
+	Whether to use libffff for numerical assistance.
+	(Default: yes, if found)])],
+	[with_ffff="$1"], [with_ffff="yes"])
+
+AC_CHECK_FFFF
+if test "$have_libffff" = "yes"; then
+	AC_DEFINE([HAVE_FFFF], [1], [Whether ffff support library is usable.])
+fi
+if test "${with_ffff}" = "yes"; then
+	AC_DEFINE([WITH_FFFF], [1], [Whether ffff support library is requested.])
+fi
+if test "${have_libffff}" = "yes" -a "${with_ffff}" = "yes"; then
+	LDFLAGS="${LDFLAGS} ${LIBFFFF_LDFLAGS} ${LIBFFFF_LIBS}"
+	CPPFLAGS="${CPPFLAGS} ${LIBFFFF_CPPFLAGS} -DUSE_FFFF"
+fi
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])

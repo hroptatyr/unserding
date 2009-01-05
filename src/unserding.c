@@ -66,8 +66,6 @@
 #define USE_COROUTINES		1
 
 
-typedef struct outbuf_s *outbuf_t;
-
 typedef struct ud_worker_s *ud_worker_t;
 typedef struct ud_ev_async_s ud_ev_async;
 

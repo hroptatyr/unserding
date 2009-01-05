@@ -269,6 +269,8 @@ tcpudp_kick_ctx(EV_P_ conn_ctx_t ctx)
 	ev_io_stop(EV_A_ ctx_wio(ctx));
 	/* stop the bugger */
 	tcpudp_listener_deinit(ctx->snk);
+	/* deinitialise the outbuf ring */
+	deinit_obring(&ctx->obring);
 	/* finally, give the ctx struct a proper rinse */
 	ctx->src = ctx->snk = -1;
 	ctx->bidx = 0;
@@ -357,27 +359,34 @@ static void __attribute__((unused))
 tcpudp_traf_wcb(EV_P_ ev_io *w, int revents)
 {
 	conn_ctx_t ctx = ev_wio_ctx(w);
+	outbuf_t obuf;
 
-	UD_DEBUG_TCPUDP("writing buffer of length %lu to %d\n",
-			ctx->obuflen, ctx->snk);
-	if (LIKELY(ctx->obufidx < ctx->obuflen)) {
+	UD_DEBUG_TCPUDP("writing buffer to %d\n", ctx->snk);
+	lock_obring(&ctx->obring);
+	/* obtain the current output buffer */
+	obuf = curr_outbuf(&ctx->obring);
+	if (LIKELY(obuf->obufidx < obuf->obuflen)) {
 		const char *buf =
-			(char*)((long int)ctx->obuf & ~1UL) + ctx->obufidx;
-		size_t blen = ctx->obuflen - ctx->obufidx;
+			(char*)((long int)obuf->obuf & ~1UL) + obuf->obufidx;
+		size_t blen = obuf->obuflen - obuf->obufidx;
 		/* the actual write */
-		ctx->obufidx += write(w->fd, buf, blen);
+		obuf->obufidx += write(w->fd, buf, blen);
 	}
-	if (LIKELY(ctx->obufidx >= ctx->obuflen)) {
-		/* if nothing's to be printed just turn it off */
-		ev_io_stop(EV_A_ w);
+	/* it's likely that we can output all at once */
+	if (LIKELY(obuf->obufidx >= obuf->obuflen)) {
 		/* reset the timeout, we want activity on the remote side now */
 		ctx->timeout = ev_now(EV_A) + TCPUDP_TIMEOUT;
 		/* free the buffer */
-		if ((long int)ctx->obuf & 1UL) {
-			free((void*)((long int)ctx->obuf & ~1UL));
-			ctx->obuf = NULL;
+		free_outbuf(obuf);
+		/* wind to the next outbuf */
+		ctx->obring.curr_idx = step_obring_idx(ctx->obring.curr_idx);
+
+		if (LIKELY(outbuf_free_p(curr_outbuf(&ctx->obring)))) {
+			/* if nothing's to be printed just turn it off */
+			ev_io_stop(EV_A_ w);
 		}
 	}
+	unlock_obring(&ctx->obring);
 	return;
 }
 
@@ -431,6 +440,9 @@ tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 	/* initialise the pwd */
 	lctx->pwd = ud_catalogue;
 
+	/* initialise the output buffer */
+	init_obring(&lctx->obring);
+
 	/* initialise the input buffer */
 	lctx->bidx = 0;
 	/* put the src and snk sock into glob_ctx */
@@ -443,19 +455,18 @@ tcpudp_inco_cb(EV_P_ ev_io *w, int revents)
 void
 ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
 {
-#if 0
-/* simplistic approach */
-	write(ctx->snk, m, mlen);
-#else
-/* callback approach */
-	ctx->obuflen = mlen;
-	ctx->obufidx = 0;
-	ctx->obuf = m;
+	outbuf_t obuf;
+
+	lock_obring(&ctx->obring);
+	obuf = next_outbuf(&ctx->obring);
+	obuf->obuflen = mlen;
+	obuf->obufidx = 0;
+	obuf->obuf = m;
+	unlock_obring(&ctx->obring);
 
 	/* start the write watcher */
 	ev_io_start(EV_A_ ctx_wio(ctx));
 	trigger_evloop(EV_A);
-#endif
 	return;
 }
 

@@ -61,6 +61,10 @@ typedef size_t index_t;
 	fprintf(stderr, "[unserding/proto] CRITICAL " args)
 #define UD_DEBUG_PROTO(args...)				\
 	fprintf(stderr, "[unserding/proto] " args)
+#define UD_CRITICAL_CAT(args...)				\
+	fprintf(stderr, "[unserding/catalogue] CRITICAL " args)
+#define UD_DEBUG_CAT(args...)				\
+	fprintf(stderr, "[unserding/catalogue] " args)
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -80,8 +84,114 @@ typedef size_t index_t;
 
 /* connexion contexts */
 typedef struct conn_ctx_s *conn_ctx_t;
+typedef struct outbuf_s *outbuf_t;
+typedef struct outbuf_ring_s *outbuf_ring_t;
 
-#define SIZEOF_CONN_CTX_S	1024
+/** Structure for output buffers */
+struct outbuf_s {
+	/** Length of the output buffer. */
+	size_t obuflen;
+	/** Index of ... */
+	index_t obufidx;
+	/** Output buffer, | with 1 if buffer must be freed after output. */
+	const char *obuf;
+};
+
+#define NOUTBUFS		16
+struct outbuf_ring_s {
+	pthread_mutex_t mtx;
+	index_t curr_idx;
+	struct outbuf_s obufs[NOUTBUFS];
+};
+
+static inline void __attribute__((always_inline, gnu_inline))
+init_outbuf(outbuf_t obuf)
+{
+	obuf->obuflen = obuf->obufidx = 0UL, obuf->obuf = NULL;
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+deinit_outbuf(outbuf_t obuf)
+{
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+lock_obring(outbuf_ring_t obring)
+{
+	pthread_mutex_lock(&obring->mtx);
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+unlock_obring(outbuf_ring_t obring)
+{
+	pthread_mutex_unlock(&obring->mtx);
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+init_obring(outbuf_ring_t obring)
+{
+	pthread_mutex_init(&obring->mtx, NULL);
+	obring->curr_idx = 0;
+	for (index_t i = 0; i < NOUTBUFS; i++) {
+		init_outbuf(&obring->obufs[i]);
+	}
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+deinit_obring(outbuf_ring_t obring)
+{
+	lock_obring(obring);
+	unlock_obring(obring);
+	pthread_mutex_destroy(&obring->mtx);
+	return;
+}
+
+static inline outbuf_t __attribute__((always_inline, gnu_inline))
+curr_outbuf(outbuf_ring_t obring)
+{
+	return &obring->obufs[obring->curr_idx];
+}
+
+static inline index_t __attribute__((always_inline, gnu_inline))
+step_obring_idx(index_t idx)
+{
+	return (idx + 1) % NOUTBUFS;
+}
+
+static inline outbuf_t __attribute__((always_inline, gnu_inline))
+next_outbuf(outbuf_ring_t obring)
+{
+	index_t idx;
+	for (idx = obring->curr_idx;
+	     obring->obufs[idx].obuf != NULL;
+	     idx = step_obring_idx(idx));
+	return &obring->obufs[idx];
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+free_outbuf(outbuf_t obuf)
+{
+	if ((long int)obuf->obuf & 1UL) {
+		free((void*)((long int)obuf->obuf & ~1UL));
+	}
+	/* reset the output buffer */
+	obuf->obuf = NULL;
+	return;
+}
+
+static inline bool __attribute__((always_inline, gnu_inline))
+outbuf_free_p(outbuf_t obuf)
+{
+	return obuf->obuf == NULL;
+}
+
+/** Size of the entire connexion context structure, VLA at the end. */
+#define SIZEOF_CONN_CTX_S	2048
 struct conn_ctx_s {
 	/* read io */
 	struct ev_io ALGN16(rio);
@@ -94,13 +204,9 @@ struct conn_ctx_s {
 	ev_tstamp timeout;
 	/** current pwd */
 	ud_cat_t pwd;
-	/** Length of the output buffer. */
-	size_t obuflen;
-	/** Index of ... */
-	index_t obufidx;
-	/** Output buffer, | with 1 if buffer must be freed after output. */
-	const char *obuf;
-	/* input buffer */
+	/** output buffer */
+	struct outbuf_ring_s obring;
+	/** input buffer */
 	index_t bidx;
 	char ALGN16(buf)[];
 } __attribute__((aligned(SIZEOF_CONN_CTX_S)));

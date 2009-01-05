@@ -62,13 +62,22 @@ extern void init_interests(void);
 
 static void *loc_conn;
 static struct connector_s c;
-static void *intr_FFD, *intr_EONIA;
 
 #define PFACK_DEBUG		UD_DEBUG
 #define PFACK_CRITICAL		UD_CRITICAL
+#define countof_m1(_x)		countof(_x) - 1
+
+/** struct for end of day data */
+struct eod_ser_s {
+	monetary32_t pri;
+};
+
+static monetary32_t *intr_FFD;
+static monetary32_t *intr_EONIA;
+static ud_cat_t c_ffd, c_eonia;
 
 static inline timestamptz_t __attribute__((always_inline))
-YYYY_MM_DD_to_UUU(char *restrict buf)
+YYYY_MM_DD_to_ts(char *restrict buf)
 {
 	struct tm tm;
 	/* now for real, parse the expiry date string */
@@ -77,41 +86,39 @@ YYYY_MM_DD_to_UUU(char *restrict buf)
 	return (timestamptz_t)mktime(&tm);
 }
 
+static char iir_qry[] =
+	"SELECT "
+	REL_FLD("iir", "date1") ", "
+	REL_FLD("iir", "close") " "
+	"FROM " "GAT_static.gfd_data" " AS " QUO_FLD("iir") " "
+	"WHERE "
+	REL_FLD("iir", "id") " = " /* overwrite me */ "00000";
+
 static void
 store_iir(void **cols, size_t ncols, void *closure)
 {
-	timestamptz_t ksjf;
+	short int idx = YYYY_MM_DD_to_ts((char*)cols[0]) % 86400;
+	monetary32_t *arr = closure;
+	arr[idx] = ffff_monetary32_get_s((char*)cols[1]);
 	return;
 }
 
 static void
-obtain_iir(void)
+obtain_iir_FFD(void)
 {
-	char qry[992];
-	size_t len;
+/* USA Fed Funds Official */
 	void *res;
+	size_t len = countof_m1(iir_qry);
 
 	/* build the query */
-	len = snprintf(
-		qry, countof(qry)-1,
-		"SELECT "
-		REL_FLD("iir", "date1") ", "
-		REL_FLD("iir", "close") " "
-		"FROM " "%s.%s" " AS " QUO_FLD("iir") " "
-		"WHERE "
-		REL_FLD("iir", "id") " = ",
-		/* snprintf() args */
-		c.sql.schema, c.sql.table);
+	iir_qry[len-4] = '3';
+	iir_qry[len-3] = '3';
+	iir_qry[len-2] = '1';
+	iir_qry[len-1] = '5';
 
-	/* USA Fed Funds Official */
-	qry[len++] = '3';
-	qry[len++] = '3';
-	qry[len++] = '1';
-	qry[len++] = '5';
-
-	PFACK_DEBUG("querying\n%s\n", qry);
+	PFACK_DEBUG("querying\n%s\n", iir_qry);
 	/* off we go */
-	if (UNLIKELY((res = pfack_sql_query(loc_conn, qry, len)) == NULL)) {
+	if (UNLIKELY((res = pfack_sql_query(loc_conn, iir_qry, len)) == NULL)) {
 		/* no statements? */
 		PFACK_CRITICAL("No interest rates available\n");
 		return;
@@ -122,19 +129,28 @@ obtain_iir(void)
 		return;
 	}
 	/* otherwise process 'em */
+	intr_FFD = malloc(16384 * sizeof(*intr_FFD));
+	/* copy the result */
 	pfack_sql_rows(res, store_iir, &intr_FFD);
 	pfack_sql_free_query(res);
+}
 
-	len -= 4;
-	/* EONIA */
-	qry[len++] = '5';
-	qry[len++] = '6';
-	qry[len++] = '4';
-	qry[len++] = '5';
+static void
+obtain_iir_EONIA(void)
+{
+/* EONIA */
+	void *res;
+	size_t len = countof_m1(iir_qry);
 
-	PFACK_DEBUG("querying\n%s\n", qry);
+	/* build the query */
+	iir_qry[len-4] = '5';
+	iir_qry[len-3] = '6';
+	iir_qry[len-2] = '4';
+	iir_qry[len-1] = '5';
+
+	PFACK_DEBUG("querying\n%s\n", iir_qry);
 	/* off we go */
-	if (UNLIKELY((res = pfack_sql_query(loc_conn, qry, len)) == NULL)) {
+	if (UNLIKELY((res = pfack_sql_query(loc_conn, iir_qry, len)) == NULL)) {
 		/* no statements? */
 		PFACK_CRITICAL("No interest rates available\n");
 		return;
@@ -145,6 +161,8 @@ obtain_iir(void)
 		return;
 	}
 	/* otherwise process 'em */
+	intr_EONIA = malloc(16384 * sizeof(*intr_EONIA));
+	/* copy the data */
 	pfack_sql_rows(res, store_iir, &intr_EONIA);
 	pfack_sql_free_query(res);
 	return;
@@ -172,7 +190,12 @@ init_interests(void)
 		return;
 	}
 
-	obtain_iir();
+	obtain_iir_FFD();
+	obtain_iir_EONIA();
+
+	/* escrow the fuckers */
+	c_ffd = ud_cat_add_child(intrs, "FFD", UD_CF_SPOTTABLE);
+	c_eonia = ud_cat_add_child(intrs, "EONIA", UD_CF_SPOTTABLE);
 	return;
 }
 

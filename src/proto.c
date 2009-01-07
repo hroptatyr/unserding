@@ -94,6 +94,19 @@ MAKE_SIMPLE_CMD(spot, "spot\n");
 static const char ls_cmd[] = "ls";
 static const char pwd_cmd[] = "pwd";
 static const char cd_cmd[] = "cd";
+static const char connect_cmd[] = "connect";
+/* help command */
+MAKE_SIMPLE_CMD(
+	help,
+	"oi     send keep-alive message\n"
+	"sup    list connected clients and neighbour servers\n"
+	"help   this help screen\n"
+	"cheers [time]  store last result for TIME seconds (default 86400)\n"
+	"wtf    immediately flush last result\n"
+	"spot <optiones> obtain spot price\n"
+	"ls     list catalogue entries of current directory\n"
+	"pwd    print the name of the current directory\n"
+	"cd X   change to directory X\n");
 
 /* jobs */
 static void ud_sup_job(job_t);
@@ -183,6 +196,10 @@ ud_parse(job_t j)
 				  j->work_space + countof(cd_cmd), 256);
 		/* now notify the slaves */
 		trigger_job_queue();
+
+	} INNIT_CPL(help_cmd) {
+		UD_DEBUG_PROTO("found `help'\n");
+		ud_print_tcp6(EV_DEFAULT_ ctx, help_rpl, countof_m1(help_rpl));
 
 	} else {
 		/* print an error */

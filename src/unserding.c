@@ -92,6 +92,12 @@ static struct job_queue_s __glob_jq = {
 };
 job_queue_t glob_jq;
 
+void
+trigger_job_queue(void)
+{
+	return;
+}
+
 
 static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
 

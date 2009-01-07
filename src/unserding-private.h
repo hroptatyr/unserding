@@ -57,6 +57,10 @@ typedef size_t index_t;
 	fprintf(stderr, "[unserding/input/tcpudp] CRITICAL " args)
 #define UD_DEBUG_TCPUDP(args...)				\
 	fprintf(stderr, "[unserding/input/tcpudp] " args)
+#define UD_CRITICAL_MCAST(args...)					\
+	fprintf(stderr, "[unserding/input/mcast] CRITICAL " args)
+#define UD_DEBUG_MCAST(args...)					\
+	fprintf(stderr, "[unserding/input/mcast] " args)
 #define UD_CRITICAL_STDIN(args...)					\
 	fprintf(stderr, "[unserding/stdin] CRITICAL " args)
 #define UD_DEBUG_STDIN(args...)				\
@@ -261,6 +265,12 @@ extern int ud_attach_tcp6(EV_P);
 extern int ud_detach_tcp6(EV_P);
 extern void ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
 extern void ud_kick_tcp6(EV_P_ conn_ctx_t ctx);
+
+/* more socket goodness, defined in mcast4.c */
+extern int ud_attach_mcast4(EV_P);
+extern int ud_detach_mcast4(EV_P);
+extern void ud_print_mcast4(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
+extern void ud_kick_mcast4(EV_P_ conn_ctx_t ctx);
 
 /* readline goodness, defined in stdin.c */
 extern int ud_attach_stdin(EV_P);

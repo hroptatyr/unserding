@@ -371,6 +371,8 @@ main (void)
 	/* initialise global job q */
 	init_glob_jq();
 
+	/* attach a multicast listener */
+	ud_attach_mcast4(EV_A);
 	/* attach a tcp listener */
 	ud_attach_tcp6(EV_A);
 

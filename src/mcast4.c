@@ -71,7 +71,8 @@
 
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));
-static struct ip_mreq mreq;
+static struct ip_mreq mreq4;
+static struct ipv6_mreq mreq6;
 
 
 /* string goodies */
@@ -199,19 +200,30 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 	}
 
 	/* set up the multicast group and join it */
-	mreq.imr_multiaddr.s_addr = inet_addr(UD_MCAST4_ADDR);
-	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	inet_pton(AF_INET, UD_MCAST4_ADDR, &mreq4.imr_multiaddr.s_addr);
+	mreq4.imr_interface.s_addr = htonl(INADDR_ANY);
 	/* now truly join */
 	if (UNLIKELY(setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
-				&mreq, sizeof(mreq)) < 0)) {
+				&mreq4, sizeof(mreq4)) < 0)) {
 		UD_CRITICAL_MCAST("could not joing the multicast group\n");
 		close(s);
 		return -1;
 	}
 
+	/* set up the multi6cast group and join it */
+	inet_pton(AF_INET6, UD_MCAST6_ADDR, &mreq6.ipv6mr_multiaddr.s6_addr);
+	mreq6.ipv6mr_interface = 0;
+	/* now truly join */
+	if (UNLIKELY(setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+				&mreq6, sizeof(mreq6)) < 0)) {
+		UD_CRITICAL_MCAST("could not joing the multi6cast group\n");
+		close(s);
+		return -1;
+	}
+
 	/* turn into a mcast sock and set a TTL */
-	setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &one, sizeof(one));
-	setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &one, sizeof(one));
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
 
 	if (getnameinfo(lres->ai_addr, lres->ai_addrlen, NULL,
 			0, servbuf, sizeof(servbuf), NI_NUMERICSERV) == 0) {
@@ -458,7 +470,10 @@ ud_detach_mcast4(EV_P)
 	if (LIKELY(lsock >= 0)) {
 		/* drop multicast group membership */
 		setsockopt(lsock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
-			   &mreq, sizeof(mreq));
+			   &mreq4, sizeof(mreq4));
+		/* drop mcast6 group membership */
+		setsockopt(lsock, IPPROTO_IPV6, IPV6_LEAVE_GROUP,
+			   &mreq6, sizeof(mreq6));
 		/* and kick the socket */
 		mcast_listener_deinit(lsock);
 	}

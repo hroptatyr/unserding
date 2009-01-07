@@ -40,8 +40,11 @@
 
 #include <stdbool.h>
 
-#define UD_NETWORK_SERVICE		"8653"
-#define UD_MCAST4_ADDR			"239.86.53.1"
+#define UD_NETWORK_SERVICE	"8653"
+/* 239.0.0.0/8 are organisational solicited v4 mcast addrs */
+#define UD_MCAST4_ADDR		"239.86.53.1"
+/* ff3x::8000:0-ff3x::ffff:ffff - dynamically allocated by hosts when needed */
+#define UD_MCAST6_ADDR		"ff38:8653::1"
 
 /**
  * Flags. */

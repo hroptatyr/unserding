@@ -132,6 +132,9 @@ boyer_moore(const char *buf, size_t blen, const char *pat, size_t plen)
 static void
 handle_rl(char *line)
 {
+	size_t llen;
+	job_t j;
+
 	if (UNLIKELY(line == NULL)) {
 		/* just remove the handler here */
 		rl_callback_handler_remove();
@@ -140,6 +143,12 @@ handle_rl(char *line)
 		return;
 	}
 	UD_DEBUG("received line \"%s\"\n", line);
+	/* enqueue t3h job and copy the input buffer over to
+	 * the job's work space */
+	llen = strlen(line);
+	j = enqueue_job_cp_ws(glob_jq, NULL, lctx, lctx->buf, llen);
+	/* now notify the slaves */
+	ud_parse(j);
 	return;
 }
 
@@ -284,7 +293,7 @@ ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
 
 	/* start the write watcher */
 	ev_io_start(EV_A_ ctx_wio(ctx));
-	trigger_evloop(EV_A);
+	//trigger_evloop(EV_A);
 	return;
 }
 

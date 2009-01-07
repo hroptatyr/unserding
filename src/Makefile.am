@@ -19,7 +19,7 @@ unserdingd_LDADD = $(LIBEV_LIBS) libpfack-mysql.a
 unserdingd_SOURCES += mod-interests.c
 
 ## the main server binary
-unserding_SOURCES = unserding.c stdin.c
+unserding_SOURCES = unserding.c stdin.c proto.c catalogue.c
 unserding_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserding_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unserding_LDADD = $(LIBEV_LIBS) -lreadline

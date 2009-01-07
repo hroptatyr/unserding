@@ -317,37 +317,41 @@ __next_job(job_queue_t jq)
 	return res;
 }
 
-static inline void __attribute__((always_inline, gnu_inline))
+static inline job_t __attribute__((always_inline, gnu_inline))
 enqueue_job(job_queue_t jq, ud_work_f workf, void *clo)
 {
+	job_t res;
 	pthread_mutex_lock(&jq->mtx);
+	res = &jq->jobs[jq->wi];
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
-	jq->jobs[jq->wi].workf = workf;
-	jq->jobs[jq->wi].clo = clo;
+	res->workf = workf;
+	res->clo = clo;
 	jq->wi = __next_job(jq);
 	pthread_mutex_unlock(&jq->mtx);
-	return;
+	return res;
 }
 
-static inline void __attribute__((always_inline, gnu_inline))
+static inline job_t __attribute__((always_inline, gnu_inline))
 enqueue_job_cp_ws(job_queue_t jq, ud_work_f workf, void *clo,
 		  const void *stu, size_t len)
 {
 /* enqueue the job and copy stuff over to the job's work space */
+	job_t res;
 	pthread_mutex_lock(&jq->mtx);
+	res = &jq->jobs[jq->wi];
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
-	jq->jobs[jq->wi].workf = workf;
-	jq->jobs[jq->wi].clo = clo;
+	res->workf = workf;
+	res->clo = clo;
 	/* copy over the baloney in stu
 	 * we dont check the length here, brilliant aye? */
-	memcpy(&jq->jobs[jq->wi].work_space, stu, len);
-	jq->jobs[jq->wi].work_space[len] = '\0';
+	memcpy(&res->work_space, stu, len);
+	res->work_space[len] = '\0';
 	/* inc the job counter */
-	jq->wi = (jq->wi + 1) % NJOBS;
+	jq->wi = __next_job(jq);
 	pthread_mutex_unlock(&jq->mtx);
-	return;
+	return res;
 }
 
 static inline job_t __attribute__((always_inline, gnu_inline))

@@ -432,6 +432,8 @@ main (void)
 
 	/* close the socket */
 	ud_detach_tcp6(EV_A);
+	/* close the socket */
+	ud_detach_mcast4(EV_A);
 
 	/* kill the workers along with their secondary loops */
 	for (index_t i = NWORKERS; i > 0; i--) {

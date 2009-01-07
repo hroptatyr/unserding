@@ -209,6 +209,16 @@ struct conn_ctx_s {
 	struct ev_timer ALGN16(ti);
 	int src;
 	int snk;
+	/** for udp based transports,
+	 * use a union here to allow clients to use whatever struct they want */
+	union {
+		/* this is the size we want at least */
+		char anon[32];
+#if defined SA_STRUCT
+		/* will be typically struct sockaddr_in6 */
+		SA_STRUCT sa;
+#endif
+	};
 	ev_tstamp timeout;
 	/** current pwd */
 	ud_cat_t pwd;

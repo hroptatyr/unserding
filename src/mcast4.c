@@ -62,13 +62,16 @@
 # include <errno.h>
 #endif
 /* our master include */
+#define SA_STRUCT		struct sockaddr_in6
 #include "unserding.h"
 #include "unserding-private.h"
 
 #define MCAST_TIMEOUT		60
+#define UDP_MULTICAST_TTL	16
 
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));
+static struct ip_mreq mreq;
 
 
 /* string goodies */
@@ -177,6 +180,8 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 	volatile int s;
 	int retval;
 	char servbuf[NI_MAXSERV];
+	int one = 1;
+	unsigned char ttl = UDP_MULTICAST_TTL;
 
 	s = socket(lres->ai_family, SOCK_DGRAM, 0);
 	if (s < 0) {
@@ -192,6 +197,21 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 		close(s);
 		return -1;
 	}
+
+	/* set up the multicast group and join it */
+	mreq.imr_multiaddr.s_addr = inet_addr(UD_MCAST4_ADDR);
+	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	/* now truly join */
+	if (UNLIKELY(setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+				&mreq, sizeof(mreq)) < 0)) {
+		UD_CRITICAL_MCAST("could not joing the multicast group\n");
+		close(s);
+		return -1;
+	}
+
+	/* turn into a mcast sock and set a TTL */
+	setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &one, sizeof(one));
+	setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
 
 	if (getnameinfo(lres->ai_addr, lres->ai_addrlen, NULL,
 			0, servbuf, sizeof(servbuf), NI_NUMERICSERV) == 0) {
@@ -257,10 +277,7 @@ static inline void __attribute__((always_inline, gnu_inline))
 mcast_kick_ctx(EV_P_ conn_ctx_t ctx)
 {
 	UD_DEBUG_MCAST("kicking ctx %p :socket %d...\n", ctx, ctx->snk);
-	/* kick the timer */
-	ev_timer_stop(EV_A_ ctx_timer(ctx));
 	/* kick the io handlers */
-	ev_io_stop(EV_A_ ctx_rio(ctx));
 	ev_io_stop(EV_A_ ctx_wio(ctx));
 	/* stop the bugger */
 	mcast_listener_deinit(ctx->snk);
@@ -272,55 +289,12 @@ mcast_kick_ctx(EV_P_ conn_ctx_t ctx)
 	return;
 }
 
-static const char idle_msg[] = "Oi shitface, stop wasting my time, will ya!\n";
-
-static void
-mcast_idleto_cb(EV_P_ ev_timer *w, int revents)
-{
-	/* our brilliant type pun */
-	conn_ctx_t ctx = ev_timer_ctx(w);
-	ev_tstamp now = ev_now (EV_A);
-
-	if (ctx->timeout < now) {
-		/* yepp, timed out */
-		UD_DEBUG_MCAST("bitching back at the eejit on %d\n", ctx->snk);
-		write(ctx->snk, idle_msg, countof(idle_msg)-1);
-		mcast_kick_ctx(loop, ctx);
-	} else {
-		/* callback was invoked, but there was some activity, re-arm */
-		w->repeat = ctx->timeout - now;
-		ev_timer_again(EV_A_ w);
-	}
-	return;
-}
-
-static inline void
-mcast_ctx_renew_timer(EV_P_ conn_ctx_t ctx)
-{
-	ctx->timeout = ev_now(EV_A) + MCAST_TIMEOUT;
-	return;
-}
-
 
 /* this callback is called when data is readable on one of the polled socks */
 static void
-mcast_traf_rcb(EV_P_ ev_io *w, int revents)
+mcast_traf_rcb(conn_ctx_t ctx)
 {
-	size_t nread;
-	/* our brilliant type pun */
-	struct conn_ctx_s *ctx = (void*)w;
-
-	UD_DEBUG_MCAST("traffic on %d\n", w->fd);
-	nread = read(w->fd, &ctx->buf[ctx->bidx],
-		     CONN_CTX_BUF_SIZE - ctx->bidx);
-	if (UNLIKELY(nread == 0)) {
-		mcast_kick_ctx(EV_A_ ctx);
-		return;
-	}
-	/* prolongate the timer a wee bit */
-	mcast_ctx_renew_timer(EV_A_ ctx);
-	/* wind the buffer index */
-	ctx->bidx += nread;
+	UD_DEBUG_MCAST("traffic\n");
 
 	/* check the input */
 	if (ctx->buf[0] == '<') {
@@ -331,8 +305,6 @@ mcast_traf_rcb(EV_P_ ev_io *w, int revents)
 	/* untangle the input buffer */
 	for (const char *p;
 	     (p = boyer_moore(ctx->buf, ctx->bidx, "\n", 1UL)) != NULL; ) {
-		/* be generous with the connexion timeout now, 1 day */
-		ctx->timeout = ev_now(EV_A) + 1440*MCAST_TIMEOUT;
 		/* enqueue t3h job and copy the input buffer over to
 		 * the job's work space */
 		enqueue_job_cp_ws(glob_jq, ud_parse, ctx, ctx->buf, p-ctx->buf);
@@ -389,60 +361,52 @@ mcast_traf_wcb(EV_P_ ev_io *w, int revents)
 static void
 mcast_inco_cb(EV_P_ ev_io *w, int revents)
 {
-	volatile int ns;
-	struct sockaddr_in6 sa;
-	socklen_t sa_size = sizeof(sa);
+	ssize_t nread;
 	char buf[INET6_ADDRSTRLEN];
 	/* the address in human readable form */
 	const char *a;
 	/* the port (in host-byte order) */
 	uint16_t p;
-	conn_ctx_t lctx;
+	conn_ctx_t c;
+	socklen_t sa_size = sizeof(c->sa);
 	ev_io *watcher;
-	ev_timer *to;
 
 	UD_DEBUG_MCAST("incoming connection\n");
+	/* initialise an io context upfront */
+	c = find_ctx();
+	/* initialise the pwd */
+	c->pwd = ud_catalogue;
+	/* initialise the output buffer */
+	init_obring(&c->obring);
+	/* initialise the input buffer */
+	c->bidx = 0;
+	/* put the src and snk sock into glob_ctx */
+	c->src = w->fd;
 
-	ns = accept(w->fd, (struct sockaddr *)&sa, &sa_size);
-	if (ns < 0) {
+	nread = recvfrom(w->fd, c->buf, CONN_CTX_BUF_SIZE, 0,
+			 (struct sockaddr*)&c->sa, &sa_size);
+	/* obtain the address in human readable form */
+	a = inet_ntop(c->sa.sin6_family, &c->sa.sin6_addr, buf, sizeof(buf));
+	p = ntohs(c->sa.sin6_port);
+	UD_DEBUG_MCAST("Server: connect from host %s, port %d.\n", a, p);
+	/* stuff the origin */
+	c->snk = w->fd;
+
+	/* handle the reading */
+	if (nread <= 0) {
 		UD_CRITICAL_MCAST("could not handle incoming connection\n");
+		mcast_kick_ctx(EV_A_ c);
 		return;
 	}
-	/* obtain the address in human readable form */
-	a = inet_ntop(sa.sin6_family, &sa.sin6_addr, buf, sizeof(buf));
-	p = ntohs(sa.sin6_port);
 
-	UD_DEBUG_MCAST("Server: connect from host %s, port %d.\n", a, p);
-
-	/* initialise an io watcher, then start it */
-	lctx = find_ctx();
-
-	/* escrow the socket poller */
-	watcher = ctx_rio(lctx);
-	ev_io_init(watcher, mcast_traf_rcb, ns, EV_READ);
-	ev_io_start(EV_A_ watcher);
-
+	/* wind the buffer index */
+	c->bidx += nread;
+	mcast_traf_rcb(c);
+#if 0
 	/* escrow the writer */
-	watcher = ctx_wio(lctx);
+	watcher = ctx_wio(c);
 	ev_io_init(watcher, mcast_traf_wcb, ns, EV_WRITE);
-
-	/* escrow the connexion idle timeout */
-	lctx->timeout = ev_now(EV_A) + MCAST_TIMEOUT;
-	to = ctx_timer(lctx);
-	ev_timer_init(to, mcast_idleto_cb, 0.0, MCAST_TIMEOUT);
-	ev_timer_again(EV_A_ to);
-
-	/* initialise the pwd */
-	lctx->pwd = ud_catalogue;
-
-	/* initialise the output buffer */
-	init_obring(&lctx->obring);
-
-	/* initialise the input buffer */
-	lctx->bidx = 0;
-	/* put the src and snk sock into glob_ctx */
-	lctx->src = w->fd;
-	lctx->snk = ns;
+#endif
 	return;
 }
 
@@ -492,6 +456,10 @@ int
 ud_detach_mcast4(EV_P)
 {
 	if (LIKELY(lsock >= 0)) {
+		/* drop multicast group membership */
+		setsockopt(lsock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
+			   &mreq, sizeof(mreq));
+		/* and kick the socket */
 		mcast_listener_deinit(lsock);
 	}
 	return 0;

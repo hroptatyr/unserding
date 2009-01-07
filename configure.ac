@@ -149,22 +149,14 @@ fi
 AM_CONDITIONAL([USE_MYSQL], [test "$with_mysql" != "no" -a "${MYSQL_CONFIG}" != ":"])
 
 ## check for libffff
-AC_ARG_WITH([ffff], [
-AS_HELP_STRING([--with-ffff], [
-	Whether to use libffff for numerical assistance.
-	(Default: yes, if found)])],
-	[with_ffff="$1"], [with_ffff="yes"])
-
 AC_CHECK_FFFF
-if test "$have_libffff" = "yes"; then
+AC_DEFINE([WITH_FFFF], [1], [Whether ffff support library is requested.])
+if test "${have_libffff}" = "yes"; then
 	AC_DEFINE([HAVE_FFFF], [1], [Whether ffff support library is usable.])
-fi
-if test "${with_ffff}" = "yes"; then
-	AC_DEFINE([WITH_FFFF], [1], [Whether ffff support library is requested.])
-fi
-if test "${have_libffff}" = "yes" -a "${with_ffff}" = "yes"; then
 	LDFLAGS="${LDFLAGS} ${LIBFFFF_LDFLAGS} ${LIBFFFF_LIBS}"
 	CPPFLAGS="${CPPFLAGS} ${LIBFFFF_CPPFLAGS} -DUSE_FFFF"
+else
+	AC_MSG_ERROR([ffff support is mandatory.])
 fi
 
 AC_CONFIG_FILES([Makefile])

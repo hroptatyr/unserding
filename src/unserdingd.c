@@ -1,4 +1,4 @@
-/*** unserding.c -- unserding network service
+/*** unserdingd.c -- unserding network service daemon
  *
  * Copyright (C) 2008 Sebastian Freundt
  *
@@ -334,6 +334,14 @@ kill_worker(ud_worker_t wk)
 }
 
 
+/* interests module husk */
+extern void __attribute__((weak)) init_interests(void);
+void __attribute__((weak))
+init_interests(void)
+{
+	return;
+}
+
 static void
 init_glob_ctx(void)
 {
@@ -369,7 +377,7 @@ main (void)
 	/* initialise instruments */
 	init_instr();
 	/* initialise interests module */
-	(void)init_interests();
+	init_interests();
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);

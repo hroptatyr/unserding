@@ -61,11 +61,14 @@
 #if defined HAVE_ERRNO_H
 # include <errno.h>
 #endif
+/* gnu readline */
+#include <readline/readline.h>
 /* our master include */
 #include "unserding.h"
 #include "unserding-private.h"
 
 static int lsock __attribute__((used));
+static conn_ctx_t lctx;
 static ev_io __srv_watcher __attribute__((aligned(16)));
 
 
@@ -126,39 +129,57 @@ boyer_moore(const char *buf, size_t blen, const char *pat, size_t plen)
 	return NULL;
 }
 
+static void
+handle_rl(char *line)
+{
+	if (UNLIKELY(line == NULL)) {
+		/* just remove the handler here */
+		rl_callback_handler_remove();
+		/* and finally kick the event loop */
+		ev_unloop(EV_DEFAULT_ EVUNLOOP_ALL);
+		return;
+	}
+	UD_DEBUG("received line \"%s\"\n", line);
+	return;
+}
+
 
 static int
 stdin_listener_init(void)
 {
+	/* initialise the readline */
+	rl_readline_name = "unserding";
+	rl_attempted_completion_function = NULL;
+
+	rl_basic_word_break_characters = "\t\n@$><=;|&{( ";
+
+	/* the callback */
+	rl_callback_handler_install("unserding> ", handle_rl);
+
 	/* succeeded if == 0 */
-	return STDIN_FILENO;
+	return lctx->snk = STDIN_FILENO;
 }
 
 static void
-stdin_listener_deinit(int sock)
+stdin_listener_deinit(EV_P_ conn_ctx_t ctx)
 {
+	int sock = ctx->snk;
+
+	UD_DEBUG_STDIN("deinitialising readline\n");
+	rl_callback_handler_remove();
+
 	UD_DEBUG_STDIN("closing listening socket %d...\n", sock);
 	shutdown(sock, SHUT_RDWR);
 	close(sock);
-	return;
-}
 
-static inline void __attribute__((always_inline, gnu_inline))
-stdin_kick_ctx(EV_P_ conn_ctx_t ctx)
-{
 	UD_DEBUG_STDIN("kicking ctx %p :socket %d...\n", ctx, ctx->snk);
-	/* kick the timer */
-	ev_timer_stop(EV_A_ ctx_timer(ctx));
 	/* kick the io handlers */
 	ev_io_stop(EV_A_ ctx_rio(ctx));
 	ev_io_stop(EV_A_ ctx_wio(ctx));
-	/* stop the bugger */
-	stdin_listener_deinit(ctx->snk);
+
 	/* finally, give the ctx struct a proper rinse */
 	ctx->src = ctx->snk = -1;
 	ctx->bidx = 0;
-	/* and finally kick the event loop */
-	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
 }
 
@@ -168,10 +189,10 @@ static void
 stdin_traf_rcb(EV_P_ ev_io *w, int revents)
 {
 	size_t nread;
-	/* our brilliant type pun */
-	struct conn_ctx_s *ctx = (void*)w;
 
-	UD_DEBUG_STDIN("traffic on %d\n", w->fd);
+	rl_callback_read_char();
+#if 0
+	//UD_DEBUG_STDIN("traffic on %d\n", w->fd);
 	nread = read(w->fd, &ctx->buf[ctx->bidx],
 		     CONN_CTX_BUF_SIZE - ctx->bidx);
 	if (UNLIKELY(nread == 0)) {
@@ -180,7 +201,7 @@ stdin_traf_rcb(EV_P_ ev_io *w, int revents)
 	}
 	/* wind the buffer index */
 	ctx->bidx += nread;
-
+#endif
 #if 0
 	/* check the input */
 	if (ctx->buf[0] == '<') {
@@ -272,6 +293,8 @@ ud_attach_stdin(EV_P)
 {
 	ev_io *srv_watcher = &__srv_watcher;
 
+	/* initialise an io watcher */
+	lctx = find_ctx();
 	/* get us a global sock */
 	lsock = stdin_listener_init();
 
@@ -284,7 +307,7 @@ ud_attach_stdin(EV_P)
 int
 ud_detach_stdin(EV_P)
 {
-	stdin_listener_deinit(lsock);
+	stdin_listener_deinit(EV_A_ lctx);
 	return 0;
 }
 

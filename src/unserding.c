@@ -58,8 +58,6 @@
 # include <errno.h>
 #endif
 
-#include <readline/readline.h>
-
 /* our master include file */
 #include "unserding.h"
 /* our private bits */
@@ -134,16 +132,6 @@ init_glob_jq(void)
 	return;
 }
 
-static void
-init_readline(void)
-{
-	rl_readline_name = "unserding";
-	rl_attempted_completion_function = NULL;
-
-	rl_basic_word_break_characters = "\t\n@$><=;|&{( ";
-	return;
-}
-
 int
 main (void)
 {
@@ -151,16 +139,13 @@ main (void)
 	struct ev_loop *loop = ev_default_loop(0);
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
-	char *test;
 
 	/* initialise the global context */
 	init_glob_ctx();
 	/* initialise global job q */
 	init_glob_jq();
-	/* initialise readline */
-	init_readline();
 
-	/* attach a tcp listener */
+	/* attach the stdinlistener, inits readline too */
 	ud_attach_stdin(EV_A);
 
 	/* initialise a sig C-c handler */
@@ -169,8 +154,6 @@ main (void)
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigpipe_watcher, sigint_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
-
-	test = readline("unserding> ");
 
 	/* reset the round robin var */
 	rr_wrk = 0;

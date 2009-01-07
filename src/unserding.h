@@ -41,7 +41,7 @@
 #include <stdbool.h>
 
 #define UD_NETWORK_SERVICE		"8653"
-#define UD_MCAST4_ADDR			"224.86.53.1"
+#define UD_MCAST4_ADDR			"239.86.53.1"
 
 /**
  * Flags. */

@@ -371,6 +371,8 @@ main (void)
 	/* initialise global job q */
 	init_glob_jq();
 
+	/* attach a multicast listener */
+	ud_attach_mcast4(EV_A);
 	/* attach a tcp listener */
 	ud_attach_tcp6(EV_A);
 
@@ -430,6 +432,8 @@ main (void)
 
 	/* close the socket */
 	ud_detach_tcp6(EV_A);
+	/* close the socket */
+	ud_detach_mcast4(EV_A);
 
 	/* kill the workers along with their secondary loops */
 	for (index_t i = NWORKERS; i > 0; i--) {

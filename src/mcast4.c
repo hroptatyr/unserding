@@ -317,9 +317,12 @@ mcast_traf_rcb(conn_ctx_t ctx)
 	/* untangle the input buffer */
 	for (const char *p;
 	     (p = boyer_moore(ctx->buf, ctx->bidx, "\n", 1UL)) != NULL; ) {
+		job_t j;
 		/* enqueue t3h job and copy the input buffer over to
 		 * the job's work space */
-		enqueue_job_cp_ws(glob_jq, ud_parse, ctx, ctx->buf, p-ctx->buf);
+		j = enqueue_job_cp_ws(glob_jq, ud_parse, //ud_print_mcast4,
+				      ctx, ctx->buf, p-ctx->buf);
+		j->prntf = ud_print_mcast4;
 		/* now notify the slaves */
 		trigger_job_queue();
 		/* check if more is to be done */
@@ -344,17 +347,18 @@ mcast_traf_wcb(EV_P_ ev_io *w, int revents)
 	lock_obring(&ctx->obring);
 	/* obtain the current output buffer */
 	obuf = curr_outbuf(&ctx->obring);
+
 	if (LIKELY(obuf->obufidx < obuf->obuflen)) {
 		const char *buf =
 			(char*)((long int)obuf->obuf & ~1UL) + obuf->obufidx;
 		size_t blen = obuf->obuflen - obuf->obufidx;
 		/* the actual write */
-		obuf->obufidx += write(w->fd, buf, blen);
+		obuf->obufidx += sendto(w->fd, buf, blen, 0,
+					(struct sockaddr*)&ctx->sa,
+					sizeof(SA_STRUCT));
 	}
 	/* it's likely that we can output all at once */
 	if (LIKELY(obuf->obufidx >= obuf->obuflen)) {
-		/* reset the timeout, we want activity on the remote side now */
-		ctx->timeout = ev_now(EV_A) + MCAST_TIMEOUT;
 		/* free the buffer */
 		free_outbuf(obuf);
 		/* wind to the next outbuf */
@@ -382,6 +386,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	conn_ctx_t c;
 	socklen_t sa_size = sizeof(c->sa);
 	ev_io *watcher;
+	int retval;
 
 	UD_DEBUG_MCAST("incoming connection\n");
 	/* initialise an io context upfront */
@@ -393,7 +398,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	/* initialise the input buffer */
 	c->bidx = 0;
 	/* put the src and snk sock into glob_ctx */
-	c->src = w->fd;
+	c->snk = c->src = w->fd;
 
 	nread = recvfrom(w->fd, c->buf, CONN_CTX_BUF_SIZE, 0,
 			 (struct sockaddr*)&c->sa, &sa_size);
@@ -401,8 +406,20 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	a = inet_ntop(c->sa.sin6_family, &c->sa.sin6_addr, buf, sizeof(buf));
 	p = ntohs(c->sa.sin6_port);
 	UD_DEBUG_MCAST("Server: connect from host %s, port %d.\n", a, p);
+#if 1
 	/* stuff the origin */
-	c->snk = w->fd;
+	c->snk = socket(PF_INET6, SOCK_DGRAM, 0);
+	retval = connect(c->snk, (struct sockaddr*)&c->sa, sizeof(SA_STRUCT));
+	if (c->snk < 0) {
+		UD_CRITICAL_MCAST("socket() failed, whysoever\n");
+		//return s;
+	}
+	__reuse_sock(c->snk);
+#endif
+
+	/* escrow the writer */
+	watcher = ctx_wio(c);
+	ev_io_init(watcher, mcast_traf_wcb, c->snk, EV_WRITE);
 
 	/* handle the reading */
 	if (nread <= 0) {
@@ -414,11 +431,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	/* wind the buffer index */
 	c->bidx += nread;
 	mcast_traf_rcb(c);
-#if 0
-	/* escrow the writer */
-	watcher = ctx_wio(c);
-	ev_io_init(watcher, mcast_traf_wcb, ns, EV_WRITE);
-#endif
 	return;
 }
 

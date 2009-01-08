@@ -137,6 +137,10 @@ struct ud_msghdr_s {
 	ud_msgsvc_t svc;
 };
 
+#define MAXHOSTNAMELEN		64
+/* text section */
+static char host[MAXHOSTNAMELEN];
+
 
 void
 ud_parse(job_t j)
@@ -160,7 +164,15 @@ ud_parse(job_t j)
 
 	} INNIT(oi_cmd) {
 		UD_DEBUG_PROTO("found `oi'\n");
-		ud_print_tcp6(EV_DEFAULT_ ctx, oi_rpl, countof(oi_rpl)-1);
+
+		if (UNLIKELY(host[0] == '\0')) {
+			(void)gethostname(host, countof(host));
+		}
+		j->work_space[0] = 'o', j->work_space[1] = 'i',
+			j->work_space[2] = ' ';
+		memcpy(&j->work_space[3], host, countof(host));
+		UD_DEBUG_PROTO("constr \"%s\"\n", j->work_space);
+		j->prntf(EV_DEFAULT_ ctx, j->work_space, strlen(j->work_space));
 
 	} INNIT(cheers_cmd) {
 		UD_DEBUG_PROTO("found `cheers'\n");

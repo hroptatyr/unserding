@@ -301,10 +301,14 @@ typedef void(*ud_work_f)(job_t);
 /**
  * Type for clean up functions inside jobs. */
 typedef void(*ud_free_f)(job_t);
+/**
+ * Type for print functions inside jobs. */
+typedef void(*ud_prnt_f)(EV_P_ conn_ctx_t, const char*, size_t);
 
 struct job_s {
 	ud_work_f workf;
 	ud_free_f freef;
+	ud_prnt_f prntf;
 	void *clo;
 	char ALGN16(work_space)[];
 } __attribute__((aligned(1024)));

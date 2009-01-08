@@ -197,6 +197,9 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 		UD_CRITICAL_MCAST("bind() failed, whysoever\n");
 		close(s);
 		return -1;
+	} else {
+		UD_DEBUG_MCAST("listening to udp://[%s]"
+			       ":" UD_NETWORK_SERVICE "\n", lres->ai_canonname);
 	}
 
 	/* set up the multicast group and join it */
@@ -205,9 +208,10 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 	/* now truly join */
 	if (UNLIKELY(setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
 				&mreq4, sizeof(mreq4)) < 0)) {
-		UD_CRITICAL_MCAST("could not joing the multicast group\n");
-		close(s);
-		return -1;
+		UD_DEBUG_MCAST("could not join the multicast group\n");
+	} else {
+		UD_DEBUG_MCAST("listening to udp://"
+			       UD_MCAST4_ADDR ":" UD_NETWORK_SERVICE "\n");
 	}
 
 	/* set up the multi6cast group and join it */
@@ -216,19 +220,17 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 	/* now truly join */
 	if (UNLIKELY(setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 				&mreq6, sizeof(mreq6)) < 0)) {
-		UD_CRITICAL_MCAST("could not joing the multi6cast group\n");
-		close(s);
-		return -1;
+		UD_DEBUG_MCAST("could not join the multi6cast group\n");
+	} else {
+		UD_DEBUG_MCAST("listening to udp://"
+			       "[" UD_MCAST6_ADDR "]" ":"
+			       UD_NETWORK_SERVICE "\n");
 	}
 
 	/* turn into a mcast sock and set a TTL */
 	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &one, sizeof(one));
 	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
 
-	if (getnameinfo(lres->ai_addr, lres->ai_addrlen, NULL,
-			0, servbuf, sizeof(servbuf), NI_NUMERICSERV) == 0) {
-		UD_DEBUG_MCAST("listening on port %s\n", servbuf);
-	}
 	return s;
 }
 
@@ -239,7 +241,7 @@ mcast_listener_init(void)
 	struct addrinfo *res;
 	const struct addrinfo hints = {
 		/* allow both v6 and v4 */
-		.ai_family = PF_INET6,
+		.ai_family = AF_UNSPEC,
 		.ai_socktype = SOCK_DGRAM,
 		.ai_protocol = IPPROTO_UDP,
 		/* specify to whom we listen */
@@ -353,9 +355,10 @@ mcast_traf_wcb(EV_P_ ev_io *w, int revents)
 			(char*)((long int)obuf->obuf & ~1UL) + obuf->obufidx;
 		size_t blen = obuf->obuflen - obuf->obufidx;
 		/* the actual write */
-		obuf->obufidx += sendto(w->fd, buf, blen, 0,
-					(struct sockaddr*)&ctx->sa,
-					sizeof(SA_STRUCT));
+		obuf->obufidx += sendto(
+			ctx->snk, buf, blen, 0,
+			(struct sockaddr*)&ctx->sa, sizeof(ctx->sa));
+		UD_DEBUG_MCAST("sent %ld\n", obuf->obufidx);
 	}
 	/* it's likely that we can output all at once */
 	if (LIKELY(obuf->obufidx >= obuf->obuflen)) {
@@ -406,16 +409,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	a = inet_ntop(c->sa.sin6_family, &c->sa.sin6_addr, buf, sizeof(buf));
 	p = ntohs(c->sa.sin6_port);
 	UD_DEBUG_MCAST("Server: connect from host %s, port %d.\n", a, p);
-#if 1
-	/* stuff the origin */
-	c->snk = socket(PF_INET6, SOCK_DGRAM, 0);
-	retval = connect(c->snk, (struct sockaddr*)&c->sa, sizeof(SA_STRUCT));
-	if (c->snk < 0) {
-		UD_CRITICAL_MCAST("socket() failed, whysoever\n");
-		//return s;
-	}
-	__reuse_sock(c->snk);
-#endif
 
 	/* escrow the writer */
 	watcher = ctx_wio(c);

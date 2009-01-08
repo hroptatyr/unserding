@@ -163,16 +163,18 @@ ud_parse(job_t j)
 		ud_print_tcp6(EV_DEFAULT_ ctx, sup_rpl, countof(sup_rpl)-1);
 
 	} INNIT(oi_cmd) {
+		size_t l;
+
 		UD_DEBUG_PROTO("found `oi'\n");
 
 		if (UNLIKELY(host[0] == '\0')) {
 			(void)gethostname(host, countof(host));
 		}
-		j->work_space[0] = 'o', j->work_space[1] = 'i',
-			j->work_space[2] = ' ';
+		memcpy(&j->work_space[0], "oi ", 3);
 		memcpy(&j->work_space[3], host, countof(host));
+		l = strlen(j->work_space), j->work_space[l++] = '\n';
 		UD_DEBUG_PROTO("constr \"%s\"\n", j->work_space);
-		j->prntf(EV_DEFAULT_ ctx, j->work_space, strlen(j->work_space));
+		j->prntf(EV_DEFAULT_ ctx, j->work_space, l);
 
 	} INNIT(cheers_cmd) {
 		UD_DEBUG_PROTO("found `cheers'\n");

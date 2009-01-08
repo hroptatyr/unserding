@@ -270,12 +270,6 @@ ctx_timer(conn_ctx_t ctx)
 extern conn_ctx_t find_ctx(void);
 
 
-/* socket goodness, defined in tcp6.c */
-extern int ud_attach_tcp6(EV_P);
-extern int ud_detach_tcp6(EV_P);
-extern void ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
-extern void ud_kick_tcp6(EV_P_ conn_ctx_t ctx);
-
 /* more socket goodness, defined in mcast4.c */
 extern int ud_attach_mcast4(EV_P);
 extern int ud_detach_mcast4(EV_P);

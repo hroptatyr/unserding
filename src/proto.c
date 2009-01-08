@@ -411,7 +411,7 @@ __spot_job(conn_ctx_t ctx, job_t j)
 		trigger_job_queue();
 	} else {
 	out:
-		ud_print_tcp6(EV_DEFAULT_ ctx, spot_synt, countof(spot_synt)-1);
+		j->prntf(EV_DEFAULT_ ctx, spot_synt, countof(spot_synt)-1);
 	}
 	return;
 }
@@ -428,7 +428,7 @@ static void
 ud_spot_job(job_t j)
 {
 	conn_ctx_t ctx = j->clo;
-	ud_print_tcp6(EV_DEFAULT_ ctx, "2.52\n", 5);
+	j->prntf(EV_DEFAULT_ ctx, "2.52\n", 5);
 	return;
 }
 

@@ -186,64 +186,6 @@ find_ctx(void)
 }
 
 
-/* connexion goodness */
-#if 0
-static int
-tcpudp_mlistener_init(void)
-{
-	struct addrinfo *res;
-	const struct addrinfo hints = {
-		.ai_family = AF_INET6,
-		.ai_socktype = SOCK_DGRAM,
-		.ai_protocol = IPPROTO_UDP,
-		/* specify to whom we listen */
-		.ai_flags = AI_PASSIVE | AI_V4MAPPED | AI_ALL,
-	};
-	int retval;
-	volatile int s;
-	struct sockaddr_in saddr;
-	struct ip_mreq imreq;
-
-	/* set content of struct saddr and imreq to zero */
-	memset(&saddr, 0, sizeof(struct sockaddr_in));
-	memset(&imreq, 0, sizeof(struct ip_mreq));
-
-	/* open a UDP socket */
-	s = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
-	if (s < 0) {
-		UD_CRITICAL("Unable to open multicast socket\n");
-		return -1;
-	}
-
-	saddr.sin_family = PF_INET;
-	saddr.sin_port = htons(8653);
-	saddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	retval = bind(s, (struct sockaddr*)&saddr, sizeof(struct sockaddr_in));
-
-	if (retval < 1) {
-		UD_CRITICAL("Unable to bind multicast socket\n");
-		return -1;
-	}
-
-	imreq.imr_multiaddr.s_addr = inet_addr("224.0.0.1");
-	imreq.imr_interface.s_addr = INADDR_ANY;
-
-	/* set TTL of multicast packet */
-	retval = setsockopt(s,
-			    saddr.ai_family == PF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
-			    saddr.ai_family == PF_INET6 ? IPV6_MULTICAST_HOPS : IP_MULTICAST_TTL,
-			    (char*) &multicastTTL, sizeof(multicastTTL));
-
-	if (retval != 0) {
-		abort();
-	}
-
-	/* succeeded if > 0 */
-	return s;
-}
-#endif
-
-
 static void
 triv_cb(EV_P_ ev_async *w, int revents)
 {
@@ -373,8 +315,6 @@ main (void)
 
 	/* attach a multicast listener */
 	ud_attach_mcast4(EV_A);
-	/* attach a tcp listener */
-	ud_attach_tcp6(EV_A);
 
 	/* initialise instruments */
 	init_instr();
@@ -430,8 +370,6 @@ main (void)
 		ud_kick_mcast4(EV_A_ &glob_ctx[res]);
 	}
 
-	/* close the socket */
-	ud_detach_tcp6(EV_A);
 	/* close the socket */
 	ud_detach_mcast4(EV_A);
 

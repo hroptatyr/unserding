@@ -70,6 +70,7 @@
 static int lsock __attribute__((used));
 static conn_ctx_t lctx;
 static ev_io __srv_watcher __attribute__((aligned(16)));
+extern void ud_print_stdin(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
 
 
 /* string goodies */
@@ -281,7 +282,7 @@ stdin_traf_wcb(EV_P_ ev_io *w, int revents)
 
 
 void
-ud_print_tcp6(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
+ud_print_stdin(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
 {
 	outbuf_t obuf;
 

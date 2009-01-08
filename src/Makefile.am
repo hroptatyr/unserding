@@ -15,7 +15,7 @@ libpfack_mysql_a_CPPFLAGS = $(AM_CPPFLAGS) $(MYSQL_CPPFLAGS) $(FPIC)
 endif
 
 ## the main server binary
-unserdingd_SOURCES = unserdingd.c tcp6.c mcast4.c proto.c catalogue.c instr.c
+unserdingd_SOURCES = unserdingd.c mcast4.c proto.c catalogue.c instr.c
 unserdingd_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) $(MYSQL_LDFLAGS)
 unserdingd_LDADD = $(LIBEV_LIBS)

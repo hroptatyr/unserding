@@ -146,7 +146,8 @@ handle_rl(char *line)
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
 	llen = strlen(line);
-	j = enqueue_job_cp_ws(glob_jq, NULL, lctx, lctx->buf, llen);
+	j = enqueue_job_cp_ws(glob_jq, NULL, j->prntf, NULL,
+			      lctx, lctx->buf, llen);
 	/* now notify the slaves */
 	ud_parse(j);
 	return;

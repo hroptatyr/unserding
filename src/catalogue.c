@@ -103,7 +103,7 @@ ud_cat_ls_job(job_t j)
 		memcpy(buf, empty_msg, idx = countof(empty_msg));
 		buf[idx-1] = '\n';
 	}
-	ud_print_tcp6(EV_DEFAULT_ ctx, (void*)((long int)buf | 1UL), idx);
+	j->prntf(EV_DEFAULT_ ctx, (void*)((long int)buf | 1UL), idx);
 	return;
 }
 
@@ -115,7 +115,7 @@ ud_cat_pwd_job(job_t j)
 
 	UD_DEBUG_CAT("pwd job\n");
 	len = snprintcat(j->work_space, 256, ctx->pwd);
-	ud_print_tcp6(EV_DEFAULT_ ctx, j->work_space, len);
+	j->prntf(EV_DEFAULT_ ctx, j->work_space, len);
 	return;
 }
 
@@ -150,7 +150,7 @@ ud_cat_cd_job(job_t j)
 	memcpy(j->work_space, err, len = countof_m1(err));
 	
 out:
-	ud_print_tcp6(EV_DEFAULT_ ctx, j->work_space, len);
+	j->prntf(EV_DEFAULT_ ctx, j->work_space, len);
 	return;
 }
 

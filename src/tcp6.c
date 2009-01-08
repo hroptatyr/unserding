@@ -340,7 +340,8 @@ tcpudp_traf_rcb(EV_P_ ev_io *w, int revents)
 		ctx->timeout = ev_now(EV_A) + 1440*TCPUDP_TIMEOUT;
 		/* enqueue t3h job and copy the input buffer over to
 		 * the job's work space */
-		enqueue_job_cp_ws(glob_jq, ud_parse, ctx, ctx->buf, p-ctx->buf);
+		enqueue_job_cp_ws(glob_jq, ud_parse, ud_print_tcp6, NULL,
+				  ctx, ctx->buf, p-ctx->buf);
 		/* now notify the slaves */
 		trigger_job_queue();
 		/* check if more is to be done */

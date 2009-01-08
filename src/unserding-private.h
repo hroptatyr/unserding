@@ -305,13 +305,16 @@ typedef void(*ud_free_f)(job_t);
  * Type for print functions inside jobs. */
 typedef void(*ud_prnt_f)(EV_P_ conn_ctx_t, const char*, size_t);
 
+#define SIZEOF_JOB_S	1024
 struct job_s {
 	ud_work_f workf;
 	ud_free_f freef;
 	ud_prnt_f prntf;
 	void *clo;
 	char ALGN16(work_space)[];
-} __attribute__((aligned(1024)));
+} __attribute__((aligned(SIZEOF_JOB_S)));
+#define JOB_WORK_SPACE_SIZE					\
+	SIZEOF_JOB_S - offsetof(struct job_s, work_space)
 
 struct job_queue_s {
 	/* read index, where to read the next job */
@@ -342,7 +345,8 @@ __next_job(job_queue_t jq)
 }
 
 static inline job_t __attribute__((always_inline, gnu_inline))
-enqueue_job(job_queue_t jq, ud_work_f workf, void *clo)
+enqueue_job(job_queue_t jq,
+	    ud_work_f workf, ud_prnt_f prntf, ud_free_f freef, void *clo)
 {
 	job_t res;
 	pthread_mutex_lock(&jq->mtx);
@@ -350,6 +354,8 @@ enqueue_job(job_queue_t jq, ud_work_f workf, void *clo)
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
 	res->workf = workf;
+	res->prntf = prntf;
+	res->freef = freef;
 	res->clo = clo;
 	jq->wi = __next_job(jq);
 	pthread_mutex_unlock(&jq->mtx);
@@ -357,8 +363,9 @@ enqueue_job(job_queue_t jq, ud_work_f workf, void *clo)
 }
 
 static inline job_t __attribute__((always_inline, gnu_inline))
-enqueue_job_cp_ws(job_queue_t jq, ud_work_f workf, void *clo,
-		  const void *stu, size_t len)
+enqueue_job_cp_ws(job_queue_t jq,
+		  ud_work_f workf, ud_prnt_f prntf, ud_free_f freef, 
+		  void *clo, const void *stu, size_t len)
 {
 /* enqueue the job and copy stuff over to the job's work space */
 	job_t res;
@@ -396,8 +403,10 @@ dequeue_job(job_queue_t jq)
 static inline void __attribute__((always_inline, gnu_inline))
 free_job(job_t j)
 {
-	j->workf = NULL;
-	j->clo = NULL;
+	if (UNLIKELY(j->freef != NULL)) {
+		j->freef(j);
+	}
+	memset(j, 0, SIZEOF_JOB_S);
 	return;
 }
 

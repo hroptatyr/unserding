@@ -75,64 +75,6 @@ static struct ip_mreq mreq4;
 static struct ipv6_mreq mreq6;
 
 
-/* string goodies */
-/**
- * Find PAT (of length PLEN) inside BUF (of length BLEN). */
-static const char __attribute__((unused)) *
-boyer_moore(const char *buf, size_t blen, const char *pat, size_t plen)
-{
-	long int next[UCHAR_MAX];
-	long int skip[UCHAR_MAX];
-
-	if ((size_t)plen > blen || plen >= UCHAR_MAX) {
-		return NULL;
-	}
-
-	/* calc skip table ("bad rule") */
-	for (index_t i = 0; i <= UCHAR_MAX; i++) {
-		skip[i] = plen;
-	}
-	for (index_t i = 0; i < plen; i++) {
-		skip[(int)pat[i]] = plen - i - 1;
-	}
-
-	for (index_t j = 0, i; j <= plen; j++) {
-		for (i = plen - 1; i >= 1; i--) {
-			for (index_t k = 1; k <= j; k++) {
-				if ((long int)i - (long int)k < 0L) {
-					goto matched;
-				}
-				if (pat[plen - k] != pat[i - k]) {
-					goto nexttry;
-				}
-			}
-			goto matched;
-		nexttry: ;
-		}
-	matched:
-		next[j] = plen - i;
-	}
-
-	plen--;
-	for (index_t i = plen /* position of last p letter */; i < blen; ) {
-		for (index_t j = 0 /* matched letter count */; j <= plen; ) {
-			if (buf[i - j] == pat[plen - j]) {
-				j++;
-				continue;
-			}
-			i += skip[(int)buf[i - j]] > next[j]
-				? skip[(int)buf[i - j]]
-				: next[j];
-			goto newi;
-		}
-		return buf + i - plen;
-	newi:
-		;
-	}
-	return NULL;
-}
-
-
 /* socket goodies */
 static inline void
 __reuse_sock(int sock)
@@ -180,7 +122,6 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 {
 	volatile int s;
 	int retval;
-	char servbuf[NI_MAXSERV];
 	int one = 1;
 	unsigned char ttl = UDP_MULTICAST_TTL;
 
@@ -199,7 +140,8 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 		return -1;
 	} else {
 		UD_DEBUG_MCAST("listening to udp://[%s]"
-			       ":" UD_NETWORK_SERVICE "\n", lres->ai_canonname);
+			       ":" UD_NETWORK_SERVICE "\n",
+			       lres->ai_canonname);
 	}
 
 	/* set up the multicast group and join it */
@@ -230,7 +172,7 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 	/* turn into a mcast sock and set a TTL */
 	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &one, sizeof(one));
 	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
-
+	/* return the socket we've got */
 	return s;
 }
 
@@ -316,24 +258,17 @@ mcast_traf_rcb(conn_ctx_t ctx)
 		/* not yet */
 		abort();
 	}
-	/* untangle the input buffer */
-	for (const char *p;
-	     (p = boyer_moore(ctx->buf, ctx->bidx, "\n", 1UL)) != NULL; ) {
+	/* we used to untangle the input buffer here, but instead we just
+	 * pass the buck and let the git of a parser do the job */
+	{
 		job_t j;
 		/* enqueue t3h job and copy the input buffer over to
 		 * the job's work space */
-		j = enqueue_job_cp_ws(glob_jq, ud_parse, //ud_print_mcast4,
-				      ctx, ctx->buf, p-ctx->buf);
+		j = enqueue_job_cp_ws(glob_jq, ud_parse, ud_print_mcast4, NULL,
+				      ctx, ctx->buf, ctx->bidx);
 		j->prntf = ud_print_mcast4;
 		/* now notify the slaves */
 		trigger_job_queue();
-		/* check if more is to be done */
-		if (LIKELY((ctx->bidx -= (p-ctx->buf) + 1) == 0)) {
-			break;
-		} else {
-			/* move the remaining bollocks */
-			memmove(ctx->buf, p+1, ctx->bidx);
-		}
 	}
 	return;
 }
@@ -389,7 +324,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	conn_ctx_t c;
 	socklen_t sa_size = sizeof(c->sa);
 	ev_io *watcher;
-	int retval;
 
 	UD_DEBUG_MCAST("incoming connection\n");
 	/* initialise an io context upfront */
@@ -406,7 +340,11 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	nread = recvfrom(w->fd, c->buf, CONN_CTX_BUF_SIZE, 0,
 			 (struct sockaddr*)&c->sa, &sa_size);
 	/* obtain the address in human readable form */
-	a = inet_ntop(c->sa.sin6_family, &c->sa.sin6_addr, buf, sizeof(buf));
+	a = inet_ntop(c->sa.sin6_family,
+		      c->sa.sin6_family == PF_INET6
+		      ? &c->sa.sin6_addr
+		      : &((struct sockaddr_in*)(&(c->sa)))->sin_addr,
+		      buf, sizeof(buf));
 	p = ntohs(c->sa.sin6_port);
 	UD_DEBUG_MCAST("Server: connect from host %s, port %d.\n", a, p);
 

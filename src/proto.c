@@ -42,6 +42,12 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
+/* posix? */
+#include <limits.h>
+#if defined HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
 
 /* our master include */
 #include "unserding.h"
@@ -82,9 +88,9 @@
 static const char inv_rpl[] = "invalid command, better luck next time\n";
 
 #define countof_m1(_x)		(countof(_x) - 1)
-#define MAKE_SIMPLE_CMD(_c, _r)			\
-	static const char _c##_cmd[] = #_c;	\
-	static const char _c##_rpl[] = _r;
+#define MAKE_SIMPLE_CMD(_c, _r)				\
+	static const char ALGN16(_c##_cmd)[] = #_c;	\
+	static const char ALGN16(_c##_rpl)[] = _r;
 
 MAKE_SIMPLE_CMD(oi, "oi\n");
 MAKE_SIMPLE_CMD(sup, "alright\n");
@@ -103,7 +109,7 @@ MAKE_SIMPLE_CMD(
 	"help   this help screen\n"
 	"cheers [time]  store last result for TIME seconds (default 86400)\n"
 	"wtf    immediately flush last result\n"
-	"spot <optiones> obtain spot price\n"
+	"spot <options> obtain spot price\n"
 	"ls     list catalogue entries of current directory\n"
 	"pwd    print the name of the current directory\n"
 	"cd X   change to directory X\n");
@@ -114,6 +120,64 @@ static void ud_spot_job(job_t);
 /* helpers */
 static void __spot_job(conn_ctx_t ctx, job_t);
 static void __ls_job(conn_ctx_t ctx, job_t);
+
+
+/* string goodies */
+/**
+ * Find PAT (of length PLEN) inside BUF (of length BLEN). */
+static const char __attribute__((unused)) *
+boyer_moore(const char *buf, size_t blen, const char *pat, size_t plen)
+{
+	long int next[UCHAR_MAX];
+	long int skip[UCHAR_MAX];
+
+	if ((size_t)plen > blen || plen >= UCHAR_MAX) {
+		return NULL;
+	}
+
+	/* calc skip table ("bad rule") */
+	for (index_t i = 0; i <= UCHAR_MAX; i++) {
+		skip[i] = plen;
+	}
+	for (index_t i = 0; i < plen; i++) {
+		skip[(int)pat[i]] = plen - i - 1;
+	}
+
+	for (index_t j = 0, i; j <= plen; j++) {
+		for (i = plen - 1; i >= 1; i--) {
+			for (index_t k = 1; k <= j; k++) {
+				if ((long int)i - (long int)k < 0L) {
+					goto matched;
+				}
+				if (pat[plen - k] != pat[i - k]) {
+					goto nexttry;
+				}
+			}
+			goto matched;
+		nexttry: ;
+		}
+	matched:
+		next[j] = plen - i;
+	}
+
+	plen--;
+	for (index_t i = plen /* position of last p letter */; i < blen; ) {
+		for (index_t j = 0 /* matched letter count */; j <= plen; ) {
+			if (buf[i - j] == pat[plen - j]) {
+				j++;
+				continue;
+			}
+			i += skip[(int)buf[i - j]] > next[j]
+				? skip[(int)buf[i - j]]
+				: next[j];
+			goto newi;
+		}
+		return buf + i - plen;
+	newi:
+		;
+	}
+	return NULL;
+}
 
 
 /* the proto glot */
@@ -151,16 +215,16 @@ ud_parse(job_t j)
 	UD_DEBUG_PROTO("parsing: \"%s\"\n", j->work_space);
 
 #define INNIT(_cmd)				\
-	else if (memcmp(j->work_space, _cmd, countof(_cmd)) == 0)
+	else if (memcmp(j->work_space, _cmd, countof_m1(_cmd)) == 0)
 #define INNIT_CPL(_cmd)				\
-	else if (memcmp(j->work_space, _cmd, countof(_cmd)-1) == 0)
+	else if (memcmp(j->work_space, _cmd, countof_m1(_cmd)) == 0)
 
 	/* starting somewhat slowly with a memcmp */
 	if (0) {
 		;
 	} INNIT(sup_cmd) {
 		UD_DEBUG_PROTO("found `sup'\n");
-		ud_print_tcp6(EV_DEFAULT_ ctx, sup_rpl, countof(sup_rpl)-1);
+		j->prntf(EV_DEFAULT_ ctx, sup_rpl, countof_m1(sup_rpl));
 
 	} INNIT(oi_cmd) {
 		size_t l;
@@ -178,12 +242,11 @@ ud_parse(job_t j)
 
 	} INNIT(cheers_cmd) {
 		UD_DEBUG_PROTO("found `cheers'\n");
-		ud_print_tcp6(EV_DEFAULT_ ctx,
-			      cheers_rpl, countof(cheers_rpl)-1);
+		j->prntf(EV_DEFAULT_ ctx, cheers_rpl, countof_m1(cheers_rpl));
 
 	} INNIT(wtf_cmd) {
 		UD_DEBUG_PROTO("found `wtf'\n");
-		ud_print_tcp6(EV_DEFAULT_ ctx, wtf_rpl, countof(wtf_rpl)-1);
+		j->prntf(EV_DEFAULT_ ctx, wtf_rpl, countof_m1(wtf_rpl));
 
 	} INNIT_CPL(spot_cmd) {
 		UD_DEBUG_PROTO("found `spot'\n");
@@ -192,32 +255,32 @@ ud_parse(job_t j)
 	} INNIT_CPL(ls_cmd) {
 		UD_DEBUG_PROTO("found `ls'\n");
 
-		enqueue_job(glob_jq, ud_cat_ls_job, ctx);
+		enqueue_job(glob_jq, ud_cat_ls_job, j->prntf, NULL, ctx);
 		/* now notify the slaves */
 		trigger_job_queue();
 
 	} INNIT_CPL(pwd_cmd) {
 		UD_DEBUG_PROTO("found `pwd'\n");
 
-		enqueue_job(glob_jq, ud_cat_pwd_job, ctx);
+		enqueue_job(glob_jq, ud_cat_pwd_job, j->prntf, NULL, ctx);
 		/* now notify the slaves */
 		trigger_job_queue();
 
 	} INNIT_CPL(cd_cmd) {
 		UD_DEBUG_PROTO("found `cd'\n");
 
-		enqueue_job_cp_ws(glob_jq, ud_cat_cd_job, ctx,
+		enqueue_job_cp_ws(glob_jq, ud_cat_cd_job, j->prntf, NULL, ctx,
 				  j->work_space + countof(cd_cmd), 256);
 		/* now notify the slaves */
 		trigger_job_queue();
 
 	} INNIT_CPL(help_cmd) {
 		UD_DEBUG_PROTO("found `help'\n");
-		ud_print_tcp6(EV_DEFAULT_ ctx, help_rpl, countof_m1(help_rpl));
+		j->prntf(EV_DEFAULT_ ctx, help_rpl, countof_m1(help_rpl));
 
 	} else {
 		/* print an error */
-		ud_print_tcp6(EV_DEFAULT_ ctx, inv_rpl, countof(inv_rpl)-1);
+		j->prntf(EV_DEFAULT_ ctx, inv_rpl, countof_m1(inv_rpl));
 	}
 #undef INNIT
 #undef INNIT_CPL
@@ -342,7 +405,8 @@ __spot_job(conn_ctx_t ctx, job_t j)
 	} while (cmd && cmd[0] != '\0');
 
 	if (LIKELY(res.sym != NULL)) {
-		enqueue_job_cp_ws(glob_jq, ud_spot_job, ctx, &res, sizeof(res));
+		enqueue_job_cp_ws(glob_jq, ud_spot_job, j->prntf, NULL,
+				  ctx, &res, sizeof(res));
 		/* now notify the slaves */
 		trigger_job_queue();
 	} else {

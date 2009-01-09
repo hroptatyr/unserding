@@ -230,46 +230,6 @@ mcast_listener_deinit(int sock)
 }
 
 
-/* this callback is called when data is writable on one of the polled socks */
-#if 0
-static void __attribute__((unused))
-mcast_traf_wcb(EV_P_ ev_io *w, int revents)
-{
-	conn_ctx_t ctx = ev_wio_ctx(w);
-	outbuf_t obuf;
-
-	UD_DEBUG_MCAST("writing buffer to %d\n", ctx->snk);
-	lock_obring(&ctx->obring);
-	/* obtain the current output buffer */
-	obuf = curr_outbuf(&ctx->obring);
-
-	if (LIKELY(obuf->obufidx < obuf->obuflen)) {
-		const char *buf =
-			(char*)((long int)obuf->obuf & ~1UL) + obuf->obufidx;
-		size_t blen = obuf->obuflen - obuf->obufidx;
-		/* the actual write */
-		obuf->obufidx += sendto(
-			ctx->snk, buf, blen, 0,
-			(struct sockaddr*)&ctx->sa, sizeof(ctx->sa));
-		UD_DEBUG_MCAST("sent %ld\n", obuf->obufidx);
-	}
-	/* it's likely that we can output all at once */
-	if (LIKELY(obuf->obufidx >= obuf->obuflen)) {
-		/* free the buffer */
-		free_outbuf(obuf);
-		/* wind to the next outbuf */
-		ctx->obring.curr_idx = step_obring_idx(ctx->obring.curr_idx);
-
-		if (LIKELY(outbuf_free_p(curr_outbuf(&ctx->obring)))) {
-			/* if nothing's to be printed just turn it off */
-			ev_io_stop(EV_A_ w);
-		}
-	}
-	unlock_obring(&ctx->obring);
-	return;
-}
-#endif	/* 0 */
-
 /* this callback is called when data is readable on the main server socket */
 static void
 mcast_inco_cb(EV_P_ ev_io *w, int revents)
@@ -316,7 +276,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	return;
 }
 
-
 void
 ud_print_mcast4(EV_P_ job_t j)
 {
@@ -324,11 +283,15 @@ ud_print_mcast4(EV_P_ job_t j)
 
 	/* the actual write */
 	nwrit = sendto(j->sock, j->buf, j->blen, 0,
-		       (struct sockaddr*)&j->sa, sizeof(j->sa));
+		       (struct sockaddr*)&j->sa,
+		       j->sa.sin6_family == PF_INET6
+		       ? sizeof(struct sockaddr_in6)
+		       : sizeof(struct sockaddr_in));
 	trigger_evloop(EV_A);
 	return;
 }
 
+
 int
 ud_attach_mcast4(EV_P)
 {

@@ -118,8 +118,7 @@ MAKE_SIMPLE_CMD(
 static void ud_sup_job(job_t);
 static void ud_spot_job(job_t);
 /* helpers */
-static void __spot_job(conn_ctx_t ctx, job_t);
-static void __ls_job(conn_ctx_t ctx, job_t);
+static void __spot_job(job_t);
 
 
 /* string goodies */
@@ -210,21 +209,21 @@ void
 ud_parse(job_t j)
 {
 /* clo is expected to be of type conn_ctx_t */
-	conn_ctx_t ctx = j->clo;
-
-	UD_DEBUG_PROTO("parsing: \"%s\"\n", j->work_space);
+	UD_DEBUG_PROTO("parsing: \"%s\"\n", j->buf);
 
 #define INNIT(_cmd)				\
-	else if (memcmp(j->work_space, _cmd, countof_m1(_cmd)) == 0)
-#define INNIT_CPL(_cmd)				\
-	else if (memcmp(j->work_space, _cmd, countof_m1(_cmd)) == 0)
+	else if (memcmp(j->buf, _cmd, countof_m1(_cmd)) == 0 &&	\
+		 ((j->buf[countof_m1(_cmd)] == '\n') ||		\
+		  (j->buf[countof_m1(_cmd)] == ' ') ||		\
+		  (j->buf[countof_m1(_cmd)] == '\0')))
 
 	/* starting somewhat slowly with a memcmp */
 	if (0) {
 		;
 	} INNIT(sup_cmd) {
 		UD_DEBUG_PROTO("found `sup'\n");
-		j->prntf(EV_DEFAULT_ ctx, sup_rpl, countof_m1(sup_rpl));
+		memcpy(j->buf, sup_rpl, j->blen = countof_m1(sup_rpl));
+		j->prntf(EV_DEFAULT_ j);
 
 	} INNIT(oi_cmd) {
 		size_t l;
@@ -234,53 +233,66 @@ ud_parse(job_t j)
 		if (UNLIKELY(host[0] == '\0')) {
 			(void)gethostname(host, countof(host));
 		}
-		memcpy(&j->work_space[0], "oi ", 3);
-		memcpy(&j->work_space[3], host, countof(host));
-		l = strlen(j->work_space), j->work_space[l++] = '\n';
-		UD_DEBUG_PROTO("constr \"%s\"\n", j->work_space);
-		j->prntf(EV_DEFAULT_ ctx, j->work_space, l);
+		memcpy(&j->buf[0], "oi ", 3);
+		memcpy(&j->buf[3], host, countof(host));
+		l = strlen(j->buf), j->buf[l] = '\n', j->blen = l + 1;
+		UD_DEBUG_PROTO("constr \"%s\"\n", j->buf);
+		j->prntf(EV_DEFAULT_ j);
 
 	} INNIT(cheers_cmd) {
 		UD_DEBUG_PROTO("found `cheers'\n");
-		j->prntf(EV_DEFAULT_ ctx, cheers_rpl, countof_m1(cheers_rpl));
+		memcpy(j->buf, cheers_rpl, j->blen = countof_m1(cheers_rpl));
+		j->prntf(EV_DEFAULT_ j);
 
 	} INNIT(wtf_cmd) {
 		UD_DEBUG_PROTO("found `wtf'\n");
-		j->prntf(EV_DEFAULT_ ctx, wtf_rpl, countof_m1(wtf_rpl));
+		memcpy(j->buf, wtf_rpl, j->blen = countof_m1(wtf_rpl));
+		j->prntf(EV_DEFAULT_ j);
 
-	} INNIT_CPL(spot_cmd) {
+	} INNIT(spot_cmd) {
 		UD_DEBUG_PROTO("found `spot'\n");
-		__spot_job(ctx, j);
+		__spot_job(j);
 
-	} INNIT_CPL(ls_cmd) {
+	} INNIT(ls_cmd) {
+		job_t j2 = obtain_job(glob_jq);
+
 		UD_DEBUG_PROTO("found `ls'\n");
-
-		enqueue_job(glob_jq, ud_cat_ls_job, j->prntf, NULL, ctx);
+		j2->prntf = j->prntf;
+		j2->workf = ud_cat_ls_job;
+		enqueue_job(glob_jq, j2);
 		/* now notify the slaves */
 		trigger_job_queue();
 
-	} INNIT_CPL(pwd_cmd) {
+	} INNIT(pwd_cmd) {
+		job_t j2 = obtain_job(glob_jq);
+
 		UD_DEBUG_PROTO("found `pwd'\n");
-
-		enqueue_job(glob_jq, ud_cat_pwd_job, j->prntf, NULL, ctx);
+		j2->prntf = j->prntf;
+		j2->workf = ud_cat_pwd_job;
+		enqueue_job(glob_jq, j2);
 		/* now notify the slaves */
 		trigger_job_queue();
 
-	} INNIT_CPL(cd_cmd) {
+	} INNIT(cd_cmd) {
+		job_t j2 = obtain_job(glob_jq);
+
 		UD_DEBUG_PROTO("found `cd'\n");
-
-		enqueue_job_cp_ws(glob_jq, ud_cat_cd_job, j->prntf, NULL, ctx,
-				  j->work_space + countof(cd_cmd), 256);
+		j2->prntf = j->prntf;
+		j2->workf = ud_cat_cd_job;
+		memcpy(j2->buf, j->buf + countof(cd_cmd), 256);
+		enqueue_job(glob_jq, j2);
 		/* now notify the slaves */
 		trigger_job_queue();
 
-	} INNIT_CPL(help_cmd) {
+	} INNIT(help_cmd) {
 		UD_DEBUG_PROTO("found `help'\n");
-		j->prntf(EV_DEFAULT_ ctx, help_rpl, countof_m1(help_rpl));
+		memcpy(j->buf, help_rpl, j->blen = countof_m1(help_rpl));
+		j->prntf(EV_DEFAULT_ j);
 
 	} else {
 		/* print an error */
-		j->prntf(EV_DEFAULT_ ctx, inv_rpl, countof_m1(inv_rpl));
+		memcpy(j->buf, inv_rpl, j->blen = countof_m1(inv_rpl));
+		j->prntf(EV_DEFAULT_ j);
 	}
 #undef INNIT
 #undef INNIT_CPL
@@ -378,9 +390,9 @@ static const char spot_synt[] =
 	"[:asof <stamp> | :from <start> :to <end>] [:cast <type>]\n";
 
 static void
-__spot_job(conn_ctx_t ctx, job_t j)
+__spot_job(job_t j)
 {
-	const char *cmd = j->work_space + countof_m1(spot_cmd);
+	const char *cmd = j->buf + countof_m1(spot_cmd);
 	struct spot_s res = {0, 0, 0, 0};
 
 	if (UNLIKELY(cmd[0] == '\0')) {
@@ -405,20 +417,18 @@ __spot_job(conn_ctx_t ctx, job_t j)
 	} while (cmd && cmd[0] != '\0');
 
 	if (LIKELY(res.sym != NULL)) {
-		enqueue_job_cp_ws(glob_jq, ud_spot_job, j->prntf, NULL,
-				  ctx, &res, sizeof(res));
+		job_t j2 = obtain_job(glob_jq);
+		j2->workf = ud_spot_job;
+		j2->prntf = j->prntf;
+		memcpy(j2->buf, &res, sizeof(res));
+		enqueue_job(glob_jq, j2);
 		/* now notify the slaves */
 		trigger_job_queue();
 	} else {
 	out:
-		j->prntf(EV_DEFAULT_ ctx, spot_synt, countof(spot_synt)-1);
+		memcpy(j->buf, spot_synt, j->blen = countof_m1(spot_synt));
+		j->prntf(EV_DEFAULT_ j);
 	}
-	return;
-}
-
-static void __attribute__((unused))
-__ls_job(conn_ctx_t ctx, job_t j)
-{
 	return;
 }
 
@@ -427,8 +437,8 @@ __ls_job(conn_ctx_t ctx, job_t j)
 static void
 ud_spot_job(job_t j)
 {
-	conn_ctx_t ctx = j->clo;
-	j->prntf(EV_DEFAULT_ ctx, "2.52\n", 5);
+	memcpy(j->buf, "2.52\n", j->blen = 5);
+	j->prntf(EV_DEFAULT_ j);
 	return;
 }
 

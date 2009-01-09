@@ -229,51 +229,9 @@ mcast_listener_deinit(int sock)
 	return;
 }
 
-static inline void __attribute__((always_inline, gnu_inline))
-mcast_kick_ctx(EV_P_ conn_ctx_t ctx)
-{
-	UD_DEBUG_MCAST("kicking ctx %p :socket %d...\n", ctx, ctx->snk);
-	/* kick the io handlers */
-	ev_io_stop(EV_A_ ctx_wio(ctx));
-	/* stop the bugger */
-	mcast_listener_deinit(ctx->snk);
-	/* deinitialise the outbuf ring */
-	deinit_obring(&ctx->obring);
-	/* finally, give the ctx struct a proper rinse */
-	ctx->src = ctx->snk = -1;
-	ctx->bidx = 0;
-	return;
-}
-
 
-/* this callback is called when data is readable on one of the polled socks */
-static void
-mcast_traf_rcb(conn_ctx_t ctx)
-{
-	UD_DEBUG_MCAST("traffic\n");
-
-	/* check the input */
-	if (ctx->buf[0] == '<') {
-		/* xml is nighing */
-		/* not yet */
-		abort();
-	}
-	/* we used to untangle the input buffer here, but instead we just
-	 * pass the buck and let the git of a parser do the job */
-	{
-		job_t j;
-		/* enqueue t3h job and copy the input buffer over to
-		 * the job's work space */
-		j = enqueue_job_cp_ws(glob_jq, ud_parse, ud_print_mcast4, NULL,
-				      ctx, ctx->buf, ctx->bidx);
-		j->prntf = ud_print_mcast4;
-		/* now notify the slaves */
-		trigger_job_queue();
-	}
-	return;
-}
-
 /* this callback is called when data is writable on one of the polled socks */
+#if 0
 static void __attribute__((unused))
 mcast_traf_wcb(EV_P_ ev_io *w, int revents)
 {
@@ -310,6 +268,7 @@ mcast_traf_wcb(EV_P_ ev_io *w, int revents)
 	unlock_obring(&ctx->obring);
 	return;
 }
+#endif	/* 0 */
 
 /* this callback is called when data is readable on the main server socket */
 static void
@@ -321,73 +280,52 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	const char *a;
 	/* the port (in host-byte order) */
 	uint16_t p;
-	conn_ctx_t c;
-	socklen_t sa_size = sizeof(c->sa);
-	ev_io *watcher;
+	/* a job */
+	job_t j = obtain_job(glob_jq);
+	socklen_t lsa = sizeof(j->sa);
 
 	UD_DEBUG_MCAST("incoming connection\n");
-	/* initialise an io context upfront */
-	c = find_ctx();
-	/* initialise the pwd */
-	c->pwd = ud_catalogue;
-	/* initialise the output buffer */
-	init_obring(&c->obring);
-	/* initialise the input buffer */
-	c->bidx = 0;
-	/* put the src and snk sock into glob_ctx */
-	c->snk = c->src = w->fd;
-
-	nread = recvfrom(w->fd, c->buf, CONN_CTX_BUF_SIZE, 0,
-			 (struct sockaddr*)&c->sa, &sa_size);
+	nread = recvfrom(j->sock = w->fd, j->buf, JOB_BUF_SIZE, 0,
+			 &j->sa, &lsa);
 	/* obtain the address in human readable form */
-	a = inet_ntop(c->sa.sin6_family,
-		      c->sa.sin6_family == PF_INET6
-		      ? &c->sa.sin6_addr
-		      : &((struct sockaddr_in*)(&(c->sa)))->sin_addr,
+	a = inet_ntop(j->sa.sin6_family,
+		      j->sa.sin6_family == PF_INET6
+		      ? (void*)&j->sa.sin6_addr
+		      : (void*)&((struct sockaddr_in*)&j->sa)->sin_addr,
 		      buf, sizeof(buf));
-	p = ntohs(c->sa.sin6_port);
+	p = ntohs(j->sa.sin6_port);
 	UD_DEBUG_MCAST("Server: connect from host %s, port %d.\n", a, p);
 
-	/* escrow the writer */
-	watcher = ctx_wio(c);
-	ev_io_init(watcher, mcast_traf_wcb, c->snk, EV_WRITE);
-
 	/* handle the reading */
-	if (nread <= 0) {
+	if (UNLIKELY(nread <= 0)) {
 		UD_CRITICAL_MCAST("could not handle incoming connection\n");
-		mcast_kick_ctx(EV_A_ c);
-		return;
-	}
+		/* is that wise? */
+		mcast_listener_deinit(w->fd);
 
-	/* wind the buffer index */
-	c->bidx += nread;
-	mcast_traf_rcb(c);
+	} else {
+		j->blen = nread;
+		j->workf = ud_parse;
+		j->prntf = ud_print_mcast4;
+
+		/* enqueue t3h job and copy the input buffer over to
+		 * the job's work space */
+		enqueue_job(glob_jq, j);
+		/* now notify the slaves */
+		trigger_job_queue();
+	}
 	return;
 }
 
 
 void
-ud_print_mcast4(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
+ud_print_mcast4(EV_P_ job_t j)
 {
-	outbuf_t obuf;
+	ssize_t nwrit;
 
-	lock_obring(&ctx->obring);
-	obuf = next_outbuf(&ctx->obring);
-	obuf->obuflen = mlen;
-	obuf->obufidx = 0;
-	obuf->obuf = m;
-	unlock_obring(&ctx->obring);
-
-	/* start the write watcher */
-	ev_io_start(EV_A_ ctx_wio(ctx));
+	/* the actual write */
+	nwrit = sendto(j->sock, j->buf, j->blen, 0,
+		       (struct sockaddr*)&j->sa, sizeof(j->sa));
 	trigger_evloop(EV_A);
-	return;
-}
-
-void
-ud_kick_mcast4(EV_P_ conn_ctx_t ctx)
-{
-	mcast_kick_ctx(EV_A_ ctx);
 	return;
 }
 

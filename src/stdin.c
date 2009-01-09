@@ -68,9 +68,8 @@
 #include "unserding-private.h"
 
 static int lsock __attribute__((used));
-static conn_ctx_t lctx;
 static ev_io __srv_watcher __attribute__((aligned(16)));
-extern void ud_print_stdin(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
+extern void ud_print_stdin(EV_P_ job_t j);
 
 
 /* string goodies */
@@ -147,8 +146,10 @@ handle_rl(char *line)
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
 	llen = strlen(line);
-	j = enqueue_job_cp_ws(glob_jq, NULL, j->prntf, NULL,
-			      lctx, lctx->buf, llen);
+	j = obtain_job(glob_jq);
+	j->prntf = ud_print_stdin;
+	memcpy(j->buf, line, llen);
+	enqueue_job(glob_jq, j);
 	/* now notify the slaves */
 	ud_parse(j);
 	return;
@@ -168,14 +169,12 @@ stdin_listener_init(void)
 	rl_callback_handler_install("unserding> ", handle_rl);
 
 	/* succeeded if == 0 */
-	return lctx->snk = STDIN_FILENO;
+	return STDIN_FILENO;
 }
 
 static void
-stdin_listener_deinit(EV_P_ conn_ctx_t ctx)
+stdin_listener_deinit(EV_P_ int sock)
 {
-	int sock = ctx->snk;
-
 	UD_DEBUG_STDIN("deinitialising readline\n");
 	rl_callback_handler_remove();
 
@@ -183,6 +182,7 @@ stdin_listener_deinit(EV_P_ conn_ctx_t ctx)
 	shutdown(sock, SHUT_RDWR);
 	close(sock);
 
+#if 0
 	UD_DEBUG_STDIN("kicking ctx %p :socket %d...\n", ctx, ctx->snk);
 	/* kick the io handlers */
 	ev_io_stop(EV_A_ ctx_rio(ctx));
@@ -191,6 +191,7 @@ stdin_listener_deinit(EV_P_ conn_ctx_t ctx)
 	/* finally, give the ctx struct a proper rinse */
 	ctx->src = ctx->snk = -1;
 	ctx->bidx = 0;
+#endif
 	return;
 }
 
@@ -282,20 +283,9 @@ stdin_traf_wcb(EV_P_ ev_io *w, int revents)
 
 
 void
-ud_print_stdin(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen)
+ud_print_stdin(EV_P_ job_t j)
 {
-	outbuf_t obuf;
-
-	lock_obring(&ctx->obring);
-	obuf = next_outbuf(&ctx->obring);
-	obuf->obuflen = mlen;
-	obuf->obufidx = 0;
-	obuf->obuf = m;
-	unlock_obring(&ctx->obring);
-
-	/* start the write watcher */
-	ev_io_start(EV_A_ ctx_wio(ctx));
-	//trigger_evloop(EV_A);
+	printf(j->buf);
 	return;
 }
 
@@ -304,8 +294,6 @@ ud_attach_stdin(EV_P)
 {
 	ev_io *srv_watcher = &__srv_watcher;
 
-	/* initialise an io watcher */
-	lctx = find_ctx();
 	/* get us a global sock */
 	lsock = stdin_listener_init();
 
@@ -318,7 +306,7 @@ ud_attach_stdin(EV_P)
 int
 ud_detach_stdin(EV_P)
 {
-	stdin_listener_deinit(EV_A_ lctx);
+	stdin_listener_deinit(EV_A_ lsock);
 	return 0;
 }
 

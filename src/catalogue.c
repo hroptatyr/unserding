@@ -49,7 +49,7 @@
 
 typedef struct ud_cat_s *__cat_t;
 
-static const char empty_msg[] = "empty";
+static const char empty_msg[] = "empty\n";
 
 #define countof_m1(_x)		(countof(_x) - 1)
 
@@ -91,31 +91,33 @@ snprintcat(char *restrict buf, size_t blen, const __cat_t c)
 void
 ud_cat_ls_job(job_t j)
 {
-	conn_ctx_t ctx = j->clo;
-	size_t idx = 0, blen = 4096;
-	char *buf = malloc(blen);
+	size_t idx = 0;
 
 	UD_DEBUG_CAT("ls job\n");
+#if 0
 	for (__cat_t c = ud_cat_first_child(ctx->pwd); c; c = c->next) {
-		idx += snprintcat(buf + idx, blen - idx, c);
+		idx += snprintcat(j->buf + idx, JOB_BUF_SIZE - idx, c);
 	}
-	if (UNLIKELY(idx == 0)) {
-		memcpy(buf, empty_msg, idx = countof(empty_msg));
-		buf[idx-1] = '\n';
+#endif
+	if (UNLIKELY((j->blen = idx) == 0)) {
+		memcpy(j->buf, empty_msg, j->blen = countof_m1(empty_msg));
 	}
-	j->prntf(EV_DEFAULT_ ctx, (void*)((long int)buf | 1UL), idx);
+	j->prntf(EV_DEFAULT_ j);
 	return;
 }
 
 void
 ud_cat_pwd_job(job_t j)
 {
-	conn_ctx_t ctx = j->clo;
-	size_t len;
+	size_t UNUSED(len);
 
 	UD_DEBUG_CAT("pwd job\n");
-	len = snprintcat(j->work_space, 256, ctx->pwd);
-	j->prntf(EV_DEFAULT_ ctx, j->work_space, len);
+#if 0
+	len = snprintcat(j->buf, JOB_BUF_SIZE, ctx->pwd);
+#else
+	j->blen = snprintf(j->buf, JOB_BUF_SIZE, "No working catalogue\n");
+#endif
+	j->prntf(EV_DEFAULT_ j);
 	return;
 }
 
@@ -123,12 +125,12 @@ ud_cat_pwd_job(job_t j)
 void
 ud_cat_cd_job(job_t j)
 {
-	conn_ctx_t ctx = j->clo;
-	const char *dir = j->work_space;
-	size_t len = 0;
+	const char *UNUSED(dir) = j->buf;
+	size_t UNUSED(len) = 0;
 	static const char err[] = "No such catalogue entry\n";
 
 	UD_DEBUG_CAT("cd job\n");
+#if 0
 	/* check for the special cat symbols `.' and `..' */
 	if (UNLIKELY(dir[0] == '.')) {
 		if (LIKELY(dir[1] == '.')) {
@@ -147,10 +149,11 @@ ud_cat_cd_job(job_t j)
 			goto out;
 		}
 	}
-	memcpy(j->work_space, err, len = countof_m1(err));
+#endif
+	memcpy(j->buf, err, j->blen = countof_m1(err));
 	
 out:
-	j->prntf(EV_DEFAULT_ ctx, j->work_space, len);
+	j->prntf(EV_DEFAULT_ j);
 	return;
 }
 

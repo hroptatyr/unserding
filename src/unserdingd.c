@@ -87,9 +87,6 @@ struct ud_worker_s {
 } __attribute__((aligned(16)));
 
 
-static index_t __attribute__((unused)) glob_idx = 0;
-static struct conn_ctx_s glob_ctx[64];
-
 static ev_signal ALGN16(__sigint_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
 static ev_async ALGN16(__wakeup_watcher);
@@ -171,18 +168,6 @@ sigint_cb(EV_P_ ev_signal *w, int revents)
 	UD_DEBUG("C-c caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
-}
-
-conn_ctx_t
-find_ctx(void)
-{
-/* returns the next free context */
-	for (index_t res = 0; res < countof(glob_ctx); res++) {
-		if (glob_ctx[res].snk == -1) {
-			return &glob_ctx[res];
-		}
-	}
-	return NULL;
 }
 
 
@@ -285,15 +270,6 @@ init_interests(void)
 }
 
 static void
-init_glob_ctx(void)
-{
-	for (index_t i = 0; i < countof(glob_ctx); i++) {
-		glob_ctx[i].snk = -1;
-	}
-	return;
-}
-
-static void
 init_glob_jq(void)
 {
 	glob_jq = &__glob_jq;
@@ -308,8 +284,6 @@ main (void)
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 
-	/* initialise the global context */
-	init_glob_ctx();
 	/* initialise global job q */
 	init_glob_jq();
 
@@ -359,16 +333,6 @@ main (void)
 	rr_wrk = 0;
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
-
-	/* kill all open connexions */
-	for (index_t res = 0; res < countof(glob_ctx); res++) {
-		if (LIKELY(glob_ctx[res].snk == -1)) {
-			continue;
-		}
-		UD_DEBUG("letting %d know\n", glob_ctx[res].snk);
-		write(glob_ctx[res].snk, emer_msg, countof(emer_msg) - 1);
-		ud_kick_mcast4(EV_A_ &glob_ctx[res]);
-	}
 
 	/* close the socket */
 	ud_detach_mcast4(EV_A);

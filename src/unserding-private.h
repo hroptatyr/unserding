@@ -90,197 +90,6 @@ typedef size_t index_t;
 #define aligned_sizeof(t)	ROUND(sizeof(t), __alignof(void*))
 
 
-/* connexion contexts */
-typedef struct conn_ctx_s *conn_ctx_t;
-typedef struct outbuf_s *outbuf_t;
-typedef struct outbuf_ring_s *outbuf_ring_t;
-
-/** Structure for output buffers */
-struct outbuf_s {
-	/** Length of the output buffer. */
-	size_t obuflen;
-	/** Index of ... */
-	index_t obufidx;
-	/** Output buffer, | with 1 if buffer must be freed after output. */
-	const char *obuf;
-};
-
-#define NOUTBUFS		16
-struct outbuf_ring_s {
-	pthread_mutex_t mtx;
-	index_t curr_idx;
-	struct outbuf_s obufs[NOUTBUFS];
-};
-
-static inline void __attribute__((always_inline, gnu_inline))
-init_outbuf(outbuf_t obuf)
-{
-	obuf->obuflen = obuf->obufidx = 0UL, obuf->obuf = NULL;
-	return;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-deinit_outbuf(outbuf_t obuf)
-{
-	return;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-lock_obring(outbuf_ring_t obring)
-{
-	pthread_mutex_lock(&obring->mtx);
-	return;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-unlock_obring(outbuf_ring_t obring)
-{
-	pthread_mutex_unlock(&obring->mtx);
-	return;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-init_obring(outbuf_ring_t obring)
-{
-	pthread_mutex_init(&obring->mtx, NULL);
-	obring->curr_idx = 0;
-	for (index_t i = 0; i < NOUTBUFS; i++) {
-		init_outbuf(&obring->obufs[i]);
-	}
-	return;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-deinit_obring(outbuf_ring_t obring)
-{
-	lock_obring(obring);
-	unlock_obring(obring);
-	pthread_mutex_destroy(&obring->mtx);
-	return;
-}
-
-static inline outbuf_t __attribute__((always_inline, gnu_inline))
-curr_outbuf(outbuf_ring_t obring)
-{
-	return &obring->obufs[obring->curr_idx];
-}
-
-static inline index_t __attribute__((always_inline, gnu_inline))
-step_obring_idx(index_t idx)
-{
-	return (idx + 1) % NOUTBUFS;
-}
-
-static inline outbuf_t __attribute__((always_inline, gnu_inline))
-next_outbuf(outbuf_ring_t obring)
-{
-	index_t idx;
-	for (idx = obring->curr_idx;
-	     obring->obufs[idx].obuf != NULL;
-	     idx = step_obring_idx(idx));
-	return &obring->obufs[idx];
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-free_outbuf(outbuf_t obuf)
-{
-	if ((long int)obuf->obuf & 1UL) {
-		free((void*)((long int)obuf->obuf & ~1UL));
-	}
-	/* reset the output buffer */
-	obuf->obuf = NULL;
-	return;
-}
-
-static inline bool __attribute__((always_inline, gnu_inline))
-outbuf_free_p(outbuf_t obuf)
-{
-	return obuf->obuf == NULL;
-}
-
-/** Size of the entire connexion context structure, VLA at the end. */
-#define SIZEOF_CONN_CTX_S	2048
-struct conn_ctx_s {
-	/* read io */
-	struct ev_io ALGN16(rio);
-	/* write io */
-	struct ev_io ALGN16(wio);
-	/* timer */
-	struct ev_timer ALGN16(ti);
-	int src;
-	int snk;
-	/** for udp based transports,
-	 * use a union here to allow clients to use whatever struct they want */
-	union {
-		/* this is the size we want at least */
-		char anon[32];
-#if defined SA_STRUCT
-		/* will be typically struct sockaddr_in6 */
-		SA_STRUCT sa;
-#endif
-	};
-	ev_tstamp timeout;
-	/** current pwd */
-	ud_cat_t pwd;
-	/** output buffer */
-	struct outbuf_ring_s obring;
-	/** input buffer */
-	index_t bidx;
-	char ALGN16(buf)[];
-} __attribute__((aligned(SIZEOF_CONN_CTX_S)));
-#define CONN_CTX_BUF_SIZE					\
-	SIZEOF_CONN_CTX_S - offsetof(struct conn_ctx_s, buf)
-
-static inline conn_ctx_t __attribute__((always_inline, gnu_inline))
-ev_rio_ctx(void *rio)
-{
-	return (void*)((char*)rio - offsetof(struct conn_ctx_s, rio));
-}
-
-static inline conn_ctx_t __attribute__((always_inline, gnu_inline))
-ev_wio_ctx(void *wio)
-{
-	return (void*)((char*)wio - offsetof(struct conn_ctx_s, wio));
-}
-
-static inline conn_ctx_t __attribute__((always_inline, gnu_inline))
-ev_timer_ctx(void *timer)
-{
-	return (void*)((char*)timer - offsetof(struct conn_ctx_s, ti));
-}
-
-static inline ev_io __attribute__((always_inline, gnu_inline)) *
-ctx_rio(conn_ctx_t ctx)
-{
-	return (void*)&ctx->rio;
-}
-
-static inline ev_io __attribute__((always_inline, gnu_inline)) *
-ctx_wio(conn_ctx_t ctx)
-{
-	return (void*)&ctx->wio;
-}
-
-static inline ev_timer __attribute__((always_inline, gnu_inline)) *
-ctx_timer(conn_ctx_t ctx)
-{
-	return (void*)&ctx->ti;
-}
-
-extern conn_ctx_t find_ctx(void);
-
-
-/* more socket goodness, defined in mcast4.c */
-extern int ud_attach_mcast4(EV_P);
-extern int ud_detach_mcast4(EV_P);
-extern void ud_print_mcast4(EV_P_ conn_ctx_t ctx, const char *m, size_t mlen);
-extern void ud_kick_mcast4(EV_P_ conn_ctx_t ctx);
-
-/* readline goodness, defined in stdin.c */
-extern int ud_attach_stdin(EV_P);
-extern int ud_detach_stdin(EV_P);
-
-
 /* job queue magic */
 /* we use a fairly simplistic approach: one vector with two index pointers */
 /* number of simultaneous jobs */
@@ -297,18 +106,31 @@ typedef void(*ud_work_f)(job_t);
 typedef void(*ud_free_f)(job_t);
 /**
  * Type for print functions inside jobs. */
-typedef void(*ud_prnt_f)(EV_P_ conn_ctx_t, const char*, size_t);
+typedef void(*ud_prnt_f)(EV_P_ job_t);
 
-#define SIZEOF_JOB_S	1024
+#define SIZEOF_JOB_S	4096
 struct job_s {
 	ud_work_f workf;
 	ud_free_f freef;
 	ud_prnt_f prntf;
 	void *clo;
-	char ALGN16(work_space)[];
+	/** socket */
+	int sock;
+	/** for udp based transports,
+	 * use a union here to allow clients to use whatever struct they want */
+	union {
+		/* this is the size we want at least */
+		char anon[32];
+#if defined SA_STRUCT
+		/* will be typically struct sockaddr_in6 */
+		SA_STRUCT sa;
+#endif
+	};
+	size_t blen;
+	char ALGN16(buf)[];
 } __attribute__((aligned(SIZEOF_JOB_S)));
-#define JOB_WORK_SPACE_SIZE					\
-	SIZEOF_JOB_S - offsetof(struct job_s, work_space)
+#define JOB_BUF_SIZE						\
+	SIZEOF_JOB_S - offsetof(struct job_s, buf)
 
 struct job_queue_s {
 	/* read index, where to read the next job */
@@ -320,6 +142,18 @@ struct job_queue_s {
 	/* the jobs vector */
 	struct job_s jobs[NJOBS];
 };
+
+static inline job_t __attribute__((always_inline, gnu_inline))
+__curr_rjob(job_queue_t jq)
+{
+	return &jq->jobs[jq->ri];
+}
+
+static inline job_t __attribute__((always_inline, gnu_inline))
+__curr_wjob(job_queue_t jq)
+{
+	return &jq->jobs[jq->wi];
+}
 
 static inline index_t __attribute__((always_inline, gnu_inline))
 __next_job(job_queue_t jq)
@@ -339,44 +173,24 @@ __next_job(job_queue_t jq)
 }
 
 static inline job_t __attribute__((always_inline, gnu_inline))
-enqueue_job(job_queue_t jq,
-	    ud_work_f workf, ud_prnt_f prntf, ud_free_f freef, void *clo)
+obtain_job(job_queue_t jq)
 {
 	job_t res;
 	pthread_mutex_lock(&jq->mtx);
-	res = &jq->jobs[jq->wi];
-	/* dont check if the queue is full, just go assume our pipes are
-	 * always large enough */
-	res->workf = workf;
-	res->prntf = prntf;
-	res->freef = freef;
-	res->clo = clo;
-	jq->wi = __next_job(jq);
+	res = __curr_wjob(jq);
 	pthread_mutex_unlock(&jq->mtx);
 	return res;
 }
 
-static inline job_t __attribute__((always_inline, gnu_inline))
-enqueue_job_cp_ws(job_queue_t jq,
-		  ud_work_f workf, ud_prnt_f prntf, ud_free_f freef, 
-		  void *clo, const void *stu, size_t len)
+static inline void __attribute__((always_inline, gnu_inline))
+enqueue_job(job_queue_t jq, job_t j)
 {
-/* enqueue the job and copy stuff over to the job's work space */
-	job_t res;
-	pthread_mutex_lock(&jq->mtx);
-	res = &jq->jobs[jq->wi];
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
-	res->workf = workf;
-	res->clo = clo;
-	/* copy over the baloney in stu
-	 * we dont check the length here, brilliant aye? */
-	memcpy(&res->work_space, stu, len);
-	res->work_space[len] = '\0';
-	/* inc the job counter */
+	pthread_mutex_lock(&jq->mtx);
 	jq->wi = __next_job(jq);
 	pthread_mutex_unlock(&jq->mtx);
-	return res;
+	return;
 }
 
 static inline job_t __attribute__((always_inline, gnu_inline))
@@ -405,6 +219,16 @@ free_job(job_t j)
 }
 
 extern job_queue_t glob_jq;
+
+
+/* more socket goodness, defined in mcast4.c */
+extern int ud_attach_mcast4(EV_P);
+extern int ud_detach_mcast4(EV_P);
+extern void ud_print_mcast4(EV_P_ job_t j);
+
+/* readline goodness, defined in stdin.c */
+extern int ud_attach_stdin(EV_P);
+extern int ud_detach_stdin(EV_P);
 
 /* some special work functions */
 extern void ud_parse(job_t);

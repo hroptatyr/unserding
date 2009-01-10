@@ -87,7 +87,6 @@
 
 static const char inv_rpl[] = "invalid command, better luck next time\n";
 
-#define countof_m1(_x)		(countof(_x) - 1)
 #define MAKE_SIMPLE_CMD(_c, _r)				\
 	static const char ALGN16(_c##_cmd)[] = #_c;	\
 	static const char ALGN16(_c##_rpl)[] = _r;
@@ -214,7 +213,6 @@ ud_parse(job_t j)
 #define INNIT(_cmd)				\
 	else if (memcmp(j->buf, _cmd, countof_m1(_cmd)) == 0 &&	\
 		 ((j->buf[countof_m1(_cmd)] == '\n') ||		\
-		  (j->buf[countof_m1(_cmd)] == ' ') ||		\
 		  (j->buf[countof_m1(_cmd)] == '\0')))
 
 	/* starting somewhat slowly with a memcmp */

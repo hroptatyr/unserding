@@ -84,6 +84,7 @@ typedef size_t index_t;
 #define ALGN16(_x)	__attribute__((aligned(16))) _x
 
 #define countof(x)		(sizeof(x) / sizeof(*x))
+#define countof_m1(x)		(countof(x) - 1)
 
 /* The encoded parameter sizes will be rounded up to match pointer alignment. */
 #define ROUND(s, a)		(a * ((s + a - 1) / a))

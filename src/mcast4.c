@@ -66,13 +66,24 @@
 #include "unserding.h"
 #include "unserding-private.h"
 
-#define MCAST_TIMEOUT		60
+#define S2S_BRAG_RATE		10
 #define UDP_MULTICAST_TTL	16
 
 static int lsock __attribute__((used));
-static ev_io __srv_watcher __attribute__((aligned(16)));
+static ev_io ALGN16(__srv_watcher);
+static ev_timer ALGN16(__s2s_watcher);
 static struct ip_mreq mreq4;
 static struct ipv6_mreq mreq6;
+/* server to client goodness */
+static struct sockaddr_in6 __s2c_sa;
+/* server to server goodness */
+/* for s2s keep alive */
+static struct sockaddr_in6 __s2s_sa;
+
+#define MAXHOSTNAMELEN		64
+/* text section */
+size_t s2s_oi_len;
+static char s2s_oi[MAXHOSTNAMELEN] = "oi ";
 
 
 /* socket goodies */
@@ -122,7 +133,7 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 {
 	volatile int s;
 	int retval;
-	int one = 1;
+	int UNUSED(one) = 1, UNUSED(zero) = 0;
 	unsigned char ttl = UDP_MULTICAST_TTL;
 
 	s = socket(lres->ai_family, SOCK_DGRAM, 0);
@@ -155,10 +166,24 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 		UD_DEBUG_MCAST("listening to udp://"
 			       UD_MCAST4_ADDR ":" UD_NETWORK_SERVICE "\n");
 	}
+	/* also join the server to server crew */
+	inet_pton(AF_INET, UD_MCAST4S2S_ADDR, &mreq4.imr_multiaddr.s_addr);
+	mreq4.imr_interface.s_addr = htonl(INADDR_ANY);
+	/* now truly join */
+	if (UNLIKELY(setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+				&mreq4, sizeof(mreq4)) < 0)) {
+		UD_DEBUG_MCAST("could not join the multicast group\n");
+	} else {
+		UD_DEBUG_MCAST("listening to udp://"
+			       UD_MCAST4S2S_ADDR ":" UD_NETWORK_SERVICE "\n");
+	}
 
 	/* set up the multi6cast group and join it */
 	inet_pton(AF_INET6, UD_MCAST6_ADDR, &mreq6.ipv6mr_multiaddr.s6_addr);
 	mreq6.ipv6mr_interface = 0;
+	/* endow our s2s struct */
+	memcpy(&__s2c_sa, lres->ai_addr, sizeof(__s2c_sa));
+	__s2c_sa.sin6_addr = mreq6.ipv6mr_multiaddr;
 	/* now truly join */
 	if (UNLIKELY(setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 				&mreq6, sizeof(mreq6)) < 0)) {
@@ -168,9 +193,23 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 			       "[" UD_MCAST6_ADDR "]" ":"
 			       UD_NETWORK_SERVICE "\n");
 	}
+	/* join the s2s lads */
+	inet_pton(AF_INET6, UD_MCAST6S2S_ADDR, &mreq6.ipv6mr_multiaddr.s6_addr);
+	mreq6.ipv6mr_interface = 0;
+	/* endow our s2s struct */
+	memcpy(&__s2s_sa, lres->ai_addr, sizeof(__s2s_sa));
+	__s2s_sa.sin6_addr = mreq6.ipv6mr_multiaddr;
+	if (UNLIKELY(setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+				&mreq6, sizeof(mreq6)) < 0)) {
+		UD_DEBUG_MCAST("could not join the multi6cast group\n");
+	} else {
+		UD_DEBUG_MCAST("listening to udp://"
+			       "[" UD_MCAST6S2S_ADDR "]" ":"
+			       UD_NETWORK_SERVICE "\n");
+	}
 
 	/* turn into a mcast sock and set a TTL */
-	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &one, sizeof(one));
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &zero, sizeof(zero));
 	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
 	/* return the socket we've got */
 	return s;
@@ -292,25 +331,59 @@ ud_print_mcast4(EV_P_ job_t j)
 }
 
 
+static void
+s2s_oi_cb(EV_P_ ev_timer *w, int revents)
+{
+	UD_DEBUG("boasting about my balls ... god, are they big\n");
+	/* s2s msg */
+	(void)sendto(lsock, s2s_oi, s2s_oi_len, 0,
+		     (struct sockaddr*)&__s2s_sa,
+		     __s2s_sa.sin6_family == PF_INET6
+		     ? sizeof(struct sockaddr_in6)
+		     : sizeof(struct sockaddr_in));
+	/* restart the timer */
+	ev_timer_again(EV_A_ w);
+	return;
+}
+
+
 int
 ud_attach_mcast4(EV_P)
 {
 	ev_io *srv_watcher = &__srv_watcher;
+	ev_timer *s2s_watcher = &__s2s_watcher;
 
 	/* get us a global sock */
-	lsock = mcast_listener_init();
-
-	if (LIKELY(lsock >= 0)) {
-		/* initialise an io watcher, then start it */
-		ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
-		ev_io_start(EV_A_ srv_watcher);
+	if (UNLIKELY((lsock = mcast_listener_init()) < 0)) {
+		return -1;
 	}
+
+	/* obtain the hostname */
+	(void)gethostname(s2s_oi + 3, countof(s2s_oi));
+	/* \n-ify */
+	s2s_oi[s2s_oi_len = strlen(s2s_oi)] = '\n';
+	s2s_oi_len++;
+
+	/* initialise an io watcher, then start it */
+	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
+	ev_io_start(EV_A_ srv_watcher);
+	/* initialise s2s crew */
+	ev_timer_init(s2s_watcher, s2s_oi_cb, 0.0, S2S_BRAG_RATE);
+	ev_timer_again(EV_A_ s2s_watcher);
 	return 0;
 }
 
 int
 ud_detach_mcast4(EV_P)
 {
+	ev_io *srv_watcher = &__srv_watcher;
+	ev_timer *s2s_watcher = &__s2s_watcher;
+
+	/* stop the guy that watches the socket */
+	ev_io_stop(EV_A_ srv_watcher);
+	/* stop the timer */
+	ev_timer_stop(EV_A_ s2s_watcher);
+
 	if (LIKELY(lsock >= 0)) {
 		/* drop multicast group membership */
 		setsockopt(lsock, IPPROTO_IP, IP_DROP_MEMBERSHIP,

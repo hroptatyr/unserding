@@ -69,27 +69,23 @@
 #define S2S_BRAG_RATE		10
 #define UDP_MULTICAST_TTL	16
 
-static int l4sock __attribute__((used));
-static int l6sock __attribute__((used));
-static ev_io ALGN16(__srv4_watcher);
-static ev_io ALGN16(__srv6_watcher);
+#if !defined HAVE_GETADDRINFO
+# error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
+#endif
+
+static int lsock __attribute__((used));
+static ev_io ALGN16(__srv_watcher);
 static ev_timer ALGN16(__s2s_watcher);
-static struct ip_mreq mreq4_s2c;
-static struct ip_mreq mreq4_s2s;
-static struct ipv6_mreq mreq6_s2c;
-static struct ipv6_mreq mreq6_s2s;
+static struct ip_mreq ALGN16(mreq4);
+static struct ipv6_mreq ALGN16(mreq6);
 /* server to client goodness */
-static struct sockaddr_in6 __s2c_sa6;
-static struct sockaddr_in __s2c_sa4;
-/* server to server goodness */
-/* for s2s keep alive */
-static struct sockaddr_in __s2s_sa4;
-static struct sockaddr_in6 __s2s_sa6;
+static struct sockaddr_in6 __sa6;
+static struct sockaddr_in __sa4;
 
 #define MAXHOSTNAMELEN		64
 /* text section */
 size_t s2s_oi_len;
-static char s2s_oi[MAXHOSTNAMELEN] = "oi ";
+static char s2s_oi[MAXHOSTNAMELEN] = "hy ";
 
 
 /* socket goodies */
@@ -241,62 +237,8 @@ mcast_listener_try(volatile struct addrinfo *lres)
 	return s;
 }
 
-#if defined HAVE_GETADDRINFO
 static int
-mcast4_listener_init(void)
-{
-	struct addrinfo *res;
-	const struct addrinfo hints = {
-		/* allow both v6 and v4 */
-		.ai_family = AF_INET,
-		.ai_socktype = SOCK_DGRAM,
-		.ai_protocol = IPPROTO_UDP,
-		/* specify to whom we listen */
-		.ai_flags = AI_PASSIVE | AI_ALL | AI_NUMERICHOST,
-		/* naught out the rest */
-		.ai_canonname = NULL,
-		.ai_addr = NULL,
-		.ai_next = NULL,
-	};
-	int retval;
-	volatile int s;
-
-	retval = getaddrinfo(NULL, UD_NETWORK_SERVICE, &hints, &res);
-	if (retval != 0) {
-		/* abort(); */
-		return -1;
-	}
-	for (struct addrinfo *lres = res; lres; lres = lres->ai_next) {
-		if ((s = mcast_listener_try(lres)) >= 0) {
-			UD_DEBUG_MCAST(":sock %d  :proto %d :host %s\n",
-					s, lres->ai_protocol,
-					lres->ai_canonname);
-
-			/* join the mcast group */
-			__mcast4_join_group(s, UD_MCAST4_ADDR, &mreq4_s2c);
-			/* also join the server to server crew */
-			__mcast4_join_group(s, UD_MCAST4S2S_ADDR, &mreq4_s2s);
-			/* endow our s2c and s2s structs */
-			memcpy(&__s2c_sa4, lres->ai_addr, sizeof(__s2c_sa4));
-			__s2c_sa4.sin_addr = mreq4_s2c.imr_multiaddr;
-			memcpy(&__s2s_sa4, lres->ai_addr, sizeof(__s2s_sa4));
-			__s2s_sa4.sin_addr = mreq4_s2s.imr_multiaddr;
-			break;
-		}
-	}
-
-	freeaddrinfo(res);
-	/* return the socket we've got */
-	/* succeeded if > 0 */
-	return s;
-}
-#else  /* !GETADDRINFO */
-# error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
-#endif
-
-#if defined HAVE_GETADDRINFO
-static int
-mcast6_listener_init(void)
+mcast46_listener_init(void)
 {
 	struct addrinfo *res;
 	const struct addrinfo hints = {
@@ -322,14 +264,15 @@ mcast6_listener_init(void)
 	for (struct addrinfo *lres = res; lres; lres = lres->ai_next) {
 		if ((s = mcast_listener_try(lres)) >= 0) {
 			/* join the mcast group */
-			__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6_s2c);
-			/* also join the server to server crew */
-			__mcast6_join_group(s, UD_MCAST6S2S_ADDR, &mreq6_s2s);
+			__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6);
 			/* endow our s2c and s2s structs */
-			memcpy(&__s2c_sa6, lres->ai_addr, sizeof(__s2c_sa6));
-			__s2c_sa6.sin6_addr = mreq6_s2c.ipv6mr_multiaddr;
-			memcpy(&__s2s_sa6, lres->ai_addr, sizeof(__s2s_sa6));
-			__s2s_sa6.sin6_addr = mreq6_s2s.ipv6mr_multiaddr;
+			memcpy(&__sa6, lres->ai_addr, sizeof(__sa6));
+			__sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+			/* join the mcast group */
+			__mcast4_join_group(s, UD_MCAST4_ADDR, &mreq4);
+			/* endow our s2c and s2s structs */
+			memcpy(&__sa4, lres->ai_addr, sizeof(__sa4));
+			__sa4.sin_addr = mreq4.imr_multiaddr;
 
 			UD_DEBUG_MCAST(":sock %d  :proto %d :host %s\n",
 				       s, lres->ai_protocol,
@@ -343,9 +286,6 @@ mcast6_listener_init(void)
 	/* succeeded if > 0 */
 	return s;
 }
-#else  /* !GETADDRINFO */
-# error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
-#endif
 
 static void
 mcast_listener_deinit(int sock)
@@ -405,6 +345,8 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	return;
 }
 
+#if 0
+/* later */
 static void
 mcast_inco_cb2(EV_P_ ev_io *w, int revents)
 {
@@ -492,56 +434,12 @@ mcast_inco_cb2(EV_P_ ev_io *w, int revents)
 	}
 	return;
 }
+#endif	/* 0 */
 
 
 static void
 nothing(job_t j)
 {
-	return;
-}
-
-/* this callback is called when data on the s2s sock is readable */
-static void
-mcasts2s_inco_cb(EV_P_ ev_io *w, int revents)
-{
-	ssize_t nread;
-	char buf[INET6_ADDRSTRLEN];
-	/* the address in human readable form */
-	const char *a;
-	/* the port (in host-byte order) */
-	uint16_t p;
-	/* a job */
-	job_t j = obtain_job(glob_jq);
-	socklen_t lsa = sizeof(j->sa);
-
-	nread = recvfrom(j->sock = w->fd, j->buf, JOB_BUF_SIZE, 0,
-			 &j->sa, &lsa);
-	/* obtain the address in human readable form */
-	a = inet_ntop(j->sa.sin6_family,
-		      j->sa.sin6_family == PF_INET6
-		      ? (void*)&j->sa.sin6_addr
-		      : (void*)&((struct sockaddr_in*)&j->sa)->sin_addr,
-		      buf, sizeof(buf));
-	p = ntohs(j->sa.sin6_port);
-	UD_DEBUG_MCAST("s2s: connect from host %s, port %d.\n", a, p);
-
-	/* handle the reading */
-	if (UNLIKELY(nread <= 0)) {
-		UD_CRITICAL_MCAST("could not handle incoming connection\n");
-		/* is that wise? */
-		mcast_listener_deinit(w->fd);
-
-	} else {
-		j->blen = nread;
-		j->workf = nothing;
-		j->prntf = ud_print_mcast4;
-
-		/* enqueue t3h job and copy the input buffer over to
-		 * the job's work space */
-		enqueue_job(glob_jq, j);
-		/* now notify the slaves */
-		trigger_job_queue();
-	}
 	return;
 }
 
@@ -556,31 +454,19 @@ ud_print_mcast4(EV_P_ job_t j)
 		       j->sa.sin6_family == PF_INET6
 		       ? sizeof(struct sockaddr_in6)
 		       : sizeof(struct sockaddr_in));
-	UD_DEBUG_MCAST("sent %ld bytes to %d\n", nwrit, j->sock);
-	//trigger_evloop(EV_A);
 	return;
 }
 
 
 static void
-s2s4_oi_cb(EV_P_ ev_timer *w, int revents)
+s2s_oi_cb(EV_P_ ev_timer *w, int revents)
 {
 	UD_DEBUG("boasting about my balls ... god, are they big\n");
 	/* s2s msg */
-	(void)sendto(l4sock, s2s_oi, s2s_oi_len, 0,
-		     (struct sockaddr*)&__s2s_sa4, sizeof(struct sockaddr_in));
-	/* restart the timer */
-	ev_timer_again(EV_A_ w);
-	return;
-}
-
-static void
-s2s6_oi_cb(EV_P_ ev_timer *w, int revents)
-{
-	UD_DEBUG("boasting about my balls ... god, are they big\n");
-	/* s2s msg */
-	(void)sendto(l6sock, s2s_oi, s2s_oi_len, 0,
-		     (struct sockaddr*)&__s2s_sa6, sizeof(struct sockaddr_in6));
+	(void)sendto(lsock, s2s_oi, s2s_oi_len, 0,
+		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
+	(void)sendto(lsock, s2s_oi, s2s_oi_len, 0,
+		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
 	/* restart the timer */
 	ev_timer_again(EV_A_ w);
 	return;
@@ -590,18 +476,13 @@ s2s6_oi_cb(EV_P_ ev_timer *w, int revents)
 int
 ud_attach_mcast4(EV_P)
 {
-	ev_io *srv4_watcher = &__srv4_watcher;
-	ev_io *srv6_watcher = &__srv6_watcher;
-#if 0
-	ev_io *srvs2s_watcher = &__srvs2s_watcher;
+	ev_io *srv_watcher = &__srv_watcher;
 	ev_timer *s2s_watcher = &__s2s_watcher;
-#endif
 
 	/* get us a global sock */
-	l4sock = mcast4_listener_init();
-	l6sock = mcast6_listener_init();
+	lsock = mcast46_listener_init();
 
-	if (UNLIKELY(l4sock < 0 && l6sock < 0)) {
+	if (UNLIKELY(lsock < 0)) {
 		return -1;
 	}
 
@@ -612,56 +493,33 @@ ud_attach_mcast4(EV_P)
 	s2s_oi_len++;
 
 	/* initialise an io watcher, then start it */
-	ev_io_init(srv4_watcher, mcast_inco_cb, l4sock, EV_READ);
-	ev_io_start(EV_A_ srv4_watcher);
+	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
+	ev_io_start(EV_A_ srv_watcher);
 
-	ev_io_init(srv6_watcher, mcast_inco_cb, l6sock, EV_READ);
-	ev_io_start(EV_A_ srv6_watcher);
-
-#if 0
-	/* initialise s2s crew */
-	ev_io_init(srvs2s_watcher, mcasts2s_inco_cb, s2ssock, EV_READ);
-	ev_io_start(EV_A_ srvs2s_watcher);
+	/* init the s2s timer */
 	ev_timer_init(s2s_watcher, s2s_oi_cb, 0.0, S2S_BRAG_RATE);
 	ev_timer_again(EV_A_ s2s_watcher);
-#endif
 	return 0;
 }
 
 int
 ud_detach_mcast4(EV_P)
 {
-	ev_io *srv4_watcher = &__srv4_watcher;
-	ev_io *srv6_watcher = &__srv6_watcher;
-#if 0
-	ev_io *srvs2s_watcher = &__srvs2s_watcher;
+	ev_io *srv_watcher = &__srv_watcher;
 	ev_timer *s2s_watcher = &__s2s_watcher;
-#endif
 
 	/* stop the guy that watches the socket */
-	ev_io_stop(EV_A_ srv4_watcher);
-	ev_io_stop(EV_A_ srv6_watcher);
+	ev_io_stop(EV_A_ srv_watcher);
 
-#if 0
-	/* stop the guy that watches the socket */
-	ev_io_stop(EV_A_ srvs2s_watcher);
 	/* stop the timer */
 	ev_timer_stop(EV_A_ s2s_watcher);
-#endif
 
-	if (LIKELY(l4sock >= 0)) {
+	if (LIKELY(lsock >= 0)) {
 		/* drop multicast group membership */
-		__mcast4_leave_group(l4sock, &mreq4_s2c);
-		__mcast4_leave_group(l4sock, &mreq4_s2s);
+		__mcast4_leave_group(lsock, &mreq4);
+		__mcast6_leave_group(lsock, &mreq6);
 		/* and kick the socket */
-		mcast_listener_deinit(l4sock);
-	}
-	if (LIKELY(l6sock >= 0)) {
-		/* drop multicast group membership */
-		__mcast6_leave_group(l6sock, &mreq6_s2c);
-		__mcast6_leave_group(l6sock, &mreq6_s2s);
-		/* and kick the socket */
-		mcast_listener_deinit(l6sock);
+		mcast_listener_deinit(lsock);
 	}
 	return 0;
 }

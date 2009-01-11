@@ -213,6 +213,7 @@ ud_parse(job_t j)
 #define INNIT(_cmd)				\
 	else if (memcmp(j->buf, _cmd, countof_m1(_cmd)) == 0 &&	\
 		 ((j->buf[countof_m1(_cmd)] == '\n') ||		\
+		  (j->buf[countof_m1(_cmd)] == ' ') ||		\
 		  (j->buf[countof_m1(_cmd)] == '\0')))
 
 	/* starting somewhat slowly with a memcmp */
@@ -288,9 +289,12 @@ ud_parse(job_t j)
 		j->prntf(EV_DEFAULT_ j);
 
 	} else {
+#if 0
 		/* print an error */
 		memcpy(j->buf, inv_rpl, j->blen = countof_m1(inv_rpl));
 		j->prntf(EV_DEFAULT_ j);
+#endif
+		j->blen = 0;
 	}
 #undef INNIT
 #undef INNIT_CPL

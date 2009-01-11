@@ -65,6 +65,7 @@
 #define SA_STRUCT		struct sockaddr_in6
 #include "unserding.h"
 #include "unserding-private.h"
+#include "protocore.h"
 
 #define S2S_BRAG_RATE		10
 #define UDP_MULTICAST_TTL	16
@@ -437,7 +438,7 @@ mcast_inco_cb2(EV_P_ ev_io *w, int revents)
 #endif	/* 0 */
 
 
-static void
+static void __attribute__((unused))
 nothing(job_t j)
 {
 	return;

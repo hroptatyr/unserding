@@ -40,6 +40,7 @@
 
 #include <pthread.h>
 #include <string.h>
+#include <stdint.h>
 
 #if defined HAVE_EV_H
 # include <ev.h>

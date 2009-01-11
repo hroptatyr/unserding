@@ -69,16 +69,22 @@
 #define S2S_BRAG_RATE		10
 #define UDP_MULTICAST_TTL	16
 
-static int lsock __attribute__((used));
-static ev_io ALGN16(__srv_watcher);
+static int l4sock __attribute__((used));
+static int l6sock __attribute__((used));
+static ev_io ALGN16(__srv4_watcher);
+static ev_io ALGN16(__srv6_watcher);
 static ev_timer ALGN16(__s2s_watcher);
-static struct ip_mreq mreq4;
-static struct ipv6_mreq mreq6;
+static struct ip_mreq mreq4_s2c;
+static struct ip_mreq mreq4_s2s;
+static struct ipv6_mreq mreq6_s2c;
+static struct ipv6_mreq mreq6_s2s;
 /* server to client goodness */
-static struct sockaddr_in6 __s2c_sa;
+static struct sockaddr_in6 __s2c_sa6;
+static struct sockaddr_in __s2c_sa4;
 /* server to server goodness */
 /* for s2s keep alive */
-static struct sockaddr_in6 __s2s_sa;
+static struct sockaddr_in __s2s_sa4;
+static struct sockaddr_in6 __s2s_sa6;
 
 #define MAXHOSTNAMELEN		64
 /* text section */
@@ -128,13 +134,91 @@ __linger_sock(int sock)
 	return;
 }
 
+static void
+__mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
+{
+	int UNUSED(one) = 1, UNUSED(zero) = 0;
+
+#if defined IP_PKTINFO && 0
+	/* turn on packet info, very linux-ish!!! */
+	setsockopt(s, IPPROTO_IPV6, IP_PKTINFO, &one, sizeof(one)) ;
+#endif
+#if defined IP_RECVSTDADDR && 0
+	/* turn on destination addr */
+	setsockopt(s, IPPROTO_IPV6, IP_RECVSTDADDR, &one, sizeof(one)) ;
+#endif
+	/* turn off loopback */
+	setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &zero, sizeof(zero));
+
+	/* set up the multicast group and join it */
+	inet_pton(AF_INET, addr, &mreq->imr_multiaddr.s_addr);
+	mreq->imr_interface.s_addr = htonl(INADDR_ANY);
+	/* now truly join */
+	if (UNLIKELY(setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+				mreq, sizeof(*mreq)) < 0)) {
+		UD_DEBUG_MCAST("could not join the multicast group\n");
+	} else {
+		UD_DEBUG_MCAST("port %d listening to udp://%s"
+			       ":" UD_NETWORK_SERVICE "\n", s, addr);
+	}
+	return;
+}
+
+static void
+__mcast6_join_group(int s, const char *addr, struct ipv6_mreq *mreq)
+{
+	int UNUSED(one) = 1, UNUSED(zero) = 0;
+	unsigned char ttl = UDP_MULTICAST_TTL;
+
+#if defined IPV6_PKTINFO && 0
+	/* turn on packet info, very linux-ish!!! */
+	setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &one, sizeof(one));
+#endif
+#if defined IPV6_RECVPKTINFO && 0
+	/* turn on destination addr */
+	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &one, sizeof(one));
+#endif
+	/* turn into a mcast sock and set a TTL */
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &zero, sizeof(zero));
+	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &one, sizeof(one));
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
+
+	/* set up the multicast group and join it */
+	inet_pton(AF_INET6, addr, &mreq->ipv6mr_multiaddr.s6_addr);
+	mreq->ipv6mr_interface = 0;
+
+	/* now truly join */
+	if (UNLIKELY(setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+				mreq, sizeof(*mreq)) < 0)) {
+		UD_DEBUG_MCAST("could not join the multi6cast group\n");
+	} else {
+		UD_DEBUG_MCAST("port %d listening to udp://[%s]"
+			       ":" UD_NETWORK_SERVICE "\n", s, addr);
+	}
+	return;
+}
+
+static void
+__mcast4_leave_group(int s, struct ip_mreq *mreq)
+{
+	/* drop multicast group membership */
+	setsockopt(s, IPPROTO_IP, IP_DROP_MEMBERSHIP, mreq, sizeof(*mreq));
+	return;
+}
+
+static void
+__mcast6_leave_group(int s, struct ipv6_mreq *mreq)
+{
+	/* drop mcast6 group membership */
+	setsockopt(s, IPPROTO_IPV6, IPV6_LEAVE_GROUP, mreq, sizeof(*mreq));
+	return;
+}
+
 static int
-_mcast_listener_try(volatile struct addrinfo *lres)
+mcast_listener_try(volatile struct addrinfo *lres)
 {
 	volatile int s;
 	int retval;
-	int UNUSED(one) = 1, UNUSED(zero) = 0;
-	unsigned char ttl = UDP_MULTICAST_TTL;
 
 	s = socket(lres->ai_family, SOCK_DGRAM, 0);
 	if (s < 0) {
@@ -154,70 +238,65 @@ _mcast_listener_try(volatile struct addrinfo *lres)
 			       ":" UD_NETWORK_SERVICE "\n",
 			       lres->ai_canonname);
 	}
-
-	/* set up the multicast group and join it */
-	inet_pton(AF_INET, UD_MCAST4_ADDR, &mreq4.imr_multiaddr.s_addr);
-	mreq4.imr_interface.s_addr = htonl(INADDR_ANY);
-	/* now truly join */
-	if (UNLIKELY(setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
-				&mreq4, sizeof(mreq4)) < 0)) {
-		UD_DEBUG_MCAST("could not join the multicast group\n");
-	} else {
-		UD_DEBUG_MCAST("listening to udp://"
-			       UD_MCAST4_ADDR ":" UD_NETWORK_SERVICE "\n");
-	}
-	/* also join the server to server crew */
-	inet_pton(AF_INET, UD_MCAST4S2S_ADDR, &mreq4.imr_multiaddr.s_addr);
-	mreq4.imr_interface.s_addr = htonl(INADDR_ANY);
-	/* now truly join */
-	if (UNLIKELY(setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
-				&mreq4, sizeof(mreq4)) < 0)) {
-		UD_DEBUG_MCAST("could not join the multicast group\n");
-	} else {
-		UD_DEBUG_MCAST("listening to udp://"
-			       UD_MCAST4S2S_ADDR ":" UD_NETWORK_SERVICE "\n");
-	}
-
-	/* set up the multi6cast group and join it */
-	inet_pton(AF_INET6, UD_MCAST6_ADDR, &mreq6.ipv6mr_multiaddr.s6_addr);
-	mreq6.ipv6mr_interface = 0;
-	/* endow our s2s struct */
-	memcpy(&__s2c_sa, lres->ai_addr, sizeof(__s2c_sa));
-	__s2c_sa.sin6_addr = mreq6.ipv6mr_multiaddr;
-	/* now truly join */
-	if (UNLIKELY(setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-				&mreq6, sizeof(mreq6)) < 0)) {
-		UD_DEBUG_MCAST("could not join the multi6cast group\n");
-	} else {
-		UD_DEBUG_MCAST("listening to udp://"
-			       "[" UD_MCAST6_ADDR "]" ":"
-			       UD_NETWORK_SERVICE "\n");
-	}
-	/* join the s2s lads */
-	inet_pton(AF_INET6, UD_MCAST6S2S_ADDR, &mreq6.ipv6mr_multiaddr.s6_addr);
-	mreq6.ipv6mr_interface = 0;
-	/* endow our s2s struct */
-	memcpy(&__s2s_sa, lres->ai_addr, sizeof(__s2s_sa));
-	__s2s_sa.sin6_addr = mreq6.ipv6mr_multiaddr;
-	if (UNLIKELY(setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-				&mreq6, sizeof(mreq6)) < 0)) {
-		UD_DEBUG_MCAST("could not join the multi6cast group\n");
-	} else {
-		UD_DEBUG_MCAST("listening to udp://"
-			       "[" UD_MCAST6S2S_ADDR "]" ":"
-			       UD_NETWORK_SERVICE "\n");
-	}
-
-	/* turn into a mcast sock and set a TTL */
-	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &zero, sizeof(zero));
-	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
-	/* return the socket we've got */
 	return s;
 }
 
 #if defined HAVE_GETADDRINFO
 static int
-mcast_listener_init(void)
+mcast4_listener_init(void)
+{
+	struct addrinfo *res;
+	const struct addrinfo hints = {
+		/* allow both v6 and v4 */
+		.ai_family = AF_INET,
+		.ai_socktype = SOCK_DGRAM,
+		.ai_protocol = IPPROTO_UDP,
+		/* specify to whom we listen */
+		.ai_flags = AI_PASSIVE | AI_ALL | AI_NUMERICHOST,
+		/* naught out the rest */
+		.ai_canonname = NULL,
+		.ai_addr = NULL,
+		.ai_next = NULL,
+	};
+	int retval;
+	volatile int s;
+
+	retval = getaddrinfo(NULL, UD_NETWORK_SERVICE, &hints, &res);
+	if (retval != 0) {
+		/* abort(); */
+		return -1;
+	}
+	for (struct addrinfo *lres = res; lres; lres = lres->ai_next) {
+		if ((s = mcast_listener_try(lres)) >= 0) {
+			UD_DEBUG_MCAST(":sock %d  :proto %d :host %s\n",
+					s, lres->ai_protocol,
+					lres->ai_canonname);
+
+			/* join the mcast group */
+			__mcast4_join_group(s, UD_MCAST4_ADDR, &mreq4_s2c);
+			/* also join the server to server crew */
+			__mcast4_join_group(s, UD_MCAST4S2S_ADDR, &mreq4_s2s);
+			/* endow our s2c and s2s structs */
+			memcpy(&__s2c_sa4, lres->ai_addr, sizeof(__s2c_sa4));
+			__s2c_sa4.sin_addr = mreq4_s2c.imr_multiaddr;
+			memcpy(&__s2s_sa4, lres->ai_addr, sizeof(__s2s_sa4));
+			__s2s_sa4.sin_addr = mreq4_s2s.imr_multiaddr;
+			break;
+		}
+	}
+
+	freeaddrinfo(res);
+	/* return the socket we've got */
+	/* succeeded if > 0 */
+	return s;
+}
+#else  /* !GETADDRINFO */
+# error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
+#endif
+
+#if defined HAVE_GETADDRINFO
+static int
+mcast6_listener_init(void)
 {
 	struct addrinfo *res;
 	const struct addrinfo hints = {
@@ -241,15 +320,26 @@ mcast_listener_init(void)
 		return -1;
 	}
 	for (struct addrinfo *lres = res; lres; lres = lres->ai_next) {
-		if ((s = _mcast_listener_try(lres)) >= 0) {
+		if ((s = mcast_listener_try(lres)) >= 0) {
+			/* join the mcast group */
+			__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6_s2c);
+			/* also join the server to server crew */
+			__mcast6_join_group(s, UD_MCAST6S2S_ADDR, &mreq6_s2s);
+			/* endow our s2c and s2s structs */
+			memcpy(&__s2c_sa6, lres->ai_addr, sizeof(__s2c_sa6));
+			__s2c_sa6.sin6_addr = mreq6_s2c.ipv6mr_multiaddr;
+			memcpy(&__s2s_sa6, lres->ai_addr, sizeof(__s2s_sa6));
+			__s2s_sa6.sin6_addr = mreq6_s2s.ipv6mr_multiaddr;
+
 			UD_DEBUG_MCAST(":sock %d  :proto %d :host %s\n",
-					s, lres->ai_protocol,
-					lres->ai_canonname);
+				       s, lres->ai_protocol,
+				       lres->ai_canonname);
 			break;
 		}
 	}
 
 	freeaddrinfo(res);
+	/* return the socket we've got */
 	/* succeeded if > 0 */
 	return s;
 }
@@ -293,7 +383,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 		      : (void*)&((struct sockaddr_in*)&j->sa)->sin_addr,
 		      buf, sizeof(buf));
 	p = ntohs(j->sa.sin6_port);
-	UD_DEBUG_MCAST("Server: connect from host %s, port %d.\n", a, p);
+	UD_DEBUG_MCAST("sock %d connect from host %s port %d\n", w->fd, a, p);
 
 	/* handle the reading */
 	if (UNLIKELY(nread <= 0)) {
@@ -304,6 +394,146 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	} else {
 		j->blen = nread;
 		j->workf = ud_parse;
+		j->prntf = ud_print_mcast4;
+
+		/* enqueue t3h job and copy the input buffer over to
+		 * the job's work space */
+		enqueue_job(glob_jq, j);
+		/* now notify the slaves */
+		trigger_job_queue();
+	}
+	return;
+}
+
+static void
+mcast_inco_cb2(EV_P_ ev_io *w, int revents)
+{
+	ssize_t nread;
+	char buf[INET6_ADDRSTRLEN];
+	/* the address in human readable form */
+	const char *a;
+	/* the port (in host-byte order) */
+	uint16_t p;
+	/* a job */
+	job_t j = obtain_job(glob_jq);
+	struct msghdr msg;
+	struct iovec iov;
+	struct sockaddr_in receiver_addr, sender_addr;
+	char ctrl[2 * sizeof(struct cmsghdr) +
+		  sizeof(struct in_addr) +
+		  sizeof(struct in_pktinfo)];
+	struct in_pktinfo pktinfo;
+	struct sockaddr_in myaddr;
+
+	msg.msg_name = &j->sa;
+	msg.msg_namelen = sizeof(j->sa);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_iov->iov_base = j->buf;
+	msg.msg_iov->iov_len = JOB_BUF_SIZE;
+	msg.msg_control = ctrl;
+	msg.msg_controllen = countof(ctrl);
+	msg.msg_flags = 0;
+
+	UD_DEBUG_MCAST("incoming connection\n");
+	nread = recvmsg(j->sock = w->fd, &msg, 0);
+
+	/* obtain the address in human readable form */
+	a = inet_ntop(j->sa.sin6_family,
+		      j->sa.sin6_family == PF_INET6
+		      ? (void*)&j->sa.sin6_addr
+		      : (void*)&((struct sockaddr_in*)&j->sa)->sin_addr,
+		      buf, sizeof(buf));
+	p = ntohs(j->sa.sin6_port);
+	UD_DEBUG_MCAST("sock %d connect from host %s port %d\n", w->fd, a, p);
+
+#if 0
+	for (struct cmsghdr *cmptr = CMSG_FIRSTHDR(&msg); cmptr;
+	     cmptr = CMSG_NXTHDR(&msg, cmptr)) {
+
+#ifdef IP_RECVSTDADDR
+		if ( cmptr->cmsg_level == IPPROTO_IP &&
+		     cmptr->cmsg_type == IP_RECVDSTADDR ) {
+			memcpy(&myaddr.sin_addr, CMSG_DATA(cmptr),
+			       sizeof(struct in_addr));
+		}
+#endif
+#ifdef IP_PKTINFO
+		if ( cmptr->cmsg_level == IPPROTO_IP &&
+		     cmptr->cmsg_type == IP_PKTINFO ) {
+			memcpy(&pktinfo, CMSG_DATA(cmptr), sizeof(struct in_pktinfo));
+			memcpy(&myaddr.sin_addr, &pktinfo.ipi_addr, sizeof(struct in_addr));
+		}
+#endif
+	}
+
+	/* obtain the address in human readable form */
+	a = inet_ntop(PF_INET, &myaddr.sin_addr, buf, sizeof(buf));
+	p = ntohs(myaddr.sin_port);
+	UD_DEBUG_MCAST("shit went to: host %s port %d\n", a, p);
+#endif
+
+	/* handle the reading */
+	if (UNLIKELY(nread <= 0)) {
+		UD_CRITICAL_MCAST("could not handle incoming connection\n");
+		/* is that wise? */
+		mcast_listener_deinit(w->fd);
+
+	} else {
+		j->blen = nread;
+		j->workf = ud_parse;
+		j->prntf = ud_print_mcast4;
+
+		/* enqueue t3h job and copy the input buffer over to
+		 * the job's work space */
+		enqueue_job(glob_jq, j);
+		/* now notify the slaves */
+		trigger_job_queue();
+	}
+	return;
+}
+
+
+static void
+nothing(job_t j)
+{
+	return;
+}
+
+/* this callback is called when data on the s2s sock is readable */
+static void
+mcasts2s_inco_cb(EV_P_ ev_io *w, int revents)
+{
+	ssize_t nread;
+	char buf[INET6_ADDRSTRLEN];
+	/* the address in human readable form */
+	const char *a;
+	/* the port (in host-byte order) */
+	uint16_t p;
+	/* a job */
+	job_t j = obtain_job(glob_jq);
+	socklen_t lsa = sizeof(j->sa);
+
+	nread = recvfrom(j->sock = w->fd, j->buf, JOB_BUF_SIZE, 0,
+			 &j->sa, &lsa);
+	/* obtain the address in human readable form */
+	a = inet_ntop(j->sa.sin6_family,
+		      j->sa.sin6_family == PF_INET6
+		      ? (void*)&j->sa.sin6_addr
+		      : (void*)&((struct sockaddr_in*)&j->sa)->sin_addr,
+		      buf, sizeof(buf));
+	p = ntohs(j->sa.sin6_port);
+	UD_DEBUG_MCAST("s2s: connect from host %s, port %d.\n", a, p);
+
+	/* handle the reading */
+	if (UNLIKELY(nread <= 0)) {
+		UD_CRITICAL_MCAST("could not handle incoming connection\n");
+		/* is that wise? */
+		mcast_listener_deinit(w->fd);
+
+	} else {
+		j->blen = nread;
+		j->workf = nothing;
 		j->prntf = ud_print_mcast4;
 
 		/* enqueue t3h job and copy the input buffer over to
@@ -326,21 +556,31 @@ ud_print_mcast4(EV_P_ job_t j)
 		       j->sa.sin6_family == PF_INET6
 		       ? sizeof(struct sockaddr_in6)
 		       : sizeof(struct sockaddr_in));
-	trigger_evloop(EV_A);
+	UD_DEBUG_MCAST("sent %ld bytes to %d\n", nwrit, j->sock);
+	//trigger_evloop(EV_A);
 	return;
 }
 
 
 static void
-s2s_oi_cb(EV_P_ ev_timer *w, int revents)
+s2s4_oi_cb(EV_P_ ev_timer *w, int revents)
 {
 	UD_DEBUG("boasting about my balls ... god, are they big\n");
 	/* s2s msg */
-	(void)sendto(lsock, s2s_oi, s2s_oi_len, 0,
-		     (struct sockaddr*)&__s2s_sa,
-		     __s2s_sa.sin6_family == PF_INET6
-		     ? sizeof(struct sockaddr_in6)
-		     : sizeof(struct sockaddr_in));
+	(void)sendto(l4sock, s2s_oi, s2s_oi_len, 0,
+		     (struct sockaddr*)&__s2s_sa4, sizeof(struct sockaddr_in));
+	/* restart the timer */
+	ev_timer_again(EV_A_ w);
+	return;
+}
+
+static void
+s2s6_oi_cb(EV_P_ ev_timer *w, int revents)
+{
+	UD_DEBUG("boasting about my balls ... god, are they big\n");
+	/* s2s msg */
+	(void)sendto(l6sock, s2s_oi, s2s_oi_len, 0,
+		     (struct sockaddr*)&__s2s_sa6, sizeof(struct sockaddr_in6));
 	/* restart the timer */
 	ev_timer_again(EV_A_ w);
 	return;
@@ -350,11 +590,18 @@ s2s_oi_cb(EV_P_ ev_timer *w, int revents)
 int
 ud_attach_mcast4(EV_P)
 {
-	ev_io *srv_watcher = &__srv_watcher;
+	ev_io *srv4_watcher = &__srv4_watcher;
+	ev_io *srv6_watcher = &__srv6_watcher;
+#if 0
+	ev_io *srvs2s_watcher = &__srvs2s_watcher;
 	ev_timer *s2s_watcher = &__s2s_watcher;
+#endif
 
 	/* get us a global sock */
-	if (UNLIKELY((lsock = mcast_listener_init()) < 0)) {
+	l4sock = mcast4_listener_init();
+	l6sock = mcast6_listener_init();
+
+	if (UNLIKELY(l4sock < 0 && l6sock < 0)) {
 		return -1;
 	}
 
@@ -365,34 +612,56 @@ ud_attach_mcast4(EV_P)
 	s2s_oi_len++;
 
 	/* initialise an io watcher, then start it */
-	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
-	ev_io_start(EV_A_ srv_watcher);
+	ev_io_init(srv4_watcher, mcast_inco_cb, l4sock, EV_READ);
+	ev_io_start(EV_A_ srv4_watcher);
+
+	ev_io_init(srv6_watcher, mcast_inco_cb, l6sock, EV_READ);
+	ev_io_start(EV_A_ srv6_watcher);
+
+#if 0
 	/* initialise s2s crew */
+	ev_io_init(srvs2s_watcher, mcasts2s_inco_cb, s2ssock, EV_READ);
+	ev_io_start(EV_A_ srvs2s_watcher);
 	ev_timer_init(s2s_watcher, s2s_oi_cb, 0.0, S2S_BRAG_RATE);
 	ev_timer_again(EV_A_ s2s_watcher);
+#endif
 	return 0;
 }
 
 int
 ud_detach_mcast4(EV_P)
 {
-	ev_io *srv_watcher = &__srv_watcher;
+	ev_io *srv4_watcher = &__srv4_watcher;
+	ev_io *srv6_watcher = &__srv6_watcher;
+#if 0
+	ev_io *srvs2s_watcher = &__srvs2s_watcher;
 	ev_timer *s2s_watcher = &__s2s_watcher;
+#endif
 
 	/* stop the guy that watches the socket */
-	ev_io_stop(EV_A_ srv_watcher);
+	ev_io_stop(EV_A_ srv4_watcher);
+	ev_io_stop(EV_A_ srv6_watcher);
+
+#if 0
+	/* stop the guy that watches the socket */
+	ev_io_stop(EV_A_ srvs2s_watcher);
 	/* stop the timer */
 	ev_timer_stop(EV_A_ s2s_watcher);
+#endif
 
-	if (LIKELY(lsock >= 0)) {
+	if (LIKELY(l4sock >= 0)) {
 		/* drop multicast group membership */
-		setsockopt(lsock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
-			   &mreq4, sizeof(mreq4));
-		/* drop mcast6 group membership */
-		setsockopt(lsock, IPPROTO_IPV6, IPV6_LEAVE_GROUP,
-			   &mreq6, sizeof(mreq6));
+		__mcast4_leave_group(l4sock, &mreq4_s2c);
+		__mcast4_leave_group(l4sock, &mreq4_s2s);
 		/* and kick the socket */
-		mcast_listener_deinit(lsock);
+		mcast_listener_deinit(l4sock);
+	}
+	if (LIKELY(l6sock >= 0)) {
+		/* drop multicast group membership */
+		__mcast6_leave_group(l6sock, &mreq6_s2c);
+		__mcast6_leave_group(l6sock, &mreq6_s2s);
+		/* and kick the socket */
+		mcast_listener_deinit(l6sock);
 	}
 	return 0;
 }

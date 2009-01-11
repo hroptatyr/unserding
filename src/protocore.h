@@ -54,20 +54,30 @@
  *   offs 0x004 uint16_t TYPE	skdfj, see below
  *   offs 0x006 uint16_t PAD	just padding, must be magic number 0xbeef
  *
- * - Simple packets, proto version 0.1
  ***/
 
-#define UDPC_SIMPLE_PKTLEN	4096
-#define UDPC_MAGIC_NUMBER	(uint16_t)(0xbeef)
-#define UDPC_PKTDST_ALL		(ud_sysid_t)0x00
-
 typedef uint16_t ud_sysid_t;
+typedef uint16_t ud_pkt_ty_t;
+
+/* Simple packets, proto version 0.1 */
+/**
+ * HY packet, used to say `hy' to all attached servers and clients. */
+#define UDPC_PKT_HY		(ud_pkt_ty_t)(htons(0x0001))
+
+#define UDPC_SIMPLE_PKTLEN	4096
+#define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
+#define UDPC_PKTSRC_UNK		(ud_sysid_t)0x00
+#define UDPC_PKTDST_ALL		(ud_sysid_t)0x00
 
 /**
  * Return true if the packet PKT is meant for us.
  * inline me? */
 extern inline bool __attribute__((always_inline, gnu_inline))
 udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id);
+/**
+ * Copy the `hy' packet into PKT. */
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_hy_pkt(char *restrict pkt, ud_sysid_t id);
 
 
 /* inlines */
@@ -76,15 +86,25 @@ udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id)
 {
 	const uint16_t *tmp = (const void*)pkt;
 	/* check magic number */
-	if (ntohs(tmp[3]) == UDPC_MAGIC_NUMBER) {
-		if (ntohs(tmp[1]) == UDPC_PKTDST_ALL ||
-		    ntohs(tmp[1]) == id) {
+	if (tmp[3] == UDPC_MAGIC_NUMBER) {
+		if (tmp[1] == UDPC_PKTDST_ALL || tmp[1] == id) {
 			return true;
 		} else {
 			return false;
 		}
 	}
 	return false;
+}
+
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_hy_pkt(char *restrict pkt, ud_sysid_t id)
+{
+	uint16_t *restrict tmp = (void*)pkt;
+	tmp[0] = id;
+	tmp[1] = UDPC_PKTDST_ALL;
+	tmp[2] = UDPC_PKT_HY;
+	tmp[3] = UDPC_MAGIC_NUMBER;
+	return;
 }
 
 #endif	/* INCLUDED_protocore_h_ */

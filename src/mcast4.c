@@ -75,6 +75,7 @@
 #endif
 
 static int lsock __attribute__((used));
+static ud_sysid_t myid = 0;
 static ev_io ALGN16(__srv_watcher);
 static ev_timer ALGN16(__s2s_watcher);
 static struct ip_mreq ALGN16(mreq4);
@@ -500,6 +501,22 @@ ud_attach_mcast4(EV_P)
 	/* init the s2s timer */
 	ev_timer_init(s2s_watcher, s2s_oi_cb, 0.0, S2S_BRAG_RATE);
 	ev_timer_again(EV_A_ s2s_watcher);
+
+/* found a race condition here, we have to check out jobs and step the counter
+ * immediately, so that obtain_job(); obtain_job(); yields two different jobs */
+	/* say hy */
+	{
+		char buf[4 * sizeof(uint16_t)];
+		udpc_hy_pkt(buf, UDPC_PKTSRC_UNK);
+		/* ship to m4cast addr */
+		(void)sendto(lsock, buf, countof(buf), 0,
+			     (struct sockaddr*)&__sa4,
+			     sizeof(struct sockaddr_in));
+		/* ship to m6cast addr */
+		(void)sendto(lsock, buf, countof(buf), 0,
+			     (struct sockaddr*)&__sa6,
+			     sizeof(struct sockaddr_in6));
+	}
 	return 0;
 }
 

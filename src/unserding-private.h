@@ -118,6 +118,8 @@ struct job_s {
 	void *clo;
 	/** socket */
 	int sock;
+	/* set to 1 if job is ready to be processed */
+	unsigned short int readyp;
 	/** for udp based transports,
 	 * use a union here to allow clients to use whatever struct they want */
 	union {
@@ -135,32 +137,18 @@ struct job_s {
 	SIZEOF_JOB_S - offsetof(struct job_s, buf)
 
 struct job_queue_s {
-	/* read index, where to read the next job */
-	index_t ri;
-	/* write index, where to put the next job */
-	index_t wi;
+	/* job index, always points to a free job */
+	unsigned short int ji;
 	/* en/de-queuing mutex */
 	pthread_mutex_t mtx;
 	/* the jobs vector */
 	struct job_s jobs[NJOBS];
 };
 
-static inline job_t __attribute__((always_inline, gnu_inline))
-__curr_rjob(job_queue_t jq)
-{
-	return &jq->jobs[jq->ri];
-}
-
-static inline job_t __attribute__((always_inline, gnu_inline))
-__curr_wjob(job_queue_t jq)
-{
-	return &jq->jobs[jq->wi];
-}
-
 static inline index_t __attribute__((always_inline, gnu_inline))
 __next_job(job_queue_t jq)
 {
-	index_t res = (jq->wi + 1) % NJOBS;
+	index_t res = (jq->ji + 1) % NJOBS;
 
 	if (LIKELY(jq->jobs[res].workf == NULL)) {
 		return res;
@@ -179,7 +167,9 @@ obtain_job(job_queue_t jq)
 {
 	job_t res;
 	pthread_mutex_lock(&jq->mtx);
-	res = __curr_wjob(jq);
+	res = &jq->jobs[jq->ji];
+	jq->ji = __next_job(jq);
+	res->readyp = 0;
 	pthread_mutex_unlock(&jq->mtx);
 	return res;
 }
@@ -190,11 +180,12 @@ enqueue_job(job_queue_t jq, job_t j)
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
 	pthread_mutex_lock(&jq->mtx);
-	jq->wi = __next_job(jq);
+	j->readyp = 1;
 	pthread_mutex_unlock(&jq->mtx);
 	return;
 }
 
+#if 0
 static inline job_t __attribute__((always_inline, gnu_inline))
 dequeue_job(job_queue_t jq)
 {
@@ -209,6 +200,7 @@ dequeue_job(job_queue_t jq)
 	pthread_mutex_unlock(&jq->mtx);
 	return res;
 }
+#endif	/* 0 */
 
 static inline void __attribute__((always_inline, gnu_inline))
 free_job(job_t j)

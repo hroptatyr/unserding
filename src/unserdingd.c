@@ -139,7 +139,7 @@ worker_killw(ud_worker_t wk)
 
 /* the global job queue */
 static struct job_queue_s __glob_jq = {
-	.ri = 0, .wi = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
+	.ji = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
 };
 job_queue_t glob_jq;
 
@@ -192,14 +192,21 @@ worker_cb(EV_P_ ev_async *w, int revents)
 	void *self = (void*)(long int)pthread_self();
 	job_t j;
 
-	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
-		UD_DEBUG("thread/loop %p/%p doing work %p\n", self, loop, j);
-		if (UNLIKELY(j == NULL)) {
-			continue;
+	for (unsigned short int i = 0; i < NJOBS; i++) {
+		pthread_mutex_lock(&glob_jq->mtx);
+		j = &glob_jq->jobs[i];
+		if (LIKELY(j->readyp != 0)) {
+			j->readyp = 0;
 		}
-		j->workf(j);
+		pthread_mutex_unlock(&glob_jq->mtx);
+		if (LIKELY(j->workf != NULL)) {
+			UD_DEBUG("thread/loop %p/%p doing work %p\n",
+				 self, loop, j);
+			j->workf(j);
+		}
 		free_job(j);
 	}
+
 	UD_DEBUG("no more jobs %p/%p\n", self, loop);
 	return;
 }

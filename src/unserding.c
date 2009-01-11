@@ -87,7 +87,7 @@ static index_t rr_wrk = 0;
 
 /* the global job queue */
 static struct job_queue_s __glob_jq = {
-	.ri = 0, .wi = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
+	.ji = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
 };
 job_queue_t glob_jq;
 

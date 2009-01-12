@@ -332,18 +332,21 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 		UD_CRITICAL_MCAST("could not handle incoming connection\n");
 		/* is that wise? */
 		mcast_listener_deinit(w->fd);
-
-	} else {
-		j->blen = nread;
-		j->workf = ud_parse;
-		j->prntf = ud_print_mcast4;
-
-		/* enqueue t3h job and copy the input buffer over to
-		 * the job's work space */
-		enqueue_job(glob_jq, j);
-		/* now notify the slaves */
-		trigger_job_queue();
+		return;
+	} else if (LIKELY(!udpc_pkt_for_us_p(j->buf, myid))) {
+		UD_DEBUG_MCAST("pkt not for us, burying him\n");
+		return;
 	}
+
+	j->blen = nread;
+	j->workf = ud_proto_parse;
+	j->prntf = ud_print_mcast4;
+
+	/* enqueue t3h job and copy the input buffer over to
+	 * the job's work space */
+	enqueue_job(glob_jq, j);
+	/* now notify the slaves */
+	trigger_job_queue();
 	return;
 }
 
@@ -446,7 +449,7 @@ nothing(job_t j)
 }
 
 void
-ud_print_mcast4(EV_P_ job_t j)
+ud_print_mcast4(job_t j)
 {
 	ssize_t nwrit;
 
@@ -461,16 +464,35 @@ ud_print_mcast4(EV_P_ job_t j)
 
 
 static void
-s2s_oi_cb(EV_P_ ev_timer *w, int revents)
+s2s_hy_cb(EV_P_ ev_timer *w, int revents)
 {
+	char buf[4 * sizeof(uint16_t)];
+
 	UD_DEBUG("boasting about my balls ... god, are they big\n");
+	/* say hy */
+	udpc_hy_pkt(buf, UDPC_PKTSRC_UNK);
+	/* ship to m4cast addr */
+	(void)sendto(lsock, buf, countof(buf), 0,
+		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
+	/* ship to m6cast addr */
+	(void)sendto(lsock, buf, countof(buf), 0,
+		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
+
+#if 0
 	/* s2s msg */
 	(void)sendto(lsock, s2s_oi, s2s_oi_len, 0,
 		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
 	(void)sendto(lsock, s2s_oi, s2s_oi_len, 0,
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
-	/* restart the timer */
+#endif
+	/* restart the timer, this will get us an id eventually */
 	ev_timer_again(EV_A_ w);
+	return;
+}
+
+void
+ud_hyrpl_job(job_t j)
+{
 	return;
 }
 
@@ -498,25 +520,9 @@ ud_attach_mcast4(EV_P)
 	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
 	ev_io_start(EV_A_ srv_watcher);
 
-	/* init the s2s timer */
-	ev_timer_init(s2s_watcher, s2s_oi_cb, 0.0, S2S_BRAG_RATE);
-	ev_timer_again(EV_A_ s2s_watcher);
-
-/* found a race condition here, we have to check out jobs and step the counter
- * immediately, so that obtain_job(); obtain_job(); yields two different jobs */
-	/* say hy */
-	{
-		char buf[4 * sizeof(uint16_t)];
-		udpc_hy_pkt(buf, UDPC_PKTSRC_UNK);
-		/* ship to m4cast addr */
-		(void)sendto(lsock, buf, countof(buf), 0,
-			     (struct sockaddr*)&__sa4,
-			     sizeof(struct sockaddr_in));
-		/* ship to m6cast addr */
-		(void)sendto(lsock, buf, countof(buf), 0,
-			     (struct sockaddr*)&__sa6,
-			     sizeof(struct sockaddr_in6));
-	}
+	/* init the s2s timer, this one says `hy' until an id was negotiated */
+	ev_timer_init(s2s_watcher, s2s_hy_cb, 0.0, S2S_BRAG_RATE);
+	ev_timer_start(EV_A_ s2s_watcher);
 	return 0;
 }
 

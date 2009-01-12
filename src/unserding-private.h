@@ -105,16 +105,16 @@ typedef struct job_s *job_t;
 typedef void(*ud_work_f)(job_t);
 /**
  * Type for clean up functions inside jobs. */
-typedef void(*ud_free_f)(job_t);
+typedef ud_work_f ud_free_f;
 /**
  * Type for print functions inside jobs. */
-typedef void(*ud_prnt_f)(EV_P_ job_t);
+typedef ud_work_f ud_prnt_f;
 
 #define SIZEOF_JOB_S	4096
 struct job_s {
 	ud_work_f workf;
-	ud_free_f freef;
 	ud_prnt_f prntf;
+	ud_free_f freef;
 	void *clo;
 	/** socket */
 	int sock;
@@ -218,14 +218,12 @@ extern job_queue_t glob_jq;
 /* more socket goodness, defined in mcast4.c */
 extern int ud_attach_mcast4(EV_P);
 extern int ud_detach_mcast4(EV_P);
-extern void ud_print_mcast4(EV_P_ job_t j);
+extern void ud_print_mcast4(job_t j);
 
 /* readline goodness, defined in stdin.c */
 extern int ud_attach_stdin(EV_P);
 extern int ud_detach_stdin(EV_P);
 
-/* some special work functions */
-extern void ud_parse(job_t);
 /* jobs to browse the catalogue */
 extern void ud_cat_ls_job(job_t);
 extern void ud_cat_pwd_job(job_t);

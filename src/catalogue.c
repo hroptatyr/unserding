@@ -102,7 +102,7 @@ ud_cat_ls_job(job_t j)
 	if (UNLIKELY((j->blen = idx) == 0)) {
 		memcpy(j->buf, empty_msg, j->blen = countof_m1(empty_msg));
 	}
-	j->prntf(EV_DEFAULT_ j);
+	j->prntf(j);
 	return;
 }
 
@@ -117,7 +117,7 @@ ud_cat_pwd_job(job_t j)
 #else
 	j->blen = snprintf(j->buf, JOB_BUF_SIZE, "No working catalogue\n");
 #endif
-	j->prntf(EV_DEFAULT_ j);
+	j->prntf(j);
 	return;
 }
 
@@ -153,7 +153,7 @@ ud_cat_cd_job(job_t j)
 	memcpy(j->buf, err, j->blen = countof_m1(err));
 	
 out:
-	j->prntf(EV_DEFAULT_ j);
+	j->prntf(j);
 	return;
 }
 

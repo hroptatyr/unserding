@@ -199,10 +199,14 @@ worker_cb(EV_P_ ev_async *w, int revents)
 			j->readyp = 0;
 		}
 		pthread_mutex_unlock(&glob_jq->mtx);
+		/* race condition!!! */
 		if (LIKELY(j->workf != NULL)) {
 			UD_DEBUG("thread/loop %p/%p doing work %p\n",
 				 self, loop, j);
 			j->workf(j);
+		}
+		if (LIKELY(j->prntf != NULL)) {
+			j->prntf(j);
 		}
 		free_job(j);
 	}

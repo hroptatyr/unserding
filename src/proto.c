@@ -222,7 +222,7 @@ ud_parse(job_t j)
 	} INNIT(sup_cmd) {
 		UD_DEBUG_PROTO("found `sup'\n");
 		memcpy(j->buf, sup_rpl, j->blen = countof_m1(sup_rpl));
-		j->prntf(EV_DEFAULT_ j);
+		j->prntf(j);
 
 	} INNIT(oi_cmd) {
 		size_t l;
@@ -236,17 +236,17 @@ ud_parse(job_t j)
 		memcpy(&j->buf[3], host, countof(host));
 		l = strlen(j->buf), j->buf[l] = '\n', j->blen = l + 1;
 		UD_DEBUG_PROTO("constr \"%s\"\n", j->buf);
-		j->prntf(EV_DEFAULT_ j);
+		j->prntf(j);
 
 	} INNIT(cheers_cmd) {
 		UD_DEBUG_PROTO("found `cheers'\n");
 		memcpy(j->buf, cheers_rpl, j->blen = countof_m1(cheers_rpl));
-		j->prntf(EV_DEFAULT_ j);
+		j->prntf(j);
 
 	} INNIT(wtf_cmd) {
 		UD_DEBUG_PROTO("found `wtf'\n");
 		memcpy(j->buf, wtf_rpl, j->blen = countof_m1(wtf_rpl));
-		j->prntf(EV_DEFAULT_ j);
+		j->prntf(j);
 
 	} INNIT(spot_cmd) {
 		UD_DEBUG_PROTO("found `spot'\n");
@@ -286,16 +286,17 @@ ud_parse(job_t j)
 	} INNIT(help_cmd) {
 		UD_DEBUG_PROTO("found `help'\n");
 		memcpy(j->buf, help_rpl, j->blen = countof_m1(help_rpl));
-		j->prntf(EV_DEFAULT_ j);
+		j->prntf(j);
 
 	} else {
 #if 0
 		/* print an error */
 		memcpy(j->buf, inv_rpl, j->blen = countof_m1(inv_rpl));
-		j->prntf(EV_DEFAULT_ j);
+		j->prntf(j);
 #endif
 		j->blen = 0;
 	}
+
 #undef INNIT
 #undef INNIT_CPL
 	return;
@@ -429,7 +430,7 @@ __spot_job(job_t j)
 	} else {
 	out:
 		memcpy(j->buf, spot_synt, j->blen = countof_m1(spot_synt));
-		j->prntf(EV_DEFAULT_ j);
+		j->prntf(j);
 	}
 	return;
 }
@@ -440,7 +441,7 @@ static void
 ud_spot_job(job_t j)
 {
 	memcpy(j->buf, "2.52\n", j->blen = 5);
-	j->prntf(EV_DEFAULT_ j);
+	j->prntf(j);
 	return;
 }
 

@@ -54,5 +54,24 @@
 #include "unserding-private.h"
 #include "protocore.h"
 
+void
+ud_proto_parse(job_t j)
+{
+	uint16_t *tmp = (void*)j->buf;
+
+	switch ((ud_pkt_ty_t)ntohs(tmp[2])) {
+	case UDPC_PKT_HY:
+		UD_DEBUG_PROTO("found HY\n");
+		break;
+	case UDPC_PKT_HY_RPL:
+		UD_DEBUG_PROTO("found HY reply\n");
+		break;
+	default:
+		break;
+	}
+	/* no need to print back */
+	j->blen = 0;
+	return;
+}
 
 /* protocore.c ends here */

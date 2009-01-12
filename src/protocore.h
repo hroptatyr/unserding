@@ -62,7 +62,10 @@ typedef uint16_t ud_pkt_ty_t;
 /* Simple packets, proto version 0.1 */
 /**
  * HY packet, used to say `hy' to all attached servers and clients. */
-#define UDPC_PKT_HY		(ud_pkt_ty_t)(htons(0x0001))
+#define UDPC_PKT_HY		(ud_pkt_ty_t)(0x0001)
+/**
+ * HY reply packet, used to say `hy back' to `hy' saying  clients. */
+#define UDPC_PKT_HY_RPL		(ud_pkt_ty_t)(0x0002)
 
 #define UDPC_SIMPLE_PKTLEN	4096
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
@@ -78,6 +81,12 @@ udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id);
  * Copy the `hy' packet into PKT. */
 extern inline void __attribute__((always_inline, gnu_inline))
 udpc_hy_pkt(char *restrict pkt, ud_sysid_t id);
+
+/* jobs */
+extern void ud_hyrpl_job(job_t);
+/* the old ascii parser */
+extern void ud_parse(job_t);
+extern void ud_proto_parse(job_t);
 
 
 /* inlines */
@@ -102,7 +111,7 @@ udpc_hy_pkt(char *restrict pkt, ud_sysid_t id)
 	uint16_t *restrict tmp = (void*)pkt;
 	tmp[0] = id;
 	tmp[1] = UDPC_PKTDST_ALL;
-	tmp[2] = UDPC_PKT_HY;
+	tmp[2] = htons(UDPC_PKT_HY);
 	tmp[3] = UDPC_MAGIC_NUMBER;
 	return;
 }

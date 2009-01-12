@@ -54,14 +54,16 @@ typedef size_t index_t;
 	fprintf(stderr, "[unserding] CRITICAL " args)
 #define UD_DEBUG(args...)			\
 	fprintf(stderr, "[unserding] " args)
-#define UD_CRITICAL_TCPUDP(args...)					\
-	fprintf(stderr, "[unserding/input/tcpudp] CRITICAL " args)
-#define UD_DEBUG_TCPUDP(args...)				\
-	fprintf(stderr, "[unserding/input/tcpudp] " args)
-#define UD_CRITICAL_MCAST(args...)					\
+# define UD_CRITICAL_MCAST(args...)					\
 	fprintf(stderr, "[unserding/input/mcast] CRITICAL " args)
-#define UD_DEBUG_MCAST(args...)					\
+#if defined UNSERMON
+# define UD_DEBUG_MCAST(args...)
+# define UD_UNSERMON_PKT(args...)		\
+	fprintf(stderr, "%04x -> %04x: " args)
+#else  /* !UNSERMON */
+# define UD_DEBUG_MCAST(args...)					\
 	fprintf(stderr, "[unserding/input/mcast] " args)
+#endif	/* UNSERMON */
 #define UD_CRITICAL_STDIN(args...)					\
 	fprintf(stderr, "[unserding/stdin] CRITICAL " args)
 #define UD_DEBUG_STDIN(args...)				\

@@ -344,7 +344,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 		return;
 #if defined UNSERMON
 	} else if (UNLIKELY(!udpc_pkt_valid_p(j->buf))) {
-		UD_DEBUG_MCAST("invalid pkt\n");
+		UD_UNSERMON_PKT("invalid pkt\n", 0, 0);
 		return;
 #else  /* !UNSERMON */
 	} else if (UNLIKELY(!udpc_pkt_for_us_p(j->buf, myid))) {
@@ -355,9 +355,9 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 
 	j->blen = nread;
 #if defined UNSERMON
-	UD_DEBUG_MCAST("found pkt 0x%04x from %d to %d\n",
-		       udpc_pkt_type(j->buf),
-		       udpc_pkt_src(j->buf), udpc_pkt_dst(j->buf));
+	UD_UNSERMON_PKT("%04x\n",
+			udpc_pkt_src(j->buf), udpc_pkt_dst(j->buf),
+			udpc_pkt_type(j->buf));
 #else  /* !UNSERMON */
 	j->workf = ud_proto_parse;
 	j->prntf = ud_print_mcast4;
@@ -413,18 +413,25 @@ handle_hy_rpl(job_t j)
 static void
 ud_print_mcast4(job_t j)
 {
-	ssize_t nwrit;
-
 	if (UNLIKELY(j->blen == 0)) {
 		return;
 	}
 
 	/* the actual write */
-	nwrit = sendto(j->sock, j->buf, j->blen, 0,
-		       (struct sockaddr*)&j->sa,
-		       j->sa.sin6_family == PF_INET6
-		       ? sizeof(struct sockaddr_in6)
-		       : sizeof(struct sockaddr_in));
+#if 0
+	(void)sendto(j->sock, j->buf, j->blen, 0,
+		     (struct sockaddr*)&j->sa,
+		     j->sa.sin6_family == PF_INET6
+		     ? sizeof(struct sockaddr_in6)
+		     : sizeof(struct sockaddr_in));
+#else
+/* always send to the mcast addresses */
+	(void)sendto(j->sock, j->buf, j->blen, 0,
+		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
+	/* ship to m6cast addr */
+	(void)sendto(j->sock, j->buf, j->blen, 0,
+		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
+#endif
 	return;
 }
 #endif	/* !UNSERMON */

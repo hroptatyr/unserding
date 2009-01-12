@@ -68,8 +68,11 @@
 #include "protocore.h"
 
 /**
- * Rate used to check for neighbours in seconds. */
-#define S2S_BRAG_RATE		2
+ * Rate used for keep-alive pings to neighbours in seconds. */
+#define S2S_BRAG_RATE		10
+/**
+ * Negotiation timeout in seconds. */
+#define S2S_NEGO_TIMEOUT	2
 #define UDP_MULTICAST_TTL	16
 
 #if !defined HAVE_GETADDRINFO
@@ -77,7 +80,7 @@
 #endif
 
 static int lsock __attribute__((used));
-static ud_sysid_t myid = 0, myid_cand = 0;
+static ud_sysid_t myid = 0, min_seen = (ud_sysid_t)-1, max_seen = (ud_sysid_t)0;
 static ev_io ALGN16(__srv_watcher);
 static ev_timer ALGN16(__s2s_watcher);
 static struct ip_mreq ALGN16(mreq4);
@@ -466,11 +469,15 @@ handle_hy(job_t j)
 static void __attribute__((unused))
 handle_hy_rpl(job_t j)
 {
-	ud_sysid_t id;
-	if ((id = udpc_pkt_src(j->buf)) >= myid_cand) {
-		myid_cand = id + 1;
-	}
+	ud_sysid_t id = udpc_pkt_src(j->buf);
+
 	UD_DEBUG_PROTO("found HY RPL: %d\n", id);
+	if (id > max_seen) {
+		max_seen = id;
+	}
+	if (id < min_seen) {
+		min_seen = id;
+	}
 	/* do not reply */
 	j->blen = 0;
 	j->prntf = NULL;
@@ -497,20 +504,52 @@ ud_print_mcast4(job_t j)
 
 
 static void
-s2s_hy_cb(EV_P_ ev_timer *w, int revents)
+s2s_nego_cb(EV_P_ ev_timer *w, int revents)
+{
+/* negotiation callback */
+	/* make up a new id from all the answers we've got */
+	if (min_seen > max_seen) {
+		/* we've seen no replies at all, just use id 1 then */
+		UD_DEBUG("No HY replies seen, id stipulated to be 1\n");
+		myid = 1;
+		goto out;
+	}
+	if (min_seen > 1) {
+		myid = min_seen - 1;
+	} else {
+		myid = max_seen + 1;
+	}
+
+	UD_DEBUG("About time! Got me id %d\n", myid);
+out:
+	/* stop the timer */
+	ev_timer_stop(EV_A_ &__s2s_watcher);
+	/* also kick the parsing fun */
+	ud_parsef[UDPC_PKT_HY_RPL] = NULL;
+	return;
+}
+
+static void __attribute__((unused))
+s2s_nego_hy(void)
 {
 	char buf[4 * sizeof(uint16_t)];
 
-	/* check if we have some candidates first */
-	if (myid_cand > 0) {
-		myid = myid_cand;
-		UD_DEBUG("About time! Got me id %d\n", myid);
-		/* stop the timer */
-		ev_timer_stop(EV_A_ &__s2s_watcher);
-		/* also kick the parsing fun */
-		ud_parsef[UDPC_PKT_HY_RPL] = NULL;
-		return;
-	}
+	UD_DEBUG("boasting about my balls ... god, are they big\n");
+	/* say hy */
+	udpc_hy_pkt(buf, UDPC_PKTSRC_UNK);
+	/* ship to m4cast addr */
+	(void)sendto(lsock, buf, countof(buf), 0,
+		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
+	/* ship to m6cast addr */
+	(void)sendto(lsock, buf, countof(buf), 0,
+		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
+	return;
+}
+
+static void __attribute__((unused))
+s2s_hy_cb(EV_P_ ev_timer *w, int revents)
+{
+	char buf[4 * sizeof(uint16_t)];
 
 	UD_DEBUG("boasting about my balls ... god, are they big\n");
 	/* say hy */
@@ -522,9 +561,6 @@ s2s_hy_cb(EV_P_ ev_timer *w, int revents)
 	(void)sendto(lsock, buf, countof(buf), 0,
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
 
-	/* set the candidate to 1, so we are eventually assigned the id 1
-	 * even if noone ever answers */
-	myid_cand = 1;
 	/* restart the timer, this will get us an id eventually */
 	ev_timer_again(EV_A_ w);
 	return;
@@ -565,8 +601,11 @@ ud_attach_mcast4(EV_P)
 	ev_io_start(EV_A_ srv_watcher);
 
 	/* init the s2s timer, this one says `hy' until an id was negotiated */
-	ev_timer_init(s2s_watcher, s2s_hy_cb, 0.0, S2S_BRAG_RATE);
+	ev_timer_init(s2s_watcher, s2s_nego_cb, S2S_NEGO_TIMEOUT, 0.0);
 	ev_timer_start(EV_A_ s2s_watcher);
+
+	/* just to spice things up, we send the HY now */
+	s2s_nego_hy();
 	return 0;
 }
 

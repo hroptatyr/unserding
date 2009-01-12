@@ -66,10 +66,11 @@
 /* our master include */
 #include "unserding.h"
 #include "unserding-private.h"
+#include "protocore.h"
 
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));
-extern void ud_print_stdin(EV_P_ job_t j);
+extern void ud_print_stdin(job_t j);
 
 
 /* string goodies */
@@ -200,46 +201,7 @@ stdin_listener_deinit(EV_P_ int sock)
 static void
 stdin_traf_rcb(EV_P_ ev_io *w, int revents)
 {
-	size_t nread;
-
 	rl_callback_read_char();
-#if 0
-	//UD_DEBUG_STDIN("traffic on %d\n", w->fd);
-	nread = read(w->fd, &ctx->buf[ctx->bidx],
-		     CONN_CTX_BUF_SIZE - ctx->bidx);
-	if (UNLIKELY(nread == 0)) {
-		stdin_kick_ctx(EV_A_ ctx);
-		return;
-	}
-	/* wind the buffer index */
-	ctx->bidx += nread;
-#endif
-#if 0
-	/* check the input */
-	if (ctx->buf[0] == '<') {
-		/* xml is nighing */
-		/* not yet */
-		abort();
-	}
-	/* untangle the input buffer */
-	for (const char *p;
-	     (p = boyer_moore(ctx->buf, ctx->bidx, "\n", 1UL)) != NULL; ) {
-		/* be generous with the connexion timeout now, 1 day */
-		ctx->timeout = ev_now(EV_A) + 1440*STDIN_TIMEOUT;
-		/* enqueue t3h job and copy the input buffer over to
-		 * the job's work space */
-		enqueue_job_cp_ws(glob_jq, ud_parse, ctx, ctx->buf, p-ctx->buf);
-		/* now notify the slaves */
-		trigger_job_queue();
-		/* check if more is to be done */
-		if (LIKELY((ctx->bidx -= (p-ctx->buf) + 1) == 0)) {
-			break;
-		} else {
-			/* move the remaining bollocks */
-			memmove(ctx->buf, p+1, ctx->bidx);
-		}
-	}
-#endif
 	return;
 }
 
@@ -283,7 +245,7 @@ stdin_traf_wcb(EV_P_ ev_io *w, int revents)
 
 
 void
-ud_print_stdin(EV_P_ job_t j)
+ud_print_stdin(job_t j)
 {
 	printf(j->buf);
 	return;

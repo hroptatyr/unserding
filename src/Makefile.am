@@ -34,7 +34,7 @@ unserding_LDADD = $(LIBEV_LIBS) -lreadline
 
 ## the network monitor
 unsermon_SOURCES = unsermon.c mcast4.c protocore.c proto.c catalogue.c
-unsermon_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
+unsermon_CPPFLAGS = -DUNSERMON $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unsermon_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsermon_LDADD = $(LIBEV_LIBS)
 

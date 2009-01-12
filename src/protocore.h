@@ -74,6 +74,10 @@ typedef void(*ud_parse_f)(job_t);
 #define UDPC_PKTDST_ALL		(ud_sysid_t)0x00
 
 /**
+ * Return true if PKT is a valid unserding packet. */
+extern inline bool __attribute__((always_inline, gnu_inline))
+udpc_pkt_valid_p(const char *pkt);
+/**
  * Return true if the packet PKT is meant for us.
  * inline me? */
 extern inline bool __attribute__((always_inline, gnu_inline))
@@ -94,6 +98,10 @@ udpc_pkt_src(char *restrict pkt);
  * Extract the destination of PKT. */
 extern inline ud_sysid_t __attribute__((always_inline, gnu_inline))
 udpc_pkt_dst(char *restrict pkt);
+/**
+ * Extract the type portion of PKT. */
+extern inline ud_pkt_ty_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_type(char *restrict pkt);
 
 /**
  * Job that looks up the parser routine in ud_parsef(). */
@@ -107,6 +115,17 @@ extern void ud_parse(job_t);
 
 
 /* inlines */
+extern inline bool __attribute__((always_inline, gnu_inline))
+udpc_pkt_valid_p(const char *pkt)
+{
+	const uint16_t *tmp = (const void*)pkt;
+	/* check magic number */
+	if (tmp[3] == UDPC_MAGIC_NUMBER) {
+		return true;
+	}
+	return false;
+}
+
 extern inline bool __attribute__((always_inline, gnu_inline))
 udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id)
 {
@@ -155,6 +174,14 @@ udpc_pkt_dst(char *restrict pkt)
 	uint16_t *restrict tmp = (void*)pkt;
 	/* yes ntoh conversion!!! */
 	return ntohs(tmp[1]);
+}
+
+extern inline ud_pkt_ty_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_type(char *restrict pkt)
+{
+	uint16_t *restrict tmp = (void*)pkt;
+	/* yes ntoh conversion!!! */
+	return ntohs(tmp[2]);
 }
 
 #endif	/* INCLUDED_protocore_h_ */

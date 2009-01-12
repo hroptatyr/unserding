@@ -52,6 +52,7 @@
 /* our master include */
 #include "unserding.h"
 #include "unserding-private.h"
+#include "protocore.h"
 
 /***
  * The unserding protocol in detail:
@@ -262,27 +263,6 @@ ud_parse(job_t j)
 		/* now notify the slaves */
 		trigger_job_queue();
 
-	} INNIT(pwd_cmd) {
-		job_t j2 = obtain_job(glob_jq);
-
-		UD_DEBUG_PROTO("found `pwd'\n");
-		j2->prntf = j->prntf;
-		j2->workf = ud_cat_pwd_job;
-		enqueue_job(glob_jq, j2);
-		/* now notify the slaves */
-		trigger_job_queue();
-
-	} INNIT(cd_cmd) {
-		job_t j2 = obtain_job(glob_jq);
-
-		UD_DEBUG_PROTO("found `cd'\n");
-		j2->prntf = j->prntf;
-		j2->workf = ud_cat_cd_job;
-		memcpy(j2->buf, j->buf + countof(cd_cmd), 256);
-		enqueue_job(glob_jq, j2);
-		/* now notify the slaves */
-		trigger_job_queue();
-
 	} INNIT(help_cmd) {
 		UD_DEBUG_PROTO("found `help'\n");
 		memcpy(j->buf, help_rpl, j->blen = countof_m1(help_rpl));
@@ -414,6 +394,10 @@ __spot_job(job_t j)
 		case K_ASOF:
 			res.date = 1210000000;
 			break;
+		case K_UNKNOWN:
+		case K_CAST:
+		case K_FROM:
+		case K_TO:
 		default:
 			break;
 		}

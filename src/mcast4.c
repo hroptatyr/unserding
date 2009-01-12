@@ -97,7 +97,10 @@ size_t s2s_oi_len;
 static char s2s_oi[MAXHOSTNAMELEN] = "hy ";
 
 #if !defined UNSERMON
-static void ud_print_mcast4(job_t j);
+static void print_cl(job_t j);
+static void print_m4(job_t j);
+static void print_m6(job_t j);
+static void print_m46(job_t j);
 #endif	/* !UNSERMON */
 
 
@@ -360,7 +363,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 			udpc_pkt_type(j->buf));
 #else  /* !UNSERMON */
 	j->workf = ud_proto_parse;
-	j->prntf = ud_print_mcast4;
+	j->prntf = print_m46;
 
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
@@ -411,27 +414,60 @@ handle_hy_rpl(job_t j)
 }
 
 static void
-ud_print_mcast4(job_t j)
+print_cl(job_t j)
 {
 	if (UNLIKELY(j->blen == 0)) {
 		return;
 	}
 
-	/* the actual write */
-#if 0
+	/* write back to whoever sent the packet */
 	(void)sendto(j->sock, j->buf, j->blen, 0,
 		     (struct sockaddr*)&j->sa,
 		     j->sa.sin6_family == PF_INET6
 		     ? sizeof(struct sockaddr_in6)
 		     : sizeof(struct sockaddr_in));
-#else
-/* always send to the mcast addresses */
+	return;
+}
+
+static void
+print_m4(job_t j)
+{
+	if (UNLIKELY(j->blen == 0)) {
+		return;
+	}
+
+	/* send to the m4cast address */
+	(void)sendto(j->sock, j->buf, j->blen, 0,
+		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
+	return;
+}
+
+static void
+print_m6(job_t j)
+{
+	if (UNLIKELY(j->blen == 0)) {
+		return;
+	}
+
+	/* send to the m6cast address */
+	(void)sendto(j->sock, j->buf, j->blen, 0,
+		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
+	return;
+}
+
+static void
+print_m46(job_t j)
+{
+	if (UNLIKELY(j->blen == 0)) {
+		return;
+	}
+
+	/* always send to the mcast addresses */
 	(void)sendto(j->sock, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
 	/* ship to m6cast addr */
 	(void)sendto(j->sock, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
-#endif
 	return;
 }
 #endif	/* !UNSERMON */

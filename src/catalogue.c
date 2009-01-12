@@ -51,8 +51,6 @@ typedef struct ud_cat_s *__cat_t;
 
 static const char empty_msg[] = "empty\n";
 
-#define countof_m1(_x)		(countof(_x) - 1)
-
 /* the global catalogue */
 static struct ud_cat_s __ud_catalogue = {
 	.parent = NULL,
@@ -102,57 +100,6 @@ ud_cat_ls_job(job_t j)
 	if (UNLIKELY((j->blen = idx) == 0)) {
 		memcpy(j->buf, empty_msg, j->blen = countof_m1(empty_msg));
 	}
-	j->prntf(j);
-	return;
-}
-
-void
-ud_cat_pwd_job(job_t j)
-{
-	size_t UNUSED(len);
-
-	UD_DEBUG_CAT("pwd job\n");
-#if 0
-	len = snprintcat(j->buf, JOB_BUF_SIZE, ctx->pwd);
-#else
-	j->blen = snprintf(j->buf, JOB_BUF_SIZE, "No working catalogue\n");
-#endif
-	j->prntf(j);
-	return;
-}
-
-
-void
-ud_cat_cd_job(job_t j)
-{
-	const char *UNUSED(dir) = j->buf;
-	size_t UNUSED(len) = 0;
-	static const char err[] = "No such catalogue entry\n";
-
-	UD_DEBUG_CAT("cd job\n");
-#if 0
-	/* check for the special cat symbols `.' and `..' */
-	if (UNLIKELY(dir[0] == '.')) {
-		if (LIKELY(dir[1] == '.')) {
-			ctx->pwd = ud_cat_parent(ctx->pwd);
-			len = snprintcat(j->work_space, 256, ctx->pwd);
-		}
-		len = snprintcat(j->work_space, 256, ctx->pwd);
-		goto out;
-	}
-
-	for (__cat_t c = ud_cat_first_child(ctx->pwd); c; c = c->next) {
-		const char *tmp = ud_cat_data(c);
-		if (UNLIKELY(strcmp(dir, tmp) == 0)) {
-			ctx->pwd = c;
-			len = snprintcat(j->work_space, 256, c);
-			goto out;
-		}
-	}
-#endif
-	memcpy(j->buf, err, j->blen = countof_m1(err));
-	
-out:
 	j->prntf(j);
 	return;
 }

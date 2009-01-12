@@ -93,11 +93,8 @@ static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
 
 /* worker magic */
-#define NWORKERS		4
 /* round robin var */
 static index_t rr_wrk = 0;
-/* the workers array */
-static struct ud_worker_s __attribute__((aligned(16))) workers[NWORKERS];
 
 /* the global job queue */
 static struct job_queue_s __glob_jq = {
@@ -125,24 +122,8 @@ sigint_cb(EV_P_ ev_signal *w, int revents)
 
 
 static void
-triv_cb(EV_P_ ev_async *w, int revents)
-{
-	return;
-}
-
-static void
-kill_cb(EV_P_ ev_async *w, int revents)
-{
-	long int self = (long int)pthread_self();
-	UD_DEBUG("SIGQUIT caught in %lx\n", self);
-	ev_unloop(EV_A_ EVUNLOOP_ALL);
-	return;
-}
-
-static void
 worker_cb(EV_P_ ev_async *w, int revents)
 {
-	void *self = (void*)(long int)pthread_self();
 	job_t j;
 
 	for (unsigned short int i = 0; i < NJOBS; i++) {
@@ -154,8 +135,6 @@ worker_cb(EV_P_ ev_async *w, int revents)
 		pthread_mutex_unlock(&glob_jq->mtx);
 		/* race condition!!! */
 		if (LIKELY(j->workf != NULL)) {
-			UD_DEBUG("thread/loop %p/%p doing work %p\n",
-				 self, loop, j);
 			j->workf(j);
 		}
 		if (LIKELY(j->prntf != NULL)) {
@@ -163,64 +142,6 @@ worker_cb(EV_P_ ev_async *w, int revents)
 		}
 		free_job(j);
 	}
-
-	UD_DEBUG("no more jobs %p/%p\n", self, loop);
-	return;
-}
-
-static void*
-worker(void *wk)
-{
-	long int self = pthread_self();
-	void *loop = worker_loop(wk);
-	UD_DEBUG("starting worker thread %lx, loop %p\n", self, loop);
-	ev_loop(EV_A_ 0);
-	UD_DEBUG("quitting worker thread %lx, loop %p\n", self, loop);
-	return NULL;
-}
-
-static void
-add_worker(struct ev_loop *loop)
-{
-	pthread_attr_t attr;
-	ud_worker_t wk = &workers[rr_wrk++];
-
-	/* initialise thread attributes */
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-	/* use the existing  */
-#if !USE_COROUTINES
-	wk->loop = loop;
-	{
-		ev_async *eva = &wk->work_watcher;
-		ev_async_init(eva, worker_cb);
-		ev_async_start(wk->loop, eva);
-	}
-	{
-		ev_async *eva = &wk->kill_watcher;
-		ev_async_init(eva, kill_cb);
-		ev_async_start(wk->loop, eva);
-	}
-#endif	/* !USE_COROUTINES */
-
-	/* start the thread now */
-	pthread_create(&wk->thread, &attr, worker, wk);
-
-	/* destroy locals */
-	pthread_attr_destroy(&attr);
-	return;
-}
-
-static void
-kill_worker(ud_worker_t wk)
-{
-	/* send a lethal signal to the workers and detach */
-	ev_async_send(worker_loop(wk), worker_killw(wk));
-#if !USE_COROUTINES
-	pthread_join(wk->thread, NULL);
-	ev_loop_destroy(worker_loop(wk));
-#endif
 	return;
 }
 

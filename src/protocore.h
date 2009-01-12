@@ -58,6 +58,7 @@
 
 typedef uint16_t ud_sysid_t;
 typedef uint16_t ud_pkt_ty_t;
+typedef void(*ud_parse_f)(job_t);
 
 /* Simple packets, proto version 0.1 */
 /**
@@ -82,11 +83,15 @@ udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id);
 extern inline void __attribute__((always_inline, gnu_inline))
 udpc_hy_pkt(char *restrict pkt, ud_sysid_t id);
 
+/**
+ * Job that looks up the parser routine in ud_parsef(). */
+extern void ud_proto_parse(job_t);
+extern ud_parse_f ud_parsef[4096];
+
 /* jobs */
 extern void ud_hyrpl_job(job_t);
 /* the old ascii parser */
 extern void ud_parse(job_t);
-extern void ud_proto_parse(job_t);
 
 
 /* inlines */

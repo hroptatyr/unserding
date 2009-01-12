@@ -146,7 +146,7 @@ __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 	setsockopt(s, IPPROTO_IPV6, IP_RECVSTDADDR, &one, sizeof(one)) ;
 #endif
 	/* turn off loopback */
-	setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &zero, sizeof(zero));
+	setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &one, sizeof(one));
 
 	/* set up the multicast group and join it */
 	inet_pton(AF_INET, addr, &mreq->imr_multiaddr.s_addr);
@@ -452,6 +452,10 @@ void
 ud_print_mcast4(job_t j)
 {
 	ssize_t nwrit;
+
+	if (UNLIKELY(j->blen == 0)) {
+		return;
+	}
 
 	/* the actual write */
 	nwrit = sendto(j->sock, j->buf, j->blen, 0,

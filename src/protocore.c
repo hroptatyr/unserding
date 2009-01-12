@@ -54,23 +54,22 @@
 #include "unserding-private.h"
 #include "protocore.h"
 
+ud_parse_f ud_parsef[4096];
+
 void
 ud_proto_parse(job_t j)
 {
 	uint16_t *tmp = (void*)j->buf;
+	ud_pkt_ty_t ty = ((ud_pkt_ty_t)ntohs(tmp[2]));
+	ud_parse_f pf = ud_parsef[ty];
 
-	switch ((ud_pkt_ty_t)ntohs(tmp[2])) {
-	case UDPC_PKT_HY:
-		UD_DEBUG_PROTO("found HY\n");
-		break;
-	case UDPC_PKT_HY_RPL:
-		UD_DEBUG_PROTO("found HY reply\n");
-		break;
-	default:
-		break;
+	if (UNLIKELY(pf == NULL)) {
+		UD_DEBUG_PROTO("found 0x%04x but cannot cope\n", ty);
+		/* no need to print back */
+		j->blen = 0;
+	} else {
+		pf(j);
 	}
-	/* no need to print back */
-	j->blen = 0;
 	return;
 }
 

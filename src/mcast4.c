@@ -67,7 +67,9 @@
 #include "unserding-private.h"
 #include "protocore.h"
 
-#define S2S_BRAG_RATE		10
+/**
+ * Rate used to check for neighbours in seconds. */
+#define S2S_BRAG_RATE		2
 #define UDP_MULTICAST_TTL	16
 
 #if !defined HAVE_GETADDRINFO
@@ -75,7 +77,7 @@
 #endif
 
 static int lsock __attribute__((used));
-static ud_sysid_t myid = 0;
+static ud_sysid_t myid = 0, myid_cand = 0;
 static ev_io ALGN16(__srv_watcher);
 static ev_timer ALGN16(__s2s_watcher);
 static struct ip_mreq ALGN16(mreq4);
@@ -448,6 +450,33 @@ nothing(job_t j)
 	return;
 }
 
+/* handle the HY packet */
+static void __attribute__((unused))
+handle_hy(job_t j)
+{
+	UD_DEBUG_PROTO("found HY\n");
+	/* generate the answer packet */
+	udpc_make_pkt(j->buf, myid, UDPC_PKTDST_ALL, UDPC_PKT_HY_RPL);
+	UD_DEBUG_PROTO("sending HY RPL: %d\n", myid);
+	j->blen = 8;
+	return;
+}
+
+/* handle the HY RPL packet */
+static void __attribute__((unused))
+handle_hy_rpl(job_t j)
+{
+	ud_sysid_t id;
+	if ((id = udpc_pkt_src(j->buf)) >= myid_cand) {
+		myid_cand = id + 1;
+	}
+	UD_DEBUG_PROTO("found HY RPL: %d\n", id);
+	/* do not reply */
+	j->blen = 0;
+	j->prntf = NULL;
+	return;
+}
+
 void
 ud_print_mcast4(job_t j)
 {
@@ -472,6 +501,17 @@ s2s_hy_cb(EV_P_ ev_timer *w, int revents)
 {
 	char buf[4 * sizeof(uint16_t)];
 
+	/* check if we have some candidates first */
+	if (myid_cand > 0) {
+		myid = myid_cand;
+		UD_DEBUG("About time! Got me id %d\n", myid);
+		/* stop the timer */
+		ev_timer_stop(EV_A_ &__s2s_watcher);
+		/* also kick the parsing fun */
+		ud_parsef[UDPC_PKT_HY_RPL] = NULL;
+		return;
+	}
+
 	UD_DEBUG("boasting about my balls ... god, are they big\n");
 	/* say hy */
 	udpc_hy_pkt(buf, UDPC_PKTSRC_UNK);
@@ -482,13 +522,9 @@ s2s_hy_cb(EV_P_ ev_timer *w, int revents)
 	(void)sendto(lsock, buf, countof(buf), 0,
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
 
-#if 0
-	/* s2s msg */
-	(void)sendto(lsock, s2s_oi, s2s_oi_len, 0,
-		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
-	(void)sendto(lsock, s2s_oi, s2s_oi_len, 0,
-		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
-#endif
+	/* set the candidate to 1, so we are eventually assigned the id 1
+	 * even if noone ever answers */
+	myid_cand = 1;
 	/* restart the timer, this will get us an id eventually */
 	ev_timer_again(EV_A_ w);
 	return;
@@ -519,6 +555,10 @@ ud_attach_mcast4(EV_P)
 	/* \n-ify */
 	s2s_oi[s2s_oi_len = strlen(s2s_oi)] = '\n';
 	s2s_oi_len++;
+
+	/* escrow some packet handlers */
+	ud_parsef[UDPC_PKT_HY] = handle_hy;
+	ud_parsef[UDPC_PKT_HY_RPL] = handle_hy_rpl;
 
 	/* initialise an io watcher, then start it */
 	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);

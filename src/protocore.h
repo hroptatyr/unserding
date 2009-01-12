@@ -82,6 +82,18 @@ udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id);
  * Copy the `hy' packet into PKT. */
 extern inline void __attribute__((always_inline, gnu_inline))
 udpc_hy_pkt(char *restrict pkt, ud_sysid_t id);
+/**
+ * Generic packet generator. */
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_make_pkt(char *restrict pkt, ud_sysid_t src, ud_sysid_t dst, ud_pkt_ty_t);
+/**
+ * Extract the source of PKT. */
+extern inline ud_sysid_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_src(char *restrict pkt);
+/**
+ * Extract the destination of PKT. */
+extern inline ud_sysid_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_dst(char *restrict pkt);
 
 /**
  * Job that looks up the parser routine in ud_parsef(). */
@@ -111,14 +123,38 @@ udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id)
 }
 
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_hy_pkt(char *restrict pkt, ud_sysid_t id)
+udpc_make_pkt(char *restrict p, ud_sysid_t src, ud_sysid_t dst, ud_pkt_ty_t ty)
 {
-	uint16_t *restrict tmp = (void*)pkt;
-	tmp[0] = id;
-	tmp[1] = UDPC_PKTDST_ALL;
-	tmp[2] = htons(UDPC_PKT_HY);
+	uint16_t *restrict tmp = (void*)p;
+	tmp[0] = htons(src);
+	tmp[1] = htons(dst);
+	tmp[2] = htons(ty);
 	tmp[3] = UDPC_MAGIC_NUMBER;
 	return;
+}
+
+
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_hy_pkt(char *restrict pkt, ud_sysid_t id)
+{
+	udpc_make_pkt(pkt, id, UDPC_PKTDST_ALL, UDPC_PKT_HY);
+	return;
+}
+
+extern inline ud_sysid_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_src(char *restrict pkt)
+{
+	uint16_t *restrict tmp = (void*)pkt;
+	/* yes ntoh conversion!!! */
+	return ntohs(tmp[0]);
+}
+
+extern inline ud_sysid_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_dst(char *restrict pkt)
+{
+	uint16_t *restrict tmp = (void*)pkt;
+	/* yes ntoh conversion!!! */
+	return ntohs(tmp[1]);
 }
 
 #endif	/* INCLUDED_protocore_h_ */

@@ -40,7 +40,8 @@
 
 #include <stdbool.h>
 
-#define UD_NETWORK_SERVICE	"8653"
+#define UD_NETWORK_SERVICE	8653
+#define UD_NETWORK_SERVSTR	"8653"
 /* 239.0.0.0/8 are organisational solicited v4 mcast addrs */
 #define UD_MCAST4_ADDR		"239.86.53.1"
 #define UD_MCAST4S2S_ADDR	"239.86.53.3"

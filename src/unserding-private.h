@@ -157,8 +157,6 @@ struct job_s {
 	ud_prnt_f prntf;
 	ud_free_f freef;
 	void *clo;
-	/** socket */
-	int sock;
 	/* set to 1 if job is ready to be processed */
 	unsigned short int readyp;
 	/** for udp based transports,

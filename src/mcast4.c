@@ -140,6 +140,7 @@ __linger_sock(int sock)
 	return;
 }
 
+#if !defined UNSERCLI
 static void
 __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 {
@@ -164,8 +165,7 @@ __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 				mreq, sizeof(*mreq)) < 0)) {
 		UD_DEBUG_MCAST("could not join the multicast group\n");
 	} else {
-		UD_DEBUG_MCAST("port %d listening to udp://%s"
-			       ":" UD_NETWORK_SERVICE "\n", s, addr);
+		UD_DEBUG_MCAST("port %d listening to udp://%s:0\n", s, addr);
 	}
 	return;
 }
@@ -199,7 +199,7 @@ __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *mreq)
 		UD_DEBUG_MCAST("could not join the multi6cast group\n");
 	} else {
 		UD_DEBUG_MCAST("port %d listening to udp://[%s]"
-			       ":" UD_NETWORK_SERVICE "\n", s, addr);
+			       ":" UD_NETWORK_SERVSTR "\n", s, addr);
 	}
 	return;
 }
@@ -219,6 +219,7 @@ __mcast6_leave_group(int s, struct ipv6_mreq *mreq)
 	setsockopt(s, IPPROTO_IPV6, IPV6_LEAVE_GROUP, mreq, sizeof(*mreq));
 	return;
 }
+#endif	/* !UNSERCLI */
 
 static int
 mcast_listener_try(volatile struct addrinfo *lres)
@@ -259,7 +260,7 @@ mcast_listener_try(volatile struct addrinfo *lres)
 			p = ((struct sockaddr_in*)lres->ai_addr)->sin_port;
 		}
 		UD_DEBUG_MCAST("listening to udp://[%s]:%d\n",
-			       lres->ai_canonname, p);
+			       lres->ai_canonname, ntohs(p));
 	}
 	return s;
 }
@@ -283,7 +284,7 @@ mcast46_listener_init(void)
 	int retval;
 	volatile int s;
 
-	retval = getaddrinfo(NULL, UD_NETWORK_SERVICE, &hints, &res);
+	retval = getaddrinfo(NULL, UD_NETWORK_SERVSTR, &hints, &res);
 
 	if (retval != 0) {
 		UD_CRITICAL_MCAST("oh oh oh, your address specs are shite\n");
@@ -329,9 +330,11 @@ mcast46_listener_init(void)
 static void
 mcast_listener_deinit(int sock)
 {
+#if !defined UNSERCLI
 	/* drop multicast group membership */
 	__mcast4_leave_group(sock, &mreq4);
 	__mcast6_leave_group(sock, &mreq6);
+#endif	/* !UNSERCLI */
 	/* linger the sink sock */
 	__linger_sock(sock);
 	UD_DEBUG_MCAST("closing listening socket %d...\n", sock);
@@ -353,7 +356,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 
 	UD_DEBUG_MCAST("\nincoming connection\n");
 	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
-	j->sock = w->fd;
 	return;
 }
 #else
@@ -372,7 +374,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 
 	UD_DEBUG_MCAST("incoming connection\n");
 	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
-	j->sock = w->fd;
 	/* obtain the address in human readable form */
 	a = inet_ntop(j->sa.sin6_family,
 		      j->sa.sin6_family == PF_INET6
@@ -462,7 +463,7 @@ send_cl(job_t j)
 	}
 
 	/* write back to whoever sent the packet */
-	(void)sendto(j->sock, j->buf, j->blen, 0,
+	(void)sendto(lsock, j->buf, j->blen, 0,
 		     (struct sockaddr*)&j->sa,
 		     j->sa.sin6_family == PF_INET6
 		     ? sizeof(struct sockaddr_in6)
@@ -478,7 +479,7 @@ send_m4(job_t j)
 	}
 
 	/* send to the m4cast address */
-	(void)sendto(j->sock, j->buf, j->blen, 0,
+	(void)sendto(lsock, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
 	return;
 }
@@ -491,7 +492,7 @@ send_m6(job_t j)
 	}
 
 	/* send to the m6cast address */
-	(void)sendto(j->sock, j->buf, j->blen, 0,
+	(void)sendto(lsock, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
 	return;
 }
@@ -504,10 +505,10 @@ send_m46(job_t j)
 	}
 
 	/* always send to the mcast addresses */
-	(void)sendto(j->sock, j->buf, j->blen, 0,
+	(void)sendto(lsock, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
 	/* ship to m6cast addr */
-	(void)sendto(j->sock, j->buf, j->blen, 0,
+	(void)sendto(lsock, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
 	return;
 }

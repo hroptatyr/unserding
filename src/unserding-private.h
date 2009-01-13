@@ -57,33 +57,29 @@ typedef size_t index_t;
 	fprintf(stderr, "[unserding] " args)
 # define UD_CRITICAL_MCAST(args...)					\
 	fprintf(stderr, "[unserding/input/mcast] CRITICAL " args)
-#if defined UNSERMON
-# define UD_DEBUG_MCAST(args...)
-# define UD_UNSERMON_PKT(args...)		\
-	fprintf(stderr, "%02x:%06x: " args)
-#else  /* !UNSERMON */
-# define UD_DEBUG_MCAST(args...)					\
+# define UD_DEBUG_MCAST(args...)				\
 	fprintf(stderr, "[unserding/input/mcast] " args)
-#endif	/* UNSERMON */
-#define UD_CRITICAL_STDIN(args...)					\
+# define UD_CRITICAL_STDIN(args...)				\
 	fprintf(stderr, "[unserding/stdin] CRITICAL " args)
-#define UD_DEBUG_STDIN(args...)				\
+# define UD_DEBUG_STDIN(args...)			\
 	fprintf(stderr, "[unserding/stdin] " args)
-#define UD_CRITICAL_PROTO(args...)				\
+# define UD_CRITICAL_PROTO(args...)				\
 	fprintf(stderr, "[unserding/proto] CRITICAL " args)
-#define UD_DEBUG_PROTO(args...)				\
+# define UD_DEBUG_PROTO(args...)			\
 	fprintf(stderr, "[unserding/proto] " args)
-#define UD_CRITICAL_CAT(args...)				\
+# define UD_CRITICAL_CAT(args...)				\
 	fprintf(stderr, "[unserding/catalogue] CRITICAL " args)
-#define UD_DEBUG_CAT(args...)				\
+# define UD_DEBUG_CAT(args...)				\
 	fprintf(stderr, "[unserding/catalogue] " args)
 
 #elif defined UNSERCLI
 # define UD_CRITICAL(args...)				\
 	fprintf(stderr, "[unserding] CRITICAL " args)
 # define UD_DEBUG(args...)
-# define UD_CRITICAL_MCAST(args...)
-# define UD_DEBUG_MCAST(args...)
+# define UD_CRITICAL_MCAST(args...)					\
+	fprintf(stderr, "[unserding/input/mcast] CRITICAL " args)
+# define UD_DEBUG_MCAST(args...)				\
+	fprintf(stderr, "[unserding/input/mcast] " args)
 # define UD_CRITICAL_STDIN(args...)			\
 	fprintf(stderr, "[unserding/stdin] CRITICAL " args)
 # define UD_DEBUG_STDIN(args...)

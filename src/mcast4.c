@@ -154,7 +154,7 @@ __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 	setsockopt(s, IPPROTO_IPV6, IP_RECVSTDADDR, &one, sizeof(one)) ;
 #endif
 	/* turn off loopback */
-	setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &one, sizeof(one));
+	setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &zero, sizeof(zero));
 
 	/* set up the multicast group and join it */
 	inet_pton(AF_INET, addr, &mreq->imr_multiaddr.s_addr);
@@ -226,13 +226,24 @@ mcast_listener_try(volatile struct addrinfo *lres)
 	volatile int s;
 	int retval;
 
-	s = socket(lres->ai_family, SOCK_DGRAM, 0);
+	s = socket(lres->ai_family, SOCK_DGRAM, IPPROTO_IP);
 	if (s < 0) {
 		UD_CRITICAL_MCAST("socket() failed, whysoever\n");
 		return s;
 	}
+#if defined UNSERCLI
+	if (LIKELY(lres->ai_family == AF_INET6)) {
+		((struct sockaddr_in6*)lres->ai_addr)->sin6_port = htons(0);
+	} else if (lres->ai_family == AF_INET) {
+		((struct sockaddr_in*)lres->ai_addr)->sin_port = htons(0);
+	} else {
+		/* omg! */
+		abort();
+	}
+#else
+	/* allow many many many servers on that port */
 	__reuse_sock(s);
-
+#endif
 	/* we used to retry upon failure, but who cares */
 	retval = bind(s, lres->ai_addr, lres->ai_addrlen);
 	if (UNLIKELY(retval == -1)) {
@@ -240,9 +251,15 @@ mcast_listener_try(volatile struct addrinfo *lres)
 		close(s);
 		return -1;
 	} else {
-		UD_DEBUG_MCAST("listening to udp://[%s]"
-			       ":" UD_NETWORK_SERVICE "\n",
-			       lres->ai_canonname);
+		uint16_t p;
+
+		if (LIKELY(lres->ai_family == AF_INET6)) {
+			p = ((struct sockaddr_in6*)lres->ai_addr)->sin6_port;
+		} else if (lres->ai_family == AF_INET) {
+			p = ((struct sockaddr_in*)lres->ai_addr)->sin_port;
+		}
+		UD_DEBUG_MCAST("listening to udp://[%s]:%d\n",
+			       lres->ai_canonname, p);
 	}
 	return s;
 }
@@ -267,12 +284,24 @@ mcast46_listener_init(void)
 	volatile int s;
 
 	retval = getaddrinfo(NULL, UD_NETWORK_SERVICE, &hints, &res);
+
 	if (retval != 0) {
-		/* abort(); */
+		UD_CRITICAL_MCAST("oh oh oh, your address specs are shite\n");
 		return -1;
 	}
 	for (struct addrinfo *lres = res; lres; lres = lres->ai_next) {
 		if ((s = mcast_listener_try(lres)) >= 0) {
+#if defined UNSERCLI
+			/* prepare the __sa6 structure, but do not join */
+			__sa6.sin6_family = PF_INET6;
+			inet_pton(AF_INET6, UD_MCAST6_ADDR, &__sa6.sin6_addr);
+			__sa6.sin6_port = htons(UD_NETWORK_SERVICE);
+			/* prepare the __sa4 structure, but do not join */
+			__sa4.sin_family = PF_INET;
+			inet_pton(AF_INET, UD_MCAST4_ADDR, &__sa4.sin_addr);
+			__sa4.sin_port = htons(UD_NETWORK_SERVICE);
+
+#else  /* !UNSERCLI */
 			/* join the mcast group */
 			__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6);
 			/* endow our s2c and s2s structs */
@@ -283,7 +312,7 @@ mcast46_listener_init(void)
 			/* endow our s2c and s2s structs */
 			memcpy(&__sa4, lres->ai_addr, sizeof(__sa4));
 			__sa4.sin_addr = mreq4.imr_multiaddr;
-
+#endif	/* UNSERCLI */
 			UD_DEBUG_MCAST(":sock %d  :proto %d :host %s\n",
 				       s, lres->ai_protocol,
 				       lres->ai_canonname);
@@ -300,6 +329,9 @@ mcast46_listener_init(void)
 static void
 mcast_listener_deinit(int sock)
 {
+	/* drop multicast group membership */
+	__mcast4_leave_group(sock, &mreq4);
+	__mcast6_leave_group(sock, &mreq6);
 	/* linger the sink sock */
 	__linger_sock(sock);
 	UD_DEBUG_MCAST("closing listening socket %d...\n", sock);
@@ -320,8 +352,8 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	socklen_t lsa = sizeof(j->sa);
 
 	UD_DEBUG_MCAST("\nincoming connection\n");
-	nread = recvfrom(j->sock = w->fd, j->buf, JOB_BUF_SIZE, 0,
-			 &j->sa, &lsa);
+	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
+	j->sock = w->fd;
 	return;
 }
 #else
@@ -339,8 +371,8 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	socklen_t lsa = sizeof(j->sa);
 
 	UD_DEBUG_MCAST("incoming connection\n");
-	nread = recvfrom(j->sock = w->fd, j->buf, JOB_BUF_SIZE, 0,
-			 &j->sa, &lsa);
+	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
+	j->sock = w->fd;
 	/* obtain the address in human readable form */
 	a = inet_ntop(j->sa.sin6_family,
 		      j->sa.sin6_family == PF_INET6
@@ -568,9 +600,6 @@ ud_detach_mcast4(EV_P)
 #endif	/* !UNSERMON */
 
 	if (LIKELY(lsock >= 0)) {
-		/* drop multicast group membership */
-		__mcast4_leave_group(lsock, &mreq4);
-		__mcast6_leave_group(lsock, &mreq6);
 		/* and kick the socket */
 		mcast_listener_deinit(lsock);
 	}

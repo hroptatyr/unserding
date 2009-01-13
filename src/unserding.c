@@ -117,10 +117,10 @@ main (void)
 	/* initialise global job q */
 	init_glob_jq();
 
-	/* attach the stdinlistener, inits readline too */
-	ud_attach_stdin(EV_A);
 	/* attach the mcast crew */
 	ud_attach_mcast4(EV_A);
+	/* attach the stdinlistener, inits readline too */
+	ud_attach_stdin(EV_A);
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);

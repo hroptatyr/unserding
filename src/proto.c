@@ -220,6 +220,9 @@ ud_parse(job_t j)
 	} INNIT(hy_cmd) {
 		/* construct the HY packet */
 		udpc_hy_pkt(j->buf, conv++);
+		j->blen = 8;
+		/* send to mcast group */
+		send_m46(j);
 
 	} INNIT(cheers_cmd) {
 
@@ -234,7 +237,7 @@ ud_parse(job_t j)
 		memcpy(j->buf, help_rpl, j->blen = countof_m1(help_rpl));
 		j->prntf(j);
 
-	} else {
+	} else if (j->buf[0] != '\0') {
 		/* print an error */
 		memcpy(j->buf, inv_rpl, j->blen = countof_m1(inv_rpl));
 		j->prntf(j);

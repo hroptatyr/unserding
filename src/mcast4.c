@@ -86,8 +86,10 @@ static size_t neighbours = 0;
 static uint8_t conv = 0;
 #endif	/* !UNSERMON */
 static ev_io ALGN16(__srv_watcher);
+#if !defined UNSERCLI
 static struct ip_mreq ALGN16(mreq4);
 static struct ipv6_mreq ALGN16(mreq6);
+#endif	/* !UNSERCLI */
 /* server to client goodness */
 static struct sockaddr_in6 __sa6;
 static struct sockaddr_in __sa4;

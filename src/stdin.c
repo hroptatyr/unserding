@@ -63,6 +63,7 @@
 #endif
 /* gnu readline */
 #include <readline/readline.h>
+#include <readline/history.h>
 /* our master include */
 #include "unserding.h"
 #include "unserding-private.h"
@@ -91,6 +92,12 @@ handle_rl(char *line)
 		return;
 	}
 	UD_DEBUG_STDIN("received line \"%s\"\n", line);
+	/* save us some work */
+	if (UNLIKELY(line[0] == '\0' || line[0] == ' ')) {
+		return;
+	}
+	/* stuff up our history */
+	add_history(line);
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
 	if (UNLIKELY((llen = strlen(line)) > 4096)) {

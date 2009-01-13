@@ -140,6 +140,8 @@ main (void)
 	/* destroy the default evloop */
 	ev_default_destroy();
 
+	/* flush stderr */
+	fflush(stderr);
 	/* unloop was called, so exit */
 	return 0;
 }

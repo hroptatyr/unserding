@@ -253,6 +253,9 @@ free_job(job_t j)
 
 extern job_queue_t glob_jq;
 
+#if defined UNSERCLI
+extern bool cli_waiting_p;
+#endif	/* UNSERCLI */
 
 /* more socket goodness, defined in mcast4.c */
 extern int ud_attach_mcast4(EV_P);

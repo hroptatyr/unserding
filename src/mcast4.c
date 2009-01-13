@@ -391,6 +391,7 @@ handle_hy(job_t j)
 	udpc_make_pkt(j->buf, myid, UDPC_PKTDST_ALL, UDPC_PKT_HY_RPL);
 	UD_DEBUG_PROTO("sending HY RPL: %d\n", myid);
 	j->blen = 8;
+	j->prntf = print_m46;
 	return;
 }
 
@@ -407,6 +408,22 @@ handle_hy_rpl(job_t j)
 	if (id < min_seen) {
 		min_seen = id;
 	}
+	/* do not reply */
+	j->blen = 0;
+	j->prntf = NULL;
+	return;
+}
+
+static void __attribute__((unused))
+handle_hy_conflict(job_t j)
+{
+	ud_sysid_t id = udpc_pkt_src(j->buf);
+
+	UD_DEBUG_PROTO("HY RPL from %d  myid %d\n", id, myid);
+	if (LIKELY(id != myid)) {
+		return;
+	}
+	UD_DEBUG_PROTO("CONFLICT! Found HY RPL from %d\n", id);
 	/* do not reply */
 	j->blen = 0;
 	j->prntf = NULL;
@@ -474,6 +491,23 @@ print_m46(job_t j)
 
 
 #if !defined UNSERMON
+static void __attribute__((unused))
+s2s_nego_hy(void)
+{
+	char buf[4 * sizeof(uint16_t)];
+
+	UD_DEBUG("boasting about my balls, god, are they big, id %d\n", myid);
+	/* say hy */
+	udpc_hy_pkt(buf, myid);
+	/* ship to m4cast addr */
+	(void)sendto(lsock, buf, countof(buf), 0,
+		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
+	/* ship to m6cast addr */
+	(void)sendto(lsock, buf, countof(buf), 0,
+		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
+	return;
+}
+
 static void
 s2s_nego_cb(EV_P_ ev_timer *w, int revents)
 {
@@ -495,25 +529,9 @@ s2s_nego_cb(EV_P_ ev_timer *w, int revents)
 out:
 	/* stop the timer */
 	ev_timer_stop(EV_A_ &__s2s_watcher);
-	/* also kick the parsing fun */
-	ud_parsef[UDPC_PKT_HY_RPL] = NULL;
-	return;
-}
-
-static void __attribute__((unused))
-s2s_nego_hy(void)
-{
-	char buf[4 * sizeof(uint16_t)];
-
-	UD_DEBUG("boasting about my balls ... god, are they big\n");
-	/* say hy */
-	udpc_hy_pkt(buf, UDPC_PKTSRC_UNK);
-	/* ship to m4cast addr */
-	(void)sendto(lsock, buf, countof(buf), 0,
-		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
-	/* ship to m6cast addr */
-	(void)sendto(lsock, buf, countof(buf), 0,
-		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
+	/* we used to kick the parsing fun, now check if someone's
+	 * HYing with out id */
+	ud_parsef[UDPC_PKT_HY_RPL] = handle_hy_conflict;
 	return;
 }
 

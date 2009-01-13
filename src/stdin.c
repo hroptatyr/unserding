@@ -107,6 +107,10 @@ handle_rl(char *line)
 	j->prntf = ud_print_stdin;
 	memcpy(j->buf, line, llen);
 	enqueue_job(glob_jq, j);
+	/* free the line readline gave us */
+	free(line);
+	/* unset the prompt, make way for messages */
+	ev_io_stop(EV_DEFAULT_ &__srv_watcher);
 	/* now notify the slaves */
 	ud_parse(j);
 	return;
@@ -121,6 +125,7 @@ stdin_listener_init(void)
 	rl_attempted_completion_function = NULL;
 
 	rl_basic_word_break_characters = "\t\n@$><=;|&{( ";
+	rl_catch_signals = 0;
 
 	/* the callback */
 	rl_callback_handler_install("unserding> ", handle_rl);
@@ -197,6 +202,15 @@ stdin_traf_wcb(EV_P_ ev_io *w, int revents)
 	unlock_obring(&ctx->obring);
 	return;
 #endif
+}
+
+void
+ud_reset_stdin(EV_P)
+{
+	ev_io_start(EV_A_ &__srv_watcher);
+	rl_on_new_line();
+	rl_forced_update_display();
+	return;
 }
 
 

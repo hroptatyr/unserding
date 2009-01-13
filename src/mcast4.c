@@ -356,8 +356,8 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	job_t j = obtain_job(glob_jq);
 	socklen_t lsa = sizeof(j->sa);
 
-	UD_DEBUG_MCAST("\nincoming connection\n");
 	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
+	fprintf(stdout, "\nincoming connection\n");
 	return;
 }
 #else

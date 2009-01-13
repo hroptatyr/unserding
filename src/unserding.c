@@ -93,8 +93,14 @@ static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
 static void
 sigint_cb(EV_P_ ev_signal *w, int revents)
 {
-	UD_DEBUG("C-c caught, unrolling everything\n");
-	ev_unloop(EV_A_ EVUNLOOP_ALL);
+	putc('\n', stdout);
+	ud_reset_stdin(EV_A);
+	return;
+}
+
+static void
+sigpipe_cb(EV_P_ ev_signal *w, int revents)
+{
 	return;
 }
 
@@ -126,7 +132,7 @@ main (void)
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);
 	/* initialise a sig C-c handler */
-	ev_signal_init(sigpipe_watcher, sigint_cb, SIGPIPE);
+	ev_signal_init(sigpipe_watcher, sigpipe_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
 
 	/* now wait for events to arrive */

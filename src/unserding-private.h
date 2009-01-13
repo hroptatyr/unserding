@@ -268,6 +268,7 @@ extern void send_cl(job_t);
 /* readline goodness, defined in stdin.c */
 extern int ud_attach_stdin(EV_P);
 extern int ud_detach_stdin(EV_P);
+extern void ud_reset_stdin(EV_P);
 
 /* jobs to browse the catalogue */
 extern void ud_cat_ls_job(job_t);

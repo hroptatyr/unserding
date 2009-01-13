@@ -243,6 +243,7 @@ ud_parse(job_t j)
 		j->prntf(j);
 	}
 
+	ud_reset_stdin(EV_DEFAULT);
 #undef INNIT
 #undef INNIT_CPL
 	return;

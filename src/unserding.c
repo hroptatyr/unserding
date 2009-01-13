@@ -67,11 +67,6 @@
 typedef struct ud_worker_s *ud_worker_t;
 typedef struct ud_ev_async_s ud_ev_async;
 
-/* our version of the async event, cdr-coding */
-struct ud_ev_async_s {
-	struct ev_async super;
-};
-
 
 static index_t __attribute__((unused)) glob_idx = 0;
 
@@ -79,11 +74,6 @@ static ev_signal ALGN16(__sigint_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
 static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
-
-/* worker magic */
-#define NWORKERS		4
-/* round robin var */
-static index_t rr_wrk = 0;
 
 /* the global job queue */
 static struct job_queue_s __glob_jq = {
@@ -129,6 +119,8 @@ main (void)
 
 	/* attach the stdinlistener, inits readline too */
 	ud_attach_stdin(EV_A);
+	/* attach the mcast crew */
+	ud_attach_mcast4(EV_A);
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
@@ -137,11 +129,11 @@ main (void)
 	ev_signal_init(sigpipe_watcher, sigint_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
 
-	/* reset the round robin var */
-	rr_wrk = 0;
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
+	/* attach the mcast crew */
+	ud_detach_mcast4(EV_A);
 	/* close the socket */
 	ud_detach_stdin(EV_A);
 

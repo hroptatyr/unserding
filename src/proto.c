@@ -87,32 +87,28 @@
  ***/
 
 static const char inv_rpl[] = "invalid command, better luck next time\n";
+static uint8_t conv = 0;
 
-#define MAKE_SIMPLE_CMD(_c, _r)				\
-	static const char ALGN16(_c##_cmd)[] = #_c;	\
-	static const char ALGN16(_c##_rpl)[] = _r;
+#define MAKE_SIMPLE_CMD(_c)				\
+	static const char ALGN16(_c##_cmd)[] = #_c;
 
-MAKE_SIMPLE_CMD(oi, "oi\n");
-MAKE_SIMPLE_CMD(sup, "alright\n");
-MAKE_SIMPLE_CMD(cheers, "no worries\n");
-MAKE_SIMPLE_CMD(wtf, "nvm\n");
-MAKE_SIMPLE_CMD(spot, "spot\n");
-static const char ls_cmd[] = "ls";
-static const char pwd_cmd[] = "pwd";
-static const char cd_cmd[] = "cd";
-static const char connect_cmd[] = "connect";
+MAKE_SIMPLE_CMD(hy);
+MAKE_SIMPLE_CMD(sup);
+MAKE_SIMPLE_CMD(cheers);
+MAKE_SIMPLE_CMD(wtf);
+MAKE_SIMPLE_CMD(spot);
+MAKE_SIMPLE_CMD(ls);
+MAKE_SIMPLE_CMD(connect);
 /* help command */
-MAKE_SIMPLE_CMD(
-	help,
-	"oi     send keep-alive message\n"
+MAKE_SIMPLE_CMD(help);
+static const char ALGN16(help_rpl)[] =
+	"hy     send keep-alive message\n"
 	"sup    list connected clients and neighbour servers\n"
 	"help   this help screen\n"
 	"cheers [time]  store last result for TIME seconds (default 86400)\n"
 	"wtf    immediately flush last result\n"
 	"spot <options> obtain spot price\n"
-	"ls     list catalogue entries of current directory\n"
-	"pwd    print the name of the current directory\n"
-	"cd X   change to directory X\n");
+	"ls     list catalogue entries of current directory\n";
 
 /* jobs */
 static void ud_sup_job(job_t);
@@ -220,61 +216,28 @@ ud_parse(job_t j)
 	/* starting somewhat slowly with a memcmp */
 	if (0) {
 		;
-	} INNIT(sup_cmd) {
-		UD_DEBUG_PROTO("found `sup'\n");
-		memcpy(j->buf, sup_rpl, j->blen = countof_m1(sup_rpl));
-		j->prntf(j);
 
-	} INNIT(oi_cmd) {
-		size_t l;
-
-		UD_DEBUG_PROTO("found `oi'\n");
-
-		if (UNLIKELY(host[0] == '\0')) {
-			(void)gethostname(host, countof(host));
-		}
-		memcpy(&j->buf[0], "oi ", 3);
-		memcpy(&j->buf[3], host, countof(host));
-		l = strlen(j->buf), j->buf[l] = '\n', j->blen = l + 1;
-		UD_DEBUG_PROTO("constr \"%s\"\n", j->buf);
-		j->prntf(j);
+	} INNIT(hy_cmd) {
+		/* construct the HY packet */
+		udpc_hy_pkt(j->buf, conv++);
 
 	} INNIT(cheers_cmd) {
-		UD_DEBUG_PROTO("found `cheers'\n");
-		memcpy(j->buf, cheers_rpl, j->blen = countof_m1(cheers_rpl));
-		j->prntf(j);
 
 	} INNIT(wtf_cmd) {
-		UD_DEBUG_PROTO("found `wtf'\n");
-		memcpy(j->buf, wtf_rpl, j->blen = countof_m1(wtf_rpl));
-		j->prntf(j);
 
 	} INNIT(spot_cmd) {
-		UD_DEBUG_PROTO("found `spot'\n");
-		__spot_job(j);
 
 	} INNIT(ls_cmd) {
-		job_t j2 = obtain_job(glob_jq);
-
-		UD_DEBUG_PROTO("found `ls'\n");
-		j2->prntf = j->prntf;
-		j2->workf = ud_cat_ls_job;
-		enqueue_job(glob_jq, j2);
-		/* now notify the slaves */
-		trigger_job_queue();
 
 	} INNIT(help_cmd) {
-		UD_DEBUG_PROTO("found `help'\n");
+		/* print the help string */
 		memcpy(j->buf, help_rpl, j->blen = countof_m1(help_rpl));
 		j->prntf(j);
 
 	} else {
-#if 0
 		/* print an error */
 		memcpy(j->buf, inv_rpl, j->blen = countof_m1(inv_rpl));
 		j->prntf(j);
-#endif
-		j->blen = 0;
 	}
 
 #undef INNIT

@@ -74,79 +74,28 @@ extern void ud_print_stdin(job_t j);
 
 
 /* string goodies */
-/**
- * Find PAT (of length PLEN) inside BUF (of length BLEN). */
-static const char __attribute__((unused)) *
-boyer_moore(const char *buf, size_t blen, const char *pat, size_t plen)
-{
-	long int next[UCHAR_MAX];
-	long int skip[UCHAR_MAX];
-
-	if ((size_t)plen > blen || plen >= UCHAR_MAX) {
-		return NULL;
-	}
-
-	/* calc skip table ("bad rule") */
-	for (index_t i = 0; i <= UCHAR_MAX; i++) {
-		skip[i] = plen;
-	}
-	for (index_t i = 0; i < plen; i++) {
-		skip[(int)pat[i]] = plen - i - 1;
-	}
-
-	for (index_t j = 0, i; j <= plen; j++) {
-		for (i = plen - 1; i >= 1; i--) {
-			for (index_t k = 1; k <= j; k++) {
-				if ((long int)i - (long int)k < 0L) {
-					goto matched;
-				}
-				if (pat[plen - k] != pat[i - k]) {
-					goto nexttry;
-				}
-			}
-			goto matched;
-		nexttry: ;
-		}
-	matched:
-		next[j] = plen - i;
-	}
-
-	plen--;
-	for (index_t i = plen /* position of last p letter */; i < blen; ) {
-		for (index_t j = 0 /* matched letter count */; j <= plen; ) {
-			if (buf[i - j] == pat[plen - j]) {
-				j++;
-				continue;
-			}
-			i += skip[(int)buf[i - j]] > next[j]
-				? skip[(int)buf[i - j]]
-				: next[j];
-			goto newi;
-		}
-		return buf + i - plen;
-	newi:
-		;
-	}
-	return NULL;
-}
-
 static void
 handle_rl(char *line)
 {
 	size_t llen;
 	job_t j;
 
+	/* print newline */
 	if (UNLIKELY(line == NULL)) {
+		/* print newline */
+		puts("");
 		/* just remove the handler here */
 		rl_callback_handler_remove();
 		/* and finally kick the event loop */
 		ev_unloop(EV_DEFAULT_ EVUNLOOP_ALL);
 		return;
 	}
-	UD_DEBUG("received line \"%s\"\n", line);
+	UD_DEBUG_STDIN("received line \"%s\"\n", line);
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
-	llen = strlen(line);
+	if (UNLIKELY((llen = strlen(line)) > 4096)) {
+		llen = 4096;
+	}
 	j = obtain_job(glob_jq);
 	j->prntf = ud_print_stdin;
 	memcpy(j->buf, line, llen);

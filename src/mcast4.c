@@ -97,13 +97,6 @@ static struct sockaddr_in __sa4;
 size_t s2s_oi_len;
 static char s2s_oi[MAXHOSTNAMELEN] = "hy ";
 
-#if !defined UNSERMON
-static void print_cl(job_t j);
-static void print_m4(job_t j);
-static void print_m6(job_t j);
-static void print_m46(job_t j);
-#endif	/* !UNSERMON */
-
 
 /* socket goodies */
 static inline void
@@ -317,6 +310,21 @@ mcast_listener_deinit(int sock)
 
 
 /* this callback is called when data is readable on the main server socket */
+#if defined UNSERCLI
+static void
+mcast_inco_cb(EV_P_ ev_io *w, int revents)
+{
+	ssize_t nread;
+	/* a job */
+	job_t j = obtain_job(glob_jq);
+	socklen_t lsa = sizeof(j->sa);
+
+	UD_DEBUG_MCAST("\nincoming connection\n");
+	nread = recvfrom(j->sock = w->fd, j->buf, JOB_BUF_SIZE, 0,
+			 &j->sa, &lsa);
+	return;
+}
+#else
 static void
 mcast_inco_cb(EV_P_ ev_io *w, int revents)
 {
@@ -360,7 +368,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 			udpc_pkt_type(j->buf));
 #else  /* !UNSERMON */
 	j->workf = ud_proto_parse;
-	j->prntf = print_cl;
+	j->prntf = send_cl;
 
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
@@ -370,6 +378,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 #endif	/* UNSERMON */
 	return;
 }
+#endif	/* !UNSERCLI */
 
 
 static void __attribute__((unused))
@@ -388,12 +397,19 @@ handle_hy(job_t j)
 	udpc_make_rpl_pkt(j->buf);
 	UD_DEBUG_PROTO("sending HY RPL\n");
 	j->blen = 8;
-	j->prntf = print_cl;
+	j->prntf = send_cl;
 	neighbours = 0;
 	return;
 }
 
 /* handle the HY RPL packet */
+# if defined UNSERCLI
+static void __attribute__((unused))
+handle_hy_rpl(job_t j)
+{
+	return;
+}
+# else	/* !UNSERCLI */
 static void __attribute__((unused))
 handle_hy_rpl(job_t j)
 {
@@ -404,9 +420,10 @@ handle_hy_rpl(job_t j)
 	j->prntf = NULL;
 	return;
 }
+# endif	 /* UNSERCLI */
 
-static void
-print_cl(job_t j)
+void
+send_cl(job_t j)
 {
 	if (UNLIKELY(j->blen == 0)) {
 		return;
@@ -421,8 +438,8 @@ print_cl(job_t j)
 	return;
 }
 
-static void __attribute__((unused))
-print_m4(job_t j)
+void
+send_m4(job_t j)
 {
 	if (UNLIKELY(j->blen == 0)) {
 		return;
@@ -434,8 +451,8 @@ print_m4(job_t j)
 	return;
 }
 
-static void __attribute__((unused))
-print_m6(job_t j)
+void __attribute__((unused))
+send_m6(job_t j)
 {
 	if (UNLIKELY(j->blen == 0)) {
 		return;
@@ -447,8 +464,8 @@ print_m6(job_t j)
 	return;
 }
 
-static void __attribute__((unused))
-print_m46(job_t j)
+void __attribute__((unused))
+send_m46(job_t j)
 {
 	if (UNLIKELY(j->blen == 0)) {
 		return;
@@ -497,7 +514,7 @@ int
 ud_attach_mcast4(EV_P)
 {
 	ev_io *srv_watcher = &__srv_watcher;
-#if !defined UNSERMON
+#if defined UNSERSRV
 	ev_timer *s2s_watcher = &__s2s_watcher;
 #endif	/* !UNSERMON */
 
@@ -516,7 +533,9 @@ ud_attach_mcast4(EV_P)
 
 #if !defined UNSERMON
 	/* escrow some packet handlers */
+# if !defined UNSERCLI
 	ud_parsef[UDPC_PKT_HY] = handle_hy;
+# endif	 /* UNSERCLI */
 	ud_parsef[UDPC_PKT_HY_RPL] = handle_hy_rpl;
 #endif	/* !UNSERMON */
 
@@ -524,7 +543,7 @@ ud_attach_mcast4(EV_P)
 	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
 	ev_io_start(EV_A_ srv_watcher);
 
-#if !defined UNSERMON
+#if defined UNSERSRV
 	/* init the s2s timer, this one says `hy' until an id was negotiated */
 	ev_timer_init(s2s_watcher, s2s_hy_cb, 0.0, S2S_BRAG_RATE);
 	ev_timer_start(EV_A_ s2s_watcher);

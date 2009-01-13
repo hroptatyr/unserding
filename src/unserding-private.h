@@ -50,9 +50,10 @@
 
 typedef size_t index_t;
 
+#if defined UNSERSRV
 #define UD_CRITICAL(args...)				\
 	fprintf(stderr, "[unserding] CRITICAL " args)
-#define UD_DEBUG(args...)			\
+# define UD_DEBUG(args...)			\
 	fprintf(stderr, "[unserding] " args)
 # define UD_CRITICAL_MCAST(args...)					\
 	fprintf(stderr, "[unserding/input/mcast] CRITICAL " args)
@@ -76,6 +77,48 @@ typedef size_t index_t;
 	fprintf(stderr, "[unserding/catalogue] CRITICAL " args)
 #define UD_DEBUG_CAT(args...)				\
 	fprintf(stderr, "[unserding/catalogue] " args)
+
+#elif defined UNSERCLI
+# define UD_CRITICAL(args...)				\
+	fprintf(stderr, "[unserding] CRITICAL " args)
+# define UD_DEBUG(args...)
+# define UD_CRITICAL_MCAST(args...)
+# define UD_DEBUG_MCAST(args...)
+# define UD_CRITICAL_STDIN(args...)			\
+	fprintf(stderr, "[unserding/stdin] CRITICAL " args)
+# define UD_DEBUG_STDIN(args...)
+# define UD_CRITICAL_PROTO(args...)
+# define UD_DEBUG_PROTO(args...)
+# define UD_CRITICAL_CAT(args...)
+# define UD_DEBUG_CAT(args...)
+
+#elif defined UNSERMON
+# define UD_CRITICAL(args...)				\
+	fprintf(stderr, "[unserding] CRITICAL " args)
+# define UD_DEBUG(args...)
+# define UD_CRITICAL_MCAST(args...)
+# define UD_DEBUG_MCAST(args...)
+# define UD_UNSERMON_PKT(args...)	fprintf(stderr, "%02x:%06x: " args)
+# define UD_CRITICAL_STDIN(args...)
+# define UD_DEBUG_STDIN(args...)
+# define UD_CRITICAL_PROTO(args...)				\
+	fprintf(stderr, "[unserding/proto] CRITICAL " args)
+# define UD_DEBUG_PROTO(args...)
+# define UD_CRITICAL_CAT(args...)
+# define UD_DEBUG_CAT(args...)
+
+#else  /* aux stuff */
+# define UD_CRITICAL(args...)
+# define UD_DEBUG(args...)
+# define UD_CRITICAL_MCAST(args...)
+# define UD_DEBUG_MCAST(args...)
+# define UD_CRITICAL_STDIN(args...)
+# define UD_DEBUG_STDIN(args...)
+# define UD_CRITICAL_PROTO(args...)
+# define UD_DEBUG_PROTO(args...)
+# define UD_CRITICAL_CAT(args...)
+# define UD_DEBUG_CAT(args...)
+#endif
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -220,6 +263,10 @@ extern job_queue_t glob_jq;
 /* more socket goodness, defined in mcast4.c */
 extern int ud_attach_mcast4(EV_P);
 extern int ud_detach_mcast4(EV_P);
+extern void send_m4(job_t);
+extern void send_m46(job_t);
+extern void send_m6(job_t);
+extern void send_cl(job_t);
 
 /* readline goodness, defined in stdin.c */
 extern int ud_attach_stdin(EV_P);

@@ -59,7 +59,7 @@ typedef size_t index_t;
 #if defined UNSERMON
 # define UD_DEBUG_MCAST(args...)
 # define UD_UNSERMON_PKT(args...)		\
-	fprintf(stderr, "%04x -> %04x: " args)
+	fprintf(stderr, "%02x:%06x: " args)
 #else  /* !UNSERMON */
 # define UD_DEBUG_MCAST(args...)					\
 	fprintf(stderr, "[unserding/input/mcast] " args)

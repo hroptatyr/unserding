@@ -81,8 +81,9 @@
 
 static int lsock __attribute__((used));
 #if !defined UNSERMON
-static ud_sysid_t myid = 0, min_seen = (ud_sysid_t)-1, max_seen = (ud_sysid_t)0;
 static ev_timer ALGN16(__s2s_watcher);
+static size_t neighbours = 0;
+static uint8_t conv = 0;
 #endif	/* !UNSERMON */
 static ev_io ALGN16(__srv_watcher);
 static struct ip_mreq ALGN16(mreq4);
@@ -349,21 +350,17 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	} else if (UNLIKELY(!udpc_pkt_valid_p(j->buf))) {
 		UD_UNSERMON_PKT("invalid pkt\n", 0, 0);
 		return;
-#else  /* !UNSERMON */
-	} else if (UNLIKELY(!udpc_pkt_for_us_p(j->buf, myid))) {
-		UD_DEBUG_MCAST("pkt not for us, burying him\n");
-		return;
 #endif	/* UNSERMON */
 	}
 
 	j->blen = nread;
 #if defined UNSERMON
 	UD_UNSERMON_PKT("%04x\n",
-			udpc_pkt_src(j->buf), udpc_pkt_dst(j->buf),
+			udpc_pkt_cno(j->buf), udpc_pkt_pno(j->buf),
 			udpc_pkt_type(j->buf));
 #else  /* !UNSERMON */
 	j->workf = ud_proto_parse;
-	j->prntf = print_m46;
+	j->prntf = print_cl;
 
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
@@ -388,10 +385,11 @@ handle_hy(job_t j)
 {
 	UD_DEBUG_PROTO("found HY\n");
 	/* generate the answer packet */
-	udpc_make_pkt(j->buf, myid, UDPC_PKTDST_ALL, UDPC_PKT_HY_RPL);
-	UD_DEBUG_PROTO("sending HY RPL: %d\n", myid);
+	udpc_make_rpl_pkt(j->buf);
+	UD_DEBUG_PROTO("sending HY RPL\n");
 	j->blen = 8;
-	j->prntf = print_m46;
+	j->prntf = print_cl;
+	neighbours = 0;
 	return;
 }
 
@@ -399,31 +397,8 @@ handle_hy(job_t j)
 static void __attribute__((unused))
 handle_hy_rpl(job_t j)
 {
-	ud_sysid_t id = udpc_pkt_src(j->buf);
-
-	UD_DEBUG_PROTO("found HY RPL: %d\n", id);
-	if (id > max_seen) {
-		max_seen = id;
-	}
-	if (id < min_seen) {
-		min_seen = id;
-	}
-	/* do not reply */
-	j->blen = 0;
-	j->prntf = NULL;
-	return;
-}
-
-static void __attribute__((unused))
-handle_hy_conflict(job_t j)
-{
-	ud_sysid_t id = udpc_pkt_src(j->buf);
-
-	UD_DEBUG_PROTO("HY RPL from %d  myid %d\n", id, myid);
-	if (LIKELY(id != myid)) {
-		return;
-	}
-	UD_DEBUG_PROTO("CONFLICT! Found HY RPL from %d\n", id);
+	UD_DEBUG_PROTO("found HY RPL\n");
+	neighbours++;
 	/* do not reply */
 	j->blen = 0;
 	j->prntf = NULL;
@@ -446,7 +421,7 @@ print_cl(job_t j)
 	return;
 }
 
-static void
+static void __attribute__((unused))
 print_m4(job_t j)
 {
 	if (UNLIKELY(j->blen == 0)) {
@@ -459,7 +434,7 @@ print_m4(job_t j)
 	return;
 }
 
-static void
+static void __attribute__((unused))
 print_m6(job_t j)
 {
 	if (UNLIKELY(j->blen == 0)) {
@@ -472,7 +447,7 @@ print_m6(job_t j)
 	return;
 }
 
-static void
+static void __attribute__((unused))
 print_m46(job_t j)
 {
 	if (UNLIKELY(j->blen == 0)) {
@@ -496,68 +471,23 @@ s2s_nego_hy(void)
 {
 	char buf[4 * sizeof(uint16_t)];
 
-	UD_DEBUG("boasting about my balls, god, are they big, id %d\n", myid);
+	UD_DEBUG("boasting about my balls, god, are they big\n");
 	/* say hy */
-	udpc_hy_pkt(buf, myid);
+	udpc_hy_pkt(buf, conv++);
 	/* ship to m4cast addr */
 	(void)sendto(lsock, buf, countof(buf), 0,
 		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
 	/* ship to m6cast addr */
 	(void)sendto(lsock, buf, countof(buf), 0,
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
-	return;
-}
-
-static void
-s2s_nego_cb(EV_P_ ev_timer *w, int revents)
-{
-/* negotiation callback */
-	/* make up a new id from all the answers we've got */
-	if (min_seen > max_seen) {
-		/* we've seen no replies at all, just use id 1 then */
-		UD_DEBUG("No HY replies seen, id stipulated to be 1\n");
-		myid = 1;
-		goto out;
-	}
-	if (min_seen > 1) {
-		myid = min_seen - 1;
-	} else {
-		myid = max_seen + 1;
-	}
-
-	UD_DEBUG("About time! Got me id %d\n", myid);
-out:
-	/* stop the timer */
-	ev_timer_stop(EV_A_ &__s2s_watcher);
-	/* we used to kick the parsing fun, now check if someone's
-	 * HYing with out id */
-	ud_parsef[UDPC_PKT_HY_RPL] = handle_hy_conflict;
 	return;
 }
 
 static void __attribute__((unused))
 s2s_hy_cb(EV_P_ ev_timer *w, int revents)
 {
-	char buf[4 * sizeof(uint16_t)];
-
-	UD_DEBUG("boasting about my balls ... god, are they big\n");
-	/* say hy */
-	udpc_hy_pkt(buf, UDPC_PKTSRC_UNK);
-	/* ship to m4cast addr */
-	(void)sendto(lsock, buf, countof(buf), 0,
-		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
-	/* ship to m6cast addr */
-	(void)sendto(lsock, buf, countof(buf), 0,
-		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
-
-	/* restart the timer, this will get us an id eventually */
-	ev_timer_again(EV_A_ w);
-	return;
-}
-
-void
-ud_hyrpl_job(job_t j)
-{
+	/* just say hi */
+	s2s_nego_hy();
 	return;
 }
 #endif	/* !UNSERMON */
@@ -596,12 +526,8 @@ ud_attach_mcast4(EV_P)
 
 #if !defined UNSERMON
 	/* init the s2s timer, this one says `hy' until an id was negotiated */
-	ev_timer_init(s2s_watcher, s2s_nego_cb, S2S_NEGO_TIMEOUT, 0.0);
+	ev_timer_init(s2s_watcher, s2s_hy_cb, 0.0, S2S_BRAG_RATE);
 	ev_timer_start(EV_A_ s2s_watcher);
-
-	/* just to spice things up, we send the HY now
-	 * only if not in unsermon mode tho */
-	s2s_nego_hy();
 #endif	/* !UNSERMON */
 	return 0;
 }

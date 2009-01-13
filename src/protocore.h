@@ -49,24 +49,32 @@
  *
  * - A simple packet is always 4096 bytes long
  * - Simple packets always read:
- *   offs 0x000 uint16_t FROM	system id, value 0 means not assigned yet
- *   offs 0x002 uint16_t TO	system id, value 0 means everyone
- *   offs 0x004 uint16_t TYPE	skdfj, see below
+ *   offs 0x000 uint8_t  CONVO	conversation id, can be set by the client
+ *   offs 0x001 uint24_t PKTNO	packet number wrt to the conversation
+ *   offs 0x004 uint16_t CMD	command to issue, see below
  *   offs 0x006 uint16_t PAD	just padding, must be magic number 0xbeef
+ *
+ * Commands (or packet types as we call them) have the property that a
+ * requesting command (c2s) is even, the corresponding reply (if existent)
+ * is then odd (LOR'd with 0x0001).
  *
  ***/
 
 typedef uint16_t ud_sysid_t;
+typedef uint8_t ud_convo_t;
+typedef uint32_t ud_pkt_no_t;
 typedef uint16_t ud_pkt_ty_t;
 typedef void(*ud_parse_f)(job_t);
 
-/* Simple packets, proto version 0.1 */
+/* Simple packets, proto version 0.2 */
+#define UDPC_PKT_RPL(_x)	(ud_pkt_ty_t)((_x) | 1)
+
 /**
  * HY packet, used to say `hy' to all attached servers and clients. */
-#define UDPC_PKT_HY		(ud_pkt_ty_t)(0x0001)
+#define UDPC_PKT_HY		(ud_pkt_ty_t)(0x0000)
 /**
  * HY reply packet, used to say `hy back' to `hy' saying  clients. */
-#define UDPC_PKT_HY_RPL		(ud_pkt_ty_t)(0x0002)
+#define UDPC_PKT_HY_RPL		UDPC_PKT_RPL(UDPC_PKT_HY)
 
 #define UDPC_SIMPLE_PKTLEN	4096
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
@@ -85,19 +93,27 @@ udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id);
 /**
  * Copy the `hy' packet into PKT. */
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_hy_pkt(char *restrict pkt, ud_sysid_t id);
+udpc_hy_pkt(char *restrict pkt, ud_convo_t cno);
 /**
- * Generic packet generator. */
+ * Generic packet generator.
+ * Create a packet into P with conversation number CID and packet
+ * number PNO of type T. */
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_make_pkt(char *restrict pkt, ud_sysid_t src, ud_sysid_t dst, ud_pkt_ty_t);
+udpc_make_pkt(char *restrict p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_ty_t t);
 /**
- * Extract the source of PKT. */
-extern inline ud_sysid_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_src(char *restrict pkt);
+ * Generic packet generator.
+ * Create a packet from the PKT into the PKT, the packet command is XOR'd
+ * with 0x1 and the packet number is increased by 1. */
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_make_rpl_pkt(char *restrict pkt);
 /**
- * Extract the destination of PKT. */
-extern inline ud_sysid_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_dst(char *restrict pkt);
+ * Extract the conversation number from PKT. */
+extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_cno(char *restrict pkt);
+/**
+ * Extract the packet number from PKT. */
+extern inline ud_pkt_no_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_pno(char *restrict pkt);
 /**
  * Extract the type portion of PKT. */
 extern inline ud_pkt_ty_t __attribute__((always_inline, gnu_inline))
@@ -142,38 +158,54 @@ udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id)
 }
 
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_make_pkt(char *restrict p, ud_sysid_t src, ud_sysid_t dst, ud_pkt_ty_t ty)
+udpc_make_pkt(char *restrict p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_ty_t ty)
 {
 	uint16_t *restrict tmp = (void*)p;
-	tmp[0] = htons(src);
-	tmp[1] = htons(dst);
+	uint32_t *restrict tm2 = (void*)p;
+	tm2[0] = htonl(((uint32_t)cno << 24) | pno);
 	tmp[2] = htons(ty);
 	tmp[3] = UDPC_MAGIC_NUMBER;
 	return;
 }
 
-
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_hy_pkt(char *restrict pkt, ud_sysid_t id)
+udpc_make_rpl_pkt(char *restrict p)
 {
-	udpc_make_pkt(pkt, id, UDPC_PKTDST_ALL, UDPC_PKT_HY);
+	uint16_t *restrict tmp = (void*)p;
+	uint32_t *restrict tm2 = (void*)p;
+	ud_pkt_ty_t new_ty;
+
+	/* increment the pkt number */
+	tm2[0]++;
+	/* construct the reply packet type */
+	new_ty = ntohs(tmp[2]) | 0x1;
+	tmp[2] = htons(new_ty);
+	/* voodoo */
+	tmp[3] = UDPC_MAGIC_NUMBER;
 	return;
 }
 
-extern inline ud_sysid_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_src(char *restrict pkt)
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_hy_pkt(char *restrict pkt, ud_convo_t cno)
 {
-	uint16_t *restrict tmp = (void*)pkt;
-	/* yes ntoh conversion!!! */
-	return ntohs(tmp[0]);
+	udpc_make_pkt(pkt, cno, 0, UDPC_PKT_HY);
+	return;
 }
 
-extern inline ud_sysid_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_dst(char *restrict pkt)
+extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_cno(char *restrict pkt)
 {
-	uint16_t *restrict tmp = (void*)pkt;
+	uint32_t *restrict tmp = (void*)pkt;
 	/* yes ntoh conversion!!! */
-	return ntohs(tmp[1]);
+	return (ud_convo_t)(ntohl(tmp[0]) >> 24);
+}
+
+extern inline ud_pkt_no_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_pno(char *restrict pkt)
+{
+	uint32_t *restrict tmp = (void*)pkt;
+	/* yes ntoh conversion!!! */
+	return (ud_pkt_no_t)(ntohl(tmp[0]) & (0xffffff));
 }
 
 extern inline ud_pkt_ty_t __attribute__((always_inline, gnu_inline))

@@ -689,7 +689,7 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 
 		## against this appalling aliasing of libev
 		SXE_CHECK_COMPILER_FLAGS([-fno-strict-aliasing], [
-			warnflags="$optiflags -fno-strict-aliasing"])
+			warnflags="$warnflags -fno-strict-aliasing"])
 
 	elif test "$__ICC" = "yes" -a \
 		"$with_maximum_warning_output" = "yes"; then

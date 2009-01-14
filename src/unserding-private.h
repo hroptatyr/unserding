@@ -159,9 +159,10 @@ struct job_s {
 	ud_work_f workf;
 	ud_prnt_f prntf;
 	ud_free_f freef;
-	void *clo;
-	/* set to 1 if job is ready to be processed */
-	unsigned short int readyp;
+	/* set to 0 if job is free,
+	 * set to 1 if job is being loaded
+	 * set to 2 if job is ready to be processed */
+	long unsigned int readyp;
 	/** for udp based transports,
 	 * use a union here to allow clients to use whatever struct they want */
 	union {
@@ -180,7 +181,9 @@ struct job_s {
 
 struct job_queue_s {
 	/* job index, always points to a free job */
-	unsigned short int ji;
+	short unsigned int ji;
+	/* read index, always points to */
+	short unsigned int ri;
 	/* en/de-queuing mutex */
 	pthread_mutex_t mtx;
 	/* the jobs vector */
@@ -190,17 +193,17 @@ struct job_queue_s {
 static inline index_t __attribute__((always_inline, gnu_inline))
 __next_job(job_queue_t jq)
 {
-	index_t res = (jq->ji + 1) % NJOBS;
+	short unsigned int res = (jq->ji + 1) % NJOBS;
 
 	if (LIKELY(jq->jobs[res].workf == NULL)) {
 		return res;
 	}
-	for (; jq->jobs[res].workf == NULL; ) {
+	do {
 		if (LIKELY(++res < NJOBS));
 		else {
 			res = 0;
 		}
-	}
+	} while (jq->jobs[res].workf != NULL);
 	return res;
 }
 
@@ -211,7 +214,7 @@ obtain_job(job_queue_t jq)
 	pthread_mutex_lock(&jq->mtx);
 	res = &jq->jobs[jq->ji];
 	jq->ji = __next_job(jq);
-	res->readyp = 0;
+	res->readyp = 1;
 	pthread_mutex_unlock(&jq->mtx);
 	return res;
 }
@@ -222,27 +225,56 @@ enqueue_job(job_queue_t jq, job_t j)
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
 	pthread_mutex_lock(&jq->mtx);
-	j->readyp = 1;
+	j->readyp = 2;
 	pthread_mutex_unlock(&jq->mtx);
 	return;
 }
 
-#if 0
 static inline job_t __attribute__((always_inline, gnu_inline))
 dequeue_job(job_queue_t jq)
 {
-	volatile job_t res = NO_JOB;
+	short unsigned int idx;
+
 	pthread_mutex_lock(&jq->mtx);
-	if (UNLIKELY(jq->ri != jq->wi)) {
-		if (UNLIKELY((res = &jq->jobs[jq->ri])->workf == NULL)) {
-			res = NULL;
-		}
+	if (LIKELY((idx = jq->ri) == jq->ji)) {
+		pthread_mutex_unlock(&jq->mtx);
+		return NO_JOB;
+	}
+	/* try the job at jq->ri */
+	if (LIKELY(jq->jobs[idx].readyp == 2)) {
+		/* brilliant */
 		jq->ri = (jq->ri + 1) % NJOBS;
+		pthread_mutex_unlock(&jq->mtx);
+		return &jq->jobs[idx];
+	} else if (jq->jobs[idx].readyp == 1) {
+		/* grrrrr */
+		idx = (idx + 1) % NJOBS;
+	} else {
+		/* must be res->readyp == 0, and hence jq->ri
+		 * points to an empty job */
+		idx = jq->ri = (idx + 1) % NJOBS;
+	}
+	while (UNLIKELY(idx != jq->ji)) {
+		if (LIKELY(jq->jobs[idx].readyp == 2)) {
+			/* brilliant */
+			if (idx == jq->ri) {
+				jq->ri = (jq->ri + 1) % NJOBS;
+			}
+			pthread_mutex_unlock(&jq->mtx);
+			return &jq->jobs[idx];
+		} else if (jq->jobs[idx].readyp == 1) {
+			/* grrrrr */
+			idx = (idx + 1) % NJOBS;
+		} else if (idx == jq->ri) {
+			/* must be res->readyp == 0
+			 * update jq->ri only if no half-ready jobs
+			 * have been encountered */
+			idx = jq->ri = (idx + 1) % NJOBS;
+		}
 	}
 	pthread_mutex_unlock(&jq->mtx);
-	return res;
+	return NO_JOB;
 }
-#endif	/* 0 */
 
 static inline void __attribute__((always_inline, gnu_inline))
 free_job(job_t j)

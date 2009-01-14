@@ -192,14 +192,7 @@ worker_cb(EV_P_ ev_async *w, int revents)
 	void *self = (void*)(long int)pthread_self();
 	job_t j;
 
-	for (unsigned short int i = 0; i < NJOBS; i++) {
-		pthread_mutex_lock(&glob_jq->mtx);
-		j = &glob_jq->jobs[i];
-		if (LIKELY(j->readyp != 0)) {
-			j->readyp = 0;
-		}
-		pthread_mutex_unlock(&glob_jq->mtx);
-		/* race condition!!! */
+	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
 		if (LIKELY(j->workf != NULL)) {
 			UD_DEBUG("thread/loop %p/%p doing work %p\n",
 				 self, loop, j);

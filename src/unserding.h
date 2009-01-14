@@ -98,6 +98,9 @@ typedef struct {
 /**
  * Conversation id. */
 typedef uint8_t ud_convo_t;
+/**
+ * Packet command. */
+typedef uint16_t ud_pkt_cmd_t;
 
 struct ud_handle_s {
 	/** Conversation number. */
@@ -117,12 +120,18 @@ extern void free_unserding_handle(ud_handle_t);
 /**
  * Send packet PKT through the handle HDL.
  * Block until there is an answer. */
-extern void unserding_send(ud_handle_t hdl, ud_packet_t pkt);
+extern void ud_send_raw(ud_handle_t hdl, ud_packet_t pkt);
 /**
- * Wait (read block) until packets with the conversation id CNO arrive,
- * or, whichever is first, TIMEOUT milliseconds have passed. */
+ * Send a CMD-packet through the handle HDL. */
+extern ud_convo_t ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd);
+/**
+ * Wait (read block) until packets or TIMEOUT millisecs have passed. */
 extern void
-unserding_recv(ud_handle_t hdl, ud_packet_t pkt, ud_convo_t cno, int timeout);
+ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout);
+/**
+ * Like ud_recv_raw() but only receive packets that belong to convo CNO. */
+extern void
+ud_recv_convo(ud_handle_t hdl, ud_packet_t pkt, int timeout, ud_convo_t cno);
 /**
  * Return the current conversation id of HDL. */
 extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
@@ -131,6 +140,15 @@ ud_handle_convo(ud_handle_t hdl);
  * Return the connexion socket stored inside HDL. */
 extern inline int __attribute__((always_inline, gnu_inline))
 ud_handle_sock(ud_handle_t hdl);
+
+/* commands */
+#define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
+/**
+ * HY packet, used to say `hy' to all attached servers and clients. */
+#define UDPC_PKT_HY		(ud_pkt_cmd_t)(0x0000)
+/**
+ * HY reply packet, used to say `hy back' to `hy' saying  clients. */
+#define UDPC_PKT_HY_RPL		UDPC_PKT_RPL(UDPC_PKT_HY)
 
 /* inlines */
 extern inline ud_convo_t __attribute__((always_inline, gnu_inline))

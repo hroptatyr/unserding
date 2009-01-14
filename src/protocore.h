@@ -61,17 +61,6 @@
  ***/
 
 typedef uint32_t ud_pkt_no_t;
-typedef uint16_t ud_pkt_cmd_t;
-
-/* Simple packets, proto version 0.2 */
-#define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
-
-/**
- * HY packet, used to say `hy' to all attached servers and clients. */
-#define UDPC_PKT_HY		(ud_pkt_cmd_t)(0x0000)
-/**
- * HY reply packet, used to say `hy back' to `hy' saying  clients. */
-#define UDPC_PKT_HY_RPL		UDPC_PKT_RPL(UDPC_PKT_HY)
 
 #define UDPC_SIMPLE_PKTLEN	4096
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
@@ -154,7 +143,7 @@ udpc_print_pkt(const ud_packet_t pkt)
 {
 	printf(":cno %02x :pno %06x :cmd %04x :mag %04x\n",
 	       udpc_pkt_cno(pkt), udpc_pkt_pno(pkt), udpc_pkt_cmd(pkt),
-	       ((const uint16_t*)pkt.pbuf)[4]);
+	       ntohs(((const uint16_t*)pkt.pbuf)[3]));
 	return;
 }
 

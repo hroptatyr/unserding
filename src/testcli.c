@@ -66,15 +66,18 @@ main (void)
 {
 	struct ud_handle_s __hdl;
 	char buf[16];
+	ud_packet_t pkt = {sizeof(buf), buf};
+	ud_convo_t cno;
 
 	/* obtain us a new handle */
 	make_unserding_handle(&__hdl);
 
-	unserding_send(&__hdl, (ud_packet_t){8, "\0\0\0\0\0\0\b\e\e\f"});
-	unserding_send(&__hdl, (ud_packet_t){8, "\1\0\0\0\0\0\b\e\e\f"});
-	unserding_recv(&__hdl, (ud_packet_t){sizeof(buf), buf}, 1, 20);
-	unserding_recv(&__hdl, (ud_packet_t){sizeof(buf), buf}, 1, 20);
-	unserding_recv(&__hdl, (ud_packet_t){sizeof(buf), buf}, 2, 20);
+	cno = ud_send_simple(&__hdl, UDPC_PKT_HY);
+
+	cno = ud_send_simple(&__hdl, UDPC_PKT_HY);
+	sleep(12);
+	ud_recv_convo(&__hdl, pkt, 200, cno);
+	ud_recv_convo(&__hdl, pkt, 200, cno);
 
 	/* free the handle */
 	free_unserding_handle(&__hdl);

@@ -109,14 +109,12 @@ mcast_init(void)
 	return s;
 }
 
+
+/* public funs */
 void
-unserding_send(ud_handle_t hdl, ud_packet_t pkt)
+ud_send_raw(ud_handle_t hdl, ud_packet_t pkt)
 {
 	int s = ud_handle_sock(hdl);
-
-	if (UNLIKELY(pkt.plen == 0)) {
-		return;
-	}
 
 	/* always send to the mcast addresses */
 	(void)sendto(s, pkt.pbuf, pkt.plen, 0,
@@ -127,17 +125,53 @@ unserding_send(ud_handle_t hdl, ud_packet_t pkt)
 	return;
 }
 
-/* a static thread-local buffer for packets */
-static __thread char buf[UDPC_SIMPLE_PKTLEN];
-
 void
-unserding_recv(ud_handle_t hdl, ud_packet_t pkt, ud_convo_t cno, int timeout)
+ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 {
 	int s = ud_handle_sock(hdl);
 	int epfd = hdl->epfd;
 	int nfds;
 	ssize_t nread;
 	struct epoll_event ev, *events = NULL;
+	char buf[UDPC_SIMPLE_PKTLEN];
+	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
+
+	if (UNLIKELY(pkt.plen == 0)) {
+		return;
+	}
+
+	/* register for input, oob, error and hangups */
+	ev.events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
+	/* register our data */
+	ev.data.ptr = hdl;
+	/* add S to the epoll descriptor EPFD */
+	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ev);
+	/* now wait */
+	nfds = epoll_wait(epfd, events, 1, timeout);
+	/* no need to loop atm, nfds can be 0 or 1 */
+	if (UNLIKELY(nfds == 0)) {
+		/* nothing received */
+		pkt.plen = 0;
+		goto out;
+	}
+	/* otherwise NFDS was 1 and it MUST be our socket */
+	nread = recvfrom(s, buf, countof(buf), 0, NULL, 0);
+	udpc_print_pkt(tmp);
+out:
+	/* remove S from the epoll descriptor EPFD */
+	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, &ev);
+	return;
+}
+
+void
+ud_recv_convo(ud_handle_t hdl, ud_packet_t pkt, int to, ud_convo_t cno)
+{
+	int s = ud_handle_sock(hdl);
+	int epfd = hdl->epfd;
+	int nfds;
+	ssize_t nread;
+	struct epoll_event ev, *events = NULL;
+	char buf[UDPC_SIMPLE_PKTLEN];
 	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
 
 	if (UNLIKELY(pkt.plen == 0)) {
@@ -152,7 +186,7 @@ unserding_recv(ud_handle_t hdl, ud_packet_t pkt, ud_convo_t cno, int timeout)
 	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ev);
 	/* now wait */
 	do {
-		nfds = epoll_wait(epfd, events, 1, timeout);
+		nfds = epoll_wait(epfd, events, 1, to);
 		/* no need to loop atm, nfds can be 0 or 1 */
 		if (UNLIKELY(nfds == 0)) {
 			/* nothing received */
@@ -167,6 +201,21 @@ out:
 	/* remove S from the epoll descriptor EPFD */
 	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, &ev);
 	return;
+}
+
+
+/* protocol funs */
+ud_convo_t
+ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd)
+{
+	ud_convo_t cno = ud_handle_convo(hdl);
+	char buf[UDPC_SIMPLE_PKTLEN];
+	ud_packet_t pkt = {.plen = countof(buf), .pbuf = buf};
+
+	udpc_make_pkt(pkt, cno, /*pno*/0, cmd);
+	ud_send_raw(hdl, pkt);
+	hdl->convo++;
+	return cno;
 }
 
 

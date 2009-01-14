@@ -117,12 +117,12 @@ extern void free_unserding_handle(ud_handle_t);
 /**
  * Send packet PKT through the handle HDL.
  * Block until there is an answer. */
-extern void unserding_enquire(ud_handle_t hdl, ud_packet_t pkt);
+extern void unserding_send(ud_handle_t hdl, ud_packet_t pkt);
 /**
  * Wait (read block) until packets with the conversation id CNO arrive,
  * or, whichever is first, TIMEOUT milliseconds have passed. */
-extern void unserding_listen(ud_handle_t hdl, ud_packet_t pkt,
-			     ud_convo_t cno, int timeout);
+extern void
+unserding_recv(ud_handle_t hdl, ud_packet_t pkt, ud_convo_t cno, int timeout);
 /**
  * Return the current conversation id of HDL. */
 extern inline ud_convo_t __attribute__((always_inline, gnu_inline))

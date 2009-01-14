@@ -110,7 +110,7 @@ mcast_init(void)
 }
 
 void
-unserding_enquire(ud_handle_t hdl, ud_packet_t pkt)
+unserding_send(ud_handle_t hdl, ud_packet_t pkt)
 {
 	int s = ud_handle_sock(hdl);
 
@@ -131,8 +131,7 @@ unserding_enquire(ud_handle_t hdl, ud_packet_t pkt)
 static __thread char buf[UDPC_SIMPLE_PKTLEN];
 
 void
-unserding_listen(ud_handle_t hdl, ud_packet_t pkt,
-		 ud_convo_t cno, int timeout)
+unserding_recv(ud_handle_t hdl, ud_packet_t pkt, ud_convo_t cno, int timeout)
 {
 	int s = ud_handle_sock(hdl);
 	int epfd = hdl->epfd;

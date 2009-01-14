@@ -70,11 +70,11 @@ main (void)
 	/* obtain us a new handle */
 	make_unserding_handle(&__hdl);
 
-	unserding_enquire(&__hdl, (ud_packet_t){8, "\0\0\0\0\0\0\b\e\e\f"});
-	unserding_enquire(&__hdl, (ud_packet_t){8, "\1\0\0\0\0\0\b\e\e\f"});
-	unserding_listen(&__hdl, (ud_packet_t){sizeof(buf), buf}, 1, 20);
-	unserding_listen(&__hdl, (ud_packet_t){sizeof(buf), buf}, 1, 20);
-	unserding_listen(&__hdl, (ud_packet_t){sizeof(buf), buf}, 2, 20);
+	unserding_send(&__hdl, (ud_packet_t){8, "\0\0\0\0\0\0\b\e\e\f"});
+	unserding_send(&__hdl, (ud_packet_t){8, "\1\0\0\0\0\0\b\e\e\f"});
+	unserding_recv(&__hdl, (ud_packet_t){sizeof(buf), buf}, 1, 20);
+	unserding_recv(&__hdl, (ud_packet_t){sizeof(buf), buf}, 1, 20);
+	unserding_recv(&__hdl, (ud_packet_t){sizeof(buf), buf}, 2, 20);
 
 	/* free the handle */
 	free_unserding_handle(&__hdl);

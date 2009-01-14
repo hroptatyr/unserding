@@ -60,36 +60,31 @@
  *
  ***/
 
-typedef uint16_t ud_sysid_t;
-typedef uint8_t ud_convo_t;
 typedef uint32_t ud_pkt_no_t;
-typedef uint16_t ud_pkt_ty_t;
-typedef void(*ud_parse_f)(job_t);
+typedef uint16_t ud_pkt_cmd_t;
 
 /* Simple packets, proto version 0.2 */
-#define UDPC_PKT_RPL(_x)	(ud_pkt_ty_t)((_x) | 1)
+#define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
 
 /**
  * HY packet, used to say `hy' to all attached servers and clients. */
-#define UDPC_PKT_HY		(ud_pkt_ty_t)(0x0000)
+#define UDPC_PKT_HY		(ud_pkt_cmd_t)(0x0000)
 /**
  * HY reply packet, used to say `hy back' to `hy' saying  clients. */
 #define UDPC_PKT_HY_RPL		UDPC_PKT_RPL(UDPC_PKT_HY)
 
 #define UDPC_SIMPLE_PKTLEN	4096
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
-#define UDPC_PKTSRC_UNK		(ud_sysid_t)0x00
-#define UDPC_PKTDST_ALL		(ud_sysid_t)0x00
 
 /**
  * Return true if PKT is a valid unserding packet. */
 extern inline bool __attribute__((always_inline, gnu_inline))
-udpc_pkt_valid_p(const char *pkt);
+udpc_pkt_valid_p(const ud_packet_t pkt);
 /**
- * Return true if the packet PKT is meant for us.
- * inline me? */
+ * Return true if the packet PKT is meant for us,
+ * that is the conversation ids coincide. */
 extern inline bool __attribute__((always_inline, gnu_inline))
-udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id);
+udpc_pkt_for_us_p(const ud_packet_t pkt, ud_convo_t cno);
 /**
  * Copy the `hy' packet into PKT. */
 extern inline void __attribute__((always_inline, gnu_inline))
@@ -99,7 +94,7 @@ udpc_hy_pkt(char *restrict pkt, ud_convo_t cno);
  * Create a packet into P with conversation number CID and packet
  * number PNO of type T. */
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_make_pkt(char *restrict p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_ty_t t);
+udpc_make_pkt(char *restrict p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t t);
 /**
  * Generic packet generator.
  * Create a packet from the PKT into the PKT, the packet command is XOR'd
@@ -109,32 +104,38 @@ udpc_make_rpl_pkt(char *restrict pkt);
 /**
  * Extract the conversation number from PKT. */
 extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_cno(char *restrict pkt);
+udpc_pkt_cno(const ud_packet_t pkt);
 /**
  * Extract the packet number from PKT. */
 extern inline ud_pkt_no_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_pno(char *restrict pkt);
+udpc_pkt_pno(const ud_packet_t pkt);
 /**
- * Extract the type portion of PKT. */
-extern inline ud_pkt_ty_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_type(char *restrict pkt);
-
+ * Extract the command portion of PKT. */
+extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_cmd(const ud_packet_t pkt);
 /**
- * Job that looks up the parser routine in ud_parsef(). */
-extern void ud_proto_parse(job_t);
-extern ud_parse_f ud_parsef[4096];
-
-/* jobs */
-extern void ud_hyrpl_job(job_t);
-/* the old ascii parser */
-extern void ud_parse(job_t);
+ * Print the packet header. temporary. */
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_print_pkt(const ud_packet_t pkt);
+/**
+ * Return true if CMD is a reply command. */
+extern inline bool __attribute__((always_inline, gnu_inline))
+udpc_reply_p(ud_pkt_cmd_t cmd);
+/**
+ * Given a command CMD, return the corresponding reply command. */
+extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+udpc_reply_cmd(ud_pkt_cmd_t cmd);
+/**
+ * Given a command CMD in network byte order return its reply command. */
+extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+udpc_reply_cmd_ns(ud_pkt_cmd_t cmd);
 
 
 /* inlines */
 extern inline bool __attribute__((always_inline, gnu_inline))
-udpc_pkt_valid_p(const char *pkt)
+udpc_pkt_valid_p(const ud_packet_t pkt)
 {
-	const uint16_t *tmp = (const void*)pkt;
+	const uint16_t *tmp = (const void*)pkt.pbuf;
 	/* check magic number */
 	if (tmp[3] == UDPC_MAGIC_NUMBER) {
 		return true;
@@ -143,29 +144,48 @@ udpc_pkt_valid_p(const char *pkt)
 }
 
 extern inline bool __attribute__((always_inline, gnu_inline))
-udpc_pkt_for_us_p(const char *pkt, ud_sysid_t id)
+udpc_pkt_for_us_p(const ud_packet_t pkt, ud_convo_t cno)
 {
-	const uint16_t *tmp = (const void*)pkt;
-	/* check magic number */
-	if (tmp[3] == UDPC_MAGIC_NUMBER) {
-		if (tmp[1] == UDPC_PKTDST_ALL || tmp[1] == id) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-	return false;
+	return udpc_pkt_valid_p(pkt) && udpc_pkt_cno(pkt) == cno;
 }
 
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_make_pkt(char *restrict p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_ty_t ty)
+udpc_print_pkt(const ud_packet_t pkt)
+{
+	printf(":cno %02x :pno %06x :cmd %04x :mag %04x\n",
+	       udpc_pkt_cno(pkt), udpc_pkt_pno(pkt), udpc_pkt_cmd(pkt),
+	       ((const uint16_t*)pkt.pbuf)[4]);
+	return;
+}
+
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_make_pkt(char *restrict p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t c)
 {
 	uint16_t *restrict tmp = (void*)p;
 	uint32_t *restrict tm2 = (void*)p;
 	tm2[0] = htonl(((uint32_t)cno << 24) | pno);
-	tmp[2] = htons(ty);
+	tmp[2] = htons(c);
 	tmp[3] = UDPC_MAGIC_NUMBER;
 	return;
+}
+
+extern inline bool __attribute__((always_inline, gnu_inline))
+udpc_reply_p(ud_pkt_cmd_t cmd)
+{
+	return cmd & 0x1;
+}
+
+extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+udpc_reply_cmd(ud_pkt_cmd_t cmd)
+{
+	return cmd | 0x1;
+}
+
+extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+udpc_reply_cmd_ns(ud_pkt_cmd_t cmd)
+{
+	ud_pkt_cmd_t res = udpc_reply_cmd(ntohs(cmd));
+	return htons(res);
 }
 
 extern inline void __attribute__((always_inline, gnu_inline))
@@ -173,13 +193,11 @@ udpc_make_rpl_pkt(char *restrict p)
 {
 	uint16_t *restrict tmp = (void*)p;
 	uint32_t *restrict tm2 = (void*)p;
-	ud_pkt_ty_t new_ty;
 
 	/* increment the pkt number */
 	tm2[0]++;
 	/* construct the reply packet type */
-	new_ty = ntohs(tmp[2]) | 0x1;
-	tmp[2] = htons(new_ty);
+	tmp[2] = udpc_reply_cmd_ns(tmp[2]);
 	/* voodoo */
 	tmp[3] = UDPC_MAGIC_NUMBER;
 	return;
@@ -193,25 +211,25 @@ udpc_hy_pkt(char *restrict pkt, ud_convo_t cno)
 }
 
 extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_cno(char *restrict pkt)
+udpc_pkt_cno(const ud_packet_t pkt)
 {
-	uint32_t *restrict tmp = (void*)pkt;
+	const uint32_t *tmp = (void*)pkt.pbuf;
 	/* yes ntoh conversion!!! */
 	return (ud_convo_t)(ntohl(tmp[0]) >> 24);
 }
 
 extern inline ud_pkt_no_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_pno(char *restrict pkt)
+udpc_pkt_pno(const ud_packet_t pkt)
 {
-	uint32_t *restrict tmp = (void*)pkt;
+	const uint32_t *tmp = (void*)pkt.pbuf;
 	/* yes ntoh conversion!!! */
 	return (ud_pkt_no_t)(ntohl(tmp[0]) & (0xffffff));
 }
 
-extern inline ud_pkt_ty_t __attribute__((always_inline, gnu_inline))
-udpc_pkt_type(char *restrict pkt)
+extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_cmd(const ud_packet_t pkt)
 {
-	uint16_t *restrict tmp = (void*)pkt;
+	const uint16_t *tmp = (void*)pkt.pbuf;
 	/* yes ntoh conversion!!! */
 	return ntohs(tmp[2]);
 }

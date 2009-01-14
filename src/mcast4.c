@@ -390,7 +390,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 		UD_CRITICAL_MCAST("could not handle incoming connection\n");
 		return;
 #if defined UNSERMON
-	} else if (UNLIKELY(!udpc_pkt_valid_p(j->buf))) {
+	} else if (UNLIKELY(!udpc_pkt_valid_p((ud_packet_t){0, j->buf}))) {
 		UD_UNSERMON_PKT("invalid pkt\n", 0, 0);
 		return;
 #endif	/* UNSERMON */
@@ -398,9 +398,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 
 	j->blen = nread;
 #if defined UNSERMON
-	UD_UNSERMON_PKT("%04x\n",
-			udpc_pkt_cno(j->buf), udpc_pkt_pno(j->buf),
-			udpc_pkt_type(j->buf));
+	udpc_print_pkt((ud_packet_t){j->blen, j->buf});
 #else  /* !UNSERMON */
 	j->workf = ud_proto_parse;
 	j->prntf = send_cl;

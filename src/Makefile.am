@@ -3,10 +3,11 @@
 AM_CPPFLAGS = -pthread
 AM_LDFLAGS = -lpthread
 
-bin_PROGRAMS = unserdingd unserding unsermon
+bin_PROGRAMS = unserdingd unserding unsermon testcli
 if USE_MYSQL
 noinst_LIBRARIES = libpfack-mysql.a
 endif
+lib_LTLIBRARIES = libunserding.la
 
 if USE_MYSQL
 ## additional helper for mysql sources
@@ -37,6 +38,15 @@ unsermon_SOURCES = unsermon.c mcast4.c protocore.c catalogue.c
 unsermon_CPPFLAGS = -DUNSERMON $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unsermon_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsermon_LDADD = $(LIBEV_LIBS)
+
+## the lib
+libunserding_la_SOURCES = libstuff.c
+
+## the main server binary
+testcli_SOURCES = testcli.c
+testcli_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
+testcli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+testcli_LDADD = $(LIBEV_LIBS) -lreadline libunserding.la
 
 # 
 # Help the developers get nice post-processed source files

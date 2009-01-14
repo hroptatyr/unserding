@@ -38,6 +38,7 @@
 #if !defined INCLUDED_unserding_h_
 #define INCLUDED_unserding_h_
 
+#include <stdint.h>
 #include <stdbool.h>
 
 #define UD_NETWORK_SERVICE	8653
@@ -78,6 +79,71 @@ typedef void *ud_cat_t;
 	{								\
 		return ud_cf_##_x##p(((struct ud_cat_s*)cat)->flags);	\
 	}
+
+
+/**
+ * Connexion handle to an unserding network.
+ * Carries the current conversation id which is incremented upon each query
+ * and hence one handle may not be used concurrently, or IOW it is not
+ * thread-safe.
+ * For multiple concurrent connexions obtain multiple handles. */
+typedef struct ud_handle_s *ud_handle_t;
+/**
+ * Simple packet structure.
+ * Attention, this is a structure passed by value. */
+typedef struct {
+	size_t plen;
+	char *pbuf;
+} ud_packet_t;
+/**
+ * Conversation id. */
+typedef uint8_t ud_convo_t;
+
+struct ud_handle_s {
+	/** Conversation number. */
+	ud_convo_t convo;
+	/** Socket. */
+	int sock:24;
+	int epfd;
+};
+
+/* connexion stuff */
+/**
+ * Create a new handle. */
+extern void make_unserding_handle(ud_handle_t);
+/**
+ * Free a handle and all resources. */
+extern void free_unserding_handle(ud_handle_t);
+/**
+ * Send packet PKT through the handle HDL.
+ * Block until there is an answer. */
+extern void unserding_enquire(ud_handle_t hdl, ud_packet_t pkt);
+/**
+ * Wait (read block) until packets with the conversation id CNO arrive,
+ * or, whichever is first, TIMEOUT milliseconds have passed. */
+extern void unserding_listen(ud_handle_t hdl, ud_packet_t pkt,
+			     ud_convo_t cno, int timeout);
+/**
+ * Return the current conversation id of HDL. */
+extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
+ud_handle_convo(ud_handle_t hdl);
+/**
+ * Return the connexion socket stored inside HDL. */
+extern inline int __attribute__((always_inline, gnu_inline))
+ud_handle_sock(ud_handle_t hdl);
+
+/* inlines */
+extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
+ud_handle_convo(ud_handle_t hdl)
+{
+	return hdl->convo;
+}	
+
+extern inline int __attribute__((always_inline, gnu_inline))
+ud_handle_sock(ud_handle_t hdl)
+{
+	return hdl->sock;
+}	
 
 
 /** Global catalogue. */

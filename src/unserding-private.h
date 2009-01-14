@@ -142,6 +142,9 @@ typedef size_t index_t;
 typedef struct job_queue_s *job_queue_t;
 typedef struct job_s *job_t;
 /**
+ * Type for parse functions inside jobs. */
+typedef void(*ud_parse_f)(job_t);
+/**
  * Type for work functions inside jobs. */
 typedef void(*ud_work_f)(job_t);
 /**
@@ -251,7 +254,19 @@ free_job(job_t j)
 	return;
 }
 
+/**
+ * Global job queue. */
 extern job_queue_t glob_jq;
+
+/**
+ * Job that looks up the parser routine in ud_parsef(). */
+extern void ud_proto_parse(job_t);
+extern ud_parse_f ud_parsef[4096];
+
+/* jobs */
+extern void ud_hyrpl_job(job_t);
+/* the old ascii parser */
+extern void ud_parse(job_t);
 
 #if defined UNSERCLI
 extern bool cli_waiting_p;

@@ -1,4 +1,4 @@
-/*** protocore.c -- unserding protocol guts
+/*** testcli.c -- unserding network service (client)
  *
  * Copyright (C) 2008 Sebastian Freundt
  *
@@ -41,35 +41,44 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <stdbool.h>
-#include <stdint.h>
-#include <string.h>
-/* posix? */
-#include <limits.h>
-#if defined HAVE_SYS_TYPES_H
-# include <sys/types.h>
+
+#if defined HAVE_SYS_SOCKET_H
+# include <sys/socket.h>
+#endif
+#if defined HAVE_NETINET_IN_H
+# include <netinet/in.h>
+#endif
+#if defined HAVE_ARPA_INET_H
+# include <arpa/inet.h>
+#endif
+#if defined HAVE_SYS_UN_H
+# include <sys/un.h>
+#endif
+#if defined HAVE_ERRNO_H
+# include <errno.h>
 #endif
 
-/* our master include */
+/* our master include file */
 #include "unserding.h"
-#include "unserding-private.h"
-#include "protocore.h"
 
-ud_parse_f ud_parsef[4096];
-
-void
-ud_proto_parse(job_t j)
+int
+main (void)
 {
-	ud_pkt_cmd_t cmd = udpc_pkt_cmd((ud_packet_t){0, j->buf});
-	ud_parse_f pf = ud_parsef[cmd];
+	struct ud_handle_s __hdl;
+	char buf[16];
 
-	if (UNLIKELY(pf == NULL)) {
-		UD_DEBUG_PROTO("found 0x%04x but cannot cope\n", cmd);
-		/* no need to print back */
-		j->blen = 0;
-	} else {
-		pf(j);
-	}
-	return;
+	/* obtain us a new handle */
+	make_unserding_handle(&__hdl);
+
+	unserding_enquire(&__hdl, (ud_packet_t){8, "\0\0\0\0\0\0\b\e\e\f"});
+	unserding_enquire(&__hdl, (ud_packet_t){8, "\1\0\0\1\0\0\b\e\e\f"});
+	unserding_listen(&__hdl, (ud_packet_t){sizeof(buf), buf}, 0, 2000);
+	unserding_listen(&__hdl, (ud_packet_t){sizeof(buf), buf}, 0, 2000);
+	unserding_listen(&__hdl, (ud_packet_t){sizeof(buf), buf}, 0, 2000);
+
+	/* free the handle */
+	free_unserding_handle(&__hdl);
+	return 0;
 }
 
-/* protocore.c ends here */
+/* unserding.c ends here */

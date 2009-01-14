@@ -162,8 +162,8 @@ unserding_listen(ud_handle_t hdl, ud_packet_t pkt,
 		}
 		/* otherwise NFDS was 1 and it MUST be our socket */
 		nread = recvfrom(s, buf, countof(buf), 0, NULL, 0);
-		udpc_print_pkt(tmp);
 	} while (!udpc_pkt_for_us_p(tmp, cno));
+	udpc_print_pkt(tmp);
 out:
 	/* remove S from the epoll descriptor EPFD */
 	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, &ev);

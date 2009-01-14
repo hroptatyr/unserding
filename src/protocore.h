@@ -94,7 +94,7 @@ udpc_hy_pkt(char *restrict pkt, ud_convo_t cno);
  * Create a packet into P with conversation number CID and packet
  * number PNO of type T. */
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_make_pkt(char *restrict p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t t);
+udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t t);
 /**
  * Generic packet generator.
  * Create a packet from the PKT into the PKT, the packet command is XOR'd
@@ -158,13 +158,21 @@ udpc_print_pkt(const ud_packet_t pkt)
 	return;
 }
 
-extern inline void __attribute__((always_inline, gnu_inline))
-udpc_make_pkt(char *restrict p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t c)
+extern inline uint32_t __attribute__((always_inline, gnu_inline))
+__interleave_cno_pno(ud_convo_t cno, ud_pkt_no_t pno);
+extern inline uint32_t __attribute__((always_inline, gnu_inline))
+__interleave_cno_pno(ud_convo_t cno, ud_pkt_no_t pno)
 {
-	uint16_t *restrict tmp = (void*)p;
-	uint32_t *restrict tm2 = (void*)p;
-	tm2[0] = htonl(((uint32_t)cno << 24) | pno);
-	tmp[2] = htons(c);
+	return ((uint32_t)cno << 24) | (pno && 0xffffff);
+}
+
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t cmd)
+{
+	uint16_t *restrict tmp = (void*)p.pbuf;
+	uint32_t *restrict tm2 = (void*)p.pbuf;
+	tm2[0] = htonl(__interleave_cno_pno(cno, pno));
+	tmp[2] = htons(cmd);
 	tmp[3] = UDPC_MAGIC_NUMBER;
 	return;
 }
@@ -193,9 +201,10 @@ udpc_make_rpl_pkt(char *restrict p)
 {
 	uint16_t *restrict tmp = (void*)p;
 	uint32_t *restrict tm2 = (void*)p;
+	uint32_t all = ntohl(tm2[0]);
 
 	/* increment the pkt number */
-	tm2[0]++;
+	tm2[0] = htonl(all+1);
 	/* construct the reply packet type */
 	tmp[2] = udpc_reply_cmd_ns(tmp[2]);
 	/* voodoo */
@@ -206,7 +215,7 @@ udpc_make_rpl_pkt(char *restrict p)
 extern inline void __attribute__((always_inline, gnu_inline))
 udpc_hy_pkt(char *restrict pkt, ud_convo_t cno)
 {
-	udpc_make_pkt(pkt, cno, 0, UDPC_PKT_HY);
+	udpc_make_pkt((ud_packet_t){0, pkt}, cno, 0, UDPC_PKT_HY);
 	return;
 }
 
@@ -214,16 +223,18 @@ extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
 udpc_pkt_cno(const ud_packet_t pkt)
 {
 	const uint32_t *tmp = (void*)pkt.pbuf;
+	uint32_t all = ntohl(tmp[0]);
 	/* yes ntoh conversion!!! */
-	return (ud_convo_t)(ntohl(tmp[0]) >> 24);
+	return (ud_convo_t)(all >> 24);
 }
 
 extern inline ud_pkt_no_t __attribute__((always_inline, gnu_inline))
 udpc_pkt_pno(const ud_packet_t pkt)
 {
 	const uint32_t *tmp = (void*)pkt.pbuf;
+	uint32_t all = ntohl(tmp[0]);
 	/* yes ntoh conversion!!! */
-	return (ud_pkt_no_t)(ntohl(tmp[0]) & (0xffffff));
+	return (ud_pkt_no_t)(all & (0xffffff));
 }
 
 extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))

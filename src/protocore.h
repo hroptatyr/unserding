@@ -60,8 +60,6 @@
  *
  ***/
 
-typedef uint32_t ud_pkt_no_t;
-
 #define UDPC_SIMPLE_PKTLEN	4096
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
 
@@ -141,7 +139,8 @@ udpc_pkt_for_us_p(const ud_packet_t pkt, ud_convo_t cno)
 extern inline void __attribute__((always_inline, gnu_inline))
 udpc_print_pkt(const ud_packet_t pkt)
 {
-	printf(":cno %02x :pno %06x :cmd %04x :mag %04x\n",
+	printf(":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+	       (unsigned int)pkt.plen,
 	       udpc_pkt_cno(pkt), udpc_pkt_pno(pkt), udpc_pkt_cmd(pkt),
 	       ntohs(((const uint16_t*)pkt.pbuf)[3]));
 	return;

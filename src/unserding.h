@@ -101,6 +101,9 @@ typedef uint8_t ud_convo_t;
 /**
  * Packet command. */
 typedef uint16_t ud_pkt_cmd_t;
+/**
+ * Packet number. */
+typedef uint32_t ud_pkt_no_t;
 
 struct ud_handle_s {
 	/** Conversation number. */

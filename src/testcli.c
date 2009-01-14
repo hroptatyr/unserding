@@ -61,6 +61,43 @@
 /* our master include file */
 #include "unserding.h"
 
+
+static inline ud_convo_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_cno(const ud_packet_t pkt)
+{
+	const uint32_t *tmp = (void*)pkt.pbuf;
+	uint32_t all = ntohl(tmp[0]);
+	/* yes ntoh conversion!!! */
+	return (ud_convo_t)(all >> 24);
+}
+
+static inline ud_pkt_no_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_pno(const ud_packet_t pkt)
+{
+	const uint32_t *tmp = (void*)pkt.pbuf;
+	uint32_t all = ntohl(tmp[0]);
+	/* yes ntoh conversion!!! */
+	return (ud_pkt_no_t)(all & (0xffffff));
+}
+
+static inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+udpc_pkt_cmd(const ud_packet_t pkt)
+{
+	const uint16_t *tmp = (void*)pkt.pbuf;
+	/* yes ntoh conversion!!! */
+	return ntohs(tmp[2]);
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+udpc_print_pkt(const ud_packet_t pkt)
+{
+	printf(":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+	       (unsigned int)pkt.plen,
+	       udpc_pkt_cno(pkt), udpc_pkt_pno(pkt), udpc_pkt_cmd(pkt),
+	       ntohs(((const uint16_t*)pkt.pbuf)[3]));
+	return;
+}
+
 int
 main (void)
 {
@@ -72,12 +109,12 @@ main (void)
 	/* obtain us a new handle */
 	make_unserding_handle(&__hdl);
 
-	cno = ud_send_simple(&__hdl, UDPC_PKT_HY);
-
-	cno = ud_send_simple(&__hdl, UDPC_PKT_HY);
-	sleep(12);
-	ud_recv_convo(&__hdl, pkt, 200, cno);
-	ud_recv_convo(&__hdl, pkt, 200, cno);
+	for (int i = 0; i < 100000; i++) {
+		cno = ud_send_simple(&__hdl, UDPC_PKT_HY);
+		pkt.plen = sizeof(buf);
+		ud_recv_convo(&__hdl, pkt, 200, cno);
+		udpc_print_pkt(pkt);
+	}
 
 	/* free the handle */
 	free_unserding_handle(&__hdl);

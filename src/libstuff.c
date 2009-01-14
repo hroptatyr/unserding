@@ -196,7 +196,14 @@ ud_recv_convo(ud_handle_t hdl, ud_packet_t pkt, int to, ud_convo_t cno)
 		/* otherwise NFDS was 1 and it MUST be our socket */
 		nread = recvfrom(s, buf, countof(buf), 0, NULL, 0);
 	} while (!udpc_pkt_for_us_p(tmp, cno));
-	udpc_print_pkt(tmp);
+	if (LIKELY(nread > 0)) {
+		if (LIKELY((size_t)nread < pkt.plen)) {
+			pkt.plen = nread;
+		}
+		memcpy(pkt.pbuf, buf, pkt.plen);
+	} else {
+		pkt.plen = 0;
+	}
 out:
 	/* remove S from the epoll descriptor EPFD */
 	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, &ev);

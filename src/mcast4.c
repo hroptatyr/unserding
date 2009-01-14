@@ -427,7 +427,7 @@ handle_hy(job_t j)
 {
 	UD_DEBUG_PROTO("found HY\n");
 	/* generate the answer packet */
-	udpc_make_rpl_pkt(j->buf);
+	udpc_make_rpl_pkt(JOB_PACKET(j));
 	UD_DEBUG_PROTO("sending HY RPL\n");
 	j->blen = 8;
 	j->prntf = send_cl;
@@ -523,7 +523,7 @@ s2s_nego_hy(void)
 
 	UD_DEBUG("boasting about my balls, god, are they big\n");
 	/* say hy */
-	udpc_hy_pkt(buf, conv++);
+	udpc_make_pkt(BUF_PACKET(buf), conv++, 0, UDPC_PKT_HY);
 	/* ship to m4cast addr */
 	(void)sendto(lsock, buf, countof(buf), 0,
 		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));

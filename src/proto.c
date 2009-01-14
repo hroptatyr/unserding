@@ -219,8 +219,8 @@ ud_parse(job_t j)
 
 	} INNIT(hy_cmd) {
 		/* construct the HY packet */
-		udpc_hy_pkt(j->buf, conv++);
 		j->blen = 8;
+		udpc_make_pkt(JOB_PACKET(j), conv++, 0, UDPC_PKT_HY);
 		/* send to mcast group */
 		send_m46(j);
 

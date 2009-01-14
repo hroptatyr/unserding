@@ -113,7 +113,6 @@ main (void)
 		cno = ud_send_simple(&__hdl, UDPC_PKT_HY);
 		pkt.plen = sizeof(buf);
 		ud_recv_convo(&__hdl, pkt, 200, cno);
-		udpc_print_pkt(pkt);
 	}
 
 	/* free the handle */

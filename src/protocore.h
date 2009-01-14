@@ -73,10 +73,6 @@ udpc_pkt_valid_p(const ud_packet_t pkt);
 extern inline bool __attribute__((always_inline, gnu_inline))
 udpc_pkt_for_us_p(const ud_packet_t pkt, ud_convo_t cno);
 /**
- * Copy the `hy' packet into PKT. */
-extern inline void __attribute__((always_inline, gnu_inline))
-udpc_hy_pkt(char *restrict pkt, ud_convo_t cno);
-/**
  * Generic packet generator.
  * Create a packet into P with conversation number CID and packet
  * number PNO of type T. */
@@ -84,10 +80,10 @@ extern inline void __attribute__((always_inline, gnu_inline))
 udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t t);
 /**
  * Generic packet generator.
- * Create a packet from the PKT into the PKT, the packet command is XOR'd
+ * Create a packet from the packet PKT into PKT, the packet command is XOR'd
  * with 0x1 and the packet number is increased by 1. */
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_make_rpl_pkt(char *restrict pkt);
+udpc_make_rpl_pkt(ud_packet_t pkt);
 /**
  * Extract the conversation number from PKT. */
 extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
@@ -185,10 +181,10 @@ udpc_reply_cmd_ns(ud_pkt_cmd_t cmd)
 }
 
 extern inline void __attribute__((always_inline, gnu_inline))
-udpc_make_rpl_pkt(char *restrict p)
+udpc_make_rpl_pkt(ud_packet_t p)
 {
-	uint16_t *restrict tmp = (void*)p;
-	uint32_t *restrict tm2 = (void*)p;
+	uint16_t *restrict tmp = (void*)p.pbuf;
+	uint32_t *restrict tm2 = (void*)p.pbuf;
 	uint32_t all = ntohl(tm2[0]);
 
 	/* increment the pkt number */
@@ -197,13 +193,6 @@ udpc_make_rpl_pkt(char *restrict p)
 	tmp[2] = udpc_reply_cmd_ns(tmp[2]);
 	/* voodoo */
 	tmp[3] = UDPC_MAGIC_NUMBER;
-	return;
-}
-
-extern inline void __attribute__((always_inline, gnu_inline))
-udpc_hy_pkt(char *restrict pkt, ud_convo_t cno)
-{
-	udpc_make_pkt((ud_packet_t){0, pkt}, cno, 0, UDPC_PKT_HY);
 	return;
 }
 

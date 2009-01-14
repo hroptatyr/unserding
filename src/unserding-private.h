@@ -286,6 +286,12 @@ free_job(job_t j)
 	return;
 }
 
+/* helper macro to use a job as packet */
+#define JOB_PACKET(j)	((ud_packet_t){.plen = j->blen, .pbuf = j->buf})
+/* helper macro to use a char buffer as packet */
+#define BUF_PACKET(b)	((ud_packet_t){.plen = countof(b), .pbuf = b})
+#define PACKET(a, b)	((ud_packet_t){.plen = a, .pbuf = b})
+
 /**
  * Global job queue. */
 extern job_queue_t glob_jq;

@@ -374,7 +374,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	job_t j = obtain_job(glob_jq);
 	socklen_t lsa = sizeof(j->sa);
 
-	UD_DEBUG_MCAST("incoming connection\n");
+	UD_DEBUG_MCAST("incoming connexion\n");
 	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
 	/* obtain the address in human readable form */
 	a = inet_ntop(j->sa.sin6_family,
@@ -384,6 +384,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 		      buf, sizeof(buf));
 	p = ntohs(j->sa.sin6_port);
 	UD_DEBUG_MCAST("sock %d connect from host %s port %d\n", w->fd, a, p);
+	UD_LOG_MCAST(":sock %d connect :from [%s]:%d\n", w->fd, a, p);
 
 	/* handle the reading */
 	if (UNLIKELY(nread <= 0)) {

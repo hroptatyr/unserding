@@ -193,7 +193,7 @@ triv_cb(EV_P_ ev_async *w, int revents)
 static void
 kill_cb(EV_P_ ev_async *w, int revents)
 {
-	long int self = (long int)pthread_self();
+	long int UNUSED(self) = (long int)pthread_self();
 	UD_DEBUG("SIGQUIT caught in %lx\n", self);
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
@@ -202,12 +202,12 @@ kill_cb(EV_P_ ev_async *w, int revents)
 static void
 worker_cb(EV_P_ ev_async *w, int revents)
 {
-	void *self = (void*)(long int)pthread_self();
+	long int UNUSED(self) = (long int)pthread_self();
 	job_t j;
 
 	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
 		if (LIKELY(j->workf != NULL)) {
-			UD_DEBUG("thread/loop %p/%p doing work %p\n",
+			UD_DEBUG("thread/loop %lx/%p doing work %p\n",
 				 self, loop, j);
 			j->workf(j);
 		}
@@ -224,7 +224,7 @@ worker_cb(EV_P_ ev_async *w, int revents)
 static void*
 worker(void *wk)
 {
-	long int self = pthread_self();
+	long int UNUSED(self) = pthread_self();
 	void *loop = worker_loop(wk);
 	UD_DEBUG("starting worker thread %lx, loop %p\n", self, loop);
 	ev_loop(EV_A_ 0);

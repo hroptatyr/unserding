@@ -8,6 +8,8 @@ if USE_MYSQL
 noinst_LIBRARIES = libpfack-mysql.a
 endif
 lib_LTLIBRARIES = libunserding.la
+BUILT_SOURCES =
+CLEAN_FILES = $(BUILT_SOURCES)
 
 if USE_MYSQL
 ## additional helper for mysql sources
@@ -28,10 +30,12 @@ unserdingd_SOURCES += mod-interests.c
 endif
 
 ## the main server binary
-unsercli_SOURCES = unsercli.c stdin.c mcast4.c proto.c protocore.c catalogue.c
+unsercli_SOURCES = unsercli.c scanner.l parser.y stdin.c catalogue.c
+unsercli_LFLAGS = --prefix="cli_yy"
+unsercli_YFLAGS = -d -p "cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
-unsercli_LDADD = $(LIBEV_LIBS) -lreadline
+unsercli_LDADD = $(LIBEV_LIBS) -lreadline -lfl libunserding.la
 
 ## the network monitor
 unsermon_SOURCES = unsermon.c mcast4.c protocore.c catalogue.c

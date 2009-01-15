@@ -36,6 +36,9 @@ with_omp="no"
 SXE_CHECK_CC
 SXE_CHECK_CFLAGS
 
+## parser goodness
+SXE_CHECK_PARSER_LEXER
+
 ## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
 

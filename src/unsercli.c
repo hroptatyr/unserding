@@ -107,6 +107,39 @@ sigpipe_cb(EV_P_ ev_signal *w, int revents)
 }
 
 
+/* parser madness */
+#include "unsercli-parser.h"
+#include "unsercli-scanner.h"
+
+typedef struct qaos_query_ctx_s *qaos_query_ctx_t;
+struct qaos_query_ctx_s {
+        char *statements;
+        size_t statements_size;
+        const char *cur_field;
+        const char *cur_op;
+        char cur_statement[256];
+        size_t cur_stmt_size;
+        bool absp;
+};
+
+void
+ud_parse(job_t j)
+{
+        yyscan_t scanner;
+        struct qaos_query_ctx_s ctx = {NULL, 0, NULL, NULL};
+        int r;
+        YY_BUFFER_STATE buf;
+        void *conn, *qryp;
+        char qry[16384];
+
+        cli_yylex_init(&scanner);
+        buf = cli_yy_scan_string(j->buf, scanner);
+        r = cli_yyparse(scanner, &ctx);
+        qaos_yylex_destroy(scanner);
+	return;
+}
+
+
 static void
 init_glob_jq(void)
 {
@@ -121,6 +154,7 @@ main (void)
 	struct ev_loop *loop = ev_default_loop(0);
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+	struct ud_handle_s __hdl;
 
 	/* where to log */
 	logout = stderr;
@@ -128,8 +162,8 @@ main (void)
 	/* initialise global job q */
 	init_glob_jq();
 
-	/* attach the mcast crew */
-	ud_attach_mcast4(EV_A);
+	/* get us some nice handle */
+	make_unserding_handle(&__hdl);
 	/* attach the stdinlistener, inits readline too */
 	ud_attach_stdin(EV_A);
 
@@ -143,14 +177,14 @@ main (void)
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
-	/* attach the mcast crew */
-	ud_detach_mcast4(EV_A);
 	/* close the socket */
 	ud_detach_stdin(EV_A);
 
 	/* destroy the default evloop */
 	ev_default_destroy();
 
+	/* free the handle */
+	free_unserding_handle(&__hdl);
 	/* close our log output */
 	fflush(logout);
 	fclose(logout);

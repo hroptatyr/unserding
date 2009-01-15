@@ -109,9 +109,7 @@ handle_rl(char *line)
 	enqueue_job(glob_jq, j);
 	/* free the line readline gave us */
 	free(line);
-	/* unset the prompt, make way for messages */
-	ev_io_stop(EV_DEFAULT_ &__srv_watcher);
-	/* now notify the slaves */
+	/* parse him, blocks until a reply is nigh */
 	ud_parse(j);
 	return;
 }

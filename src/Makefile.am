@@ -3,7 +3,7 @@
 AM_CPPFLAGS = -pthread
 AM_LDFLAGS = -lpthread
 
-bin_PROGRAMS = unserdingd unserding unsermon testcli
+bin_PROGRAMS = unserdingd unsercli unsermon testcli
 if USE_MYSQL
 noinst_LIBRARIES = libpfack-mysql.a
 endif
@@ -28,10 +28,10 @@ unserdingd_SOURCES += mod-interests.c
 endif
 
 ## the main server binary
-unserding_SOURCES = unserding.c stdin.c mcast4.c proto.c protocore.c catalogue.c
-unserding_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
-unserding_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
-unserding_LDADD = $(LIBEV_LIBS) -lreadline
+unsercli_SOURCES = unsercli.c stdin.c mcast4.c proto.c protocore.c catalogue.c
+unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
+unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+unsercli_LDADD = $(LIBEV_LIBS) -lreadline
 
 ## the network monitor
 unsermon_SOURCES = unsermon.c mcast4.c protocore.c catalogue.c

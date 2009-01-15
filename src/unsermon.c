@@ -65,6 +65,8 @@
 
 #define USE_COROUTINES		1
 
+FILE *logout;
+
 
 typedef struct ud_worker_s *ud_worker_t;
 typedef struct ud_ev_async_s ud_ev_async;
@@ -169,6 +171,9 @@ main (void)
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 
+	/* where to log */
+	logout = stderr;
+
 	/* initialise global job q */
 	init_glob_jq();
 
@@ -197,6 +202,9 @@ main (void)
 	/* destroy the default evloop */
 	ev_default_destroy();
 
+	/* close log file */
+	fflush(logout);
+	fclose(logout);
 	/* unloop was called, so exit */
 	return 0;
 }

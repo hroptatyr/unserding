@@ -57,6 +57,7 @@
 #if defined HAVE_ERRNO_H
 # include <errno.h>
 #endif
+#include <fcntl.h>
 
 /* our master include file */
 #include "unserding.h"
@@ -64,6 +65,8 @@
 #include "unserding-private.h"
 
 #define USE_COROUTINES		1
+
+FILE *logout;
 
 
 typedef struct ud_worker_s *ud_worker_t;
@@ -88,6 +91,8 @@ struct ud_worker_s {
 
 
 static ev_signal ALGN16(__sigint_watcher);
+static ev_signal ALGN16(__sighup_watcher);
+static ev_signal ALGN16(__sigterm_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
 static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
@@ -166,6 +171,14 @@ static void
 sigint_cb(EV_P_ ev_signal *w, int revents)
 {
 	UD_DEBUG("C-c caught, unrolling everything\n");
+	ev_unloop(EV_A_ EVUNLOOP_ALL);
+	return;
+}
+
+static void
+sighup_cb(EV_P_ ev_signal *w, int revents)
+{
+	UD_DEBUG("SIGHUP caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
 }
@@ -265,6 +278,43 @@ kill_worker(ud_worker_t wk)
 }
 
 
+/* helper for daemon mode */
+static int
+daemonise(void)
+{
+	int fd;
+	pid_t pid;
+
+	switch (pid = fork()) {
+	case -1:
+		return false;
+	case 0:
+		break;
+	default:
+		UD_DEBUG("Successfully bore a squaller: %d\n", pid);
+		exit(0);
+	}
+
+	if (setsid() == -1) {
+		return false;
+	}
+	for (int i = getdtablesize(); i>=0; --i) {
+		/* close all descriptors */
+		close(i);
+	}
+	if (LIKELY((fd = open("/dev/null", O_RDWR, 0)) >= 0)) {
+		(void)dup2(fd, STDIN_FILENO);
+		(void)dup2(fd, STDOUT_FILENO);
+		(void)dup2(fd, STDERR_FILENO);
+		if (fd > STDERR_FILENO) {
+			(void)close(fd);
+		}
+	}
+	logout = fopen("/tmp/unserding.log", "w");
+	return 0;
+}
+
+
 /* interests module husk */
 extern void __attribute__((weak)) init_interests(void);
 void __attribute__((weak))
@@ -284,9 +334,18 @@ int
 main (void)
 {
 	/* use the default event loop unless you have special needs */
-	struct ev_loop *loop = ev_default_loop(0);
+	struct ev_loop *loop;
 	ev_signal *sigint_watcher = &__sigint_watcher;
+	ev_signal *sighup_watcher = &__sighup_watcher;
+	ev_signal *sigterm_watcher = &__sigterm_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+
+	/* whither to log */
+	logout = stderr;
+	/* run as daemon */
+	daemonise();
+	/* what's loop? */
+	loop = ev_default_loop(0);
 
 	/* initialise global job q */
 	init_glob_jq();
@@ -305,6 +364,12 @@ main (void)
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigpipe_watcher, sigint_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
+	/* initialise a SIGTERM handler */
+	ev_signal_init(sigterm_watcher, sighup_cb, SIGTERM);
+	ev_signal_start(EV_A_ sigterm_watcher);
+	/* initialise a SIGHUP handler */
+	ev_signal_init(sighup_watcher, sighup_cb, SIGHUP);
+	ev_signal_start(EV_A_ sighup_watcher);
 	/* initialise a wakeup handler */
 	glob_notify = &__wakeup_watcher;
 	ev_async_init(glob_notify, triv_cb);
@@ -363,8 +428,11 @@ main (void)
 	/* destroy the default evloop */
 	ev_default_destroy();
 
+	/* close our log output */	
+	fflush(logout);
+	fclose(logout);
 	/* unloop was called, so exit */
 	return 0;
 }
 
-/* unserding.c ends here */
+/* unserdingd.c ends here */

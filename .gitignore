@@ -18,3 +18,5 @@ libltdl/
 *~
 ++*
 =*
+build/
+ylwrap

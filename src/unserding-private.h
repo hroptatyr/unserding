@@ -350,7 +350,7 @@ extern job_queue_t glob_jq;
 /**
  * Job that looks up the parser routine in ud_parsef(). */
 extern void ud_proto_parse(job_t);
-extern ud_parse_f ud_parsef[4096];
+extern ud_parse_f ud_parsef[];
 
 /* jobs */
 extern void ud_hyrpl_job(job_t);

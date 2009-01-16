@@ -54,7 +54,7 @@
 #include "unserding-private.h"
 #include "protocore.h"
 
-ud_parse_f ud_parsef[4096];
+ud_parse_f ud_parsef[65536];
 
 void
 ud_proto_parse(job_t j)

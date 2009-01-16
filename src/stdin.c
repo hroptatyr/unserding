@@ -115,12 +115,14 @@ handle_rl(char *line)
 	return;
 }
 
-extern char *rl_display_prompt;
+/* dirty */
+extern void _rl_erase_entire_line(void);
 void
 stdin_print_async(ud_packet_t pkt)
 {
-	rl_message("incoming packet\n");
-	rl_clear_message();
+	(void)_rl_erase_entire_line();
+	puts("incoming packet");
+	rl_redisplay();
 	return;
 }
 

@@ -452,6 +452,20 @@ handle_hy_rpl(job_t j)
 }
 # endif	 /* UNSERCLI */
 
+static void __attribute__((unused))
+handle_7e54(job_t j)
+{
+	/* just a 2.5 seconds delayed HY */
+	usleep(2500000);
+	/* generate the answer packet */
+	udpc_make_rpl_pkt(JOB_PACKET(j));
+	UD_DEBUG_PROTO("sending HY RPL\n");
+	j->blen = 8;
+	j->prntf = send_cl;
+	return;
+}
+
+
 void
 send_cl(job_t j)
 {
@@ -545,6 +559,8 @@ ud_attach_mcast4(EV_P)
 	ev_timer *s2s_watcher = &__s2s_watcher;
 #endif	/* UNSERSRV */
 
+	/* give the parser fun array a proper rinse */
+	memset(ud_parsef, 0, sizeof(*ud_parsef) * 65536);
 	/* get us a global sock */
 	lsock = mcast46_listener_init();
 
@@ -563,6 +579,8 @@ ud_attach_mcast4(EV_P)
 	ud_parsef[UDPC_PKT_HY] = handle_hy;
 #endif	 /* UNSERCLI */
 	ud_parsef[UDPC_PKT_HY_RPL] = handle_hy_rpl;
+
+	ud_parsef[0x7e54] = handle_7e54;
 
 	/* initialise an io watcher, then start it */
 	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);

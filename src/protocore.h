@@ -96,6 +96,10 @@ udpc_pkt_pno(const ud_packet_t pkt);
 extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
 udpc_pkt_cmd(const ud_packet_t pkt);
 /**
+ * Set the command slot of PKT to CMD. */
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_pkt_set_cmd(ud_packet_t pkt, ud_pkt_cmd_t cmd);
+/**
  * Print the packet header. temporary. */
 extern inline void __attribute__((always_inline, gnu_inline))
 udpc_print_pkt(const ud_packet_t pkt);
@@ -211,6 +215,15 @@ udpc_pkt_pno(const ud_packet_t pkt)
 	uint32_t all = ntohl(tmp[0]);
 	/* yes ntoh conversion!!! */
 	return (ud_pkt_no_t)(all & (0xffffff));
+}
+
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_pkt_set_cmd(ud_packet_t pkt, ud_pkt_cmd_t cmd)
+{
+	uint16_t *tmp = (void*)pkt.pbuf;
+	/* yes ntoh conversion!!! */
+	tmp[2] = htons(cmd);
+	return;
 }
 
 extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))

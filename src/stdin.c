@@ -107,10 +107,13 @@ handle_rl(char *line)
 	j->prntf = ud_print_stdin;
 	memcpy(j->buf, line, llen);
 	enqueue_job(glob_jq, j);
+#if 0
+/* will be deferred */
 	/* free the line readline gave us */
 	free(line);
+#endif
 	/* parse him, blocks until a reply is nigh */
-	ud_parse(j);
+	ud_parse(PACKET(rl_end, line));
 	return;
 }
 

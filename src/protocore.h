@@ -60,7 +60,6 @@
  *
  ***/
 
-#define UDPC_SIMPLE_PKTLEN	4096
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
 
 /**

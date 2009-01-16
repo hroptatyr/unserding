@@ -113,7 +113,7 @@ bugger		{ RETURN_TOKEN(TOK_NVM); }
 {val}		{ RETURN_TOKEN(TOK_VAL); }
 
  /* more ignored shit, whitespace et al */
-{ws}		{ RETURN_TOKEN(TOK_SPACE); }
+{ws}		{ /* ignore */ }
 .		{ /* ignore */ }
 
 %%

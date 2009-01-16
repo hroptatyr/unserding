@@ -49,6 +49,8 @@
 # error "We need an event loop, give us one."
 #endif	/* HAVE_EV_H */
 
+#include "unserding.h"
+
 typedef size_t index_t;
 
 #if defined UNSERSRV && defined DEBUG_FLAG
@@ -353,7 +355,7 @@ extern ud_parse_f ud_parsef[4096];
 /* jobs */
 extern void ud_hyrpl_job(job_t);
 /* the old ascii parser */
-extern void ud_parse(job_t);
+extern void ud_parse(ud_packet_t);
 
 #if defined UNSERCLI
 extern bool cli_waiting_p;

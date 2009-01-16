@@ -74,7 +74,7 @@ static index_t __attribute__((unused)) glob_idx = 0;
 
 static ev_signal ALGN16(__sigint_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
-static ev_async ALGN16(__wakeup_watcher);
+//static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
 
 /* the global job queue */
@@ -82,6 +82,8 @@ static struct job_queue_s __glob_jq = {
 	.ji = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
 };
 job_queue_t glob_jq;
+
+static struct ud_handle_s __hdl;
 
 void
 trigger_job_queue(void)
@@ -110,34 +112,23 @@ sigpipe_cb(EV_P_ ev_signal *w, int revents)
 #include "unsercli-parser.h"
 #include "unsercli-scanner.h"
 
-typedef struct qaos_query_ctx_s *qaos_query_ctx_t;
-
-extern int cli_yyparse(void *scanner, qaos_query_ctx_t ctx);
-
-struct qaos_query_ctx_s {
-        char *statements;
-        size_t statements_size;
-        const char *cur_field;
-        const char *cur_op;
-        char cur_statement[256];
-        size_t cur_stmt_size;
-        bool absp;
-};
+extern int cli_yyparse(void *scanner, ud_packet_t);
 
 void
-ud_parse(job_t j)
+ud_parse(const ud_packet_t pkt)
 {
         yyscan_t scanner;
-        struct qaos_query_ctx_s ctx = {NULL, 0, NULL, NULL};
-        int r;
         YY_BUFFER_STATE buf;
-        void *conn, *qryp;
-        char qry[16384];
+        char res[UDPC_SIMPLE_PKTLEN];
 
         cli_yylex_init(&scanner);
-        buf = cli_yy_scan_string(j->buf, scanner);
-        r = cli_yyparse(scanner, &ctx);
+        buf = cli_yy_scan_string(pkt.pbuf, scanner);
+        if (cli_yyparse(scanner, BUF_PACKET(res)) == 0) {
+		ud_send_raw(&__hdl, BUF_PACKET(res));
+	}
         cli_yylex_destroy(scanner);
+	/* free the input line */
+	free(pkt.pbuf);
 	return;
 }
 
@@ -156,7 +147,6 @@ main (void)
 	struct ev_loop *loop = ev_default_loop(0);
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
-	struct ud_handle_s __hdl;
 
 	/* where to log */
 	logout = stderr;

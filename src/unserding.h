@@ -50,6 +50,9 @@
 #define UD_MCAST6_ADDR		"ff38:8653::1"
 #define UD_MCAST6S2S_ADDR	"ff38:8653::3"
 
+/* should be computed somehow using the mtu of the nic */
+#define UDPC_SIMPLE_PKTLEN	4096
+
 /**
  * Flags. */
 typedef long unsigned int ud_flags_t;

@@ -41,7 +41,7 @@
 %name-prefix="cli_yy"
 %lex-param{void *scanner}
 %parse-param{void *scanner}
-%parse-param{qaos_query_ctx_t ctx}
+%parse-param{ud_packet_t pkt}
 
 %{
 #include <string.h>
@@ -51,17 +51,7 @@
 
 #include "config.h"
 #include "unserding.h"
-
-typedef struct qaos_query_ctx_s *qaos_query_ctx_t;
-struct qaos_query_ctx_s {
-        char *statements;
-        size_t statements_size;
-        const char *cur_field;
-        const char *cur_op;
-        char cur_statement[256];
-        size_t cur_stmt_size;
-        bool absp;
-};
+#include "protocore.h"
 
 #if defined HAVE_BDWGC
 # define xmalloc        GC_MALLOC
@@ -74,13 +64,9 @@ struct qaos_query_ctx_s {
 #endif  /* BDWGC */
 
 /* declarations */
-extern int cli_yyparse(void *scanner, qaos_query_ctx_t ctx);
+extern int cli_yyparse(void *scanner, ud_packet_t pkt);
 
-#define YYSTYPE		const char*
-
-#define STMT_AND	"AND"
-#define STMT_AND_SIZE	sizeof(STMT_AND)-1
-
+#define YYSTYPE			const char*
 #define YYENABLE_NLS		0
 #define YYLTYPE_IS_TRIVIAL	1
 
@@ -89,23 +75,22 @@ extern int cli_yyparse(void *scanner, qaos_query_ctx_t ctx);
 extern int cli_yylex();
 extern int cli_yyget_lineno();
 extern char *cli_yyget_text();
-extern void
-cli_yyerror(void *scanner, qaos_query_ctx_t ctx, char const *s);
+extern void cli_yyerror(void *scanner, ud_packet_t pkt, char const *errmsg);
+
+static const char help_rpl[] =
+	"hy     send keep-alive message\n"
+	"sup    list connected clients and neighbour servers\n"
+	"help   this help screen\n"
+	"cheers [time]  store last result for TIME seconds (default 86400)\n"
+	"nvm    immediately flush last result\n"
+	"ls     list catalogue entries of current directory\n"
+	"spot <options> obtain spot price\n"
+	;
 
 void
-cli_yyerror(void *scanner, qaos_query_ctx_t ctx, char const *s)
+cli_yyerror(void *scanner, ud_packet_t pkt, char const *s)
 {
-	fprintf(stderr, "error in line %d: %s\n",
-		cli_yyget_lineno(scanner), s);
-	return;
-}
-
-static inline void
-__concat(qaos_query_ctx_t ctx)
-{
-	strncpy(&ctx->statements[ctx->statements_size],
-		ctx->cur_statement, ctx->cur_stmt_size);
-	ctx->statements_size += ctx->cur_stmt_size;
+	puts("syntax error");
 	return;
 }
 
@@ -131,7 +116,10 @@ query:
 hy_cmd | cheers_cmd | nvm_cmd | wtf_cmd | cya_cmd | sup_cmd | ls_cmd;
 
 hy_cmd:
-TOK_HY;
+TOK_HY {
+	udpc_make_pkt(pkt, 0, 0, UDPC_PKT_HY);
+	YYACCEPT;
+};
 
 cheers_cmd:
 TOK_CHEERS;
@@ -140,7 +128,10 @@ nvm_cmd:
 TOK_NVM;
 
 wtf_cmd:
-TOK_WTF;
+TOK_WTF {
+	puts(help_rpl);
+	YYACCEPT;
+};
 
 cya_cmd:
 TOK_CYA;
@@ -149,13 +140,13 @@ sup_cmd:
 TOK_SUP;
 
 ls_cmd:
-TOK_LS | TOK_LS TOK_SPACE keyvals;
+TOK_LS | TOK_LS keyvals;
 
 keyvals:
-keyval | keyvals TOK_SPACE keyval;
+keyval | keyvals keyval;
 
 keyval:
-key TOK_SPACE val;
+key val;
 
 key:
 TOK_KEY;

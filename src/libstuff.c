@@ -109,6 +109,16 @@ mcast_init(void)
 	return s;
 }
 
+static inline int __attribute__((always_inline, gnu_inline))
+ud_handle_epfd(ud_handle_t hdl)
+{
+	if (LIKELY(hdl->epfd >= 0)) {
+		return hdl->epfd;
+	} else {
+		return hdl->epfd = epoll_create(1);
+	}
+}
+
 
 /* public funs */
 void
@@ -129,7 +139,7 @@ void
 ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 {
 	int s = ud_handle_sock(hdl);
-	int epfd = hdl->epfd;
+	int epfd = ud_handle_epfd(hdl);
 	int nfds;
 	ssize_t nread;
 	struct epoll_event ev, *events = NULL;
@@ -167,7 +177,7 @@ void
 ud_recv_convo(ud_handle_t hdl, ud_packet_t pkt, int to, ud_convo_t cno)
 {
 	int s = ud_handle_sock(hdl);
-	int epfd = hdl->epfd;
+	int epfd = ud_handle_epfd(hdl);
 	int nfds;
 	ssize_t nread;
 	struct epoll_event ev, *events = NULL;
@@ -231,7 +241,7 @@ make_unserding_handle(ud_handle_t hdl)
 {
 	hdl->convo = 0;
 	hdl->sock = mcast_init();
-	hdl->epfd = epoll_create(1);
+	hdl->epfd = -1;
 	return;
 }
 

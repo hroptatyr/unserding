@@ -71,16 +71,13 @@
 
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));
-extern void ud_print_stdin(job_t j);
+extern void stdin_print_async(ud_packet_t pkt);
 
 
 /* string goodies */
 static void
 handle_rl(char *line)
 {
-	size_t llen;
-	job_t j;
-
 	/* print newline */
 	if (UNLIKELY(line == NULL)) {
 		/* print newline */
@@ -98,22 +95,32 @@ handle_rl(char *line)
 	}
 	/* stuff up our history */
 	add_history(line);
+
+#if 0
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
-	if (UNLIKELY((llen = strlen(line)) > 4096)) {
+	if (UNLIKELY((llen = rl_end) > 4096)) {
 		llen = 4096;
 	}
 	j = obtain_job(glob_jq);
 	j->prntf = ud_print_stdin;
 	memcpy(j->buf, line, llen);
 	enqueue_job(glob_jq, j);
-#if 0
 /* will be deferred */
 	/* free the line readline gave us */
 	free(line);
 #endif
 	/* parse him, blocks until a reply is nigh */
 	ud_parse(PACKET(rl_end, line));
+	return;
+}
+
+extern char *rl_display_prompt;
+void
+stdin_print_async(ud_packet_t pkt)
+{
+	rl_message("incoming packet\n");
+	rl_clear_message();
 	return;
 }
 
@@ -147,7 +154,6 @@ stdin_listener_deinit(EV_P_ int sock)
 	return;
 }
 
-
 /* this callback is called when data is readable on one of the polled socks */
 static void
 stdin_traf_rcb(EV_P_ ev_io *w, int revents)
@@ -156,6 +162,7 @@ stdin_traf_rcb(EV_P_ ev_io *w, int revents)
 	return;
 }
 
+
 void
 ud_reset_stdin(EV_P)
 {
@@ -164,14 +171,6 @@ ud_reset_stdin(EV_P)
 	putc('\n', stdout);
 	rl_on_new_line();
 	rl_forced_update_display();
-	return;
-}
-
-
-void
-ud_print_stdin(job_t j)
-{
-	printf(j->buf);
 	return;
 }
 

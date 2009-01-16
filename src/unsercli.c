@@ -69,12 +69,15 @@ FILE *logout;
 typedef struct ud_worker_s *ud_worker_t;
 typedef struct ud_ev_async_s ud_ev_async;
 
+extern void stdin_print_async(ud_packet_t);
+
 
 static index_t __attribute__((unused)) glob_idx = 0;
 
 static ev_signal ALGN16(__sigint_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
 //static ev_async ALGN16(__wakeup_watcher);
+static ev_io ALGN16(__srv_watcher);
 ev_async *glob_notify;
 
 /* the global job queue */
@@ -107,23 +110,39 @@ sigpipe_cb(EV_P_ ev_signal *w, int revents)
 	return;
 }
 
+static void
+rplpkt_cb(EV_P_ ev_io *w, int revents)
+{
+	ssize_t nread;
+	struct sockaddr_in6 sa;
+	socklen_t lsa = sizeof(sa);
+	char res[UDPC_SIMPLE_PKTLEN];
+
+	nread = recvfrom(w->fd, res, countof(res), 0, &sa, &lsa);
+	stdin_print_async(PACKET(nread, res));
+	return;
+}
+
 
 /* parser madness */
 #include "unsercli-parser.h"
 #include "unsercli-scanner.h"
 
-extern int cli_yyparse(void *scanner, ud_packet_t);
+extern int cli_yyparse(void *scanner, ud_packet_t*);
 
 void
 ud_parse(const ud_packet_t pkt)
 {
         yyscan_t scanner;
         YY_BUFFER_STATE buf;
+	int ret;
         char res[UDPC_SIMPLE_PKTLEN];
+	ud_packet_t respkt = BUF_PACKET(res);
 
         cli_yylex_init(&scanner);
         buf = cli_yy_scan_string(pkt.pbuf, scanner);
-        if (cli_yyparse(scanner, BUF_PACKET(res)) == 0) {
+        if ((ret = cli_yyparse(scanner, &respkt)) == 0 && respkt.plen > 0) {
+		/* send a packet */
 		ud_send_raw(&__hdl, BUF_PACKET(res));
 	}
         cli_yylex_destroy(scanner);
@@ -147,6 +166,7 @@ main (void)
 	struct ev_loop *loop = ev_default_loop(0);
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+	ev_io *srv_watcher = &__srv_watcher;
 
 	/* where to log */
 	logout = stderr;
@@ -165,6 +185,9 @@ main (void)
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigpipe_watcher, sigpipe_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
+	/* initialise an io watcher, then start it */
+	ev_io_init(srv_watcher, rplpkt_cb, ud_handle_sock(&__hdl), EV_READ);
+	ev_io_start(EV_A_ srv_watcher);
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);

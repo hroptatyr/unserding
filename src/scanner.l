@@ -48,7 +48,6 @@
 %option bison-bridge
 %option header-file="lex.yy.h"
 %option outfile="lex.yy.c"
-%option nodefault
 %option pointer
 %option debug
 
@@ -58,6 +57,9 @@
 #include <string.h>
 
 #include "unsercli-parser.h"
+
+extern int cli_yyget_column(yyscan_t);
+extern void cli_yyset_column(int, yyscan_t);
 
 #define RETURN_TOKEN(_x)			\
 	do {					\
@@ -77,7 +79,7 @@ eq		[:=]?|is
 neg		!
 
 key		:[a-z]+
-val		[a-z]
+val		[a-z]+
 
 int		[-+]?[0-9]+
 
@@ -111,7 +113,7 @@ bugger		{ RETURN_TOKEN(TOK_NVM); }
 {val}		{ RETURN_TOKEN(TOK_VAL); }
 
  /* more ignored shit, whitespace et al */
-{ws}		{ /* ignore */ }
+{ws}		{ RETURN_TOKEN(TOK_SPACE); }
 .		{ /* ignore */ }
 
 %%

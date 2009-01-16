@@ -74,7 +74,7 @@ struct qaos_query_ctx_s {
 #endif  /* BDWGC */
 
 /* declarations */
-extern int qaos_yyparse(void *scanner, qaos_query_ctx_t ctx);
+extern int cli_yyparse(void *scanner, qaos_query_ctx_t ctx);
 
 #define YYSTYPE		const char*
 
@@ -89,16 +89,15 @@ extern int qaos_yyparse(void *scanner, qaos_query_ctx_t ctx);
 extern int cli_yylex();
 extern int cli_yyget_lineno();
 extern char *cli_yyget_text();
-extern __attribute__((noreturn)) void
+extern void
 cli_yyerror(void *scanner, qaos_query_ctx_t ctx, char const *s);
 
-void __attribute__((noreturn))
+void
 cli_yyerror(void *scanner, qaos_query_ctx_t ctx, char const *s)
 {
 	fprintf(stderr, "error in line %d: %s\n",
 		cli_yyget_lineno(scanner), s);
-	exit(1);
-	/* unreached */
+	return;
 }
 
 static inline void
@@ -123,6 +122,7 @@ __concat(qaos_query_ctx_t ctx)
 	TOK_INTEGER
 	TOK_KEY
 	TOK_VAL
+	TOK_SPACE
 
 %%
 
@@ -149,13 +149,13 @@ sup_cmd:
 TOK_SUP;
 
 ls_cmd:
-TOK_LS | TOK_LS keyvals;
+TOK_LS | TOK_LS TOK_SPACE keyvals;
 
 keyvals:
-keyval | keyvals keyval;
+keyval | keyvals TOK_SPACE keyval;
 
 keyval:
-key val;
+key TOK_SPACE val;
 
 key:
 TOK_KEY;

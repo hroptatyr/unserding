@@ -95,7 +95,6 @@ static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
 static void
 sigint_cb(EV_P_ ev_signal *w, int revents)
 {
-	putc('\n', stdout);
 	ud_reset_stdin(EV_A);
 	return;
 }
@@ -112,6 +111,9 @@ sigpipe_cb(EV_P_ ev_signal *w, int revents)
 #include "unsercli-scanner.h"
 
 typedef struct qaos_query_ctx_s *qaos_query_ctx_t;
+
+extern int cli_yyparse(void *scanner, qaos_query_ctx_t ctx);
+
 struct qaos_query_ctx_s {
         char *statements;
         size_t statements_size;

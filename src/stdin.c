@@ -84,7 +84,7 @@ handle_rl(char *line)
 	/* print newline */
 	if (UNLIKELY(line == NULL)) {
 		/* print newline */
-		puts("");
+		putc('\n', stdout);
 		/* just remove the handler here */
 		rl_callback_handler_remove();
 		/* and finally kick the event loop */
@@ -205,7 +205,9 @@ stdin_traf_wcb(EV_P_ ev_io *w, int revents)
 void
 ud_reset_stdin(EV_P)
 {
-	ev_io_start(EV_A_ &__srv_watcher);
+	rl_line_buffer[0] = '\0';
+	rl_point = rl_end = 0;
+	putc('\n', stdout);
 	rl_on_new_line();
 	rl_forced_update_display();
 	return;

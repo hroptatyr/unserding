@@ -71,7 +71,8 @@
 
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));
-extern void stdin_print_async(ud_packet_t pkt);
+extern void
+stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal);
 
 
 /* string goodies */
@@ -118,10 +119,28 @@ handle_rl(char *line)
 /* dirty */
 extern void _rl_erase_entire_line(void);
 void
-stdin_print_async(ud_packet_t pkt)
+stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 {
+	char buf[INET6_ADDRSTRLEN];
+	/* the port (in host-byte order) */
+	uint16_t p;
+
+	/* obtain the address in human readable form */
+	(void)inet_ntop(sa->sin_family,
+			sa->sin_family == PF_INET6
+			? (void*)&((struct sockaddr_in6*)sa)->sin6_addr
+			: (void*)&((struct sockaddr_in*)sa)->sin_addr,
+			buf, sizeof(buf));
+	p = ntohs(sa->sin_port);
+
 	(void)_rl_erase_entire_line();
-	puts("incoming packet");
+	fprintf(stdout, "packet from [%s]:%d "
+		":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+		buf, p, (unsigned int)pkt.plen,
+		udpc_pkt_cno(pkt),
+		udpc_pkt_pno(pkt),
+		udpc_pkt_cmd(pkt),
+		ntohs(((const uint16_t*)pkt.pbuf)[3]));
 	rl_redisplay();
 	return;
 }

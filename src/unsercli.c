@@ -69,7 +69,9 @@ FILE *logout;
 typedef struct ud_worker_s *ud_worker_t;
 typedef struct ud_ev_async_s ud_ev_async;
 
-extern void stdin_print_async(ud_packet_t);
+/* should that be properly public? */
+extern void
+stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal);
 
 
 static index_t __attribute__((unused)) glob_idx = 0;
@@ -119,7 +121,7 @@ rplpkt_cb(EV_P_ ev_io *w, int revents)
 	char res[UDPC_SIMPLE_PKTLEN];
 
 	nread = recvfrom(w->fd, res, countof(res), 0, &sa, &lsa);
-	stdin_print_async(PACKET(nread, res));
+	stdin_print_async(PACKET(nread, res), (void*)&sa, lsa);
 	return;
 }
 

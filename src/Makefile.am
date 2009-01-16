@@ -3,13 +3,13 @@
 AM_CPPFLAGS = -pthread
 AM_LDFLAGS = -lpthread
 
-bin_PROGRAMS = unserdingd unsercli unsermon testcli
+bin_PROGRAMS = unserdingd unsercli testcli
 if USE_MYSQL
 noinst_LIBRARIES = libpfack-mysql.a
 endif
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
-CLEAN_FILES = $(BUILT_SOURCES)
+CLEANFILES = $(BUILT_SOURCES)
 
 if USE_MYSQL
 ## additional helper for mysql sources
@@ -37,18 +37,14 @@ unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsercli_LDADD = $(LIBEV_LIBS) -lreadline -lfl libunserding.la
 BUILT_SOURCES += unsercli-parser.h unsercli-scanner.h
+## weird, must be an automake bug
+CLEANFILES += unsercli-parser.c unsercli-scanner.c
 
 ## fucking automake refuses to replay my flex patch
 unsercli-scanner.h: scanner.l
 	$(LEX) $(unsercli_LFLAGS) --header-file=$@ $<
 	test -e lex.yy.c && $(RM) lex.yy.c
 	test -e lex.yy.h && mv lex.yy.h $@
-
-## the network monitor
-unsermon_SOURCES = unsermon.c mcast4.c protocore.c catalogue.c
-unsermon_CPPFLAGS = -DUNSERMON $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
-unsermon_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
-unsermon_LDADD = $(LIBEV_LIBS)
 
 ## the lib
 libunserding_la_SOURCES = libstuff.c

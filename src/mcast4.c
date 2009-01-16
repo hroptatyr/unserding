@@ -80,11 +80,9 @@
 #endif
 
 static int lsock __attribute__((used));
-#if !defined UNSERMON
 static ev_timer ALGN16(__s2s_watcher);
 static size_t neighbours = 0;
 static uint8_t conv = 0;
-#endif	/* !UNSERMON */
 static ev_io ALGN16(__srv_watcher);
 #if !defined UNSERCLI
 static struct ip_mreq ALGN16(mreq4);
@@ -390,17 +388,9 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	if (UNLIKELY(nread <= 0)) {
 		UD_CRITICAL_MCAST("could not handle incoming connection\n");
 		return;
-#if defined UNSERMON
-	} else if (UNLIKELY(!udpc_pkt_valid_p((ud_packet_t){0, j->buf}))) {
-		UD_UNSERMON_PKT("invalid pkt\n", 0, 0);
-		return;
-#endif	/* UNSERMON */
 	}
 
 	j->blen = nread;
-#if defined UNSERMON
-	udpc_print_pkt((ud_packet_t){j->blen, j->buf});
-#else  /* !UNSERMON */
 	j->workf = ud_proto_parse;
 	j->prntf = send_cl;
 
@@ -409,7 +399,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	enqueue_job(glob_jq, j);
 	/* now notify the slaves */
 	trigger_job_queue();
-#endif	/* UNSERMON */
 	return;
 }
 #endif	/* !UNSERCLI */
@@ -421,7 +410,6 @@ nothing(job_t j)
 	return;
 }
 
-#if !defined UNSERMON
 /* handle the HY packet */
 static void __attribute__((unused))
 handle_hy(job_t j)
@@ -513,10 +501,8 @@ send_m46(job_t j)
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
 	return;
 }
-#endif	/* !UNSERMON */
 
 
-#if !defined UNSERMON
 static void __attribute__((unused))
 s2s_nego_hy(void)
 {
@@ -541,7 +527,6 @@ s2s_hy_cb(EV_P_ ev_timer *w, int revents)
 	s2s_nego_hy();
 	return;
 }
-#endif	/* !UNSERMON */
 
 
 int
@@ -550,7 +535,7 @@ ud_attach_mcast4(EV_P)
 	ev_io *srv_watcher = &__srv_watcher;
 #if defined UNSERSRV
 	ev_timer *s2s_watcher = &__s2s_watcher;
-#endif	/* !UNSERMON */
+#endif	/* UNSERSRV */
 
 	/* get us a global sock */
 	lsock = mcast46_listener_init();
@@ -565,13 +550,11 @@ ud_attach_mcast4(EV_P)
 	s2s_oi[s2s_oi_len = strlen(s2s_oi)] = '\n';
 	s2s_oi_len++;
 
-#if !defined UNSERMON
 	/* escrow some packet handlers */
-# if !defined UNSERCLI
+#if !defined UNSERCLI
 	ud_parsef[UDPC_PKT_HY] = handle_hy;
-# endif	 /* UNSERCLI */
+#endif	 /* UNSERCLI */
 	ud_parsef[UDPC_PKT_HY_RPL] = handle_hy_rpl;
-#endif	/* !UNSERMON */
 
 	/* initialise an io watcher, then start it */
 	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
@@ -581,7 +564,7 @@ ud_attach_mcast4(EV_P)
 	/* init the s2s timer, this one says `hy' until an id was negotiated */
 	ev_timer_init(s2s_watcher, s2s_hy_cb, 0.0, S2S_BRAG_RATE);
 	ev_timer_start(EV_A_ s2s_watcher);
-#endif	/* !UNSERMON */
+#endif	/* UNSERSRV */
 	return 0;
 }
 
@@ -589,17 +572,13 @@ int
 ud_detach_mcast4(EV_P)
 {
 	ev_io *srv_watcher = &__srv_watcher;
-#if !defined UNSERMON
 	ev_timer *s2s_watcher = &__s2s_watcher;
-#endif	/* !UNSERMON */
 
 	/* stop the guy that watches the socket */
 	ev_io_stop(EV_A_ srv_watcher);
 
-#if !defined UNSERMON
 	/* stop the timer */
 	ev_timer_stop(EV_A_ s2s_watcher);
-#endif	/* !UNSERMON */
 
 	if (LIKELY(lsock >= 0)) {
 		/* and kick the socket */

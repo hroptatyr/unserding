@@ -135,7 +135,7 @@ ud_parse(job_t j)
         cli_yylex_init(&scanner);
         buf = cli_yy_scan_string(j->buf, scanner);
         r = cli_yyparse(scanner, &ctx);
-        qaos_yylex_destroy(scanner);
+        cli_yylex_destroy(scanner);
 	return;
 }
 

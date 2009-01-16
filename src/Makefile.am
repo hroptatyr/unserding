@@ -36,6 +36,13 @@ unsercli_YFLAGS = -d -p "cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsercli_LDADD = $(LIBEV_LIBS) -lreadline -lfl libunserding.la
+BUILT_SOURCES += unsercli-parser.h unsercli-scanner.h
+
+## fucking automake refuses to replay my flex patch
+unsercli-scanner.h: scanner.l
+	$(LEX) $(unsercli_LFLAGS) --header-file=$@ $<
+	test -e lex.yy.c && $(RM) lex.yy.c
+	test -e lex.yy.h && mv lex.yy.h $@
 
 ## the network monitor
 unsermon_SOURCES = unsermon.c mcast4.c protocore.c catalogue.c

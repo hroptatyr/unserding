@@ -331,7 +331,7 @@ init_glob_jq(void)
 }
 
 int
-main (void)
+main(int argc, char *argv[])
 {
 	/* use the default event loop unless you have special needs */
 	struct ev_loop *loop;
@@ -342,8 +342,10 @@ main (void)
 
 	/* whither to log */
 	logout = stderr;
-	/* run as daemon */
-	daemonise();
+	/* run as daemon, do me properly */
+	if (argc > 1) {
+		daemonise();
+	}
 	/* what's loop? */
 	loop = ev_default_loop(0);
 

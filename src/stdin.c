@@ -144,17 +144,6 @@ stdin_listener_deinit(EV_P_ int sock)
 	UD_DEBUG_STDIN("closing listening socket %d...\n", sock);
 	shutdown(sock, SHUT_RDWR);
 	close(sock);
-
-#if 0
-	UD_DEBUG_STDIN("kicking ctx %p :socket %d...\n", ctx, ctx->snk);
-	/* kick the io handlers */
-	ev_io_stop(EV_A_ ctx_rio(ctx));
-	ev_io_stop(EV_A_ ctx_wio(ctx));
-
-	/* finally, give the ctx struct a proper rinse */
-	ctx->src = ctx->snk = -1;
-	ctx->bidx = 0;
-#endif
 	return;
 }
 
@@ -165,44 +154,6 @@ stdin_traf_rcb(EV_P_ ev_io *w, int revents)
 {
 	rl_callback_read_char();
 	return;
-}
-
-/* this callback is called when data is writable on one of the polled socks */
-static void __attribute__((unused))
-stdin_traf_wcb(EV_P_ ev_io *w, int revents)
-{
-#if 0
-	conn_ctx_t ctx = ev_wio_ctx(w);
-	outbuf_t obuf;
-
-	UD_DEBUG_STDIN("writing buffer to %d\n", ctx->snk);
-	lock_obring(&ctx->obring);
-	/* obtain the current output buffer */
-	obuf = curr_outbuf(&ctx->obring);
-	if (LIKELY(obuf->obufidx < obuf->obuflen)) {
-		const char *buf =
-			(char*)((long int)obuf->obuf & ~1UL) + obuf->obufidx;
-		size_t blen = obuf->obuflen - obuf->obufidx;
-		/* the actual write */
-		obuf->obufidx += write(w->fd, buf, blen);
-	}
-	/* it's likely that we can output all at once */
-	if (LIKELY(obuf->obufidx >= obuf->obuflen)) {
-		/* reset the timeout, we want activity on the remote side now */
-		ctx->timeout = ev_now(EV_A) + STDIN_TIMEOUT;
-		/* free the buffer */
-		free_outbuf(obuf);
-		/* wind to the next outbuf */
-		ctx->obring.curr_idx = step_obring_idx(ctx->obring.curr_idx);
-
-		if (LIKELY(outbuf_free_p(curr_outbuf(&ctx->obring)))) {
-			/* if nothing's to be printed just turn it off */
-			ev_io_stop(EV_A_ w);
-		}
-	}
-	unlock_obring(&ctx->obring);
-	return;
-#endif
 }
 
 void
@@ -241,7 +192,13 @@ ud_attach_stdin(EV_P)
 int
 ud_detach_stdin(EV_P)
 {
+	ev_io *srv_watcher = &__srv_watcher;
+
+	/* close the socket et al */
 	stdin_listener_deinit(EV_A_ lsock);
+
+	/* stop the io watcher */
+	ev_io_stop(EV_A_ srv_watcher);
 	return 0;
 }
 

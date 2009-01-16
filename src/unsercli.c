@@ -143,7 +143,7 @@ ud_parse(const ud_packet_t pkt)
         buf = cli_yy_scan_string(pkt.pbuf, scanner);
         if ((ret = cli_yyparse(scanner, &respkt)) == 0 && respkt.plen > 0) {
 		/* send a packet */
-		ud_send_raw(&__hdl, BUF_PACKET(res));
+		ud_send_raw(&__hdl, respkt);
 	}
         cli_yylex_destroy(scanner);
 	/* free the input line */

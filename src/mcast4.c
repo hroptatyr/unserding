@@ -382,7 +382,15 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 		      buf, sizeof(buf));
 	p = ntohs(j->sa.sin6_port);
 	UD_DEBUG_MCAST("sock %d connect from host %s port %d\n", w->fd, a, p);
-	UD_LOG_MCAST(":sock %d connect :from [%s]:%d\n", w->fd, a, p);
+	UD_LOG_MCAST(":sock %d connect :from [%s]:%d\n"
+		     "                                         "
+		     ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+		     w->fd, a, p,
+		     (unsigned int)nread,
+		     udpc_pkt_cno(JOB_PACKET(j)),
+		     udpc_pkt_pno(JOB_PACKET(j)),
+		     udpc_pkt_cmd(JOB_PACKET(j)),
+		     ntohs(((const uint16_t*)j->buf)[3]));
 
 	/* handle the reading */
 	if (UNLIKELY(nread <= 0)) {

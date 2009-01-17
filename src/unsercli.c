@@ -129,24 +129,21 @@ rplpkt_cb(EV_P_ ev_io *w, int revents)
 /* parser madness */
 #include "unsercli-parser.h"
 #include "unsercli-scanner.h"
+#include "protocore.h"
 
-extern int cli_yyparse(void *scanner, ud_packet_t*);
+extern int cli_yyparse(void *scanner, ud_handle_t);
 
 void
 ud_parse(const ud_packet_t pkt)
 {
         yyscan_t scanner;
         YY_BUFFER_STATE buf;
-	int ret;
-        char res[UDPC_SIMPLE_PKTLEN];
-	ud_packet_t respkt = BUF_PACKET(res);
 
+	/* set up the lexer */
         cli_yylex_init(&scanner);
         buf = cli_yy_scan_string(pkt.pbuf, scanner);
-        if ((ret = cli_yyparse(scanner, &respkt)) == 0 && respkt.plen > 0) {
-		/* send a packet */
-		ud_send_raw(&__hdl, respkt);
-	}
+	/* parse him */
+        (void)cli_yyparse(scanner, &__hdl);
         cli_yylex_destroy(scanner);
 	/* free the input line */
 	free(pkt.pbuf);

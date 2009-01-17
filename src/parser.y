@@ -41,7 +41,7 @@
 %name-prefix="cli_yy"
 %lex-param{void *scanner}
 %parse-param{void *scanner}
-%parse-param{ud_packet_t *pkt}
+%parse-param{ud_handle_t hdl}
 
 %{
 #include <string.h>
@@ -51,6 +51,7 @@
 
 #include "config.h"
 #include "unserding.h"
+#include "unserding-private.h"
 #include "protocore.h"
 
 #if defined HAVE_BDWGC
@@ -64,7 +65,7 @@
 #endif  /* BDWGC */
 
 /* declarations */
-extern int cli_yyparse(void *scanner, ud_packet_t *pkt);
+extern int cli_yyparse(void *scanner, ud_handle_t hdl);
 
 #define YYSTYPE			const char*
 #define YYENABLE_NLS		0
@@ -75,7 +76,7 @@ extern int cli_yyparse(void *scanner, ud_packet_t *pkt);
 extern int cli_yylex();
 extern int cli_yyget_lineno();
 extern char *cli_yyget_text();
-extern void cli_yyerror(void *scanner, ud_packet_t *pkt, char const *errmsg);
+extern void cli_yyerror(void *scanner, ud_handle_t hdl, char const *errmsg);
 
 static const char help_rpl[] =
 	"hy     send keep-alive message\n"
@@ -88,10 +89,9 @@ static const char help_rpl[] =
 	;
 
 void
-cli_yyerror(void *scanner, ud_packet_t *pkt, char const *s)
+cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 {
 	puts("syntax error");
-	pkt->plen = 0;
 	return;
 }
 
@@ -115,34 +115,33 @@ cli_yyerror(void *scanner, ud_packet_t *pkt, char const *s)
 
 query:
 hy_cmd {
-	udpc_make_pkt(*pkt, 0, 0, UDPC_PKT_HY);
-	pkt->plen = 8;
+	char buf[8];
+	ud_packet_t pkt = BUF_PACKET(buf);
+	udpc_make_pkt(pkt, hdl->convo++, 0, UDPC_PKT_HY);
+	ud_send_raw(hdl, pkt);
 	YYACCEPT;
 } |
 cheers_cmd {
-	pkt->plen = 0;
 	YYACCEPT;
 } |
 nvm_cmd {
-	pkt->plen = 0;
 	YYACCEPT;
 } |
 wtf_cmd {
 	puts(help_rpl);
-	pkt->plen = 0;
 	YYACCEPT;
 } |
 cya_cmd {
-	udpc_make_pkt(*pkt, 0, 0, 0x7e54);
-	pkt->plen = 8;
+	char buf[8];
+	ud_packet_t pkt = BUF_PACKET(buf);
+	udpc_make_pkt(pkt, hdl->convo++, 0, 0x7e54);
+	ud_send_raw(hdl, pkt);
 	YYACCEPT;
 } |
 sup_cmd {
-	pkt->plen = 0;
 	YYACCEPT;
 } |
 ls_cmd {
-	pkt->plen = 0;
 	YYACCEPT;
 };
 

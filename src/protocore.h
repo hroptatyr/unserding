@@ -73,6 +73,7 @@ typedef void(*ud_pktwrk_f)(job_t);
 typedef ud_pktwrk_f *ud_pktfam_t;
 
 extern void init_proto(void);
+extern void ud_proto_parse(job_t j);
 
 /**
  * Return true if PKT is a valid unserding packet. */

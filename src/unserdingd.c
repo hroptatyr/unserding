@@ -63,6 +63,8 @@
 #include "unserding.h"
 /* our private bits */
 #include "unserding-private.h"
+/* proto stuff */
+#include "protocore.h"
 
 #define USE_COROUTINES		1
 
@@ -206,11 +208,8 @@ worker_cb(EV_P_ ev_async *w, int revents)
 	job_t j;
 
 	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
-		if (LIKELY(j->workf != NULL)) {
-			UD_DEBUG("thread/loop %lx/%p doing work %p\n",
-				 self, loop, j);
-			j->workf(j);
-		}
+		UD_DEBUG("thread/loop %lx/%p doing work %p\n", self, loop, j);
+		ud_proto_parse(j);
 		send_cl(j);
 		free_job(j);
 	}

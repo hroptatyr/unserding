@@ -215,11 +215,10 @@ struct job_s {
 		SA_STRUCT sa;
 #endif
 	};
-	ud_work_f workf;
 	/* set to 0 if job is free,
 	 * set to 1 if job is being loaded
 	 * set to 2 if job is ready to be processed */
-	long unsigned int readyp;
+	long unsigned int flags;
 
 	size_t blen;
 	char ALGN16(buf)[];
@@ -238,12 +237,78 @@ struct job_queue_s {
 	struct job_s jobs[NJOBS];
 };
 
+static inline uint8_t __attribute__((always_inline, gnu_inline))
+__job_ready_bits(job_t j)
+{
+	return j->flags & 0x3;
+}
+
+static inline bool __attribute__((always_inline, gnu_inline))
+__job_emptyp(job_t j)
+{
+/* return true iff job slot is empty */
+	return __job_ready_bits(j) == 0;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+__job_set_empty(job_t j)
+{
+/* make J empty */
+	j->flags &= ~0x11;
+	return;
+}
+
+static inline bool __attribute__((always_inline, gnu_inline))
+__job_prepdp(job_t j)
+{
+/* return true iff job slot is currently being prepared */
+	return __job_ready_bits(j) == 1;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+__job_set_prepd(job_t j)
+{
+/* turn job into a prepared one */
+	j->flags = (j->flags & ~0x11) | 1;
+	return;
+}
+
+static inline bool __attribute__((always_inline, gnu_inline))
+__job_readyp(job_t j)
+{
+/* return true iff job slot is ready */
+	return __job_ready_bits(j) == 2;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+__job_set_ready(job_t j)
+{
+/* turn job into a ready one */
+	j->flags = (j->flags & ~0x11) | 2;
+	return;
+}
+
+static inline bool __attribute__((always_inline, gnu_inline))
+__job_finip(job_t j)
+{
+/* return true iff job in the job slot is finished */
+	return __job_ready_bits(j) == 3;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+__job_set_fini(job_t j)
+{
+/* turn job into a finished one */
+	j->flags |= 3;
+	return;
+}
+
 static inline index_t __attribute__((always_inline, gnu_inline))
 __next_job(job_queue_t jq)
 {
 	short unsigned int res = (jq->ji + 1) % NJOBS;
 
-	if (LIKELY(jq->jobs[res].workf == NULL)) {
+	if (LIKELY(__job_emptyp(&jq->jobs[res]))) {
 		return res;
 	}
 	do {
@@ -251,20 +316,20 @@ __next_job(job_queue_t jq)
 		else {
 			res = 0;
 		}
-	} while (jq->jobs[res].workf != NULL);
+	} while (!__job_emptyp(&jq->jobs[res]));
 	return res;
 }
 
 static inline job_t __attribute__((always_inline, gnu_inline))
 obtain_job(job_queue_t jq)
 {
-	job_t res;
+	job_t j;
 	pthread_mutex_lock(&jq->mtx);
-	res = &jq->jobs[jq->ji];
+	j = &jq->jobs[jq->ji];
 	jq->ji = __next_job(jq);
-	res->readyp = 1;
+	__job_set_prepd(j);
 	pthread_mutex_unlock(&jq->mtx);
-	return res;
+	return j;
 }
 
 static inline void __attribute__((always_inline, gnu_inline))
@@ -273,7 +338,7 @@ enqueue_job(job_queue_t jq, job_t j)
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
 	pthread_mutex_lock(&jq->mtx);
-	j->readyp = 2;
+	__job_set_ready(j);
 	pthread_mutex_unlock(&jq->mtx);
 	return;
 }
@@ -289,12 +354,12 @@ dequeue_job(job_queue_t jq)
 		return NO_JOB;
 	}
 	/* try the job at jq->ri */
-	if (LIKELY(jq->jobs[idx].readyp == 2)) {
+	if (LIKELY(__job_readyp(&jq->jobs[idx]))) {
 		/* brilliant */
 		jq->ri = (jq->ri + 1) % NJOBS;
 		pthread_mutex_unlock(&jq->mtx);
 		return &jq->jobs[idx];
-	} else if (jq->jobs[idx].readyp == 1) {
+	} else if (__job_prepdp(&jq->jobs[idx])) {
 		/* grrrrr */
 		idx = (idx + 1) % NJOBS;
 	} else {
@@ -303,14 +368,14 @@ dequeue_job(job_queue_t jq)
 		idx = jq->ri = (idx + 1) % NJOBS;
 	}
 	while (UNLIKELY(idx != jq->ji)) {
-		if (LIKELY(jq->jobs[idx].readyp == 2)) {
+		if (LIKELY(__job_readyp(&jq->jobs[idx]))) {
 			/* brilliant */
 			if (idx == jq->ri) {
 				jq->ri = (jq->ri + 1) % NJOBS;
 			}
 			pthread_mutex_unlock(&jq->mtx);
 			return &jq->jobs[idx];
-		} else if (jq->jobs[idx].readyp == 1) {
+		} else if (__job_prepdp(&jq->jobs[idx])) {
 			/* grrrrr */
 			idx = (idx + 1) % NJOBS;
 		} else if (idx == jq->ri) {

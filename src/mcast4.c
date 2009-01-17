@@ -357,7 +357,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	}
 
 	j->blen = nread;
-	j->workf = ud_proto_parse;
 
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */

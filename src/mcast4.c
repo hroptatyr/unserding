@@ -84,10 +84,8 @@ static ev_timer ALGN16(__s2s_watcher);
 static size_t neighbours = 0;
 static uint8_t conv = 0;
 static ev_io ALGN16(__srv_watcher);
-#if !defined UNSERCLI
 static struct ip_mreq ALGN16(mreq4);
 static struct ipv6_mreq ALGN16(mreq6);
-#endif	/* !UNSERCLI */
 /* server to client goodness */
 static struct sockaddr_in6 __sa6;
 static struct sockaddr_in __sa4;
@@ -140,7 +138,6 @@ __linger_sock(int sock)
 	return;
 }
 
-#if !defined UNSERCLI
 static void
 __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 {
@@ -219,7 +216,6 @@ __mcast6_leave_group(int s, struct ipv6_mreq *mreq)
 	setsockopt(s, IPPROTO_IPV6, IPV6_LEAVE_GROUP, mreq, sizeof(*mreq));
 	return;
 }
-#endif	/* !UNSERCLI */
 
 static int
 mcast_listener_try(volatile struct addrinfo *lres)
@@ -232,19 +228,9 @@ mcast_listener_try(volatile struct addrinfo *lres)
 		UD_CRITICAL_MCAST("socket() failed, whysoever\n");
 		return s;
 	}
-#if defined UNSERCLI
-	if (LIKELY(lres->ai_family == AF_INET6)) {
-		((struct sockaddr_in6*)lres->ai_addr)->sin6_port = htons(0);
-	} else if (lres->ai_family == AF_INET) {
-		((struct sockaddr_in*)lres->ai_addr)->sin_port = htons(0);
-	} else {
-		/* omg! */
-		abort();
-	}
-#else
 	/* allow many many many servers on that port */
 	__reuse_sock(s);
-#endif
+
 	/* we used to retry upon failure, but who cares */
 	retval = bind(s, lres->ai_addr, lres->ai_addrlen);
 	if (UNLIKELY(retval == -1)) {
@@ -292,17 +278,6 @@ mcast46_listener_init(void)
 	}
 	for (struct addrinfo *lres = res; lres; lres = lres->ai_next) {
 		if ((s = mcast_listener_try(lres)) >= 0) {
-#if defined UNSERCLI
-			/* prepare the __sa6 structure, but do not join */
-			__sa6.sin6_family = PF_INET6;
-			inet_pton(AF_INET6, UD_MCAST6_ADDR, &__sa6.sin6_addr);
-			__sa6.sin6_port = htons(UD_NETWORK_SERVICE);
-			/* prepare the __sa4 structure, but do not join */
-			__sa4.sin_family = PF_INET;
-			inet_pton(AF_INET, UD_MCAST4_ADDR, &__sa4.sin_addr);
-			__sa4.sin_port = htons(UD_NETWORK_SERVICE);
-
-#else  /* !UNSERCLI */
 			/* join the mcast group */
 			__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6);
 			/* endow our s2c and s2s structs */
@@ -313,7 +288,7 @@ mcast46_listener_init(void)
 			/* endow our s2c and s2s structs */
 			memcpy(&__sa4, lres->ai_addr, sizeof(__sa4));
 			__sa4.sin_addr = mreq4.imr_multiaddr;
-#endif	/* UNSERCLI */
+
 			UD_DEBUG_MCAST(":sock %d  :proto %d :host %s\n",
 				       s, lres->ai_protocol,
 				       lres->ai_canonname);
@@ -330,11 +305,9 @@ mcast46_listener_init(void)
 static void
 mcast_listener_deinit(int sock)
 {
-#if !defined UNSERCLI
 	/* drop multicast group membership */
 	__mcast4_leave_group(sock, &mreq4);
 	__mcast6_leave_group(sock, &mreq6);
-#endif	/* !UNSERCLI */
 	/* linger the sink sock */
 	__linger_sock(sock);
 	UD_DEBUG_MCAST("closing listening socket %d...\n", sock);
@@ -345,20 +318,6 @@ mcast_listener_deinit(int sock)
 
 
 /* this callback is called when data is readable on the main server socket */
-#if defined UNSERCLI
-static void
-mcast_inco_cb(EV_P_ ev_io *w, int revents)
-{
-	ssize_t nread;
-	/* a job */
-	job_t j = obtain_job(glob_jq);
-	socklen_t lsa = sizeof(j->sa);
-
-	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
-	fprintf(stdout, "\nincoming connection\n");
-	return;
-}
-#else
 static void
 mcast_inco_cb(EV_P_ ev_io *w, int revents)
 {
@@ -400,7 +359,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 
 	j->blen = nread;
 	j->workf = ud_proto_parse;
-	j->prntf = send_cl;
 
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
@@ -409,8 +367,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	trigger_job_queue();
 	return;
 }
-#endif	/* !UNSERCLI */
-
 
 static void __attribute__((unused))
 nothing(job_t j)
@@ -427,19 +383,11 @@ handle_hy(job_t j)
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	UD_DEBUG_PROTO("sending HY RPL\n");
 	j->blen = 8;
-	j->prntf = send_cl;
 	neighbours = 0;
 	return;
 }
 
 /* handle the HY RPL packet */
-# if defined UNSERCLI
-static void __attribute__((unused))
-handle_hy_rpl(job_t j)
-{
-	return;
-}
-# else	/* !UNSERCLI */
 static void __attribute__((unused))
 handle_hy_rpl(job_t j)
 {
@@ -447,10 +395,8 @@ handle_hy_rpl(job_t j)
 	neighbours++;
 	/* do not reply */
 	j->blen = 0;
-	j->prntf = NULL;
 	return;
 }
-# endif	 /* UNSERCLI */
 
 static void __attribute__((unused))
 handle_7e54(job_t j)
@@ -461,7 +407,6 @@ handle_7e54(job_t j)
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	UD_DEBUG_PROTO("sending HY RPL\n");
 	j->blen = 8;
-	j->prntf = send_cl;
 	return;
 }
 
@@ -555,9 +500,7 @@ int
 ud_attach_mcast4(EV_P)
 {
 	ev_io *srv_watcher = &__srv_watcher;
-#if defined UNSERSRV
 	ev_timer *s2s_watcher = &__s2s_watcher;
-#endif	/* UNSERSRV */
 
 	/* give the parser fun array a proper rinse */
 	memset(ud_parsef, 0, sizeof(*ud_parsef) * 65536);
@@ -575,9 +518,7 @@ ud_attach_mcast4(EV_P)
 	s2s_oi_len++;
 
 	/* escrow some packet handlers */
-#if !defined UNSERCLI
 	ud_parsef[UDPC_PKT_HY] = handle_hy;
-#endif	 /* UNSERCLI */
 	ud_parsef[UDPC_PKT_HY_RPL] = handle_hy_rpl;
 
 	ud_parsef[0x7e54] = handle_7e54;
@@ -586,11 +527,9 @@ ud_attach_mcast4(EV_P)
 	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
 	ev_io_start(EV_A_ srv_watcher);
 
-#if defined UNSERSRV
 	/* init the s2s timer, this one says `hy' until an id was negotiated */
 	ev_timer_init(s2s_watcher, s2s_hy_cb, 0.0, S2S_BRAG_RATE);
 	ev_timer_start(EV_A_ s2s_watcher);
-#endif	/* UNSERSRV */
 	return 0;
 }
 

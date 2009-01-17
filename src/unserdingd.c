@@ -211,9 +211,7 @@ worker_cb(EV_P_ ev_async *w, int revents)
 				 self, loop, j);
 			j->workf(j);
 		}
-		if (LIKELY(j->prntf != NULL)) {
-			j->prntf(j);
-		}
+		send_cl(j);
 		free_job(j);
 	}
 

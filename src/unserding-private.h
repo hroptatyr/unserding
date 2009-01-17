@@ -207,13 +207,6 @@ typedef ud_work_f ud_prnt_f;
 
 #define SIZEOF_JOB_S	4096
 struct job_s {
-	ud_work_f workf;
-	ud_prnt_f prntf;
-	ud_free_f freef;
-	/* set to 0 if job is free,
-	 * set to 1 if job is being loaded
-	 * set to 2 if job is ready to be processed */
-	long unsigned int readyp;
 	/** for udp based transports,
 	 * use a union here to allow clients to use whatever struct they want */
 	union {
@@ -224,6 +217,12 @@ struct job_s {
 		SA_STRUCT sa;
 #endif
 	};
+	ud_work_f workf;
+	/* set to 0 if job is free,
+	 * set to 1 if job is being loaded
+	 * set to 2 if job is ready to be processed */
+	long unsigned int readyp;
+
 	size_t blen;
 	char ALGN16(buf)[];
 } __attribute__((aligned(SIZEOF_JOB_S)));
@@ -330,9 +329,11 @@ dequeue_job(job_queue_t jq)
 static inline void __attribute__((always_inline, gnu_inline))
 free_job(job_t j)
 {
+#if 0
 	if (UNLIKELY(j->freef != NULL)) {
 		j->freef(j);
 	}
+#endif
 	memset(j, 0, SIZEOF_JOB_S);
 	return;
 }

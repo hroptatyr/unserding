@@ -100,7 +100,6 @@ ud_cat_ls_job(job_t j)
 	if (UNLIKELY((j->blen = idx) == 0)) {
 		memcpy(j->buf, empty_msg, j->blen = countof_m1(empty_msg));
 	}
-	j->prntf(j);
 	return;
 }
 

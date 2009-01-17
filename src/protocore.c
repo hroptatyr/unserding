@@ -54,21 +54,155 @@
 #include "unserding-private.h"
 #include "protocore.h"
 
-ud_parse_f ud_parsef[65536];
+/**
+ * Big array with worker functions.
+ * 256 families should suffice methinks. */
+extern ud_pktfam_t ud_pktfam[];
+/**
+ * Family 00, general adminitrative procedures. */
+extern ud_pktwrk_f ud_fam00[];
+/**
+ * Family 01, catalogue procs. */
+extern ud_pktwrk_f ud_fam01[];
 
+
+ud_pktfam_t ud_pktfam[128] = {
+	/* family 0 */
+	ud_fam00,
+	ud_fam01,
+	NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	/* fam 16 */
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	/* fam 32 */
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	/* fam 48 */
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	/* fam 64 */
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	/* fam 80 */
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	/* fam 96 */
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	/* fam 112 */
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL,
+};
+
+/* forwarders */
+static void f00_hy(job_t j);
+static void f00_hy_rpl(job_t j);
+
+ud_pktwrk_f ud_fam00[256] = {
+	f00_hy, f00_hy_rpl,
+};
+
+static void f01_ls(job_t j);
+static void f01_ls_rpl(job_t j);
+
+ud_pktwrk_f ud_fam01[256] = {
+	f01_ls, f01_ls_rpl,
+};
+
+
+/* family 00 */
+
+/* HY packet */
+static size_t neighbours = 0;
+
+static void
+f00_hy(job_t j)
+{
+	UD_DEBUG_PROTO("found HY\n");
+	/* generate the answer packet */
+	udpc_make_rpl_pkt(JOB_PACKET(j));
+	UD_DEBUG_PROTO("sending HY RPL\n");
+	j->blen = 8;
+	neighbours = 0;
+	return;
+}
+
+/* handle the HY RPL packet */
+static void
+f00_hy_rpl(job_t j)
+{
+	UD_DEBUG_PROTO("found HY RPL\n");
+	neighbours++;
+	/* do not reply */
+	j->blen = 0;
+	return;
+}
+
+static void
+handle_7e54(job_t j)
+{
+	/* just a 2.5 seconds delayed HY */
+	usleep(2500000);
+	/* generate the answer packet */
+	udpc_make_rpl_pkt(JOB_PACKET(j));
+	UD_DEBUG_PROTO("sending HY RPL\n");
+	j->blen = 8;
+	return;
+}
+
+static void
+f01_ls(job_t j)
+{
+}
+
+static void
+f01_ls_rpl(job_t j)
+{
+}
+
+
+/* family 01 */
+
+
 void
 ud_proto_parse(job_t j)
 {
 	ud_pkt_cmd_t cmd = udpc_pkt_cmd((ud_packet_t){0, j->buf});
-	ud_parse_f pf = ud_parsef[cmd];
+	uint8_t fam = udpc_cmd_fam(cmd);
+	uint8_t wrk = udpc_cmd_wrk(cmd);
+	ud_pktfam_t pf = ud_pktfam[fam];
+	ud_pktwrk_f wf = pf ? pf[wrk] : NULL;
 
-	if (UNLIKELY(pf == NULL)) {
+	if (UNLIKELY(wf == NULL)) {
 		UD_DEBUG_PROTO("found 0x%04x but cannot cope\n", cmd);
 		/* no need to print back */
 		j->blen = 0;
 	} else {
-		pf(j);
+		wf(j);
 	}
+	return;
+}
+
+void
+init_proto(void)
+{
 	return;
 }
 

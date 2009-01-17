@@ -81,7 +81,6 @@
 
 static int lsock __attribute__((used));
 static ev_timer ALGN16(__s2s_watcher);
-static size_t neighbours = 0;
 static uint8_t conv = 0;
 static ev_io ALGN16(__srv_watcher);
 static struct ip_mreq ALGN16(mreq4);
@@ -368,48 +367,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	return;
 }
 
-static void __attribute__((unused))
-nothing(job_t j)
-{
-	return;
-}
-
-/* handle the HY packet */
-static void __attribute__((unused))
-handle_hy(job_t j)
-{
-	UD_DEBUG_PROTO("found HY\n");
-	/* generate the answer packet */
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	UD_DEBUG_PROTO("sending HY RPL\n");
-	j->blen = 8;
-	neighbours = 0;
-	return;
-}
-
-/* handle the HY RPL packet */
-static void __attribute__((unused))
-handle_hy_rpl(job_t j)
-{
-	UD_DEBUG_PROTO("found HY RPL\n");
-	neighbours++;
-	/* do not reply */
-	j->blen = 0;
-	return;
-}
-
-static void __attribute__((unused))
-handle_7e54(job_t j)
-{
-	/* just a 2.5 seconds delayed HY */
-	usleep(2500000);
-	/* generate the answer packet */
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	UD_DEBUG_PROTO("sending HY RPL\n");
-	j->blen = 8;
-	return;
-}
-
 
 void
 send_cl(job_t j)
@@ -502,8 +459,6 @@ ud_attach_mcast4(EV_P)
 	ev_io *srv_watcher = &__srv_watcher;
 	ev_timer *s2s_watcher = &__s2s_watcher;
 
-	/* give the parser fun array a proper rinse */
-	memset(ud_parsef, 0, sizeof(*ud_parsef) * 65536);
 	/* get us a global sock */
 	lsock = mcast46_listener_init();
 
@@ -516,12 +471,6 @@ ud_attach_mcast4(EV_P)
 	/* \n-ify */
 	s2s_oi[s2s_oi_len = strlen(s2s_oi)] = '\n';
 	s2s_oi_len++;
-
-	/* escrow some packet handlers */
-	ud_parsef[UDPC_PKT_HY] = handle_hy;
-	ud_parsef[UDPC_PKT_HY_RPL] = handle_hy_rpl;
-
-	ud_parsef[0x7e54] = handle_7e54;
 
 	/* initialise an io watcher, then start it */
 	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);

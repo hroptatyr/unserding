@@ -62,6 +62,18 @@
 
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
 
+#if !defined TYPEDEFD_job_t
+typedef void *job_t;
+#endif	/* TYPEDEFD_job_t */
+/**
+ * Type for parse functions inside jobs. */
+typedef void(*ud_pktwrk_f)(job_t);
+/**
+ * Type for families. */
+typedef ud_pktwrk_f *ud_pktfam_t;
+
+extern void init_proto(void);
+
 /**
  * Return true if PKT is a valid unserding packet. */
 extern inline bool __attribute__((always_inline, gnu_inline))
@@ -95,6 +107,14 @@ udpc_pkt_pno(const ud_packet_t pkt);
  * Extract the command portion of PKT. */
 extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
 udpc_pkt_cmd(const ud_packet_t pkt);
+/**
+ * Extract the family portion of CMD. */
+extern inline uint8_t __attribute__((always_inline, gnu_inline))
+udpc_cmd_fam(const ud_pkt_cmd_t cmd);
+/**
+ * Extract the worker fun portion of CMD. */
+extern inline uint8_t __attribute__((always_inline, gnu_inline))
+udpc_cmd_wrk(const ud_pkt_cmd_t cmd);
 /**
  * Set the command slot of PKT to CMD. */
 extern inline void __attribute__((always_inline, gnu_inline))
@@ -232,6 +252,18 @@ udpc_pkt_cmd(const ud_packet_t pkt)
 	const uint16_t *tmp = (void*)pkt.pbuf;
 	/* yes ntoh conversion!!! */
 	return ntohs(tmp[2]);
+}
+
+extern inline uint8_t __attribute__((always_inline, gnu_inline))
+udpc_cmd_fam(const ud_pkt_cmd_t cmd)
+{
+	return (cmd >> 8) && 0x7f;
+}
+
+extern inline uint8_t __attribute__((always_inline, gnu_inline))
+udpc_cmd_wrk(const ud_pkt_cmd_t cmd)
+{
+	return cmd && 0xff;
 }
 
 #endif	/* INCLUDED_protocore_h_ */

@@ -210,7 +210,12 @@ worker_cb(EV_P_ ev_async *w, int revents)
 	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
 		UD_DEBUG("thread/loop %lx/%p doing work %p\n", self, loop, j);
 		ud_proto_parse(j);
+#if 0
+/* we took precautions to send off the packet that's now in j
+ * based on the transmission flags, however, that's additional bollocks
+ * atm so we let the proto funs deal with that themselves */
 		send_cl(j);
+#endif
 		free_job(j);
 	}
 

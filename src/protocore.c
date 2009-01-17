@@ -141,6 +141,8 @@ f00_hy(job_t j)
 	UD_DEBUG_PROTO("sending HY RPL\n");
 	j->blen = 8;
 	neighbours = 0;
+	/* and send him back */
+	send_cl(j);
 	return;
 }
 
@@ -150,8 +152,6 @@ f00_hy_rpl(job_t j)
 {
 	UD_DEBUG_PROTO("found HY RPL\n");
 	neighbours++;
-	/* do not reply */
-	j->blen = 0;
 	return;
 }
 
@@ -163,7 +163,8 @@ handle_7e54(job_t j)
 	/* generate the answer packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	UD_DEBUG_PROTO("sending HY RPL\n");
-	j->blen = 8;
+	/* and send him back */
+	send_cl(j);
 	return;
 }
 
@@ -191,12 +192,11 @@ ud_proto_parse(job_t j)
 	ud_pktwrk_f wf = pf ? pf[wrk] : NULL;
 
 	if (UNLIKELY(wf == NULL)) {
-		UD_DEBUG_PROTO("found 0x%04x but cannot cope\n", cmd);
-		/* no need to print back */
-		j->blen = 0;
-	} else {
-		wf(j);
+		UD_LOG("found 0x%04x but cannot cope\n", cmd);
+		return;
 	}
+	/* otherwise, just do what's in there */
+	wf(j);
 	return;
 }
 

@@ -258,13 +258,13 @@ udpc_pkt_cmd(const ud_packet_t pkt)
 extern inline uint8_t __attribute__((always_inline, gnu_inline))
 udpc_cmd_fam(const ud_pkt_cmd_t cmd)
 {
-	return (cmd >> 8) && 0x7f;
+	return (cmd >> 8) & 0x7f;
 }
 
 extern inline uint8_t __attribute__((always_inline, gnu_inline))
 udpc_cmd_wrk(const ud_pkt_cmd_t cmd)
 {
-	return cmd && 0xff;
+	return cmd & 0xff;
 }
 
 #endif	/* INCLUDED_protocore_h_ */

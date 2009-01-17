@@ -240,7 +240,15 @@ struct job_queue_s {
 static inline uint8_t __attribute__((always_inline, gnu_inline))
 __job_ready_bits(job_t j)
 {
+/* the bits of the flags slot that deal with the readiness of a job */
 	return j->flags & 0x3;
+}
+
+static inline uint8_t __attribute__((always_inline, gnu_inline))
+__job_trans_bits(job_t j)
+{
+/* the bits of the flags slot that deal with the transmission of a job */
+	return j->flags & 0xc;
 }
 
 static inline bool __attribute__((always_inline, gnu_inline))
@@ -302,6 +310,37 @@ __job_set_fini(job_t j)
 	j->flags |= 3;
 	return;
 }
+
+static inline bool __attribute__((always_inline, gnu_inline))
+__job_notransp(job_t j)
+{
+/* return true iff job is not to be transmitted back */
+	return __job_trans_bits(j) == 0;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+__job_set_notrans(job_t j)
+{
+/* make job not be transmitted back */
+	j->flags &= ~0xc;
+	return;
+}
+
+static inline bool __attribute__((always_inline, gnu_inline))
+__job_transp(job_t j)
+{
+/* return true iff job is to be transmitted back to the origin */
+	return __job_trans_bits(j) == 3;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+__job_set_trans(job_t j)
+{
+/* make job be transmitted back to whence it came */
+	j->flags |= 0xc;
+	return;
+}
+
 
 static inline index_t __attribute__((always_inline, gnu_inline))
 __next_job(job_queue_t jq)

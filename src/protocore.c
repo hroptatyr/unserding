@@ -64,6 +64,9 @@ extern ud_pktwrk_f ud_fam00[];
 /**
  * Family 01, catalogue procs. */
 extern ud_pktwrk_f ud_fam01[];
+/**
+ * Family 7e, test stuff. */
+extern ud_pktwrk_f ud_fam7e[];
 
 
 ud_pktfam_t ud_pktfam[128] = {
@@ -108,7 +111,7 @@ ud_pktfam_t ud_pktfam[128] = {
 	NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
+	NULL, NULL, ud_fam7e, NULL,
 };
 
 /* forwarders */
@@ -124,6 +127,29 @@ static void f01_ls_rpl(job_t j);
 
 ud_pktwrk_f ud_fam01[256] = {
 	f01_ls, f01_ls_rpl,
+};
+
+static void f7e_54(job_t j);
+
+ud_pktwrk_f ud_fam7e[256] = {
+	/* 0 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 16 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 32 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 48 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 64 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 80 */
+	NULL, NULL, NULL, NULL, f7e_54, NULL /* no rpl */, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
 
@@ -156,13 +182,13 @@ f00_hy_rpl(job_t j)
 }
 
 static void
-handle_7e54(job_t j)
+f7e_54(job_t j)
 {
 	/* just a 2.5 seconds delayed HY */
 	usleep(2500000);
 	/* generate the answer packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));
-	UD_DEBUG_PROTO("sending HY RPL\n");
+	UD_DEBUG_PROTO("sending 54 RPL\n");
 	/* and send him back */
 	send_cl(j);
 	return;

@@ -354,6 +354,9 @@ main(int argc, char *argv[])
 	/* initialise global job q */
 	init_glob_jq();
 
+	/* initialise the proto core */
+	init_proto();
+
 	/* attach a multicast listener */
 	ud_attach_mcast4(EV_A);
 

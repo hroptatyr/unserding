@@ -158,6 +158,11 @@ ud_pktwrk_f ud_fam7e[256] = {
 /* HY packet */
 static size_t neighbours = 0;
 
+#define MAXHOSTNAMELEN		64
+/* text section */
+unsigned char hnlen;
+static char hn[MAXHOSTNAMELEN] = "";
+
 static void
 f00_hy(job_t j)
 {
@@ -165,7 +170,11 @@ f00_hy(job_t j)
 	/* generate the answer packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	UD_DEBUG_PROTO("sending HY RPL\n");
-	j->blen = 8;
+	/* attach the hostname now */
+	j->buf[8] = hnlen;
+	memcpy(j->buf + 9, hn, hnlen);
+	j->blen = 8 + hnlen + 1;
+	/* initialise the neighbours counter */
 	neighbours = 0;
 	/* and send him back */
 	send_cl(j);
@@ -229,6 +238,9 @@ ud_proto_parse(job_t j)
 void
 init_proto(void)
 {
+	/* obtain the hostname */
+	(void)gethostname(hn, countof(hn));
+	hnlen = strlen(hn);
 	return;
 }
 

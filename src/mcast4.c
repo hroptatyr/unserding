@@ -89,11 +89,6 @@ static struct ipv6_mreq ALGN16(mreq6);
 static struct sockaddr_in6 __sa6;
 static struct sockaddr_in __sa4;
 
-#define MAXHOSTNAMELEN		64
-/* text section */
-size_t s2s_oi_len;
-static char s2s_oi[MAXHOSTNAMELEN] = "hy ";
-
 
 /* socket goodies */
 static inline void
@@ -465,12 +460,6 @@ ud_attach_mcast4(EV_P)
 	if (UNLIKELY(lsock < 0)) {
 		return -1;
 	}
-
-	/* obtain the hostname */
-	(void)gethostname(s2s_oi + 3, countof(s2s_oi));
-	/* \n-ify */
-	s2s_oi[s2s_oi_len = strlen(s2s_oi)] = '\n';
-	s2s_oi_len++;
 
 	/* initialise an io watcher, then start it */
 	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);

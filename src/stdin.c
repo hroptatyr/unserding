@@ -146,6 +146,9 @@ stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 	for (uint16_t i = 8, len = 0; len < pkt.plen; i += len) {
 		udpc_type_t t = pkt.pbuf[i];
 
+		/* two spaces upfront */
+		putc_unlocked(' ', stdout);
+		putc_unlocked(' ', stdout);
 		switch (t) {
 		case UDPC_TYPE_STRING:
 			fputs("(string)", stdout);

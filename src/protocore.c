@@ -199,6 +199,8 @@ f7e_54(job_t j)
 	usleep(2500000);
 	/* generate the answer packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));
+	j->buf[8] = UDPC_TYPE_UNK;
+	j->blen = 9;
 	UD_DEBUG_PROTO("sending 54 RPL\n");
 	/* and send him back */
 	send_cl(j);

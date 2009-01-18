@@ -71,18 +71,6 @@ typedef void *ud_cat_t;
 #define UD_CF_LAST		0x08
 /** Flag to indicate */
 
-#define UD_CAT_PREDICATE(_x, _f)					\
-	static inline bool __attribute__((always_inline, gnu_inline))	\
-	ud_cf_##_x##p(ud_flags_t flags)					\
-	{								\
-		return flags & (_f);					\
-	}								\
-	static inline bool __attribute__((always_inline, gnu_inline))	\
-	ud_cat_##_x##p(ud_cat_t cat)					\
-	{								\
-		return ud_cf_##_x##p(((struct ud_cat_s*)cat)->flags);	\
-	}
-
 
 /**
  * Connexion handle to an unserding network.
@@ -172,18 +160,6 @@ ud_handle_sock(ud_handle_t hdl)
 
 /** Global catalogue. */
 extern ud_cat_t ud_catalogue;
-/** Instruments. */
-extern ud_cat_t instr;
-/** Equity instruments. */
-extern ud_cat_t equit;
-/** Commodity instruments. */
-extern ud_cat_t commo;
-/** Currency instruments. */
-extern ud_cat_t curnc;
-/** Interest instruments. */
-extern ud_cat_t intrs;
-/** Derivatives. */
-extern ud_cat_t deriv;
 
 /**
  * The catalogue data structure.
@@ -195,14 +171,7 @@ struct ud_cat_s {
 	ud_cat_t next;
 	ud_cat_t prev;
 	const void *data;
-	ud_flags_t flags;
 };
-
-/* predicate magic */
-UD_CAT_PREDICATE(justcat, 0x01);
-UD_CAT_PREDICATE(spottable, 0x02);
-UD_CAT_PREDICATE(tradable, 0x04);
-UD_CAT_PREDICATE(last, 0x08);
 
 /* some catalogue functions */
 static inline ud_cat_t __attribute__((always_inline, gnu_inline))
@@ -240,7 +209,7 @@ ud_cat_prev_child(ud_cat_t cat)
 }
 
 static inline ud_cat_t __attribute__((always_inline, gnu_inline))
-ud_cat_add_child(ud_cat_t cat, const void *data, ud_flags_t flags)
+ud_cat_add_child(ud_cat_t cat, const void *data)
 {
 	struct ud_cat_s *cell = malloc(sizeof(struct ud_cat_s));
 	cell->parent = cat;
@@ -253,7 +222,6 @@ ud_cat_add_child(ud_cat_t cat, const void *data, ud_flags_t flags)
 		((struct ud_cat_s*)cat)->fir_child = cell;
 	}
 	cell->data = data;
-	cell->flags = flags;
 	/* fix up the parent of cell */
 	((struct ud_cat_s*)cat)->las_child = cell;
 	return (ud_cat_t)cell;
@@ -275,5 +243,47 @@ ud_cat_data(const ud_cat_t cat)
 /* instruments */
 extern void init_instr(void);
 
+
+/* tags */
+typedef uint8_t ud_tag_t;
+enum ud_tag_e {
+	UD_TAG_UNK,
+	/* :class takes UDPC_TYPE_STRING */
+	UD_TAG_CLASS,
+	/* :attr / :attribute takes UDPC_TYPE_ATTR
+	 * this indicates which operations can be used on an entry
+	 * attribute spot to obtain spot values
+	 * attribute trad to obtain trade values
+	 * etc. */
+	UD_TAG_ATTR,
+	/* :name takes UDPC_TYPE_STRING */
+	UD_TAG_NAME,
+	/* :date takes UDPC_TYPE_DATE* (one of the date types) */
+	UD_TAG_DATE,
+	/* :expiry ... dunno bout that one, behaves like :date */
+	UD_TAG_EXPIRY,
+	/* :paddr takes UDPC_TYPE_POINTER, just a 64bit address really */
+	UD_TAG_PADDR,
+	/* :underlying ... dunno bout that one, behaves like :paddr */
+	UD_TAG_UNDERLYING,
+	/* :price takes UDPC_TYPE_MON* or UDPC_TYPE_*FLOAT */
+	UD_TAG_PRICE,
+	/* :strike ... dunno, it's like :price really */
+	UD_TAG_STRIKE,
+	/* :place ... takes UDPC_TYPE_STRING */
+	UD_TAG_PLACE,
+	/* :symbol takes UDPC_TYPE_STRING */
+	UD_TAG_SYMBOL,
+	/* :currency takes UDPC_TYPE_STRING */
+	UD_TAG_CURRENCY,
+};
+
+/* catalogue entries look like this
+ * basically a proper tlv cell except sometimes the length is implicit */
+typedef struct ud_tlv_s *ud_tlv_t;
+struct ud_tlv_s {
+	ud_tag_t tag;
+	char data[];
+};
 
 #endif	/* INCLUDED_unserding_h_ */

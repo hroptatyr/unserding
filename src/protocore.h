@@ -79,7 +79,10 @@ enum udpc_type_e {
 	/* variadic stuff */
 	/* expects a uint8_t following designating the length */
 	UDPC_TYPE_STRING,
-
+	/* simplistic date, days since epoch, 16bit */
+	UDPC_TYPE_DATE_DSE,
+	/* simplistic date, seconds since epoch, 32bit */
+	UDPC_TYPE_DATE_SSE,
 };
 
 extern inline void __attribute__((always_inline, gnu_inline))

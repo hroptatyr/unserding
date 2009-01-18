@@ -59,7 +59,6 @@ static struct ud_cat_s __ud_catalogue = {
 	.next = NULL,
 	.prev = NULL,
 	.data = "catalogue",
-	.flags = UD_CF_JUSTCAT,
 };
 ud_cat_t ud_catalogue = &__ud_catalogue;
 
@@ -70,6 +69,7 @@ snprintcat(char *restrict buf, size_t blen, const __cat_t c)
 {
 	size_t len = snprintf(buf, blen, "---- %p %s\n",
 			      c->data, (const char*)c->data);
+#if 0
 	if (ud_cat_justcatp(c)) {
 		buf[3] = 'c';
 	}
@@ -82,6 +82,7 @@ snprintcat(char *restrict buf, size_t blen, const __cat_t c)
 	if (ud_cat_lastp(c)) {
 		buf[0] = 'l';
 	}
+#endif
 	return len;
 }
 

@@ -47,18 +47,38 @@
 #include "unserding.h"
 #include "unserding-private.h"
 
-ud_cat_t instr, equit, commo, curnc, intrs, deriv;
+static inline ud_tlv_t
+make_tlv(ud_tag_t tag, uint8_t size)
+{
+	ud_tlv_t res = (void*)malloc(sizeof(ud_tag_t) + size);
+	res->tag = tag;
+	return res;
+}
+
+static inline ud_tlv_t
+make_class(const char *cls, uint8_t size)
+{
+	ud_tlv_t res = make_tlv(UD_TAG_CLASS, size+1);
+	res->data[0] = (char)size;
+	memcpy(res->data + 1, cls, size);
+	return res;
+}
 
 void
 init_instr(void)
 {
+	static const char instr[] = "instrument";
+	ud_tlv_t tmp = make_tlv(UD_TAG_CLASS, countof_m1(instr));
+
 	UD_DEBUG("adding instruments\n");
+#if 0
 	instr = ud_cat_add_child(ud_catalogue, "instruments", UD_CF_JUSTCAT);
 	equit = ud_cat_add_child(instr, "equity", UD_CF_JUSTCAT);
 	commo = ud_cat_add_child(instr, "commodity", UD_CF_JUSTCAT);
 	curnc = ud_cat_add_child(instr, "currency", UD_CF_JUSTCAT);
 	intrs = ud_cat_add_child(instr, "interest", UD_CF_JUSTCAT);
 	deriv = ud_cat_add_child(instr, "derivative", UD_CF_JUSTCAT);
+#endif
 	return;
 }
 

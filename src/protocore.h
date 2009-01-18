@@ -82,6 +82,16 @@ enum udpc_type_e {
 
 };
 
+extern inline void __attribute__((always_inline, gnu_inline))
+ud_fputs(uint8_t len, const char *s, FILE *f);
+extern inline void __attribute__((always_inline, gnu_inline))
+ud_fputs(uint8_t len, const char *s, FILE *f)
+{
+	for (uint8_t i = 0; i < len; i++) {
+		putc_unlocked(s[i], f);
+	}
+	return;
+}
 
 #if !defined TYPEDEFD_job_t
 typedef void *job_t;

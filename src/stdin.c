@@ -141,6 +141,26 @@ stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 		udpc_pkt_pno(pkt),
 		udpc_pkt_cmd(pkt),
 		ntohs(((const uint16_t*)pkt.pbuf)[3]));
+
+	/* generic packet printer, doesnt belong here */
+	for (uint16_t i = 8, len = 0; len < pkt.plen; i += len) {
+		udpc_type_t t = pkt.pbuf[i];
+
+		switch (t) {
+		case UDPC_TYPE_STRING:
+			fputs("(string)", stdout);
+			len = 1 + pkt.pbuf[i+1];
+			ud_fputs(len, &pkt.pbuf[i+2], stdout);
+			break;
+
+		case UDPC_TYPE_UNK:
+		default:
+			goto out;
+		}
+	}
+out:
+	putc_unlocked('\n', stdout);
+	fflush(stdout);
 	rl_redisplay();
 	return;
 }

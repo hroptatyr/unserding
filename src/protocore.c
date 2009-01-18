@@ -170,10 +170,12 @@ f00_hy(job_t j)
 	/* generate the answer packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	UD_DEBUG_PROTO("sending HY RPL\n");
+	/* just say that there's more in this packet which is a string */
+	j->buf[8] = UDPC_TYPE_STRING;
 	/* attach the hostname now */
-	j->buf[8] = hnlen;
-	memcpy(j->buf + 9, hn, hnlen);
-	j->blen = 8 + hnlen + 1;
+	j->buf[9] = hnlen;
+	memcpy(j->buf + 10, hn, hnlen);
+	j->blen = 8 + 1 + 1 + hnlen;
 	/* initialise the neighbours counter */
 	neighbours = 0;
 	/* and send him back */

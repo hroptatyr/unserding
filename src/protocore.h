@@ -62,6 +62,27 @@
 
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
 
+typedef uint8_t udpc_type_t;
+enum udpc_type_e {
+	UDPC_TYPE_UNK,
+	/* fixed size types */
+	UDPC_TYPE_CHAR,
+	UDPC_TYPE_WORD,
+	UDPC_TYPE_DWORD,
+	UDPC_TYPE_QWORD,
+	UDPC_TYPE_SFLOAT,
+	UDPC_TYPE_DFLOAT,
+	/* ffff's monetary32_t */
+	UDPC_TYPE_MON32,
+	/* ffff's monetary64_t */
+	UDPC_TYPE_MON64,
+	/* variadic stuff */
+	/* expects a uint8_t following designating the length */
+	UDPC_TYPE_STRING,
+
+};
+
+
 #if !defined TYPEDEFD_job_t
 typedef void *job_t;
 #endif	/* TYPEDEFD_job_t */

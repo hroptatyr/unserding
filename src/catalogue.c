@@ -60,14 +60,13 @@ static ud_cat_t ud_catalogue = NULL;
 void
 __ud_fill_catobj(ud_catobj_t co, ...)
 {
-	ud_tlv_t bar = (void*)co;
 	va_list args;
 
         /* prepare list for va_arg */
         va_start(args, co);
-
-        for (uint8_t i = 0; ++bar; ++i ) {
-		co->attrs[i] = bar;
+	(void)va_arg(args, void*);
+        for (uint8_t i = 0; i < co->nattrs; ++i ) {
+		co->attrs[i] = va_arg(args, ud_tlv_t);
 	}
 	va_end(args);
 	return;

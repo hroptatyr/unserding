@@ -47,6 +47,7 @@
 #include "unserding.h"
 #include "unserding-private.h"
 #include "pfack-sql.h"
+#include "catalogue.h"
 
 #if defined HAVE_FFFF_FFFF_H
 /* to get a default set of aliases */
@@ -65,7 +66,6 @@ static struct connector_s c;
 
 #define PFACK_DEBUG		UD_DEBUG
 #define PFACK_CRITICAL		UD_CRITICAL
-#define countof_m1(_x)		countof(_x) - 1
 
 /** struct for end of day data */
 struct eod_ser_s {
@@ -74,7 +74,7 @@ struct eod_ser_s {
 
 static monetary32_t *intr_FFD;
 static monetary32_t *intr_EONIA;
-static ud_cat_t c_ffd, c_eonia;
+static ud_catobj_t c_ffd, c_eonia;
 
 static inline timestamptz_t __attribute__((always_inline))
 YYYY_MM_DD_to_ts(char *restrict buf)
@@ -193,9 +193,23 @@ init_interests(void)
 	obtain_iir_FFD();
 	obtain_iir_EONIA();
 
+#if 0
 	/* escrow the fuckers */
 	c_ffd = ud_cat_add_child(intrs, "FFD", UD_CF_SPOTTABLE);
 	c_eonia = ud_cat_add_child(intrs, "EONIA", UD_CF_SPOTTABLE);
+#else
+	c_ffd = ud_make_catobj(
+		MAKE_CLASS("instrument"),
+		MAKE_CLASS("interest"),
+		MAKE_NAME("FFD"));
+
+	c_eonia = ud_make_catobj(
+		MAKE_CLASS("instrument"),
+		MAKE_CLASS("interest"),
+		MAKE_NAME("EONIA"));
+#endif
+	ud_cat_add_obj(c_ffd);
+	ud_cat_add_obj(c_eonia);
 	return;
 }
 

@@ -46,24 +46,42 @@
 /* our master include */
 #include "unserding.h"
 #include "unserding-private.h"
+#include "catalogue.h"
 
 typedef struct ud_cat_s *__cat_t;
 
 static const char empty_msg[] = "empty\n";
 
 /* the global catalogue */
-static struct ud_cat_s __ud_catalogue = {
-	.parent = NULL,
-	.fir_child = NULL,
-	.las_child = NULL,
-	.next = NULL,
-	.prev = NULL,
-	.data = "catalogue",
-};
-ud_cat_t ud_catalogue = &__ud_catalogue;
+static ud_cat_t ud_catalogue = NULL;
 
 
 /* helpers */
+void
+__ud_fill_catobj(ud_catobj_t co, ...)
+{
+	ud_tlv_t bar = (void*)co;
+	va_list args;
+
+        /* prepare list for va_arg */
+        va_start(args, co);
+
+        for (uint8_t i = 0; ++bar; ++i ) {
+		co->attrs[i] = bar;
+	}
+	va_end(args);
+	return;
+}
+
+void
+ud_cat_add_obj(ud_catobj_t co)
+{
+	ud_cat_t new = malloc(sizeof(struct ud_cat_s));
+	new->next = ud_catalogue;
+	new->data = co;
+	return;
+}
+
 static inline size_t __attribute__((always_inline))
 snprintcat(char *restrict buf, size_t blen, const __cat_t c)
 {

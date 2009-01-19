@@ -66,7 +66,7 @@ __ud_fill_catobj(ud_catobj_t co, ...)
 
         /* prepare list for va_arg */
         va_start(args, co);
-	(void)va_arg(args, void*);
+	/* traverse the varargs list */
         for (uint8_t i = 0; i < co->nattrs; ++i ) {
 		co->attrs[i] = va_arg(args, ud_tlv_t);
 	}
@@ -81,6 +81,7 @@ ud_cat_add_obj(ud_catobj_t co)
 	new->next = ud_catalogue;
 	new->data = co;
 	ud_catalen++;
+	ud_catalogue = new;
 	return;
 }
 

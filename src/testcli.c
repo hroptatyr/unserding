@@ -60,7 +60,7 @@
 
 /* our master include file */
 #include "unserding.h"
-
+#include "protocore.h"
 
 static inline ud_convo_t __attribute__((always_inline, gnu_inline))
 udpc_pkt_cno(const ud_packet_t pkt)

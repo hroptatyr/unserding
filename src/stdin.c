@@ -158,6 +158,7 @@ stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 
 		case UDPC_TYPE_UNK:
 		default:
+			fprintf(stdout, "(%02x)", t);
 			goto out;
 		}
 	}

@@ -215,9 +215,14 @@ struct job_s {
 		SA_STRUCT sa;
 #endif
 	};
-	/* set to 0 if job is free,
+	/**
+	 * bits 0-1 is job state:
+	 * set to 0 if job is free,
 	 * set to 1 if job is being loaded
-	 * set to 2 if job is ready to be processed */
+	 * set to 2 if job is ready to be processed
+	 * bits 2-3 is transmission state:
+	 *
+	 * */
 	long unsigned int flags;
 
 	size_t blen;
@@ -475,9 +480,6 @@ extern void send_cl(job_t);
 extern int ud_attach_stdin(EV_P);
 extern int ud_detach_stdin(EV_P);
 extern void ud_reset_stdin(EV_P);
-
-/* jobs to browse the catalogue */
-extern void ud_cat_ls_job(job_t);
 
 
 /* worker magic */

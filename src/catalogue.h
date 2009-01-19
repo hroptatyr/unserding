@@ -49,6 +49,67 @@ struct ud_cat_s {
 	ud_catobj_t data;
 };
 
+/**
+ * The catalogue object data structure.
+ * Naive. */
+struct ud_catobj_s {
+	uint8_t nattrs;
+	ud_tlv_t attrs[];
+};
+
+/**
+ * A tag-length-value cell.  The length bit is either implicit or coded
+ * into data somehow. */
+struct ud_tlv_s {
+	ud_tag_t tag;
+	const char data[];
+};
+
+/* navigatable tlv cell */
+struct ud_tlvcons_s {
+	ud_tlvcons_t next;
+	ud_tlv_t tlv;
+};
+
+/* tlv and tlvcons goodies */
+extern inline ud_tlv_t __attribute__((always_inline, gnu_inline))
+make_tlv(ud_tag_t tag, uint8_t size);
+extern inline ud_tlv_t __attribute__((always_inline, gnu_inline))
+make_tlv(ud_tag_t tag, uint8_t size)
+{
+	ud_tlv_t res = (void*)malloc(sizeof(ud_tag_t) + size);
+	res->tag = tag;
+	return res;
+}
+
+extern inline void __attribute__((always_inline, gnu_inline))
+free_tlv(ud_tlv_t tlv);
+extern inline void __attribute__((always_inline, gnu_inline))
+free_tlv(ud_tlv_t tlv)
+{
+	free(tlv);
+	return;
+}
+
+extern inline ud_tlvcons_t __attribute__((always_inline, gnu_inline))
+make_tlvcons(ud_tlv_t tlv);
+extern inline ud_tlvcons_t __attribute__((always_inline, gnu_inline))
+make_tlvcons(ud_tlv_t tlv)
+{
+	ud_tlvcons_t res = (void*)malloc(sizeof(struct ud_tlvcons_s));
+	res->tlv = tlv;
+	return res;
+}
+
+extern inline void __attribute__((always_inline, gnu_inline))
+free_tlvcons(ud_tlvcons_t tlv);
+extern inline void __attribute__((always_inline, gnu_inline))
+free_tlvcons(ud_tlvcons_t tlv)
+{
+	free(tlv);
+	return;
+}
+
 /* special tlv cells */
 extern inline ud_catobj_t __attribute__((always_inline, gnu_inline))
 ud_make_catobj(ud_tlv_t o, ...);

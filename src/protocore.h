@@ -83,8 +83,34 @@ enum udpc_type_e {
 	UDPC_TYPE_DATE_DSE,
 	/* simplistic date, seconds since epoch, 32bit */
 	UDPC_TYPE_DATE_SSE,
+
+	/* seq types */
+	/* seqof type modifies an upcoming type to be a seq of that type
+	 * syntax goes: <seqof> <length> <obj> <obj> ...
+	 * the type is to be obtained through <obj> type designator. */
+	UDPC_TYPE_SEQOF,
+	/* catobjs are actually sequences of keyval pairs
+	 * syntax goes: <catobj> <number-of(keyval-pairs)> ... */
+	UDPC_TYPE_CATOBJ,
+	/* a keyval pair */
+	UDPC_TYPE_KEYVAL,
 };
 
+
+/* commands */
+#define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
+/**
+ * HY packet, used to say `hy' to all attached servers and clients. */
+#define UDPC_PKT_HY		(ud_pkt_cmd_t)(0x0000)
+/**
+ * HY reply packet, used to say `hy back' to `hy' saying  clients. */
+#define UDPC_PKT_HY_RPL		UDPC_PKT_RPL(UDPC_PKT_HY)
+/**
+ * LS packet, used to say `ls [seqof(keyval)]' */
+#define UDPC_PKT_LS		(ud_pkt_cmd_t)(0x0100)
+#define UDPC_PKT_LS_RPL		UDPC_PKT_RPL(UDPC_PKT_LS)
+
+
 extern inline void __attribute__((always_inline, gnu_inline))
 ud_fputs(uint8_t len, const char *s, FILE *f);
 extern inline void __attribute__((always_inline, gnu_inline))

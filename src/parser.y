@@ -142,6 +142,10 @@ sup_cmd {
 	YYACCEPT;
 } |
 ls_cmd {
+	char buf[8];
+	ud_packet_t pkt = BUF_PACKET(buf);
+	udpc_make_pkt(pkt, hdl->convo++, 0, UDPC_PKT_LS);
+	ud_send_raw(hdl, pkt);
 	YYACCEPT;
 };
 

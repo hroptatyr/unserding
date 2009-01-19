@@ -135,15 +135,6 @@ ud_handle_convo(ud_handle_t hdl);
 extern inline int __attribute__((always_inline, gnu_inline))
 ud_handle_sock(ud_handle_t hdl);
 
-/* commands */
-#define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
-/**
- * HY packet, used to say `hy' to all attached servers and clients. */
-#define UDPC_PKT_HY		(ud_pkt_cmd_t)(0x0000)
-/**
- * HY reply packet, used to say `hy back' to `hy' saying  clients. */
-#define UDPC_PKT_HY_RPL		UDPC_PKT_RPL(UDPC_PKT_HY)
-
 /* inlines */
 extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
 ud_handle_convo(ud_handle_t hdl)
@@ -167,68 +158,6 @@ typedef struct ud_catobj_s *ud_catobj_t;
 typedef struct ud_tlv_s *ud_tlv_t;
 typedef struct ud_tlvcons_s *ud_tlvcons_t;
 
-/**
- * A tag-length-value cell.  The length bit is either implicit or coded
- * into data somehow. */
-struct ud_tlv_s {
-	ud_tag_t tag;
-	const char data[];
-};
-
-/* navigatable tlv cell */
-struct ud_tlvcons_s {
-	ud_tlvcons_t next;
-	ud_tlv_t tlv;
-};
-
-/* tlv and tlvcons goodies */
-extern inline ud_tlv_t __attribute__((always_inline, gnu_inline))
-make_tlv(ud_tag_t tag, uint8_t size);
-extern inline ud_tlv_t __attribute__((always_inline, gnu_inline))
-make_tlv(ud_tag_t tag, uint8_t size)
-{
-	ud_tlv_t res = (void*)malloc(sizeof(ud_tag_t) + size);
-	res->tag = tag;
-	return res;
-}
-
-extern inline void __attribute__((always_inline, gnu_inline))
-free_tlv(ud_tlv_t tlv);
-extern inline void __attribute__((always_inline, gnu_inline))
-free_tlv(ud_tlv_t tlv)
-{
-	free(tlv);
-	return;
-}
-
-
-extern inline ud_tlvcons_t __attribute__((always_inline, gnu_inline))
-make_tlvcons(ud_tlv_t tlv);
-extern inline ud_tlvcons_t __attribute__((always_inline, gnu_inline))
-make_tlvcons(ud_tlv_t tlv)
-{
-	ud_tlvcons_t res = (void*)malloc(sizeof(struct ud_tlvcons_s));
-	res->tlv = tlv;
-	return res;
-}
-
-extern inline void __attribute__((always_inline, gnu_inline))
-free_tlvcons(ud_tlvcons_t tlv);
-extern inline void __attribute__((always_inline, gnu_inline))
-free_tlvcons(ud_tlvcons_t tlv)
-{
-	free(tlv);
-	return;
-}
-
-
-/**
- * The catalogue object data structure.
- * Naive. */
-struct ud_catobj_s {
-	uint8_t nattrs;
-	ud_tlv_t attrs[];
-};
 
 extern void ud_cat_add_obj(ud_catobj_t co);
 

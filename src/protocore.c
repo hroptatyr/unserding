@@ -207,14 +207,29 @@ f7e_54(job_t j)
 	return;
 }
 
+extern bool ud_cat_ls_job(job_t j);
+
 static void
 f01_ls(job_t j)
 {
+#if 0
+	while (ud_cat_ls_job(j)) {
+		/* and send him back */
+		send_cl(j);
+	}
+#else
+	ud_cat_ls_job(j);
+	/* and send him back */
+	send_cl(j);
+#endif
+	return;
 }
 
-static void
+static void __attribute__((unused))
 f01_ls_rpl(job_t j)
 {
+	/* just ignore hime */
+	return;
 }
 
 

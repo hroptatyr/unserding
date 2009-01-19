@@ -152,7 +152,7 @@ stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 		switch (t) {
 		case UDPC_TYPE_STRING:
 			fputs("(string)", stdout);
-			len = 1 + pkt.pbuf[i+1];
+			len = pkt.pbuf[i+1];
 			ud_fputs(len, &pkt.pbuf[i+2], stdout);
 			break;
 

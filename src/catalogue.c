@@ -49,6 +49,7 @@
 #include "catalogue.h"
 #include "protocore.h"
 
+#if defined UNSERSRV
 typedef struct ud_cat_s *__cat_t;
 
 static const char empty_msg[] = "empty\n";
@@ -110,9 +111,11 @@ snprintcat(char *restrict buf, size_t blen, const __cat_t c)
 static size_t
 serialise_keyval(char *restrict buf, ud_tlv_t keyval)
 {
-	size_t idx = 1;
+	size_t idx = 2;
+	/* buf[0] is KEYVAL type designator */
+	buf[0] = UDPC_TYPE_KEYVAL;
 	/* refactor me, lookup table? */
-	switch ((ud_tag_t)(buf[0] = keyval->tag)) {
+	switch ((ud_tag_t)(buf[1] = keyval->tag)) {
 	case UD_TAG_CLASS:
 		/* should be serialise_class */
 		memcpy(&buf[idx], keyval->data, 1+keyval->data[0]);
@@ -164,31 +167,36 @@ ud_cat_ls_job(job_t j)
 	j->blen = idx;
 	return false;
 }
+#endif	/* UNSERSRV */
 
 uint8_t
 ud_fprint_tlv(const char *buf, FILE *fp)
 {
 	ud_tag_t t;
-	uint8_t len = 1;
+	uint8_t len;
 
 	switch ((t = buf[0])) {
 	case UD_TAG_CLASS:
-		fputs(" :class ", fp);
+		fputs(":class ", fp);
 		len = buf[1];
-		ud_fputs(len++, buf + 2, fp);
+		ud_fputs(len, buf + 2, fp);
+		len += 2;
 		break;
 
 	case UD_TAG_NAME:
-		fputs(" :name ", fp);
+		fputs(":name ", fp);
 		len = buf[1];
-		ud_fputs(len++, buf + 2, fp);
+		ud_fputs(len, buf + 2, fp);
+		len += 2;
 		break;
 
 	case UD_TAG_UNK:
 	default:
-		fprintf(fp, " :key %02x", t);
+		fprintf(fp, ":key %02x", t);
+		len = 1;
 		break;
 	}
+	fputc(' ', fp);
 	return len;
 }
 

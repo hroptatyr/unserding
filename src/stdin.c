@@ -116,44 +116,6 @@ handle_rl(char *line)
 	return;
 }
 
-/* still dirty, doesnt belong amongst the stdin code */
-static uint16_t
-deserialise(const char *buf, FILE *fp)
-{
-	udpc_type_t t;
-	uint16_t len = 0;
-
-re:
-	switch ((t = buf[0])) {
-	case UDPC_TYPE_STRING:
-		fputs("(string)", fp);
-		len = buf[1];
-		ud_fputs(len, buf + 2, fp);
-		break;
-
-	case UDPC_TYPE_CATOBJ:
-		fputs("(catobj)", fp);
-		buf += 2;
-		/* use fall-through */
-
-	case UDPC_TYPE_KEYVAL:
-		fputs("(tlv)", fp);
-		buf += (len += 1 + ud_fprint_tlv(&buf[1], fp));
-		goto re;
-
-	case UDPC_TYPE_SEQOF:
-		fprintf(fp, "(seqof(#%d))", buf[1]);
-		buf += 2;
-		goto re;
-
-	case UDPC_TYPE_UNK:
-	default:
-		fprintf(fp, "(%02x)", t);
-		break;
-	}
-	return len;
-}
-
 /* dirty */
 extern void _rl_erase_entire_line(void);
 void
@@ -175,8 +137,10 @@ stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 	fprintf(stdout, "packet from [%s]:%d ", buf, p);
 	/* now the header */
 	ud_fprint_pkthdr(pkt, stdout);
-	/* the rest of the packet, raw */
+	/* the raw packet */
 	ud_fprint_pkt_raw(pkt, stdout);
+	/* the packet in pretty */
+	ud_fprint_pkt_pretty(pkt, stdout);
 	/* hm, let's hope they put a newline last */
 	rl_redisplay();
 	return;

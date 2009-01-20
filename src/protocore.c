@@ -53,6 +53,7 @@
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"
+#include "catalogue.h"
 
 #if defined UNSERSRV
 /**
@@ -368,6 +369,60 @@ ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp)
 	default:
 		break;
 	}
+	putc('\n', fp);
+	return;
+}
+
+static uint16_t /* better not inline */
+__fprint_one(const char *buf, FILE *fp)
+{
+	uint16_t len = 0;
+
+	switch ((udpc_type_t)buf[0]) {
+	case UDPC_TYPE_STRING:
+		fputs("(string)", fp);
+		ud_fputs(buf[1], &buf[2], fp);
+		len = buf[1] + 1;
+		break;
+
+	case UDPC_TYPE_SEQOF:
+		fprintf(fp, "(seqof(#%d))", buf[1]);
+		len = 2;
+		if ((uint8_t)buf[len-1] == 0 ||
+		    (udpc_type_t)buf[len] != UDPC_TYPE_CATOBJ) {
+			break;
+		}
+		/* otherwise use fall-through */
+
+	case UDPC_TYPE_CATOBJ:
+		fputs("\n(catobj)", fp);
+		/* byte at offs 1 is the number of catobjs */
+		len += 2;
+		if ((uint8_t)buf[len-1] == 0 ||
+		    (udpc_type_t)buf[len] != UDPC_TYPE_KEYVAL) {
+			break;
+		}
+		/* otherwise use fall-through */
+
+	case UDPC_TYPE_KEYVAL:
+		fputs("(tlv)", fp);
+		len++;
+		len += ud_fprint_tlv(&buf[len], fp);
+		break;
+
+	case UDPC_TYPE_UNK:
+	default:
+		fprintf(fp, "(%02x)", buf[0]);
+		len = 1;
+		break;
+	}
+	return len;
+}
+
+void
+ud_fprint_pkt_pretty(ud_packet_t pkt, FILE *fp)
+{
+	for (uint16_t i = 8; i < pkt.plen; i += __fprint_one(&pkt.pbuf[i], fp));
 	putc('\n', fp);
 	return;
 }

@@ -318,9 +318,9 @@ daemonise(void)
 
 
 /* interests module husk */
-extern void __attribute__((weak)) init_interests(void);
+extern void __attribute__((weak)) mod_interests_LTX_init(void);
 void __attribute__((weak))
-init_interests(void)
+mod_interests_LTX_init(void)
 {
 	return;
 }
@@ -363,7 +363,7 @@ main(int argc, char *argv[])
 	/* initialise instruments */
 	init_instr();
 	/* initialise interests module */
-	init_interests();
+	mod_interests_LTX_init();
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);

@@ -59,7 +59,7 @@
 #endif	/* FFFF */
 
 typedef long int timestamptz_t;
-extern void init_interests(void);
+extern void mod_interests_LTX_init(void);
 
 static void *loc_conn;
 static struct connector_s c;
@@ -169,7 +169,7 @@ obtain_iir_EONIA(void)
 }
 
 void
-init_interests(void)
+mod_interests_LTX_init(void)
 {
 	/* where do we get that fucking connector info from? */
 	c.proto = PP_MYSQL;
@@ -193,11 +193,6 @@ init_interests(void)
 	obtain_iir_FFD();
 	obtain_iir_EONIA();
 
-#if 0
-	/* escrow the fuckers */
-	c_ffd = ud_cat_add_child(intrs, "FFD", UD_CF_SPOTTABLE);
-	c_eonia = ud_cat_add_child(intrs, "EONIA", UD_CF_SPOTTABLE);
-#else
 	c_ffd = ud_make_catobj(
 		UD_MAKE_CLASS("instrument"),
 		UD_MAKE_CLASS("interest"),
@@ -207,9 +202,12 @@ init_interests(void)
 		UD_MAKE_CLASS("instrument"),
 		UD_MAKE_CLASS("interest"),
 		UD_MAKE_NAME("EONIA"));
-#endif
+
 	ud_cat_add_obj(c_ffd);
 	ud_cat_add_obj(c_eonia);
+
+	/* and close the database */
+	pfack_sql_close(loc_conn);
 	return;
 }
 

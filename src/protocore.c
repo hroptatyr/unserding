@@ -308,7 +308,8 @@ putb(char a, FILE *fp)
 void
 ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp)
 {
-	for (uint16_t i = 0; i < pkt.plen; i += 16) {
+	uint16_t i = 0;
+	for (; i < (pkt.plen & ~0xf); i += 16) {
 		fprintf(fp, "%04x  ", i);
 		putb(pkt.pbuf[i+0], fp);
 		putb(pkt.pbuf[i+1], fp);
@@ -329,69 +330,45 @@ ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp)
 		putb(pkt.pbuf[i+15], fp);
 		putc('\n', fp);
 	}
-	if ((pkt.plen & 0xf) > 0) {
-		uint16_t i = (pkt.plen & ~0xf) + 16;
-		
-		fprintf(fp, "%04x  ", i);
-		switch (pkt.plen & 0xf) {
-		case 15:
-			putb(pkt.pbuf[i++], fp);
-		case 14:
-			putb(pkt.pbuf[i++], fp);
-		case 13:
-			putb(pkt.pbuf[i++], fp);
-		case 12:
-			putb(pkt.pbuf[i++], fp);
-
-		case 11:
-			putb(pkt.pbuf[i++], fp);
-		case 10:
-			putb(pkt.pbuf[i++], fp);
-		case 9:
-			putb(pkt.pbuf[i++], fp);
-		case 8:
-			putb(pkt.pbuf[i++], fp);
-
-		case 7:
-			!(i & 7) ? putc(' ', stdout) : 0;
-			putb(pkt.pbuf[i++], fp);
-		case 6:
-			!(i & 7) ? putc(' ', stdout) : 0;
-			putb(pkt.pbuf[i++], fp);
-		case 5:
-			!(i & 7) ? putc(' ', stdout) : 0;
-			putb(pkt.pbuf[i++], fp);
-		case 4:
-			!(i & 7) ? putc(' ', stdout) : 0;
-			putb(pkt.pbuf[i++], fp);
-
-		case 3:
-			!(i & 7) ? putc(' ', stdout) : 0;
-			putb(pkt.pbuf[i++], fp);
-		case 2:
-			!(i & 7) ? putc(' ', stdout) : 0;
-			putb(pkt.pbuf[i++], fp);
-		case 1:
-			!(i & 7) ? putc(' ', stdout) : 0;
-			putb(pkt.pbuf[i++], fp);
-		case 0:
-		default:
-			break;
-		}
-		putc('\n', fp);
+	if (i == pkt.plen) {
+		return;
 	}
-#if 0
-	/* generic packet printer, doesnt belong here */
-	for (uint16_t i = 8, len = 0; len < pkt.plen; i += len) {
-		/* two spaces upfront */
-		putc_unlocked(' ', stdout);
-		putc_unlocked(' ', stdout);
-		/* deseriealise him */
-		if (UNLIKELY((len = deserialise(&pkt.pbuf[i], stdout)) == 0)) {
-			break;
-		}
+
+	fprintf(fp, "%04x  ", i);
+	if ((pkt.plen & 0xf) >= 8) {
+		putb(pkt.pbuf[i+0], fp);
+		putb(pkt.pbuf[i+1], fp);
+		putb(pkt.pbuf[i+2], fp);
+		putb(pkt.pbuf[i+3], fp);
+		putb(pkt.pbuf[i+4], fp);
+		putb(pkt.pbuf[i+5], fp);
+		putb(pkt.pbuf[i+6], fp);
+		putb(pkt.pbuf[i+7], fp);
+		putc(' ', fp);
+		i += 8;
 	}
-#endif
+	/* and the rest, duff's */
+	switch (pkt.plen & 0x7) {
+	case 7:
+		putb(pkt.pbuf[i++], fp);
+	case 6:
+		putb(pkt.pbuf[i++], fp);
+	case 5:
+		putb(pkt.pbuf[i++], fp);
+	case 4:
+		putb(pkt.pbuf[i++], fp);
+
+	case 3:
+		putb(pkt.pbuf[i++], fp);
+	case 2:
+		putb(pkt.pbuf[i++], fp);
+	case 1:
+		putb(pkt.pbuf[i++], fp);
+	case 0:
+	default:
+		break;
+	}
+	putc('\n', fp);
 	return;
 }
 

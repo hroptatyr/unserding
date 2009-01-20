@@ -41,6 +41,39 @@
 #include "unserding.h"
 #include <stdarg.h>
 
+/* tags */
+enum ud_tag_e {
+	UD_TAG_UNK,
+	/* :class takes UDPC_TYPE_STRING */
+	UD_TAG_CLASS,
+	/* :attr / :attribute takes UDPC_TYPE_ATTR
+	 * this indicates which operations can be used on an entry
+	 * attribute spot to obtain spot values
+	 * attribute trad to obtain trade values
+	 * etc. */
+	UD_TAG_ATTR,
+	/* :name takes UDPC_TYPE_STRING */
+	UD_TAG_NAME,
+	/* :date takes UDPC_TYPE_DATE* (one of the date types) */
+	UD_TAG_DATE,
+	/* :expiry ... dunno bout that one, behaves like :date */
+	UD_TAG_EXPIRY,
+	/* :paddr takes UDPC_TYPE_POINTER, just a 64bit address really */
+	UD_TAG_PADDR,
+	/* :underlying ... dunno bout that one, behaves like :paddr */
+	UD_TAG_UNDERLYING,
+	/* :price takes UDPC_TYPE_MON* or UDPC_TYPE_*FLOAT */
+	UD_TAG_PRICE,
+	/* :strike ... dunno, it's like :price really */
+	UD_TAG_STRIKE,
+	/* :place ... takes UDPC_TYPE_STRING */
+	UD_TAG_PLACE,
+	/* :symbol takes UDPC_TYPE_STRING */
+	UD_TAG_SYMBOL,
+	/* :currency takes UDPC_TYPE_STRING */
+	UD_TAG_CURRENCY,
+};
+
 /**
  * The catalogue data structure.
  * Naive. */
@@ -114,9 +147,9 @@ free_tlvcons(ud_tlvcons_t tlv)
 extern inline ud_catobj_t __attribute__((always_inline, gnu_inline))
 ud_make_catobj(ud_tlv_t o, ...);
 extern inline ud_tlv_t __attribute__((always_inline, gnu_inline))
-make_class(const char *cls, uint8_t size);
+ud_make_class(const char *cls, uint8_t size);
 extern inline ud_tlv_t __attribute__((always_inline, gnu_inline))
-make_name(const char *nam, uint8_t size);
+ud_make_name(const char *nam, uint8_t size);
 
 extern void __ud_fill_catobj(ud_catobj_t co, ...);
 
@@ -134,7 +167,7 @@ ud_make_catobj(ud_tlv_t o, ...)
 
 /* special tlv cells */
 extern inline ud_tlv_t __attribute__((always_inline, gnu_inline))
-make_class(const char *cls, uint8_t size)
+ud_make_class(const char *cls, uint8_t size)
 {
 	ud_tlv_t res = make_tlv(UD_TAG_CLASS, size+1);
 	(((char*)res) + offsetof(struct ud_tlv_s, data))[0] = (char)size;
@@ -143,7 +176,7 @@ make_class(const char *cls, uint8_t size)
 }
 
 extern inline ud_tlv_t __attribute__((always_inline, gnu_inline))
-make_name(const char *nam, uint8_t size)
+ud_make_name(const char *nam, uint8_t size)
 {
 	ud_tlv_t res = make_tlv(UD_TAG_NAME, size+1);
 	(((char*)res) + offsetof(struct ud_tlv_s, data))[0] = (char)size;
@@ -151,7 +184,11 @@ make_name(const char *nam, uint8_t size)
 	return res;
 }
 
-#define MAKE_CLASS(_x)	make_class(_x, countof_m1(_x))
-#define MAKE_NAME(_x)	make_name(_x, countof_m1(_x))
+#define UD_MAKE_CLASS(_x)	ud_make_class(_x, countof_m1(_x))
+#define UD_MAKE_NAME(_x)	ud_make_name(_x, countof_m1(_x))
+
+/**
+ * Print. */
+extern uint8_t ud_fprint_tlv(const char *buf, FILE *fp);
 
 #endif	/* INCLUDED_catalogue_h_ */

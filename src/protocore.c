@@ -54,6 +54,7 @@
 #include "unserding-private.h"
 #include "protocore.h"
 
+#if defined UNSERSRV
 /**
  * Big array with worker functions.
  * 256 families should suffice methinks. */
@@ -260,6 +261,93 @@ init_proto(void)
 	/* obtain the hostname */
 	(void)gethostname(hn, countof(hn));
 	hnlen = strlen(hn);
+	return;
+}
+#endif	/* UNSERSRV */
+
+void
+ud_fprint_pkthdr(ud_packet_t pkt, FILE *fp)
+{
+	fprintf(fp, ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+		(unsigned int)pkt.plen,
+		udpc_pkt_cno(pkt),
+		udpc_pkt_pno(pkt),
+		udpc_pkt_cmd(pkt),
+		ntohs(((const uint16_t*)pkt.pbuf)[3]));
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+putb(char a, FILE *fp)
+{
+	char b = a & 0xf, c = (a >> 4) & 0xf;
+	switch (c) {
+	case 0 ... 9:
+		putc(c + 0x30, fp);
+		break;
+	case 10 ... 15:
+		putc(c + 0x57, fp);
+		break;
+	default:
+		break;
+	}
+	switch (b) {
+	case 0 ... 9:
+		putc(b + 0x30, fp);
+		break;
+	case 10 ... 15:
+		putc(b + 0x57, fp);
+		break;
+	default:
+		break;
+	}
+	putc(' ', fp);
+	return;
+}
+
+void
+ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp)
+{
+	for (uint16_t i = 0; i < pkt.plen; i += 16) {
+		fprintf(fp, "%04x  ", i);
+		putb(pkt.pbuf[i+0], fp);
+		putb(pkt.pbuf[i+1], fp);
+		putb(pkt.pbuf[i+2], fp);
+		putb(pkt.pbuf[i+3], fp);
+		putb(pkt.pbuf[i+4], fp);
+		putb(pkt.pbuf[i+5], fp);
+		putb(pkt.pbuf[i+6], fp);
+		putb(pkt.pbuf[i+7], fp);
+		putc(' ', fp);
+		putb(pkt.pbuf[i+8], fp);
+		putb(pkt.pbuf[i+9], fp);
+		putb(pkt.pbuf[i+10], fp);
+		putb(pkt.pbuf[i+11], fp);
+		putb(pkt.pbuf[i+12], fp);
+		putb(pkt.pbuf[i+13], fp);
+		putb(pkt.pbuf[i+14], fp);
+		putb(pkt.pbuf[i+15], fp);
+		putc('\n', fp);
+	}
+	if ((pkt.plen & 0xf) > 0) {
+		fprintf(fp, "%04x  ", 16 + (unsigned int)(pkt.plen & ~0xf));
+		for (uint16_t i = pkt.plen & ~0xf; i < pkt.plen; i++) {
+			putb(pkt.pbuf[i], fp);
+		}
+		putc('\n', fp);
+	}
+#if 0
+	/* generic packet printer, doesnt belong here */
+	for (uint16_t i = 8, len = 0; len < pkt.plen; i += len) {
+		/* two spaces upfront */
+		putc_unlocked(' ', stdout);
+		putc_unlocked(' ', stdout);
+		/* deseriealise him */
+		if (UNLIKELY((len = deserialise(&pkt.pbuf[i], stdout)) == 0)) {
+			break;
+		}
+	}
+#endif
 	return;
 }
 

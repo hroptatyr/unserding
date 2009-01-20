@@ -122,6 +122,10 @@ ud_fputs(uint8_t len, const char *s, FILE *f)
 	return;
 }
 
+extern void ud_fprint_pkthdr(ud_packet_t pkt, FILE *fp);
+extern void ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp);
+extern void ud_fprint_pkt_pretty(ud_packet_t pkt, FILE *fp);
+
 #if !defined TYPEDEFD_job_t
 typedef void *job_t;
 #endif	/* TYPEDEFD_job_t */

@@ -164,38 +164,4 @@ extern void ud_cat_add_obj(ud_catobj_t co);
 /* instruments */
 extern void init_instr(void);
 
-
-/* tags */
-enum ud_tag_e {
-	UD_TAG_UNK,
-	/* :class takes UDPC_TYPE_STRING */
-	UD_TAG_CLASS,
-	/* :attr / :attribute takes UDPC_TYPE_ATTR
-	 * this indicates which operations can be used on an entry
-	 * attribute spot to obtain spot values
-	 * attribute trad to obtain trade values
-	 * etc. */
-	UD_TAG_ATTR,
-	/* :name takes UDPC_TYPE_STRING */
-	UD_TAG_NAME,
-	/* :date takes UDPC_TYPE_DATE* (one of the date types) */
-	UD_TAG_DATE,
-	/* :expiry ... dunno bout that one, behaves like :date */
-	UD_TAG_EXPIRY,
-	/* :paddr takes UDPC_TYPE_POINTER, just a 64bit address really */
-	UD_TAG_PADDR,
-	/* :underlying ... dunno bout that one, behaves like :paddr */
-	UD_TAG_UNDERLYING,
-	/* :price takes UDPC_TYPE_MON* or UDPC_TYPE_*FLOAT */
-	UD_TAG_PRICE,
-	/* :strike ... dunno, it's like :price really */
-	UD_TAG_STRIKE,
-	/* :place ... takes UDPC_TYPE_STRING */
-	UD_TAG_PLACE,
-	/* :symbol takes UDPC_TYPE_STRING */
-	UD_TAG_SYMBOL,
-	/* :currency takes UDPC_TYPE_STRING */
-	UD_TAG_CURRENCY,
-};
-
 #endif	/* INCLUDED_unserding_h_ */

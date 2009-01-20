@@ -199,14 +199,14 @@ init_interests(void)
 	c_eonia = ud_cat_add_child(intrs, "EONIA", UD_CF_SPOTTABLE);
 #else
 	c_ffd = ud_make_catobj(
-		MAKE_CLASS("instrument"),
-		MAKE_CLASS("interest"),
-		MAKE_NAME("FFD"));
+		UD_MAKE_CLASS("instrument"),
+		UD_MAKE_CLASS("interest"),
+		UD_MAKE_NAME("FFD"));
 
 	c_eonia = ud_make_catobj(
-		MAKE_CLASS("instrument"),
-		MAKE_CLASS("interest"),
-		MAKE_NAME("EONIA"));
+		UD_MAKE_CLASS("instrument"),
+		UD_MAKE_CLASS("interest"),
+		UD_MAKE_NAME("EONIA"));
 #endif
 	ud_cat_add_obj(c_ffd);
 	ud_cat_add_obj(c_eonia);

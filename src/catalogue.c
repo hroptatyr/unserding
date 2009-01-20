@@ -138,9 +138,36 @@ serialise_catobj(char *restrict buf, ud_catobj_t co)
 	buf[0] = (udpc_type_t)UDPC_TYPE_CATOBJ;
 	buf[1] = co->nattrs;
 	for (uint8_t i = 0; i < co->nattrs; ++i) {
-		idx += serialise_keyval(&buf[2], co->attrs[i]);
+		idx += serialise_keyval(&buf[idx], co->attrs[i]);
 	}
 	return idx;
+}
+
+uint8_t
+ud_fprint_tlv(const char *buf, FILE *fp)
+{
+	ud_tag_t t;
+	uint8_t len = 1;
+
+	switch ((t = buf[0])) {
+	case UD_TAG_CLASS:
+		fputs(" :class ", fp);
+		len = buf[1];
+		ud_fputs(len++, buf + 2, fp);
+		break;
+
+	case UD_TAG_NAME:
+		fputs(" :name ", fp);
+		len = buf[1];
+		ud_fputs(len++, buf + 2, fp);
+		break;
+
+	case UD_TAG_UNK:
+	default:
+		fprintf(fp, " :key %02x", t);
+		break;
+	}
+	return len;
 }
 
 /* some jobs to browse the catalogue */

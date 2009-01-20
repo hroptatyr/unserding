@@ -30,7 +30,7 @@ unserdingd_SOURCES += mod-interests.c
 endif
 
 ## the main server binary
-unsercli_SOURCES = unsercli.c scanner.l parser.y stdin.c catalogue.c
+unsercli_SOURCES = unsercli.c scanner.l parser.y protocore.c stdin.c catalogue.c
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_YFLAGS = -d -p "cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)

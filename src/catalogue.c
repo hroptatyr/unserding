@@ -115,12 +115,12 @@ serialise_keyval(char *restrict buf, ud_tlv_t keyval)
 	switch ((ud_tag_t)(buf[0] = keyval->tag)) {
 	case UD_TAG_CLASS:
 		/* should be serialise_class */
-		memcpy(&buf[idx], keyval, keyval->data[0]);
+		memcpy(&buf[idx], keyval->data, 1+keyval->data[0]);
 		idx += keyval->data[0] + 1;
 		break;
 	case UD_TAG_NAME:
 		/* should be serialise_name */
-		memcpy(&buf[idx], keyval, keyval->data[0]);
+		memcpy(&buf[idx], keyval->data, 1+keyval->data[0]);
 		idx += keyval->data[0] + 1;
 		break;
 	default:
@@ -141,6 +141,28 @@ serialise_catobj(char *restrict buf, ud_catobj_t co)
 		idx += serialise_keyval(&buf[idx], co->attrs[i]);
 	}
 	return idx;
+}
+
+/* some jobs to browse the catalogue */
+extern bool ud_cat_ls_job(job_t j);
+bool
+ud_cat_ls_job(job_t j)
+{
+	size_t idx = 10;
+
+	UD_DEBUG_CAT("ls job\n");
+	/* we are a seqof(UDPC_TYPE_CATOBJ) */
+	j->buf[8] = (udpc_type_t)UDPC_TYPE_SEQOF;
+	/* we are ud_catalen entries wide */
+	j->buf[9] = (uint8_t)ud_catalen;
+
+	for (ud_cat_t c = ud_catalogue; c; c = c->next) {
+		ud_catobj_t dat = c->data;
+		idx += serialise_catobj(&j->buf[idx], dat);
+	}
+
+	j->blen = idx;
+	return false;
 }
 
 uint8_t
@@ -168,28 +190,6 @@ ud_fprint_tlv(const char *buf, FILE *fp)
 		break;
 	}
 	return len;
-}
-
-/* some jobs to browse the catalogue */
-extern bool ud_cat_ls_job(job_t j);
-bool
-ud_cat_ls_job(job_t j)
-{
-	size_t idx = 10;
-
-	UD_DEBUG_CAT("ls job\n");
-	/* we are a seqof(UDPC_TYPE_CATOBJ) */
-	j->buf[8] = (udpc_type_t)UDPC_TYPE_SEQOF;
-	/* we are ud_catalen entries wide */
-	j->buf[9] = (uint8_t)ud_catalen;
-#if 1
-	for (ud_cat_t c = ud_catalogue; c; c = c->next) {
-		ud_catobj_t dat = c->data;
-		idx += serialise_catobj(&j->buf[idx], dat);
-	}
-#endif
-	j->blen = idx;
-	return false;
 }
 
 /* catalogue.c ends here */

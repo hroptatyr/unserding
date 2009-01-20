@@ -330,9 +330,53 @@ ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp)
 		putc('\n', fp);
 	}
 	if ((pkt.plen & 0xf) > 0) {
-		fprintf(fp, "%04x  ", 16 + (unsigned int)(pkt.plen & ~0xf));
-		for (uint16_t i = pkt.plen & ~0xf; i < pkt.plen; i++) {
-			putb(pkt.pbuf[i], fp);
+		uint16_t i = (pkt.plen & ~0xf) + 16;
+		
+		fprintf(fp, "%04x  ", i);
+		switch (pkt.plen & 0xf) {
+		case 15:
+			putb(pkt.pbuf[i++], fp);
+		case 14:
+			putb(pkt.pbuf[i++], fp);
+		case 13:
+			putb(pkt.pbuf[i++], fp);
+		case 12:
+			putb(pkt.pbuf[i++], fp);
+
+		case 11:
+			putb(pkt.pbuf[i++], fp);
+		case 10:
+			putb(pkt.pbuf[i++], fp);
+		case 9:
+			putb(pkt.pbuf[i++], fp);
+		case 8:
+			putb(pkt.pbuf[i++], fp);
+
+		case 7:
+			!(i & 7) ? putc(' ', stdout) : 0;
+			putb(pkt.pbuf[i++], fp);
+		case 6:
+			!(i & 7) ? putc(' ', stdout) : 0;
+			putb(pkt.pbuf[i++], fp);
+		case 5:
+			!(i & 7) ? putc(' ', stdout) : 0;
+			putb(pkt.pbuf[i++], fp);
+		case 4:
+			!(i & 7) ? putc(' ', stdout) : 0;
+			putb(pkt.pbuf[i++], fp);
+
+		case 3:
+			!(i & 7) ? putc(' ', stdout) : 0;
+			putb(pkt.pbuf[i++], fp);
+		case 2:
+			!(i & 7) ? putc(' ', stdout) : 0;
+			putb(pkt.pbuf[i++], fp);
+		case 1:
+			!(i & 7) ? putc(' ', stdout) : 0;
+			putb(pkt.pbuf[i++], fp);
+		case 0:
+		default:
+			break;
 		}
 		putc('\n', fp);
 	}

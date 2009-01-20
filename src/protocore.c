@@ -382,7 +382,7 @@ __fprint_one(const char *buf, FILE *fp)
 	case UDPC_TYPE_STRING:
 		fputs("(string)", fp);
 		ud_fputs(buf[1], &buf[2], fp);
-		len = buf[1] + 1;
+		len = buf[1] + 2;
 		break;
 
 	case UDPC_TYPE_SEQOF:

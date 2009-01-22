@@ -107,7 +107,7 @@ main (void)
 	ud_convo_t cno;
 
 	/* obtain us a new handle */
-	make_unserding_handle(&__hdl);
+	init_unserding_handle(&__hdl);
 
 	for (int i = 0; i < 100000; i++) {
 		cno = ud_send_simple(&__hdl, UDPC_PKT_HY);

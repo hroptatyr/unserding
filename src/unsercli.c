@@ -88,7 +88,10 @@ static struct job_queue_s __glob_jq = {
 };
 job_queue_t glob_jq;
 
+/* our global handle space, closured because */
 static struct ud_handle_s __hdl;
+static char __pktbuf[UDPC_SIMPLE_PKTLEN];
+static ud_packet_t __pkt = {.plen = countof(__pktbuf), .pbuf = __pktbuf};
 
 void
 trigger_job_queue(void)
@@ -174,7 +177,7 @@ main (void)
 	init_glob_jq();
 
 	/* get us some nice handle */
-	make_unserding_handle(&__hdl);
+	init_unserding_handle(&__hdl);
 	/* attach the stdinlistener, inits readline too */
 	ud_attach_stdin(EV_A);
 

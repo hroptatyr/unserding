@@ -237,7 +237,7 @@ ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd)
 
 
 void
-make_unserding_handle(ud_handle_t hdl)
+init_unserding_handle(ud_handle_t hdl)
 {
 	hdl->convo = 0;
 	hdl->sock = mcast_init();

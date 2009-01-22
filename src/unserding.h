@@ -86,6 +86,11 @@ typedef struct {
 	size_t plen;
 	char *pbuf;
 } ud_packet_t;
+
+/**
+ * Structure to chain several packets. */
+typedef ud_packet_t *ud_pktchn_t;
+
 /**
  * Conversation id. */
 typedef uint8_t ud_convo_t;
@@ -102,12 +107,13 @@ struct ud_handle_s {
 	/** Socket. */
 	int sock:24;
 	int epfd;
+	ud_pktchn_t pktchn;
 };
 
 /* connexion stuff */
 /**
- * Create a new handle. */
-extern void make_unserding_handle(ud_handle_t);
+ * Initialise a handle into what's behind HDL. */
+extern void init_unserding_handle(ud_handle_t hdl);
 /**
  * Free a handle and all resources. */
 extern void free_unserding_handle(ud_handle_t);

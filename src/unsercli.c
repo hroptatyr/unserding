@@ -142,6 +142,8 @@ ud_parse(const ud_packet_t pkt)
         yyscan_t scanner;
         YY_BUFFER_STATE buf;
 
+	/* set up our packet, just take the obligatory header for granted */
+	__pkt.plen = 8;
 	/* set up the lexer */
         cli_yylex_init(&scanner);
         buf = cli_yy_scan_string(pkt.pbuf, scanner);
@@ -178,6 +180,8 @@ main (void)
 
 	/* get us some nice handle */
 	init_unserding_handle(&__hdl);
+	/* store our global packet */
+	__hdl.pktchn = &__pkt;
 	/* attach the stdinlistener, inits readline too */
 	ud_attach_stdin(EV_A);
 

@@ -61,6 +61,8 @@
 /* our master include file */
 #include "unserding.h"
 #include "protocore.h"
+#include "catalogue.h"
+
 
 static inline ud_convo_t __attribute__((always_inline, gnu_inline))
 udpc_pkt_cno(const ud_packet_t pkt)
@@ -101,6 +103,7 @@ udpc_print_pkt(const ud_packet_t pkt)
 int
 main (void)
 {
+#if 0
 	struct ud_handle_s __hdl;
 	char buf[16];
 	ud_packet_t pkt = {sizeof(buf), buf};
@@ -109,7 +112,7 @@ main (void)
 	/* obtain us a new handle */
 	init_unserding_handle(&__hdl);
 
-	for (int i = 0; i < 100000; i++) {
+	for (int i = 0; i < 1000; i++) {
 		cno = ud_send_simple(&__hdl, UDPC_PKT_HY);
 		pkt.plen = sizeof(buf);
 		ud_recv_convo(&__hdl, pkt, 200, cno);
@@ -117,7 +120,19 @@ main (void)
 
 	/* free the handle */
 	free_unserding_handle(&__hdl);
+
 	return 0;
+#elif 1
+	volatile int a = 0;
+
+	for (int i = 0; i < 10000000; i++) {
+		a += ud_tag_from_s(":class");
+		a += ud_tag_from_s(":name");
+		a += ud_tag_from_s(":price");
+		a += ud_tag_from_s(":attr");
+	}
+	return a;
+#endif
 }
 
 /* unserding.c ends here */

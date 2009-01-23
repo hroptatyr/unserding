@@ -3,6 +3,8 @@
 AM_CPPFLAGS = -pthread
 AM_LDFLAGS = -lpthread
 
+headerdir = $(includedir)/unserding
+
 bin_PROGRAMS = unserdingd unsercli testcli
 if USE_MYSQL
 noinst_LIBRARIES = libpfack-mysql.a
@@ -10,6 +12,8 @@ endif
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
+
+header_HEADERS = unserding.h catalogue.h protocore.h
 
 if USE_MYSQL
 ## additional helper for mysql sources
@@ -50,7 +54,7 @@ unsercli-scanner.h: scanner.l
 libunserding_la_SOURCES = libstuff.c
 
 ## the main server binary
-testcli_SOURCES = testcli.c
+testcli_SOURCES = testcli.c catalogue.c
 testcli_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 testcli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 testcli_LDADD = $(LIBEV_LIBS) -lreadline libunserding.la

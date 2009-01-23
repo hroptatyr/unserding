@@ -53,6 +53,7 @@
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"
+#include "catalogue.h"
 
 #if defined HAVE_BDWGC
 # define xmalloc        GC_MALLOC
@@ -67,9 +68,14 @@
 /* declarations */
 extern int cli_yyparse(void *scanner, ud_handle_t hdl);
 
-#define YYSTYPE			const char*
 #define YYENABLE_NLS		0
 #define YYLTYPE_IS_TRIVIAL	1
+
+struct cli_yystype_s {
+	long int slen;
+	const char *sval;
+};
+#define YYSTYPE			struct cli_yystype_s
 
 
 /* these delcarations are provided to suppress compiler warnings */
@@ -97,7 +103,9 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 
 %}
 
-%token <ival>
+%expect 0
+
+%token <noval>
 	TOK_HY
 	TOK_CHEERS
 	TOK_NVM
@@ -106,9 +114,10 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 	TOK_SUP
 	TOK_LS
 	TOK_INTEGER
+
+%token <sval>
 	TOK_KEY
 	TOK_VAL
-	TOK_SPACE
 
 %%
 
@@ -142,10 +151,8 @@ sup_cmd {
 	YYACCEPT;
 } |
 ls_cmd {
-	char buf[8];
-	ud_packet_t pkt = BUF_PACKET(buf);
-	udpc_make_pkt(pkt, hdl->convo++, 0, UDPC_PKT_LS);
-	ud_send_raw(hdl, pkt);
+	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_LS);
+	ud_send_raw(hdl, hdl->pktchn[0]);
 	YYACCEPT;
 };
 
@@ -177,10 +184,15 @@ keyval:
 key val;
 
 key:
-TOK_KEY;
+TOK_KEY {
+	/* pkt plen should be where we left it */
+	printf("%ld %s -> %02x\n", hdl->pktchn[0].plen, yylval.sval, ud_tag_from_s(yylval.sval));
+};
 
 val:
-TOK_VAL;
+TOK_VAL {
+	printf(":val %s (%ld)\n", yylval.sval, yylval.slen);
+};
 
 %%
 

@@ -49,12 +49,18 @@
 %option header-file="lex.yy.h"
 %option outfile="lex.yy.c"
 %option pointer
-%option debug
+%option nodebug
 
 %{
 
 #include <stdlib.h>
 #include <string.h>
+
+struct cli_yystype_s {
+	long int slen;
+	const char *sval;
+};
+#define YYSTYPE			struct cli_yystype_s
 
 #include "unsercli-parser.h"
 
@@ -79,7 +85,7 @@ eq		[:=]?|is
 neg		!
 
 key		:[a-z]+
-val		[a-z]+
+val		[A-Za-z0-9,.-]+
 
 int		[-+]?[0-9]+
 
@@ -109,12 +115,18 @@ nvm		{ RETURN_TOKEN(TOK_NVM); }
 bugger		{ RETURN_TOKEN(TOK_NVM); }
 
 {int}		{ RETURN_TOKEN(TOK_INTEGER); }
-{key}		{ RETURN_TOKEN(TOK_KEY); }
-{val}		{ RETURN_TOKEN(TOK_VAL); }
+{key}		{
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_KEY);
+}
+{val}		{
+	yylval->slen = cli_yyget_leng(yyscanner);
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_VAL);
+}
 
  /* more ignored shit, whitespace et al */
 {ws}		{ /* ignore */ }
-.		{ /* ignore */ }
 
 %%
 

@@ -40,6 +40,7 @@
 
 #include "unserding.h"
 #include <stdarg.h>
+#include <stddef.h>
 
 /* tags */
 enum ud_tag_e {
@@ -190,5 +191,11 @@ ud_make_name(const char *nam, uint8_t size)
 /**
  * Print. */
 extern uint8_t ud_fprint_tlv(const char *buf, FILE *fp);
+
+/**
+ * A ludicrously fast parser for keywords.
+ * This does not use flex/bison but a trie based approach.
+ * This can also parse stuff like :0x7e or :7e to allow for raw keys. */
+extern ud_tag_t ud_tag_from_s(const char *buf);
 
 #endif	/* INCLUDED_catalogue_h_ */

@@ -61,6 +61,8 @@
 #if defined HAVE_ERRNO_H
 # include <errno.h>
 #endif
+/* posix */
+#include <pwd.h>
 /* gnu readline */
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -73,6 +75,9 @@ static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));
 extern void
 stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal);
+
+#define HISTFILE	".unsercli_history"
+static char histfile[256];
 
 
 /* string goodies */
@@ -160,6 +165,10 @@ stdin_listener_init(void)
 	/* the callback */
 	rl_callback_handler_install("unserding> ", handle_rl);
 
+	/* load the history file */
+	(void)read_history(histfile);
+	history_set_pos(history_length);
+
 	/* succeeded if == 0 */
 	return STDIN_FILENO;
 }
@@ -169,6 +178,9 @@ stdin_listener_deinit(EV_P_ int sock)
 {
 	UD_DEBUG_STDIN("deinitialising readline\n");
 	rl_callback_handler_remove();
+
+	/* save the history file */
+	(void)write_history(histfile)
 
 	UD_DEBUG_STDIN("closing listening socket %d...\n", sock);
 	shutdown(sock, SHUT_RDWR);
@@ -182,6 +194,22 @@ stdin_traf_rcb(EV_P_ ev_io *w, int revents)
 {
 	rl_callback_read_char();
 	return;
+}
+
+static void
+init_histfile()
+{
+	char pwdbuf[256], *p = histfile;
+        struct passwd pwdstr;
+        struct passwd *pwd = NULL;
+
+        if (getpwuid_r(geteuid(), &pwdstr, pwdbuf, sizeof(pwdbuf), &pwd) != 0) {
+                return;
+	}
+        p += snprintf(histfile, countof(histfile), pwd->pw_dir);
+	*p++ = '/';
+	memcpy(p, HISTFILE, countof(HISTFILE));
+        return;
 }
 
 
@@ -201,6 +229,8 @@ ud_attach_stdin(EV_P)
 {
 	ev_io *srv_watcher = &__srv_watcher;
 
+	/* initialise the histfile */
+	init_histfile();
 	/* get us a global sock */
 	lsock = stdin_listener_init();
 

@@ -153,6 +153,10 @@ sup_cmd {
 ls_cmd {
 	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_LS);
 	ud_send_raw(hdl, hdl->pktchn[0]);
+
+	/* the packet we're gonna send in raw shape */
+	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
+
 	YYACCEPT;
 };
 
@@ -175,7 +179,15 @@ sup_cmd:
 TOK_SUP;
 
 ls_cmd:
-TOK_LS | TOK_LS keyvals;
+TOK_LS |
+TOK_LS /* in the middle */ {
+	/* init the seqof counter */
+	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_SEQOF;
+	/* set its initial value to naught */
+	hdl->pktchn[0].pbuf[9] = 0;
+	/* set the packet idx */
+	hdl->pktchn[0].plen = 10;
+} keyvals;
 
 keyvals:
 keyval | keyvals keyval;
@@ -185,13 +197,18 @@ key val;
 
 key:
 TOK_KEY {
-	/* pkt plen should be where we left it */
-	printf("%ld %s -> %02x\n", hdl->pktchn[0].plen, yylval.sval, ud_tag_from_s(yylval.sval));
+	ud_tag_t t = ud_tag_from_s(yylval.sval);
+	hdl->pktchn[0].pbuf[hdl->pktchn[0].plen++] = t;
 };
 
 val:
 TOK_VAL {
-	printf(":val %s (%ld)\n", yylval.sval, yylval.slen);
+	char *restrict pbuf = &hdl->pktchn[0].pbuf[hdl->pktchn[0].plen];
+	pbuf[0] = yylval.slen;
+	memcpy(&pbuf[1], yylval.sval, yylval.slen);
+	hdl->pktchn[0].plen += yylval.slen + 1;
+	/* inc the seqof counter */
+	hdl->pktchn[0].pbuf[9]++;
 };
 
 %%

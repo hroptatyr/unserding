@@ -317,6 +317,8 @@ daemonise(void)
 }
 
 
+extern void mod_pseu_index_LTX_init(void);
+
 /* interests module husk */
 extern void __attribute__((weak)) mod_interests_LTX_init(void);
 void __attribute__((weak))
@@ -364,6 +366,7 @@ main(int argc, char *argv[])
 	init_instr();
 	/* initialise interests module */
 	mod_interests_LTX_init();
+	mod_pseu_index_LTX_init();
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);

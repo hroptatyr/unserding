@@ -26,6 +26,8 @@ unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c catalogue.c instr.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unserdingd_LDADD = $(LIBEV_LIBS)
+## additional modules
+unserdingd_SOURCES += mod-pseu-index.c
 if USE_MYSQL
 unserdingd_LDADD += libpfack-mysql.a
 unserdingd_LDFLAGS += $(MYSQL_LDFLAGS)

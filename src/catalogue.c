@@ -108,10 +108,10 @@ snprintcat(char *restrict buf, size_t blen, const __cat_t c)
 	return len;
 }
 
-static size_t
+static unsigned int
 serialise_keyval(char *restrict buf, ud_tlv_t keyval)
 {
-	size_t idx = 2;
+	unsigned int idx = 2;
 	/* buf[0] is KEYVAL type designator */
 	buf[0] = UDPC_TYPE_KEYVAL;
 	/* refactor me, lookup table? */
@@ -132,10 +132,10 @@ serialise_keyval(char *restrict buf, ud_tlv_t keyval)
 	return idx;
 }
 
-static size_t
+static unsigned int
 serialise_catobj(char *restrict buf, ud_catobj_t co)
 {
-	size_t idx = 2;
+	unsigned int idx = 2;
 
 	/* we are a UDPC_TYPE_CATOBJ */
 	buf[0] = (udpc_type_t)UDPC_TYPE_CATOBJ;
@@ -146,14 +146,53 @@ serialise_catobj(char *restrict buf, ud_catobj_t co)
 	return idx;
 }
 
+static inline signed char __attribute__((always_inline, gnu_inline))
+tlv_cmp_f(const ud_tlv_t t1, const ud_tlv_t t2)
+{
+/* returns -1 if t1 < t2, 0 if t1 == t2 and 1 if t1 > t2 */
+	uint8_t bingo = t1->data[0] < t2->data[0] ? t1->data[0] : t2->data[0];
+	return memcmp((const char*)t1, (const char *)t2, bingo);
+}
+
+static unsigned int
+sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
+{
+	unsigned int idx = 0;
+
+	if (UNLIKELY(j->buf[8] != UDPC_TYPE_SEQOF)) {
+		return 0;
+	} else if (UNLIKELY((idx = j->buf[9]) <= 1)) {
+		return idx;
+	}
+	/* otherwise, real work to do */
+	{
+		ud_tlv_t tmin = (ud_tlv_t)&j->buf[10];
+		for (ud_tlv_t t = (ud_tlv_t)
+			     ((char*)tmin + 1 + 1 + tmin->data[0]);
+		     (size_t)((const char *)t - j->buf) < j->blen;
+		     t = (ud_tlv_t)((char*)t + 1 + 1 + t->data[0])) {
+			if (tlv_cmp_f(tmin, t) > 0) {
+				tmin = t;
+			}
+		}
+		UD_LOG("tmin is %02x %s\n", tmin->tag, &tmin->data[1]);
+	}
+	return idx;
+}
+
 /* some jobs to browse the catalogue */
 extern bool ud_cat_ls_job(job_t j);
 bool
 ud_cat_ls_job(job_t j)
 {
-	size_t idx = 10;
+	unsigned int idx = 10;
+	unsigned int slen = 0;
+	char tmp[UDPC_SIMPLE_PKTLEN];
+	ud_tlv_t sub[8];
 
 	UD_DEBUG_CAT("ls job\n");
+	/* filter what the luser sent us */
+	slen = sort_params(sub, tmp, j);
 	/* we are a seqof(UDPC_TYPE_CATOBJ) */
 	j->buf[8] = (udpc_type_t)UDPC_TYPE_SEQOF;
 	/* we are ud_catalen entries wide */

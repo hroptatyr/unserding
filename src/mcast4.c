@@ -354,6 +354,9 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	j->blen = nread;
 	__job_set_ready(j);
 
+	/* spit the packet in its raw shape */
+	ud_fprint_pkt_raw(JOB_PACKET(j), logout);
+
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
 	enqueue_job(glob_jq, j);

@@ -231,29 +231,11 @@ catobj_filter(ud_catobj_t dat, ud_tlv_t *sub, uint8_t slen)
 	for (uint8_t i = 0; j < slen && i < dat->nattrs; ) {
 		switch (tlv_cmp_f(dat->attrs[i], sub[j])) {
 		case 0:
-			ud_fputs(dat->attrs[i]->data[0],
-				 dat->attrs[i]->data + 1, stderr);
-			fputs(" == ", stderr);
-			ud_fputs(sub[j]->data[0],
-				 sub[j]->data + 1, stderr);
-			fputc('\n', stderr);
 			i++, j++;
 			break;
 		case 1:
-			ud_fputs(dat->attrs[i]->data[0],
-				 dat->attrs[i]->data + 1, stderr);
-			fputs(" > ", stderr);
-			ud_fputs(sub[j]->data[0],
-				 sub[j]->data + 1, stderr);
-			fputc('\n', stderr);
 			return false;
 		case -1:
-			ud_fputs(dat->attrs[i]->data[0],
-				 dat->attrs[i]->data + 1, stderr);
-			fputs(" < ", stderr);
-			ud_fputs(sub[j]->data[0],
-				 sub[j]->data + 1, stderr);
-			fputc('\n', stderr);
 			i++;
 			break;
 		default:

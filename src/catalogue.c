@@ -158,10 +158,9 @@ serialise_catobj(char *restrict buf, ud_catobj_t co)
 static unsigned int
 sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 {
-	unsigned int idx = 0, i = 0;
-	ud_tlv_t tmin;
+	uint8_t idx = 0;
 	uint8_t sz;
-	char *p;
+	ud_tlv_t tmin, last;
 
 	if (UNLIKELY(j->buf[8] != UDPC_TYPE_SEQOF)) {
 		return 0;
@@ -174,32 +173,53 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 		return 1;
 	}
 
-	/* do me properly */
-	memcpy(wrkspc, p = &j->buf[10], 2048);
-        for (uint8_t i = 0; i < idx; ++i ) {
-		tlvs[i] = p;
-		p += 2 + ud_tlv_size(tlvs[i]);
-	}
-	/* sort the args, is a selection sort now, will be heap sort one day */
-	for (uint8_t j = 0; j < idx; j++) {
-		uint8_t imin = j;
-		ud_tlv_t tmin = tlvs[imin];
+	/* do a primitive slection sort, do me properly! */
+	/* we traverse the list once to find the minimum element */
+	tmin = (ud_tlv_t)&j->buf[10];
 
-		/* traverse the rest of the bugger, try and find the
-		 * minimum element there */
-		for (uint8_t i = imin; i < idx; ++i) {
-			ud_tlv_t t = tlvs[i];
+	for (ud_tlv_t t = (ud_tlv_t)
+		     ((char*)tmin + 2 + ud_tlv_size(tmin));
+	     (char*)t < j->buf + j->blen;
+	     t = (ud_tlv_t)((char*)t + 2 + ud_tlv_size(t))) {
+
+		if (tlv_cmp_f(tmin, t) > 0) {
+			tmin = t;
+		}
+	}
+	/* copy the stuff over to the work space */
+	tlvs[0] = (ud_tlv_t)wrkspc;
+	memcpy(wrkspc, tmin, sz = 2 + ud_tlv_size(tmin));
+	wrkspc += sz;
+
+	/* using this as new maximum */
+	last = tmin;
+
+	for (uint8_t k = 1; k < idx; k++) {
+		/* just choose a tmin */
+		tmin = (ud_tlv_t)&j->buf[10];
+
+		for (ud_tlv_t t = (ud_tlv_t)
+			     ((char*)tmin + 2 + ud_tlv_size(tmin));
+		     (char*)t < j->buf + j->blen;
+		     t = (ud_tlv_t)((char*)t + 2 + ud_tlv_size(t))) {
+
+			if (tlv_cmp_f(tmin, last) <= 0) {
+				tmin = t;
+				continue;
+			}
+			if (tlv_cmp_f(t, last) <= 0) {
+				continue;
+			}
 			if (tlv_cmp_f(tmin, t) > 0) {
-				tmin = t, imin = i;
+				tmin = t;
 			}
 		}
-		/* tmin @ imin is minimum element, swap co->attrs[j]
-		 * and co->attrs[imin] */
-		if (imin != j) {
-			ud_tlv_t tmp = tlvs[j];
-			tlvs[j] = tlvs[imin];
-			tlvs[imin] = tmp;
-		}
+		tlvs[k] = (ud_tlv_t)wrkspc;
+		memcpy(wrkspc, tmin, sz = 2 + ud_tlv_size(tmin));
+		wrkspc += sz;
+
+		/* using this as new maximum */
+		last = tmin;
 	}
 	return idx;
 }
@@ -207,24 +227,40 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 static inline bool
 catobj_filter(ud_catobj_t dat, ud_tlv_t *sub, uint8_t slen)
 {
-	for (uint8_t i = 0, j = 0; j < slen && i < dat->nattrs; ) {
+	uint8_t j = 0;
+	for (uint8_t i = 0; j < slen && i < dat->nattrs; ) {
 		switch (tlv_cmp_f(dat->attrs[i], sub[j])) {
 		case 0:
-			UD_LOG("%s == %s  %d %d  %d\n", dat->attrs[i], sub[j], i, j, slen);
+			ud_fputs(dat->attrs[i]->data[0],
+				 dat->attrs[i]->data + 1, stderr);
+			fputs(" == ", stderr);
+			ud_fputs(sub[j]->data[0],
+				 sub[j]->data + 1, stderr);
+			fputc('\n', stderr);
 			i++, j++;
 			break;
 		case 1:
-			UD_LOG("%s > %s  %d %d  %d\n", dat->attrs[i], sub[j], i, j, slen);
+			ud_fputs(dat->attrs[i]->data[0],
+				 dat->attrs[i]->data + 1, stderr);
+			fputs(" > ", stderr);
+			ud_fputs(sub[j]->data[0],
+				 sub[j]->data + 1, stderr);
+			fputc('\n', stderr);
 			return false;
 		case -1:
-			UD_LOG("%s < %s  %d %d  %d\n", dat->attrs[i], sub[j], i, j, slen);
+			ud_fputs(dat->attrs[i]->data[0],
+				 dat->attrs[i]->data + 1, stderr);
+			fputs(" < ", stderr);
+			ud_fputs(sub[j]->data[0],
+				 sub[j]->data + 1, stderr);
+			fputc('\n', stderr);
 			i++;
 			break;
 		default:
 			break;
 		}
 	}
-	return true;
+	return j == slen;
 }
 
 /* some jobs to browse the catalogue */

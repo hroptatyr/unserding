@@ -109,6 +109,10 @@ enum udpc_type_e {
  * LS packet, used to say `ls [seqof(keyval)]' */
 #define UDPC_PKT_LS		(ud_pkt_cmd_t)(0x0100)
 #define UDPC_PKT_LS_RPL		UDPC_PKT_RPL(UDPC_PKT_LS)
+/**
+ * CAT packet, used to say `cat [seqof(keyval)]' */
+#define UDPC_PKT_CAT		(ud_pkt_cmd_t)(0x0102)
+#define UDPC_PKT_CAT_RPL	UDPC_PKT_RPL(UDPC_PKT_CAT)
 
 
 extern inline void __attribute__((always_inline, gnu_inline))

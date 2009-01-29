@@ -113,6 +113,8 @@ sup		{ RETURN_TOKEN(TOK_SUP); }
 alright		{ RETURN_TOKEN(TOK_SUP); }
 nvm		{ RETURN_TOKEN(TOK_NVM); }
 bugger		{ RETURN_TOKEN(TOK_NVM); }
+impo(rt)?	{ RETURN_TOKEN(TOK_IMPORT); }
+cat		{ RETURN_TOKEN(TOK_CAT); }
 
 {int}		{ RETURN_TOKEN(TOK_INTEGER); }
 {key}		{

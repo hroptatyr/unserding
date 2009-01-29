@@ -273,6 +273,34 @@ ud_cat_ls_job(job_t j)
 	j->blen = idx;
 	return false;
 }
+
+extern bool ud_cat_cat_job(job_t j);
+bool
+ud_cat_cat_job(job_t j)
+{
+	unsigned int idx = 10;
+	unsigned int slen = 0;
+	char tmp[UDPC_SIMPLE_PKTLEN];
+	ud_tlv_t sub[8];
+
+	UD_DEBUG_CAT("ls job\n");
+	/* filter what the luser sent us */
+	slen = sort_params(sub, tmp, j);
+	/* we are a seqof(UDPC_TYPE_CATOBJ) */
+	j->buf[8] = (udpc_type_t)UDPC_TYPE_SEQOF;
+	/* we are ud_catalen entries wide */
+	j->buf[9] = (uint8_t)ud_catalen;
+
+	for (ud_cat_t c = ud_catalogue; c; c = c->next) {
+		ud_catobj_t dat = c->data;
+		if (catobj_filter(dat, sub, slen)) {
+			idx += serialise_catobj(&j->buf[idx], dat);
+		}
+	}
+
+	j->blen = idx;
+	return false;
+}
 #endif	/* UNSERSRV */
 
 uint8_t

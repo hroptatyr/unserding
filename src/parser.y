@@ -113,6 +113,8 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 	TOK_CYA
 	TOK_SUP
 	TOK_LS
+	TOK_CAT
+	TOK_IMPORT
 	TOK_INTEGER
 
 %token <sval>
@@ -158,7 +160,26 @@ ls_cmd {
 	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
 
 	YYACCEPT;
+} |
+cat_cmd {
+	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_CAT);
+	ud_send_raw(hdl, hdl->pktchn[0]);
+
+	/* the packet we're gonna send in raw shape */
+	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
+
+	YYACCEPT;
+} |
+impo_cmd {
+	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, 0x7e10);
+	ud_send_raw(hdl, hdl->pktchn[0]);
+
+	/* the packet we're gonna send in raw shape */
+	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
+
+	YYACCEPT;
 };
+
 
 hy_cmd:
 TOK_HY;
@@ -188,6 +209,20 @@ TOK_LS /* in the middle */ {
 	/* set the packet idx */
 	hdl->pktchn[0].plen = 10;
 } keyvals;
+
+cat_cmd:
+TOK_CAT |
+TOK_CAT /* in the middle */ {
+	/* init the seqof counter */
+	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_SEQOF;
+	/* set its initial value to naught */
+	hdl->pktchn[0].pbuf[9] = 0;
+	/* set the packet idx */
+	hdl->pktchn[0].plen = 10;
+} keyvals;
+
+impo_cmd:
+TOK_IMPORT;
 
 keyvals:
 keyval | keyvals keyval;

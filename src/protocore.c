@@ -124,11 +124,13 @@ ud_pktwrk_f ud_fam00[256] = {
 	f00_hy, f00_hy_rpl,
 };
 
+static void f01_ignore_rpl(job_t j);
 static void f01_ls(job_t j);
-static void f01_ls_rpl(job_t j);
+static void f01_cat(job_t j);
 
 ud_pktwrk_f ud_fam01[256] = {
-	f01_ls, f01_ls_rpl,
+	f01_ls, f01_ignore_rpl,
+	f01_cat, f01_ignore_rpl,
 };
 
 static void f7e_54(job_t j);
@@ -209,28 +211,39 @@ f7e_54(job_t j)
 	return;
 }
 
+/* generic ignorer */
+static void __attribute__((unused))
+f01_ignore_rpl(job_t j)
+{
+	/* just ignore hime */
+	return;
+}
+
 extern bool ud_cat_ls_job(job_t j);
 
 static void
 f01_ls(job_t j)
 {
-#if 0
-	while (ud_cat_ls_job(j)) {
+	bool morep;
+	do {
+		morep = ud_cat_ls_job(j);
 		/* and send him back */
 		send_cl(j);
-	}
-#else
-	ud_cat_ls_job(j);
-	/* and send him back */
-	send_cl(j);
-#endif
+	} while (morep);
 	return;
 }
 
-static void __attribute__((unused))
-f01_ls_rpl(job_t j)
+extern bool ud_cat_cat_job(job_t j);
+
+static void
+f01_cat(job_t j)
 {
-	/* just ignore hime */
+	bool morep;
+	do {
+		morep = ud_cat_cat_job(j);
+		/* and send him back */
+		send_cl(j);
+	} while (morep);
 	return;
 }
 

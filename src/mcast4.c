@@ -86,8 +86,12 @@ static ev_io ALGN16(__srv_watcher);
 static struct ip_mreq ALGN16(mreq4);
 static struct ipv6_mreq ALGN16(mreq6);
 /* server to client goodness */
-static struct sockaddr_in6 __sa6;
-static struct sockaddr_in __sa4;
+static struct sockaddr_in6 __sa6 = {
+	.sin6_addr = IN6ADDR_ANY_INIT
+};
+static struct sockaddr_in __sa4 = {
+	.sin_addr = {0}
+};
 
 
 /* socket goodies */
@@ -212,85 +216,42 @@ __mcast6_leave_group(int s, struct ipv6_mreq *mreq)
 }
 
 static int
-mcast_listener_try(volatile struct addrinfo *lres)
+mcast46_listener_init(void)
 {
-	volatile int s;
 	int retval;
+	volatile int s;
 
-	s = socket(lres->ai_family, SOCK_DGRAM, IPPROTO_IP);
+	__sa6.sin6_family = AF_INET6;
+	__sa6.sin6_port = htons(UD_NETWORK_SERVICE);
+
+	__sa4.sin_family = AF_INET;
+	__sa4.sin_port = htons(UD_NETWORK_SERVICE);
+
+	s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP);
 	if (s < 0) {
-		UD_CRITICAL_MCAST("socket() failed, whysoever\n");
+		UD_DEBUG_MCAST("socket() failed\n");
 		return s;
 	}
 	/* allow many many many servers on that port */
 	__reuse_sock(s);
 
 	/* we used to retry upon failure, but who cares */
-	retval = bind(s, lres->ai_addr, lres->ai_addrlen);
-	if (UNLIKELY(retval == -1)) {
-		UD_CRITICAL_MCAST("bind() failed, whysoever\n");
+	retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6));
+	if (retval == -1) {
+		UD_DEBUG_MCAST("bind() failed %d %d\n", errno, EINVAL);
 		close(s);
 		return -1;
-	} else {
-		uint16_t p;
-
-		if (LIKELY(lres->ai_family == AF_INET6)) {
-			p = ((struct sockaddr_in6*)lres->ai_addr)->sin6_port;
-		} else if (lres->ai_family == AF_INET) {
-			p = ((struct sockaddr_in*)lres->ai_addr)->sin_port;
-		}
-		UD_DEBUG_MCAST("listening to udp://[%s]:%d\n",
-			       lres->ai_canonname, ntohs(p));
-	}
-	return s;
-}
-
-static int
-mcast46_listener_init(void)
-{
-	struct addrinfo *res;
-	const struct addrinfo hints = {
-		/* allow both v6 and v4 */
-		.ai_family = AF_UNSPEC,
-		.ai_socktype = SOCK_DGRAM,
-		.ai_protocol = IPPROTO_UDP,
-		/* specify to whom we listen */
-		.ai_flags = AI_PASSIVE | AI_V4MAPPED | AI_ALL | AI_NUMERICHOST,
-		/* naught out the rest */
-		.ai_canonname = NULL,
-		.ai_addr = NULL,
-		.ai_next = NULL,
-	};
-	int retval;
-	volatile int s;
-
-	retval = getaddrinfo(NULL, UD_NETWORK_SERVSTR, &hints, &res);
-
-	if (retval != 0) {
-		UD_CRITICAL_MCAST("oh oh oh, your address specs are shite\n");
-		return -1;
-	}
-	for (struct addrinfo *lres = res; lres; lres = lres->ai_next) {
-		if ((s = mcast_listener_try(lres)) >= 0) {
-			/* join the mcast group */
-			__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6);
-			/* endow our s2c and s2s structs */
-			memcpy(&__sa6, lres->ai_addr, sizeof(__sa6));
-			__sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
-			/* join the mcast group */
-			__mcast4_join_group(s, UD_MCAST4_ADDR, &mreq4);
-			/* endow our s2c and s2s structs */
-			memcpy(&__sa4, lres->ai_addr, sizeof(__sa4));
-			__sa4.sin_addr = mreq4.imr_multiaddr;
-
-			UD_DEBUG_MCAST(":sock %d  :proto %d :host %s\n",
-				       s, lres->ai_protocol,
-				       lres->ai_canonname);
-			break;
-		}
 	}
 
-	freeaddrinfo(res);
+	/* join the mcast group */
+	__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6);
+	/* endow our s2c and s2s structs */
+	__sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+	/* join the mcast group */
+	__mcast4_join_group(s, UD_MCAST4_ADDR, &mreq4);
+	/* endow our s2c and s2s structs */
+	__sa4.sin_addr = mreq4.imr_multiaddr;
+
 	/* return the socket we've got */
 	/* succeeded if > 0 */
 	return s;

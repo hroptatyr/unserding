@@ -69,8 +69,8 @@ struct eod_ser_s {
 	monetary32_t pri;
 };
 
-static monetary32_t *intr_PSEU;
-static monetary32_t *intr_BUGG;
+static time_series_t idx_PSEU;
+static time_series_t idx_BUGG;
 static ud_catobj_t c_pseu, c_bugg;
 
 static inline timestamptz_t __attribute__((always_inline))
@@ -84,23 +84,36 @@ YYYY_MM_DD_to_ts(char *restrict buf)
 }
 
 static void
-store_iir(void **cols, size_t ncols, void *closure)
-{
-	short int idx = YYYY_MM_DD_to_ts((char*)cols[0]) % 86400;
-	monetary32_t *arr = closure;
-	arr[idx] = ffff_monetary32_get_s((char*)cols[1]);
-	return;
-}
-
-static void
 obtain_pri_PSEU(void)
 {
+	idx_PSEU = malloc(sizeof(struct time_series_s) +
+			  16384 * sizeof(monetary32_t));
+	idx_PSEU->lo = 0;
+	idx_PSEU->hi = idx_PSEU->ser_len = 16384;
+	idx_PSEU->nser_prices = 1;
+	idx_PSEU->aosp = 0;
+	/* now the prices */
+	for (int i = 0; i < 16384; ++i) {
+		idx_PSEU->prices[i] =
+			ffff_monetary32_get_d(2.01 + (double)i/16384.0);
+	}
 	return;
 }
 
 static void
 obtain_pri_BUGG(void)
 {
+	idx_BUGG = malloc(sizeof(struct time_series_s) +
+			  8192 * sizeof(monetary32_t));
+	idx_BUGG->lo = 0;
+	idx_BUGG->hi = idx_BUGG->ser_len = 8192;
+	idx_BUGG->nser_prices = 1;
+	idx_BUGG->aosp = 0;
+	/* fill in prices */
+	for (int i = 0; i < 8192; ++i) {
+		idx_BUGG->prices[i] =
+			ffff_monetary32_get_d(4.2 - (double)i/8192.0);
+	}
 	return;
 }
 

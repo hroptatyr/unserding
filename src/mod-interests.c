@@ -46,7 +46,8 @@
 /* our master include */
 #include "unserding.h"
 #include "unserding-private.h"
-#include "pfack-sql.h"
+#define USE_MYSQL
+#include <pfack/pfack-sql.h>
 #include "catalogue.h"
 
 #if defined HAVE_FFFF_FFFF_H

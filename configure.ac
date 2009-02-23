@@ -162,6 +162,10 @@ else
 	AC_MSG_ERROR([ffff support is mandatory.])
 fi
 
+## check for libpfack
+AC_CHECK_PFACK
+AC_DEFINE([WITH_PFACK], [1], [Whether libpfack support library is requested.])
+
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([unserding.pc])

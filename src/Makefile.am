@@ -6,20 +6,11 @@ AM_LDFLAGS = -lpthread
 headerdir = $(includedir)/unserding
 
 bin_PROGRAMS = unserdingd unsercli testcli
-if USE_MYSQL
-noinst_LIBRARIES = libpfack-mysql.a
-endif
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
 header_HEADERS = unserding.h catalogue.h protocore.h
-
-if USE_MYSQL
-## additional helper for mysql sources
-libpfack_mysql_a_SOURCES = pfack-mysql.c
-libpfack_mysql_a_CPPFLAGS = $(AM_CPPFLAGS) $(MYSQL_CPPFLAGS) $(FPIC)
-endif
 
 ## the main server binary
 unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c catalogue.c instr.c
@@ -29,8 +20,9 @@ unserdingd_LDADD = $(LIBEV_LIBS)
 ## additional modules
 unserdingd_SOURCES += mod-pseu-index.c
 if USE_MYSQL
-unserdingd_LDADD += libpfack-mysql.a
-unserdingd_LDFLAGS += $(MYSQL_LDFLAGS)
+unserdingd_CPPFLAGS += $(LIBPFACK_CPPFLAGS)
+unserdingd_LDFLAGS += $(LIBPFACK_LDFLAGS)
+unserdingd_LDADD += $(LIBPFACK_LIBS) -lpfack-mysql
 ## additional modules
 unserdingd_SOURCES += mod-interests.c
 endif

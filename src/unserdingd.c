@@ -65,10 +65,15 @@
 #include "unserding-private.h"
 /* proto stuff */
 #include "protocore.h"
+/* catalogue stuff */
+#include "catalogue-ng.h"
 
 #define USE_COROUTINES		1
 
 FILE *logout;
+
+/* the catalogue of instruments */
+void *instruments;
 
 
 typedef struct ud_worker_s *ud_worker_t;
@@ -363,7 +368,7 @@ main(int argc, char *argv[])
 	ud_attach_mcast4(EV_A);
 
 	/* initialise instruments */
-	init_instr();
+	instruments = make_catalogue();
 	/* initialise interests module */
 	mod_interests_LTX_init();
 	mod_pseu_index_LTX_init();

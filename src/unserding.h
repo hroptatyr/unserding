@@ -1,4 +1,4 @@
-/*** unserding.c -- unserding network service
+/*** unserding.h -- unserding network service
  *
  * Copyright (C) 2008 Sebastian Freundt
  *
@@ -38,6 +38,7 @@
 #if !defined INCLUDED_unserding_h_
 #define INCLUDED_unserding_h_
 
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -158,6 +159,8 @@ ud_handle_sock(ud_handle_t hdl)
 /* catalogue codswallop */
 typedef uint8_t ud_tag_t;
 typedef struct ud_catobj_s *ud_catobj_t;
+
+extern void *instruments;
 
 /* catalogue entries look like this
  * basically a proper tlv cell except sometimes the length is implicit */

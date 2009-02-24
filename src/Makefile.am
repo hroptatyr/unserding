@@ -13,7 +13,8 @@ CLEANFILES = $(BUILT_SOURCES)
 header_HEADERS = unserding.h catalogue.h protocore.h
 
 ## the main server binary
-unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c catalogue.c instr.c
+unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c catalogue.c
+unserdingd_SOURCES += catalogue-ng.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unserdingd_LDADD = $(LIBEV_LIBS)

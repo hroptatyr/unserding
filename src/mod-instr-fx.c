@@ -1,4 +1,4 @@
-/*** catalogue-ng.c -- new generation catalogue
+/*** mod-instr-fx.c -- unserding module for fx instruments
  *
  * Copyright (C) 2008, 2009 Sebastian Freundt
  *
@@ -35,37 +35,55 @@
  *
  ***/
 
-#include "catalogue-ng.h"
+#include "config.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+/* our master include */
+#include "unserding.h"
+#include "unserding-private.h"
 #include <pfack/instruments.h>
-#include <ffff/hashtable.h>
+#include "catalogue.h"
 
-/* ctor, dtor */
-catng_t
-make_catalogue(void)
-{
-	struct ase_dict_options_s opts = {
-		.initial_size = 32,
-		.worst_case_constant_lookup_p = true,
-		.two_power_sizes = true,
-		.arity = 4,
-	};
-	return (void*)ase_make_htable(&opts);
-}
+#if defined HAVE_FFFF_FFFF_H
+/* to get a default set of aliases */
+# define USE_MONETARY64
+# include <ffff/ffff.h>
+#else  /* !FFFF */
+/* posix */
+# include <math.h>
+#endif	/* FFFF */
+#include "catalogue-ng.h"
 
-void
-free_catalogue(catng_t cat)
+typedef long int timestamptz_t;
+extern void mod_instr_fx_LTX_init(void);
+extern void mod_instr_fx_LTX_deinit(void);
+
+static void
+obtain_some_4217s(void)
 {
-	ase_free_htable(cat);
+	void *tmp;
+
+	tmp = make_currency(PFACK_4217_EUR);
+	catalogue_add_instr(instruments, tmp, 0x80000001);
 	return;
 }
 
-/* modifiers */
 void
-catalogue_add_instr(catng_t cat, const instrument_t instr, hcode_t cod)
+mod_instr_fx_LTX_init(void)
 {
-	void *key = (void*)cod;
-	ase_htable_put(cat, cod, key/*val-only?*/, instr);
+	obtain_some_4217s();
 	return;
 }
 
-/* catalogue-ng.c ends here */
+void
+mod_instr_fx_LTX_deinit(void)
+{
+	return;
+}
+
+/* mod-instr-fx.c ends here */

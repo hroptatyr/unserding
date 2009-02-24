@@ -27,6 +27,8 @@ unserdingd_LDADD += $(LIBPFACK_LIBS) -lpfack-mysql
 ## additional modules
 unserdingd_SOURCES += mod-interests.c
 endif
+## and yet more modules, 4217 (ccys)
+unserdingd_SOURCES += mod-instr-fx.c
 
 ## the main server binary
 unsercli_SOURCES = unsercli.c scanner.l parser.y protocore.c catalogue.c stdin.c

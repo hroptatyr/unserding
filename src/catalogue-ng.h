@@ -41,10 +41,14 @@
 #include "unserding.h"
 #include <stdarg.h>
 #include <stddef.h>
+#include <pfack/instruments.h>
 
 typedef void *catng_t;
+typedef long unsigned int hcode_t;
 
 extern catng_t make_catalogue(void);
 extern void free_catalogue(catng_t cat);
+
+extern void catalogue_add_instr(catng_t cat, const instrument_t, hcode_t cod);
 
 #endif	/* INCLUDED_catalogue_ng_h_ */

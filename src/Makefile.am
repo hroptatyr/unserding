@@ -17,13 +17,13 @@ unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c catalogue.c
 unserdingd_SOURCES += catalogue-ng.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
-unserdingd_LDADD = $(LIBEV_LIBS)
+unserdingd_LDADD = $(LIBEV_LIBS) $(LIBPFACK_LIBS)
 ## additional modules
 unserdingd_SOURCES += mod-pseu-index.c
 if USE_MYSQL
 unserdingd_CPPFLAGS += $(LIBPFACK_CPPFLAGS)
 unserdingd_LDFLAGS += $(LIBPFACK_LDFLAGS)
-unserdingd_LDADD += $(LIBPFACK_LIBS) -lpfack-mysql
+unserdingd_LDADD += -lpfack-mysql
 ## additional modules
 unserdingd_SOURCES += mod-interests.c
 endif

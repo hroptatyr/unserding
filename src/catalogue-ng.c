@@ -35,9 +35,24 @@
  *
  ***/
 
+#include "config.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+/* our master include */
+#include "unserding.h"
+#include "unserding-private.h"
 #include "catalogue-ng.h"
+#include "protocore.h"
+/* other external stuff */
 #include <pfack/instruments.h>
 #include <ffff/hashtable.h>
+
+extern void *instruments;
 
 /* ctor, dtor */
 catng_t
@@ -66,6 +81,52 @@ catalogue_add_instr(catng_t cat, const instrument_t instr, hcode_t cod)
 	void *key = (void*)cod;
 	ase_htable_put(cat, cod, key/*val-only?*/, instr);
 	return;
+}
+
+
+static unsigned int
+serialise_catobj(char *restrict buf, const_instrument_t instr)
+{
+	unsigned int idx = 2;
+
+	/* we are a UDPC_TYPE_CATOBJ */
+	buf[0] = (udpc_type_t)UDPC_TYPE_PFINSTR;
+	buf[1] = instr->type;
+	return idx;
+}
+
+/* another browser */
+extern bool ud_cat_lc_job(job_t j);
+bool
+ud_cat_lc_job(job_t j)
+{
+	unsigned int idx = 10;
+	//unsigned int slen = 0;
+	//char tmp[UDPC_SIMPLE_PKTLEN];
+	//ud_tlv_t sub[8];
+	struct ase_dict_iter_s iter;
+	const void *key;
+	void *val;
+
+	UD_DEBUG_CAT("lc job\n");
+	/* filter what the luser sent us */
+	//slen = sort_params(sub, tmp, j);
+	/* we are a seqof(UDPC_TYPE_CATOBJ) */
+	j->buf[8] = (udpc_type_t)UDPC_TYPE_SEQOF;
+	/* we are ud_catalen entries wide */
+	j->buf[9] = (uint8_t)ase_htable_fill(instruments);
+
+	ht_iter_init_ll(instruments, &iter);
+	while (ht_iter_next(&iter, &key, &val)) {
+		const_instrument_t instr = val;
+		/* filter me one day
+		 * for now we just spill what we've got */
+		idx += serialise_catobj(&j->buf[idx], instr);
+	}
+	ht_iter_fini_ll(&iter);
+
+	j->blen = idx;
+	return false;
 }
 
 /* catalogue-ng.c ends here */

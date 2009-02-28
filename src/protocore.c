@@ -126,11 +126,13 @@ ud_pktwrk_f ud_fam00[256] = {
 
 static void f01_ignore_rpl(job_t j);
 static void f01_ls(job_t j);
+static void f01_lc(job_t j);
 static void f01_cat(job_t j);
 
 ud_pktwrk_f ud_fam01[256] = {
 	f01_ls, f01_ignore_rpl,
 	f01_cat, f01_ignore_rpl,
+	f01_lc, f01_ignore_rpl,
 };
 
 static void f7e_54(job_t j);
@@ -227,6 +229,20 @@ f01_ls(job_t j)
 	bool morep;
 	do {
 		morep = ud_cat_ls_job(j);
+		/* and send him back */
+		send_cl(j);
+	} while (morep);
+	return;
+}
+
+extern bool ud_cat_lc_job(job_t j);
+
+static void
+f01_lc(job_t j)
+{
+	bool morep;
+	do {
+		morep = ud_cat_lc_job(j);
 		/* and send him back */
 		send_cl(j);
 	} while (morep);

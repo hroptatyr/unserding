@@ -113,6 +113,7 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 	TOK_CYA
 	TOK_SUP
 	TOK_LS
+	TOK_LC
 	TOK_CAT
 	TOK_IMPORT
 	TOK_INTEGER
@@ -154,6 +155,15 @@ sup_cmd {
 } |
 ls_cmd {
 	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_LS);
+	ud_send_raw(hdl, hdl->pktchn[0]);
+
+	/* the packet we're gonna send in raw shape */
+	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
+
+	YYACCEPT;
+} |
+lc_cmd {
+	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_LC);
 	ud_send_raw(hdl, hdl->pktchn[0]);
 
 	/* the packet we're gonna send in raw shape */
@@ -209,6 +219,9 @@ TOK_LS /* in the middle */ {
 	/* set the packet idx */
 	hdl->pktchn[0].plen = 10;
 } keyvals;
+
+lc_cmd:
+TOK_LC;
 
 cat_cmd:
 TOK_CAT |

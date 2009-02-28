@@ -94,6 +94,9 @@ enum udpc_type_e {
 	UDPC_TYPE_CATOBJ,
 	/* a keyval pair */
 	UDPC_TYPE_KEYVAL,
+	/* instrument serialisation */
+	UDPC_TYPE_PFINSTR,
+	UDPC_TYPE_MDDLINSTR,
 };
 
 
@@ -109,6 +112,10 @@ enum udpc_type_e {
  * LS packet, used to say `ls [seqof(keyval)]' */
 #define UDPC_PKT_LS		(ud_pkt_cmd_t)(0x0100)
 #define UDPC_PKT_LS_RPL		UDPC_PKT_RPL(UDPC_PKT_LS)
+/**
+ * LC packet, used to say `lc [seqof(keyval)]' */
+#define UDPC_PKT_LC		(ud_pkt_cmd_t)(0x0104)
+#define UDPC_PKT_LC_RPL		UDPC_PKT_RPL(UDPC_PKT_LC)
 /**
  * CAT packet, used to say `cat [seqof(keyval)]' */
 #define UDPC_PKT_CAT		(ud_pkt_cmd_t)(0x0102)

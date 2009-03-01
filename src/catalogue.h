@@ -73,6 +73,8 @@ enum ud_tag_e {
 	UD_TAG_SYMBOL,
 	/* :currency takes UDPC_TYPE_STRING */
 	UD_TAG_CURRENCY,
+	/* :cfi is 6 chars long, 10962 */
+	UD_TAG_CFI,
 };
 
 /**

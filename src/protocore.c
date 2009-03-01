@@ -439,6 +439,11 @@ __fprint_one(const char *buf, FILE *fp)
 		len += ud_fprint_tlv(&buf[len], fp);
 		break;
 
+	case UDPC_TYPE_PFINSTR:
+		fputs("\n(pfinstr)", fp);
+		len++;
+		break;
+
 	case UDPC_TYPE_UNK:
 	default:
 		fprintf(fp, "(%02x)", buf[0]);

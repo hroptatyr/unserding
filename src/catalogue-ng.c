@@ -48,6 +48,7 @@
 #include "unserding-private.h"
 #include "catalogue-ng.h"
 #include "protocore.h"
+#include "catalogue.h"
 /* other external stuff */
 #include <pfack/instruments.h>
 #include <ffff/hashtable.h>
@@ -87,12 +88,21 @@ catalogue_add_instr(catng_t cat, const instrument_t instr, hcode_t cod)
 static unsigned int
 serialise_catobj(char *restrict buf, const_instrument_t instr)
 {
-	unsigned int idx = 2;
+	unsigned int idx;
 
 	/* we are a UDPC_TYPE_CATOBJ */
 	buf[0] = (udpc_type_t)UDPC_TYPE_PFINSTR;
-	buf[1] = instr->type;
-	return idx;
+	/* spit the primary name */
+	buf[1] = (udpc_type_t)UDPC_TYPE_KEYVAL;
+	buf[2] = (ud_tag_t)UD_TAG_NAME;
+	buf[3] = (unsigned char)strlen(instr->name);
+	idx = 4 + buf[3];
+	memcpy(&buf[4], instr->name, (size_t)buf[3]);
+	/* spit out the CFI */
+	buf[idx++] = (udpc_type_t)UDPC_TYPE_KEYVAL;
+	buf[idx++] = (ud_tag_t)UD_TAG_CFI;
+	memcpy(buf + idx, instr->cfi, sizeof(instr->cfi));
+	return idx + 6;
 }
 
 /* another browser */

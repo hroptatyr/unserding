@@ -78,6 +78,7 @@ enum udpc_type_e {
 	UDPC_TYPE_MON64,
 	/* variadic stuff */
 	/* expects a uint8_t following designating the length */
+	/* 9 */
 	UDPC_TYPE_STRING,
 	/* simplistic date, days since epoch, 16bit */
 	UDPC_TYPE_DATE_DSE,
@@ -94,7 +95,7 @@ enum udpc_type_e {
 	UDPC_TYPE_CATOBJ,
 	/* a keyval pair */
 	UDPC_TYPE_KEYVAL,
-	/* instrument serialisation */
+	/* instrument serialisation, 0x0f */
 	UDPC_TYPE_PFINSTR,
 	UDPC_TYPE_MDDLINSTR,
 };

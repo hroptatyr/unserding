@@ -86,21 +86,33 @@ catalogue_add_instr(catng_t cat, const instrument_t instr, hcode_t cod)
 
 
 static unsigned int
-serialise_catobj(char *restrict buf, const_instrument_t instr)
+serialise_catobj(char *restrict buf, const void *key, const_instrument_t instr)
 {
 	unsigned int idx;
+	unsigned int cod = (unsigned int)(long unsigned int)key;
 
 	/* we are a UDPC_TYPE_CATOBJ */
 	buf[0] = (udpc_type_t)UDPC_TYPE_PFINSTR;
+	idx = 1;
+	/* spit out the code */
+	buf[idx++] = (udpc_type_t)UDPC_TYPE_DWORD;
+	buf[idx++] = ((char*)&cod)[0];
+	buf[idx++] = ((char*)&cod)[1];
+	buf[idx++] = ((char*)&cod)[2];
+	buf[idx++] = ((char*)&cod)[3];
 	/* spit the primary name */
-	buf[1] = (udpc_type_t)UDPC_TYPE_KEYVAL;
-	buf[2] = (ud_tag_t)UD_TAG_NAME;
-	buf[3] = (unsigned char)strlen(instr->name);
-	idx = 4 + buf[3];
-	memcpy(&buf[4], instr->name, (size_t)buf[3]);
+	buf[idx++] = (udpc_type_t)UDPC_TYPE_KEYVAL;
+	buf[idx++] = (ud_tag_t)UD_TAG_NAME;
+	{
+		size_t l = strlen(instr->name);
+		buf[idx++] = (unsigned char)l;
+		memcpy(&buf[idx], instr->name, l);
+		idx += l;
+	}
 	/* spit out the CFI */
 	buf[idx++] = (udpc_type_t)UDPC_TYPE_KEYVAL;
 	buf[idx++] = (ud_tag_t)UD_TAG_CFI;
+	buf[idx++] = (unsigned char)6;
 	memcpy(buf + idx, instr->cfi, sizeof(instr->cfi));
 	return idx + 6;
 }
@@ -131,7 +143,7 @@ ud_cat_lc_job(job_t j)
 		const_instrument_t instr = val;
 		/* filter me one day
 		 * for now we just spill what we've got */
-		idx += serialise_catobj(&j->buf[idx], instr);
+		idx += serialise_catobj(&j->buf[idx], key, instr);
 	}
 	ht_iter_fini_ll(&iter);
 

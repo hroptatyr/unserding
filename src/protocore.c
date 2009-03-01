@@ -444,6 +444,12 @@ __fprint_one(const char *buf, FILE *fp)
 		len++;
 		break;
 
+	case UDPC_TYPE_DWORD: {
+		unsigned int dw = *(const unsigned int*const)&buf[1];
+		fprintf(fp, "(dword)%08x", dw);
+		len = 5;
+		break;
+	}
 	case UDPC_TYPE_UNK:
 	default:
 		fprintf(fp, "(%02x)", buf[0]);

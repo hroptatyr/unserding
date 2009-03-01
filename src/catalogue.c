@@ -328,8 +328,8 @@ ud_fprint_tlv(const char *buf, FILE *fp)
 
 	case UD_TAG_CFI:
 		fputs(":cfi ", fp);
-		ud_fputs(sizeof(pfack_10962_t), buf + 1, fp);
-		len = 1 + 6;
+		ud_fputs(sizeof(pfack_10962_t), buf + 2, fp);
+		len = 2 + 6;
 		break;
 
 	case UD_TAG_UNK:

@@ -450,6 +450,15 @@ __fprint_one(const char *buf, FILE *fp)
 		 * would require pfack headers here and libpfack linkage
 		 * which however is frowned upon because a cli needs not
 		 * know that. */
+		/* We do know a bit of the format though, at least print
+		 * the CFI and the primary name.
+		 * FIXME whenever libpfack's serialiser is changed! */
+		fputs(" :cfi ", fp);
+		ud_fputs(/*sizeof(pfack_10962_t)*/6, &buf[7], fp);
+		fputs(" :opol ", fp);
+		ud_fputs(/*sizeof(mic_t)*/4, &buf[13], fp);
+		fputs(" :psym ", fp);
+		ud_fputs((unsigned char)buf[17], &buf[18], fp);
 		break;
 	}
 	case UDPC_TYPE_DWORD: {

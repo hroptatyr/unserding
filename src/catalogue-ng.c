@@ -100,21 +100,10 @@ serialise_catobj(char *restrict buf, const void *key, const_instrument_t instr)
 	buf[idx++] = ((char*)&cod)[1];
 	buf[idx++] = ((char*)&cod)[2];
 	buf[idx++] = ((char*)&cod)[3];
-	/* spit the primary name */
-	buf[idx++] = (udpc_type_t)UDPC_TYPE_KEYVAL;
-	buf[idx++] = (ud_tag_t)UD_TAG_NAME;
-	{
-		size_t l = strlen(instr->name);
-		buf[idx++] = (unsigned char)l;
-		memcpy(&buf[idx], instr->name, l);
-		idx += l;
-	}
-	/* spit out the CFI */
-	buf[idx++] = (udpc_type_t)UDPC_TYPE_KEYVAL;
-	buf[idx++] = (ud_tag_t)UD_TAG_CFI;
-	buf[idx++] = (unsigned char)6;
-	memcpy(buf + idx, instr->cfi, sizeof(instr->cfi));
-	return idx + 6;
+
+	/* use libpfack's serialiser */
+	idx += seria_instrument(&buf[idx], 4096, instr);
+	return idx;
 }
 
 /* another browser */

@@ -439,11 +439,19 @@ __fprint_one(const char *buf, FILE *fp)
 		len += ud_fprint_tlv(&buf[len], fp);
 		break;
 
-	case UDPC_TYPE_PFINSTR:
-		fputs("\n(pfinstr)", fp);
-		len++;
-		break;
+	case UDPC_TYPE_PFINSTR: {
+		unsigned int dw = *(const unsigned int*const)&buf[1 + 1];
 
+		fputs("\n(pfinstr)", fp);
+		fprintf(fp, "(dword):cod %08x", dw);
+		/* pfinstr tag, dword tag, dword length */
+		len = 1 + 1 + 4 + (size_t)buf[6];
+		/* we cant print the actual instrument tho
+		 * would require pfack headers here and libpfack linkage
+		 * which however is frowned upon because a cli needs not
+		 * know that. */
+		break;
+	}
 	case UDPC_TYPE_DWORD: {
 		unsigned int dw = *(const unsigned int*const)&buf[1];
 		fprintf(fp, "(dword)%08x", dw);

@@ -63,13 +63,41 @@ typedef long int timestamptz_t;
 extern void mod_instr_fx_LTX_init(void);
 extern void mod_instr_fx_LTX_deinit(void);
 
+static inline void __attribute__((always_inline))
+catalogue_add_ccy_instr(void *cat, const_pfack_4217_t ccy, unsigned int cod)
+{
+	void *tmp = make_currency(ccy);
+	catalogue_add_instr(cat, tmp, cod);
+	return;
+}
+
 static void
 obtain_some_4217s(void)
 {
-	void *tmp;
+	/* currencies */
+	catalogue_add_ccy_instr(instruments, PFACK_4217_EUR, 0x80000001);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_USD, 0x80000002);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_GBP, 0x80000003);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_CAD, 0x80000004);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_AUD, 0x80000005);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_KRW, 0x80000006);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_JPY, 0x80000007);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_INR, 0x80000008);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_HKD, 0x80000009);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_CHF, 0x8000000a);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_CNY, 0x8000000b);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_RUB, 0x8000000c);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_BRL, 0x8000000d);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_MXN, 0x8000000e);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_SEK, 0x8000000f);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_NOK, 0x80000010);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_NZD, 0x80000011);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_CLP, 0x80000012);
 
-	tmp = make_currency(PFACK_4217_EUR);
-	catalogue_add_instr(instruments, tmp, 0x80000001);
+	/* precious metals */
+	catalogue_add_ccy_instr(instruments, PFACK_4217_XAU, 0x80000100);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_XAG, 0x80000101);
+	catalogue_add_ccy_instr(instruments, PFACK_4217_XPT, 0x80000102);
 	return;
 }
 

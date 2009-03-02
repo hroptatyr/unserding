@@ -77,6 +77,8 @@ catalogue_add_fx_instr(
 {
 	char newn[3 + 3 + 1];
 	void *tmp;
+	const_instrument_t binstr = catng_find_4217(base);
+	const_instrument_t tinstr = catng_find_4217(terms);
 
 	/* create the name of the pair */
 	newn[0] = base->sym[0],
@@ -88,7 +90,7 @@ catalogue_add_fx_instr(
 	newn[6] = '\0';
 
 	/* create the instrument */
-	tmp = make_fxpair(newn, NULL, NULL);
+	tmp = make_fxpair(newn, binstr, tinstr);
 	catalogue_add_instr(instruments, tmp, cod);
 	return;
 }
@@ -131,6 +133,22 @@ obtain_some_4217s(void)
 	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_INR, 0xc0000007);
 	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_HKD, 0xc0000008);
 	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_CHF, 0xc0000009);
+
+	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_CAD, 0xc0000010);
+	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_AUD, 0xc0000011);
+	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_KRW, 0xc0000012);
+	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_JPY, 0xc0000013);
+	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_INR, 0xc0000014);
+	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_HKD, 0xc0000015);
+	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_CHF, 0xc0000016);
+
+	catalogue_add_fx_instr(PFACK_4217_GBP, PFACK_4217_USD, 0xc0000020);
+	catalogue_add_fx_instr(PFACK_4217_GBP, PFACK_4217_CAD, 0xc0000021);
+	catalogue_add_fx_instr(PFACK_4217_GBP, PFACK_4217_AUD, 0xc0000022);
+
+	catalogue_add_fx_instr(PFACK_4217_XAU, PFACK_4217_USD, 0xc0000100);
+	catalogue_add_fx_instr(PFACK_4217_XAG, PFACK_4217_USD, 0xc0000101);
+	catalogue_add_fx_instr(PFACK_4217_XPT, PFACK_4217_USD, 0xc0000102);
 	return;
 }
 

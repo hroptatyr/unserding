@@ -140,4 +140,27 @@ ud_cat_lc_job(job_t j)
 	return false;
 }
 
+/* auxiliary hack */
+const_instrument_t
+catng_find_4217(const_pfack_4217_t ccy)
+{
+	/* we need a special index for this one */
+	struct ase_dict_iter_s iter;
+	const void *key;
+	void *val;
+
+	ht_iter_init_ll(instruments, &iter);
+	while (ht_iter_next(&iter, &key, &val)) {
+		const_instrument_t instr = val;
+		const struct currency_s *tmp = (const void*)instr->closure;
+		if (tmp->currency == ccy) {
+			/* we expect at most one such instrument */
+			ht_iter_fini_ll(&iter);
+			return instr;
+		}
+	}
+	ht_iter_fini_ll(&iter);
+	return NULL;
+}
+
 /* catalogue-ng.c ends here */

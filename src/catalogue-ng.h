@@ -51,4 +51,6 @@ extern void free_catalogue(catng_t cat);
 
 extern void catalogue_add_instr(catng_t cat, const instrument_t, hcode_t cod);
 
+extern const_instrument_t catng_find_4217(const_pfack_4217_t ccy);
+
 #endif	/* INCLUDED_catalogue_ng_h_ */

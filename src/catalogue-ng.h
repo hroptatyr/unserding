@@ -49,8 +49,6 @@ typedef long unsigned int hcode_t;
 extern catng_t make_catalogue(void);
 extern void free_catalogue(catng_t cat);
 
-extern void catalogue_add_instr(catng_t cat, const instrument_t, hcode_t cod);
-
-extern const_instrument_t catng_find_4217(const_pfack_4217_t ccy);
+extern void catalogue_add_instr(catng_t cat, const instr_t);
 
 #endif	/* INCLUDED_catalogue_ng_h_ */

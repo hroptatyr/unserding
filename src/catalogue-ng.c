@@ -60,7 +60,7 @@ catng_t
 make_catalogue(void)
 {
 	struct ase_dict_options_s opts = {
-		.initial_size = 32,
+		.initial_size = 64,
 		.worst_case_constant_lookup_p = true,
 		.two_power_sizes = true,
 		.arity = 4,
@@ -77,19 +77,20 @@ free_catalogue(catng_t cat)
 
 /* modifiers */
 void
-catalogue_add_instr(catng_t cat, const instrument_t instr, hcode_t cod)
+catalogue_add_instr(catng_t cat, const instr_t instr)
 {
-	void *key = (void*)cod;
+	unsigned int cod = instr_general_group(instr)->ga_id;
+	void *key = (void*)(long unsigned int)cod;
 	ase_htable_put(cat, cod, key/*val-only?*/, instr);
 	return;
 }
 
 
 static unsigned int
-serialise_catobj(char *restrict buf, const void *key, const_instrument_t instr)
+serialise_catobj(char *restrict buf, const_instr_t instr)
 {
 	unsigned int idx;
-	unsigned int cod = (unsigned int)(long unsigned int)key;
+	instr_id_t cod = instr_general_group(instr)->ga_id;
 
 	/* we are a UDPC_TYPE_CATOBJ */
 	buf[0] = (udpc_type_t)UDPC_TYPE_PFINSTR;
@@ -129,38 +130,15 @@ ud_cat_lc_job(job_t j)
 
 	ht_iter_init_ll(instruments, &iter);
 	while (ht_iter_next(&iter, &key, &val)) {
-		const_instrument_t instr = val;
+		const_instr_t instr = val;
 		/* filter me one day
 		 * for now we just spill what we've got */
-		idx += serialise_catobj(&j->buf[idx], key, instr);
+		idx += serialise_catobj(&j->buf[idx], instr);
 	}
 	ht_iter_fini_ll(&iter);
 
 	j->blen = idx;
 	return false;
-}
-
-/* auxiliary hack */
-const_instrument_t
-catng_find_4217(const_pfack_4217_t ccy)
-{
-	/* we need a special index for this one */
-	struct ase_dict_iter_s iter;
-	const void *key;
-	void *val;
-
-	ht_iter_init_ll(instruments, &iter);
-	while (ht_iter_next(&iter, &key, &val)) {
-		const_instrument_t instr = val;
-		const struct currency_s *tmp = (const void*)instr->closure;
-		if (tmp->currency == ccy) {
-			/* we expect at most one such instrument */
-			ht_iter_fini_ll(&iter);
-			return instr;
-		}
-	}
-	ht_iter_fini_ll(&iter);
-	return NULL;
 }
 
 /* catalogue-ng.c ends here */

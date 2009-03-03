@@ -51,4 +51,13 @@ extern void free_catalogue(catng_t cat);
 
 extern void catalogue_add_instr(catng_t cat, const instr_t);
 
+/* tags */
+enum ud_ngtag_e {
+	NNGTAGS
+};
+
+struct ud_ngtag_impl_s {
+	enum ud_ngtag_e t;
+};
+
 #endif	/* INCLUDED_catalogue_ng_h_ */

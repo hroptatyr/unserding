@@ -86,10 +86,49 @@ catalogue_add_instr(catng_t cat, const instr_t instr)
 }
 
 
-static unsigned int
-ud_write_g0_name(char *restrict buf, const char *name)
+/* helpers */
+static inline unsigned int
+ud_write_instr_uid(char *restrict buf, ud_tag_t t, instr_uid_t uid)
 {
-	size_t len = strlen(name);
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = t;
+	memcpy(buf + 2, (char*)&uid, sizeof(instr_uid_t));
+	return 2 + sizeof(uid);
+}
+
+static inline unsigned int
+ud_write_date_dse(char *restrict buf, ud_tag_t t, ffff_date_dse_t d)
+{
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = t;
+	memcpy(buf + 2, (char*)&d, sizeof(d));
+	return sizeof(d) + 2;
+}
+
+static inline unsigned int
+ud_write_monetary32(char *restrict buf, ud_tag_t t, monetary32_t m)
+{
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = t;
+	memcpy(buf + 2, (char*)&m, sizeof(m));
+	return sizeof(m) + 2;
+}
+
+static inline unsigned int
+ud_write_short(char *restrict buf, ud_tag_t t, short int s)
+{
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = t;
+	memcpy(buf + 2, (char*)&s, sizeof(s));
+	return sizeof(s) + 2;
+}
+
+
+static unsigned int
+ud_write_g0_name(char *restrict buf, const void *grp)
+{
+	instr_grp_general_t tmp = grp;
+	size_t len = strlen(tmp->name);
 	if (UNLIKELY(len == 0)) {
 		return 0;
 	}
@@ -97,60 +136,104 @@ ud_write_g0_name(char *restrict buf, const char *name)
 	buf[0] = UDPC_TYPE_KEYVAL;
 	buf[1] = UD_TAG_GROUP0_NAME;
 	buf[2] = (uint8_t)len;
-	memcpy(buf + 3, name, len);
+	memcpy(buf + 3, tmp->name, len);
 	return len + 3;
 }
 
 static unsigned int
-ud_write_g0_cfi(char *restrict buf, const char *cfi)
+ud_write_g0_cfi(char *restrict buf, const void *grp)
 {
-	/* otherwise */
+	instr_grp_general_t tmp = grp;
 	buf[0] = UDPC_TYPE_KEYVAL;
 	buf[1] = UD_TAG_GROUP0_CFI;
-	memcpy(buf + 2, cfi, sizeof(pfack_10962_t));
+	memcpy(buf + 2, tmp->cfi, sizeof(pfack_10962_t));
 	return sizeof(pfack_10962_t) + 2;
 }
 
 static unsigned int
-ud_write_g0_opol(char *restrict buf, const char *opol)
+ud_write_g0_opol(char *restrict buf, const void *grp)
 {
+	instr_grp_general_t tmp = grp;
 	/* otherwise */
 	buf[0] = UDPC_TYPE_KEYVAL;
 	buf[1] = UD_TAG_GROUP0_OPOL;
-	memcpy(buf + 2, opol, sizeof(pfack_10383_t));
+	memcpy(buf + 2, tmp->opol, sizeof(pfack_10383_t));
 	return sizeof(pfack_10383_t) + 2;
 }
 
 static unsigned int
-ud_write_g0_gaid(char *restrict buf, instr_id_t gaid)
+ud_write_g0_gaid(char *restrict buf, const void *grp)
 {
-	/* otherwise */
-	buf[0] = UDPC_TYPE_KEYVAL;
-	buf[1] = UD_TAG_GROUP0_GAID;
-	memcpy(buf + 2, (char*)&gaid, sizeof(instr_id_t));
-	return sizeof(instr_id_t) + 2;
+	instr_grp_general_t tmp = grp;
+	return ud_write_instr_uid(buf, UD_TAG_GROUP0_GAID, tmp->ga_id);
 }
 
 static unsigned int
-ud_write_g2_fund_instr(char *restrict buf, instr_uid_t instr)
+ud_write_g2_fund_instr(char *restrict buf, const void *grp)
 {
-	/* otherwise */
-	buf[0] = UDPC_TYPE_KEYVAL;
-	buf[1] = UD_TAG_GROUP2_FUND_INSTR;
-	memcpy(buf + 2, (char*)&instr, sizeof(instr_uid_t));
-	return sizeof(instr_uid_t) + 2;
+	instr_grp_funding_t tmp = grp;
+	return ud_write_instr_uid(
+		buf, UD_TAG_GROUP2_FUND_INSTR, tmp->fund_instr);
 }
 
 static unsigned int
-ud_write_g2_set_instr(char *restrict buf, instr_uid_t instr)
+ud_write_g2_set_instr(char *restrict buf, const void *grp)
 {
-	/* otherwise */
-	buf[0] = UDPC_TYPE_KEYVAL;
-	buf[1] = UD_TAG_GROUP2_SET_INSTR;
-	memcpy(buf + 2, (char*)&instr, sizeof(instr_uid_t));
-	return sizeof(instr_uid_t) + 2;
+	instr_grp_funding_t tmp = grp;
+	return ud_write_instr_uid(
+		buf, UD_TAG_GROUP2_SET_INSTR, tmp->set_instr);
 }
 
+static unsigned int
+ud_write_g3_start(char *restrict buf, const void *grp)
+{
+	instr_grp_delivery_t tmp = grp;
+	return ud_write_date_dse(buf, UD_TAG_GROUP3_START, tmp->start);
+}
+
+static unsigned int
+ud_write_g3_expiry(char *restrict buf, const void *grp)
+{
+	instr_grp_delivery_t tmp = grp;
+	return ud_write_date_dse(buf, UD_TAG_GROUP3_EXPIRY, tmp->expiry);
+}
+
+static unsigned int
+ud_write_g3_settle(char *restrict buf, const void *grp)
+{
+	instr_grp_delivery_t tmp = grp;
+	return ud_write_date_dse(buf, UD_TAG_GROUP3_SETTLE, tmp->settle);
+}
+
+static unsigned int
+ud_write_g4_underlyer(char *restrict buf, const void *grp)
+{
+	instr_grp_referent_t tmp = grp;
+	return ud_write_instr_uid(buf, UD_TAG_GROUP4_UNDERLYER, tmp->underlyer);
+}
+
+static unsigned int
+ud_write_g4_strike(char *restrict buf, const void *grp)
+{
+	instr_grp_referent_t tmp = grp;
+	return ud_write_monetary32(buf, UD_TAG_GROUP4_STRIKE, tmp->strike);
+}
+
+static unsigned int
+ud_write_g4_ratio_numer(char *restrict buf, const void *grp)
+{
+	instr_grp_referent_t tmp = grp;
+	return ud_write_short(buf, UD_TAG_GROUP4_RATIO_NUMER, tmp->ratio_numer);
+}
+
+static unsigned int
+ud_write_g4_ratio_denom(char *restrict buf, const void *grp)
+{
+	instr_grp_referent_t tmp = grp;
+	return ud_write_short(buf, UD_TAG_GROUP4_RATIO_DENOM, tmp->ratio_denom);
+}
+
+
 /* unserding serialiser */
 static unsigned int
 serialise_catobj(char *restrict buf, const_instr_t instr)
@@ -173,18 +256,31 @@ serialise_catobj(char *restrict buf, const_instr_t instr)
 	if ((tmp = instr_general_group(instr)) != NULL) {
 		/* write group 0, general group */
 		/* :name, :cfi, :opol, :gaid */
-		instr_grp_general_t grp = tmp;
-		idx += ud_write_g0_name(&buf[idx], grp->name);
-		idx += ud_write_g0_cfi(&buf[idx], grp->cfi);
-		idx += ud_write_g0_opol(&buf[idx], grp->opol);
-		idx += ud_write_g0_gaid(&buf[idx], grp->ga_id);
+		idx += ud_write_g0_name(&buf[idx], tmp);
+		idx += ud_write_g0_cfi(&buf[idx], tmp);
+		idx += ud_write_g0_opol(&buf[idx], tmp);
+		idx += ud_write_g0_gaid(&buf[idx], tmp);
 	}
 	if ((tmp = instr_funding_group(instr)) != NULL) {
-		/* write group 0, general group */
+		/* write group 2, general group */
 		/* :fund-instr, :set-instr */
-		instr_grp_funding_t grp = tmp;
-		idx += ud_write_g2_fund_instr(&buf[idx], grp->fund_instr);
-		idx += ud_write_g2_set_instr(&buf[idx], grp->set_instr);
+		idx += ud_write_g2_fund_instr(&buf[idx], tmp);
+		idx += ud_write_g2_set_instr(&buf[idx], tmp);
+	}
+	if ((tmp = instr_delivery_group(instr)) != NULL) {
+		/* write group 3, general group */
+		/* :start, :expiry, :settle */
+		idx += ud_write_g3_start(&buf[idx], tmp);
+		idx += ud_write_g3_expiry(&buf[idx], tmp);
+		idx += ud_write_g3_settle(&buf[idx], tmp);
+	}
+	if ((tmp = instr_referent_group(instr)) != NULL) {
+		/* write group 4, general group */
+		/* :underlyer, :strike, :ratio-numer, :ratio-denom */
+		idx += ud_write_g4_underlyer(&buf[idx], tmp);
+		idx += ud_write_g4_strike(&buf[idx], tmp);
+		idx += ud_write_g4_ratio_numer(&buf[idx], tmp);
+		idx += ud_write_g4_ratio_denom(&buf[idx], tmp);
 	}
 	return idx;
 }

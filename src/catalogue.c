@@ -346,21 +346,68 @@ ud_fprint_tlv(const char *buf, FILE *fp)
 		break;
 
 	case UD_TAG_GROUP0_GAID: {
-		unsigned int dw = *(const unsigned int*const)&buf[1];
-		fprintf(fp, ":g0-gaid %08x", dw);
-		len = 1 + sizeof(instr_id_t);
+		instr_id_t tmp = *(const instr_id_t*const)&buf[1];
+		fprintf(fp, ":g0-gaid %08x", tmp);
+		len = 1 + sizeof(tmp);
 		break;
 	}
+
 	case UD_TAG_GROUP2_FUND_INSTR: {
-		unsigned int dw = *(const unsigned int*const)&buf[1];
-		fprintf(fp, ":g2-instr %08x", dw);
-		len = 1 + sizeof(instr_uid_t);
+		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
+		fprintf(fp, ":g2-instr %08x", (unsigned int)tmp.dummy);
+		len = 1 + sizeof(tmp);
 		break;
 	}
 	case UD_TAG_GROUP2_SET_INSTR: {
-		unsigned int dw = *(const unsigned int*const)&buf[1];
-		fprintf(fp, ":g2-instr %08x", dw);
-		len = 1 + sizeof(instr_uid_t);
+		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
+		fprintf(fp, ":g2-instr %08x", (unsigned int)tmp.dummy);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP3_START: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		fprintf(fp, ":g3-start %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP3_EXPIRY: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		fprintf(fp, ":g3-expiry %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP3_SETTLE: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		fprintf(fp, ":g3-settle %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP4_UNDERLYER: {
+		unsigned int tmp = *(const unsigned int*const)&buf[1];
+		fprintf(fp, ":g4-underlyer %08x", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP4_STRIKE: {
+		monetary32_t tmp = *(const monetary32_t*const)&buf[1];
+		fprintf(fp, ":g4-strike %2.4f", ffff_monetary_d(tmp));
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP4_RATIO_NUMER: {
+		short unsigned int tmp =
+			*(const short unsigned int*const)&buf[1];
+		fprintf(fp, ":g4-ratio-numer %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP4_RATIO_DENOM: {
+		short unsigned int tmp =
+			*(const short unsigned int*const)&buf[1];
+		fprintf(fp, ":g4-ratio-denom %u", tmp);
+		len = 1 + sizeof(tmp);
 		break;
 	}
 	case UD_TAG_UNK:

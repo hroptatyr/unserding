@@ -1,6 +1,6 @@
-/*** mcast4.c -- ipv4 multicast handlers
+/*** mcast4.c -- ipv4, ipv6 multicast handlers
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008, 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *

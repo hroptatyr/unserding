@@ -183,11 +183,35 @@ obtain_indices(void)
 	return;
 }
 
+static void
+obtain_options(void)
+{
+	/* just the S&P P3800 example */
+	instr_t tmp = make_oxxxxx(
+		(instr_id_t)42083U, "S&P C1900 2008-06", "OPEICS", "XCBO");
+	/* set funding */
+	instr_funding_set_fund_instr(tmp, 0x80000002);
+	instr_funding_set_set_instr(tmp, 0x80000002);
+	/* delivery group */
+	instr_delivery_set_start(tmp, 0);
+	instr_delivery_set_expiry(tmp, 14049);
+	instr_delivery_set_settle(tmp, 14052);
+	/* referential group */
+	instr_referent_set_underlyer(tmp, (instr_id_t)15);
+	instr_referent_set_strike(tmp, ffff_monetary_get_d(1900.0));
+	instr_referent_set_ratio_numer(tmp, 1);
+	instr_referent_set_ratio_denom(tmp, 1);
+	/* now add him */
+	catalogue_add_instr(instruments, tmp);
+	return;
+}
+
 void
 mod_instr_fx_LTX_init(void)
 {
 	obtain_some_4217s();
 	obtain_indices();
+	obtain_options();
 	return;
 }
 

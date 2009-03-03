@@ -62,7 +62,11 @@
 # include <errno.h>
 #endif
 /* our master include */
-#define SA_STRUCT		struct sockaddr_in6
+#if defined AF_INET6
+# define SA_STRUCT		struct sockaddr_in6
+#else  /* !AF_INET6 */
+# define SA_STRUCT		struct sockaddr_in
+#endif	/* AF_INET6 */
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"
@@ -84,11 +88,13 @@ static ev_timer ALGN16(__s2s_watcher);
 static uint8_t conv = 0;
 static ev_io ALGN16(__srv_watcher);
 static struct ip_mreq ALGN16(mreq4);
+#if defined AF_INET6
 static struct ipv6_mreq ALGN16(mreq6);
 /* server to client goodness */
 static struct sockaddr_in6 __sa6 = {
 	.sin6_addr = IN6ADDR_ANY_INIT
 };
+#endif	/* AF_INET6 */
 static struct sockaddr_in __sa4 = {
 	.sin_addr = {0}
 };
@@ -165,6 +171,7 @@ __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 	return;
 }
 
+#if defined IPPROTO_IPV6
 static void
 __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *mreq)
 {
@@ -198,6 +205,7 @@ __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *mreq)
 	}
 	return;
 }
+#endif	/* IPPROTO_IPV6 */
 
 static void
 __mcast4_leave_group(int s, struct ip_mreq *mreq)
@@ -207,6 +215,7 @@ __mcast4_leave_group(int s, struct ip_mreq *mreq)
 	return;
 }
 
+#if defined IPPROTO_IPV6
 static void
 __mcast6_leave_group(int s, struct ipv6_mreq *mreq)
 {
@@ -214,6 +223,7 @@ __mcast6_leave_group(int s, struct ipv6_mreq *mreq)
 	setsockopt(s, IPPROTO_IPV6, IPV6_LEAVE_GROUP, mreq, sizeof(*mreq));
 	return;
 }
+#endif	/* IPPROTO_IPV6 */
 
 static int
 mcast46_listener_init(void)
@@ -221,32 +231,46 @@ mcast46_listener_init(void)
 	int retval;
 	volatile int s;
 
+#if defined AF_INET6
 	__sa6.sin6_family = AF_INET6;
 	__sa6.sin6_port = htons(UD_NETWORK_SERVICE);
+#endif	/* AF_INET6 */
 
 	__sa4.sin_family = AF_INET;
 	__sa4.sin_port = htons(UD_NETWORK_SERVICE);
 
-	s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP);
-	if (s < 0) {
-		UD_DEBUG_MCAST("socket() failed\n");
+	if (LIKELY(
+#if defined PF_INET6
+		(s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) >= 0 ||
+#endif	/* PF_INET6 */
+		(s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) >= 0)) {
+		/* likely case upfront */
+		;
+	} else {
+		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
 		return s;
 	}
 	/* allow many many many servers on that port */
 	__reuse_sock(s);
 
 	/* we used to retry upon failure, but who cares */
+#if defined PF_INET6
 	retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6));
+#else
+	retval = bind(s, (struct sockaddr*)&__sa4, sizeof(__sa4));
+#endif
 	if (retval == -1) {
 		UD_DEBUG_MCAST("bind() failed %d %d\n", errno, EINVAL);
 		close(s);
 		return -1;
 	}
 
+#if defined IPPROTO_IPV6
 	/* join the mcast group */
 	__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6);
 	/* endow our s2c and s2s structs */
 	__sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+#endif	/* IPPROTO_IPV6 */
 	/* join the mcast group */
 	__mcast4_join_group(s, UD_MCAST4_ADDR, &mreq4);
 	/* endow our s2c and s2s structs */
@@ -262,7 +286,9 @@ mcast_listener_deinit(int sock)
 {
 	/* drop multicast group membership */
 	__mcast4_leave_group(sock, &mreq4);
+#if defined IPPROTO_IPV6
 	__mcast6_leave_group(sock, &mreq6);
+#endif	/* IPPROTO_IPV6 */
 	/* linger the sink sock */
 	__linger_sock(sock);
 	UD_DEBUG_MCAST("closing listening socket %d...\n", sock);

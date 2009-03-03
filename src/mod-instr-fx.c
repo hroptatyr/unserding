@@ -66,32 +66,17 @@ extern void mod_instr_fx_LTX_deinit(void);
 static inline void __attribute__((always_inline))
 catalogue_add_ccy_instr(const_pfack_4217_t ccy, unsigned int cod)
 {
-	void *tmp = make_currency(ccy);
-	catalogue_add_instr(instruments, tmp, cod);
+	instr_t tmp = make_txxxxx(cod, ccy->sym, "TCXXXX");
+	catalogue_add_instr(instruments, tmp);
 	return;
 }
 
 static void
 catalogue_add_fx_instr(
-	const_pfack_4217_t base, const_pfack_4217_t terms, unsigned int cod)
+	pfack_4217_id_t base, pfack_4217_id_t terms, unsigned int cod)
 {
-	char newn[3 + 3 + 1];
-	void *tmp;
-	const_instrument_t binstr = catng_find_4217(base);
-	const_instrument_t tinstr = catng_find_4217(terms);
-
-	/* create the name of the pair */
-	newn[0] = base->sym[0],
-		newn[1] = base->sym[1],
-		newn[2] = base->sym[2];
-	newn[3] = terms->sym[0],
-		newn[4] = terms->sym[1],
-		newn[5] = terms->sym[2];
-	newn[6] = '\0';
-
-	/* create the instrument */
-	tmp = make_fxpair(newn, binstr, tinstr);
-	catalogue_add_instr(instruments, tmp, cod);
+	instr_t tmp = make_ffcpnx(cod, base, terms);
+	catalogue_add_instr(instruments, tmp);
 	return;
 }
 
@@ -124,31 +109,53 @@ obtain_some_4217s(void)
 	catalogue_add_ccy_instr(PFACK_4217_XPT, 0x80000102);
 
 	/* some usual pairs */
-	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_USD, 0xc0000001);
-	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_GBP, 0xc0000002);
-	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_CAD, 0xc0000003);
-	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_AUD, 0xc0000004);
-	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_KRW, 0xc0000005);
-	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_JPY, 0xc0000006);
-	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_INR, 0xc0000007);
-	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_HKD, 0xc0000008);
-	catalogue_add_fx_instr(PFACK_4217_EUR, PFACK_4217_CHF, 0xc0000009);
+	catalogue_add_fx_instr(
+		PFACK_4217_EUR_IDX, PFACK_4217_USD_IDX, 0xc0000001);
+	catalogue_add_fx_instr(
+		PFACK_4217_EUR_IDX, PFACK_4217_GBP_IDX, 0xc0000002);
+	catalogue_add_fx_instr(
+		PFACK_4217_EUR_IDX, PFACK_4217_CAD_IDX, 0xc0000003);
+	catalogue_add_fx_instr(
+		PFACK_4217_EUR_IDX, PFACK_4217_AUD_IDX, 0xc0000004);
+	catalogue_add_fx_instr(
+		PFACK_4217_EUR_IDX, PFACK_4217_KRW_IDX, 0xc0000005);
+	catalogue_add_fx_instr(
+		PFACK_4217_EUR_IDX, PFACK_4217_JPY_IDX, 0xc0000006);
+	catalogue_add_fx_instr(
+		PFACK_4217_EUR_IDX, PFACK_4217_INR_IDX, 0xc0000007);
+	catalogue_add_fx_instr(
+		PFACK_4217_EUR_IDX, PFACK_4217_HKD_IDX, 0xc0000008);
+	catalogue_add_fx_instr(
+		PFACK_4217_EUR_IDX, PFACK_4217_CHF_IDX, 0xc0000009);
 
-	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_CAD, 0xc0000010);
-	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_AUD, 0xc0000011);
-	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_KRW, 0xc0000012);
-	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_JPY, 0xc0000013);
-	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_INR, 0xc0000014);
-	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_HKD, 0xc0000015);
-	catalogue_add_fx_instr(PFACK_4217_USD, PFACK_4217_CHF, 0xc0000016);
+	catalogue_add_fx_instr(
+		PFACK_4217_USD_IDX, PFACK_4217_CAD_IDX, 0xc0000010);
+	catalogue_add_fx_instr(
+		PFACK_4217_USD_IDX, PFACK_4217_AUD_IDX, 0xc0000011);
+	catalogue_add_fx_instr(
+		PFACK_4217_USD_IDX, PFACK_4217_KRW_IDX, 0xc0000012);
+	catalogue_add_fx_instr(
+		PFACK_4217_USD_IDX, PFACK_4217_JPY_IDX, 0xc0000013);
+	catalogue_add_fx_instr(
+		PFACK_4217_USD_IDX, PFACK_4217_INR_IDX, 0xc0000014);
+	catalogue_add_fx_instr(
+		PFACK_4217_USD_IDX, PFACK_4217_HKD_IDX, 0xc0000015);
+	catalogue_add_fx_instr(
+		PFACK_4217_USD_IDX, PFACK_4217_CHF_IDX, 0xc0000016);
 
-	catalogue_add_fx_instr(PFACK_4217_GBP, PFACK_4217_USD, 0xc0000020);
-	catalogue_add_fx_instr(PFACK_4217_GBP, PFACK_4217_CAD, 0xc0000021);
-	catalogue_add_fx_instr(PFACK_4217_GBP, PFACK_4217_AUD, 0xc0000022);
+	catalogue_add_fx_instr(
+		PFACK_4217_GBP_IDX, PFACK_4217_USD_IDX, 0xc0000020);
+	catalogue_add_fx_instr(
+		PFACK_4217_GBP_IDX, PFACK_4217_CAD_IDX, 0xc0000021);
+	catalogue_add_fx_instr(
+		PFACK_4217_GBP_IDX, PFACK_4217_AUD_IDX, 0xc0000022);
 
-	catalogue_add_fx_instr(PFACK_4217_XAU, PFACK_4217_USD, 0xc0000100);
-	catalogue_add_fx_instr(PFACK_4217_XAG, PFACK_4217_USD, 0xc0000101);
-	catalogue_add_fx_instr(PFACK_4217_XPT, PFACK_4217_USD, 0xc0000102);
+	catalogue_add_fx_instr(
+		PFACK_4217_XAU_IDX, PFACK_4217_USD_IDX, 0xc0000100);
+	catalogue_add_fx_instr(
+		PFACK_4217_XAG_IDX, PFACK_4217_USD_IDX, 0xc0000101);
+	catalogue_add_fx_instr(
+		PFACK_4217_XPT_IDX, PFACK_4217_USD_IDX, 0xc0000102);
 	return;
 }
 

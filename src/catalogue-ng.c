@@ -131,6 +131,26 @@ ud_write_g0_gaid(char *restrict buf, instr_id_t gaid)
 	return sizeof(instr_id_t) + 2;
 }
 
+static unsigned int
+ud_write_g2_fund_instr(char *restrict buf, instr_uid_t instr)
+{
+	/* otherwise */
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = UD_TAG_GROUP2_FUND_INSTR;
+	memcpy(buf + 2, (char*)&instr, sizeof(instr_uid_t));
+	return sizeof(instr_uid_t) + 2;
+}
+
+static unsigned int
+ud_write_g2_set_instr(char *restrict buf, instr_uid_t instr)
+{
+	/* otherwise */
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = UD_TAG_GROUP2_SET_INSTR;
+	memcpy(buf + 2, (char*)&instr, sizeof(instr_uid_t));
+	return sizeof(instr_uid_t) + 2;
+}
+
 /* unserding serialiser */
 static unsigned int
 serialise_catobj(char *restrict buf, const_instr_t instr)
@@ -158,6 +178,13 @@ serialise_catobj(char *restrict buf, const_instr_t instr)
 		idx += ud_write_g0_cfi(&buf[idx], grp->cfi);
 		idx += ud_write_g0_opol(&buf[idx], grp->opol);
 		idx += ud_write_g0_gaid(&buf[idx], grp->ga_id);
+	}
+	if ((tmp = instr_funding_group(instr)) != NULL) {
+		/* write group 0, general group */
+		/* :fund-instr, :set-instr */
+		instr_grp_funding_t grp = tmp;
+		idx += ud_write_g2_fund_instr(&buf[idx], grp->fund_instr);
+		idx += ud_write_g2_set_instr(&buf[idx], grp->set_instr);
 	}
 	return idx;
 }

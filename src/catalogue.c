@@ -351,6 +351,18 @@ ud_fprint_tlv(const char *buf, FILE *fp)
 		len = 1 + sizeof(instr_id_t);
 		break;
 	}
+	case UD_TAG_GROUP2_FUND_INSTR: {
+		unsigned int dw = *(const unsigned int*const)&buf[1];
+		fprintf(fp, ":g2-instr %08x", dw);
+		len = 1 + sizeof(instr_uid_t);
+		break;
+	}
+	case UD_TAG_GROUP2_SET_INSTR: {
+		unsigned int dw = *(const unsigned int*const)&buf[1];
+		fprintf(fp, ":g2-instr %08x", dw);
+		len = 1 + sizeof(instr_uid_t);
+		break;
+	}
 	case UD_TAG_UNK:
 	default:
 		fprintf(fp, ":key %02x", t);

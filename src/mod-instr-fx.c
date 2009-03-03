@@ -81,6 +81,14 @@ catalogue_add_fx_instr(
 }
 
 static void
+catalogue_add_ti_instr(instr_id_t id, const char *name)
+{
+	instr_t tmp = make_txxxxx(id, name, "TIXXXX");
+	catalogue_add_instr(instruments, tmp);
+	return;
+}
+
+static void
 obtain_some_4217s(void)
 {
 	/* currencies */
@@ -159,10 +167,27 @@ obtain_some_4217s(void)
 	return;
 }
 
+static void
+obtain_indices(void)
+{
+	catalogue_add_ti_instr(1, "DAX");
+	catalogue_add_ti_instr(3, "ESX");
+	catalogue_add_ti_instr(5, "CAC");
+	catalogue_add_ti_instr(7, "FTSE");
+	catalogue_add_ti_instr(9, "DJX");
+	catalogue_add_ti_instr(11, "NDX");
+	catalogue_add_ti_instr(13, "RUT");
+	catalogue_add_ti_instr(15, "SPX");
+	catalogue_add_ti_instr(17, "XEO");
+	catalogue_add_ti_instr(19, "K200");
+	return;
+}
+
 void
 mod_instr_fx_LTX_init(void)
 {
 	obtain_some_4217s();
+	obtain_indices();
 	return;
 }
 

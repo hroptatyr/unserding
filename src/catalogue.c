@@ -326,12 +326,31 @@ ud_fprint_tlv(const char *buf, FILE *fp)
 		len += 2;
 		break;
 
-	case UD_TAG_CFI:
-		fputs(":cfi ", fp);
-		ud_fputs(sizeof(pfack_10962_t), buf + 2, fp);
-		len = 2 + 6;
+	case UD_TAG_GROUP0_NAME:
+		fputs(":g0-name ", fp);
+		len = buf[1];
+		ud_fputs(len, buf + 2, fp);
+		len += 2;
 		break;
 
+	case UD_TAG_GROUP0_CFI:
+		fputs(":g0-cfi ", fp);
+		ud_fputs(sizeof(pfack_10962_t), buf + 1, fp);
+		len = 1 + sizeof(pfack_10962_t);
+		break;
+
+	case UD_TAG_GROUP0_OPOL:
+		fputs(":g0-opol ", fp);
+		ud_fputs(sizeof(pfack_10383_t), buf + 1, fp);
+		len = 1 + sizeof(pfack_10383_t);
+		break;
+
+	case UD_TAG_GROUP0_GAID: {
+		unsigned int dw = *(const unsigned int*const)&buf[1];
+		fprintf(fp, ":g0-gaid %08x", dw);
+		len = 1 + sizeof(instr_id_t);
+		break;
+	}
 	case UD_TAG_UNK:
 	default:
 		fprintf(fp, ":key %02x", t);

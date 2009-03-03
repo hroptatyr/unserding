@@ -439,32 +439,22 @@ __fprint_one(const char *buf, FILE *fp)
 		len += ud_fprint_tlv(&buf[len], fp);
 		break;
 
-	case UDPC_TYPE_PFINSTR: {
-		unsigned int dw = *(const unsigned int*const)&buf[1 + 1];
-
+	case UDPC_TYPE_PFINSTR:
 		fputs("\n(pfinstr)", fp);
-		fprintf(fp, "(dword):cod %08x", dw);
-		/* pfinstr tag, dword tag, dword length */
-		len = 1 + 1 + 4 + (size_t)buf[6];
-		/* we cant print the actual instrument tho
-		 * would require pfack headers here and libpfack linkage
-		 * which however is frowned upon because a cli needs not
-		 * know that. */
-		/* We do know a bit of the format though, at least print
-		 * the CFI and the primary name.
-		 * FIXME whenever libpfack's serialiser is changed! */
-		fputs(" :cfi ", fp);
-		ud_fputs(/*sizeof(pfack_10962_t)*/6, &buf[7], fp);
-		fputs(" :opol ", fp);
-		ud_fputs(/*sizeof(mic_t)*/4, &buf[13], fp);
-		fputs(" :psym ", fp);
-		ud_fputs((unsigned char)buf[17], &buf[18], fp);
+		len = 1;
 		break;
-	}
+
 	case UDPC_TYPE_DWORD: {
 		unsigned int dw = *(const unsigned int*const)&buf[1];
 		fprintf(fp, "(dword)%08x", dw);
-		len = 5;
+		len = 1 + sizeof(dw);
+		break;
+	}
+
+	case UDPC_TYPE_WORD: {
+		short unsigned int dw = *(const unsigned int*const)&buf[1];
+		fprintf(fp, "(word)%04x", dw);
+		len = 1 + sizeof(dw);
 		break;
 	}
 	case UDPC_TYPE_UNK:

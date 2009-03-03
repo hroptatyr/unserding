@@ -85,28 +85,84 @@ catalogue_add_instr(catng_t cat, const instr_t instr)
 	return;
 }
 
+
+static unsigned int
+ud_write_g0_name(char *restrict buf, const char *name)
+{
+	size_t len = strlen(name);
+	if (UNLIKELY(len == 0)) {
+		return 0;
+	}
+	/* otherwise */
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = UD_TAG_GROUP0_NAME;
+	buf[2] = (uint8_t)len;
+	memcpy(buf + 3, name, len);
+	return len + 3;
+}
 
+static unsigned int
+ud_write_g0_cfi(char *restrict buf, const char *cfi)
+{
+	/* otherwise */
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = UD_TAG_GROUP0_CFI;
+	memcpy(buf + 2, cfi, sizeof(pfack_10962_t));
+	return sizeof(pfack_10962_t) + 2;
+}
+
+static unsigned int
+ud_write_g0_opol(char *restrict buf, const char *opol)
+{
+	/* otherwise */
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = UD_TAG_GROUP0_OPOL;
+	memcpy(buf + 2, opol, sizeof(pfack_10383_t));
+	return sizeof(pfack_10383_t) + 2;
+}
+
+static unsigned int
+ud_write_g0_gaid(char *restrict buf, instr_id_t gaid)
+{
+	/* otherwise */
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = UD_TAG_GROUP0_GAID;
+	memcpy(buf + 2, (char*)&gaid, sizeof(instr_id_t));
+	return sizeof(instr_id_t) + 2;
+}
+
+/* unserding serialiser */
 static unsigned int
 serialise_catobj(char *restrict buf, const_instr_t instr)
 {
 	unsigned int idx;
-	instr_id_t cod = instr_general_group(instr)->ga_id;
+	short unsigned int grpset = instr->grps;
+	char *p;
+	const void *tmp;
 
 	/* we are a UDPC_TYPE_CATOBJ */
 	buf[0] = (udpc_type_t)UDPC_TYPE_PFINSTR;
-	idx = 1;
-	/* spit out the code */
-	buf[idx++] = (udpc_type_t)UDPC_TYPE_DWORD;
-	buf[idx++] = ((char*)&cod)[0];
-	buf[idx++] = ((char*)&cod)[1];
-	buf[idx++] = ((char*)&cod)[2];
-	buf[idx++] = ((char*)&cod)[3];
+	/* write the group set */
+	buf[1] = (udpc_type_t)UDPC_TYPE_WORD;
+	idx = 2;
+	p = (char*)&grpset;
+	buf[idx++] = *p++;
+	buf[idx++] = *p++;
 
-	/* use libpfack's serialiser */
-	idx += seria_instrument(&buf[idx], 4096, instr);
+	/* encode the groups now */
+	if ((tmp = instr_general_group(instr)) != NULL) {
+		/* write group 0, general group */
+		/* :name, :cfi, :opol, :gaid */
+		instr_grp_general_t grp = tmp;
+		idx += ud_write_g0_name(&buf[idx], grp->name);
+		idx += ud_write_g0_cfi(&buf[idx], grp->cfi);
+		idx += ud_write_g0_opol(&buf[idx], grp->opol);
+		idx += ud_write_g0_gaid(&buf[idx], grp->ga_id);
+	}
 	return idx;
 }
 
+
 /* another browser */
 extern bool ud_cat_lc_job(job_t j);
 bool

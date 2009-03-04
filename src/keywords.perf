@@ -2,10 +2,15 @@
 %{
 #include "catalogue.h"
 #include <string.h>
+
+/* why cant these idiots declare it? */
+inline const struct ud_tagtbl_s __attribute__((always_inline, gnu_inline))*
+__ud_tag_from_s (register const char *str, register unsigned int len);
 %}
 
 %readonly-tables
 %enum
+%7bit
 %struct-type
 %define lookup-function-name __ud_tag_from_s
 

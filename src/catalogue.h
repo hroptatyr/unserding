@@ -231,7 +231,8 @@ ud_make_class(const char *cls, uint8_t size)
 {
 	ud_tlv_t res = make_tlv(UD_TAG_CLASS, size+1);
 	(((char*)res) + offsetof(struct ud_tlv_s, data))[0] = (char)size;
-	memcpy((((char*)res) + offsetof(struct ud_tlv_s, data)) + 1, cls, size);
+	__builtin_memcpy(
+		(((char*)res) + offsetof(struct ud_tlv_s, data))+1, cls, size);
 	return res;
 }
 
@@ -240,7 +241,8 @@ ud_make_name(const char *nam, uint8_t size)
 {
 	ud_tlv_t res = make_tlv(UD_TAG_NAME, size+1);
 	(((char*)res) + offsetof(struct ud_tlv_s, data))[0] = (char)size;
-	memcpy((((char*)res) + offsetof(struct ud_tlv_s, data)) + 1, nam, size);
+	__builtin_memcpy(
+		(((char*)res) + offsetof(struct ud_tlv_s, data))+1, nam, size);
 	return res;
 }
 
@@ -249,12 +251,14 @@ ud_make_name(const char *nam, uint8_t size)
 
 /**
  * Print. */
-extern uint8_t ud_fprint_tlv(const char *buf, FILE *fp);
+extern uint8_t ud_fprint_tlv(const char *buf, void *fp);
 
 /**
  * A ludicrously fast parser for keywords.
  * This does not use flex/bison but a trie based approach.
- * This can also parse stuff like :0x7e or :7e to allow for raw keys. */
+ * This can also parse stuff like :0x7e or :7e to allow for raw keys.
+ *
+ * At the moment the trie-based approach is supplanted by gperf. */
 extern ud_tag_t ud_tag_from_s(const char *buf);
 
 #endif	/* INCLUDED_catalogue_h_ */

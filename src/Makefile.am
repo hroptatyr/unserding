@@ -5,7 +5,7 @@ AM_LDFLAGS = -lpthread
 
 headerdir = $(includedir)/unserding
 
-bin_PROGRAMS = unserdingd unsercli testcli
+bin_PROGRAMS = unserdingd unsercli
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
@@ -31,7 +31,9 @@ endif
 unserdingd_SOURCES += mod-instr-fx.c
 
 ## the main server binary
-unsercli_SOURCES = unsercli.c scanner.l parser.y protocore.c catalogue.c stdin.c
+unsercli_SOURCES = unsercli.c stdin.c
+unsercli_SOURCES += scanner.l parser.y keywords.c
+unsercli_SOURCES += protocore.c catalogue.c
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_YFLAGS = -d -p "cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
@@ -47,14 +49,31 @@ unsercli-scanner.h: scanner.l
 	test -e lex.yy.c && $(RM) lex.yy.c
 	test -e lex.yy.h && mv lex.yy.h $@
 
+## gperf baloney
+GPERF = gperf
+GPERFFLAGS = --multiple-iterations=8 --language=C
+BUILT_SOURCES += keywords.c
+CLEANFILES += keywords.c keywords.c.tmp
+## gperf target
+keywords.c: keywords.perf
+	if $(GPERF) $(GPERFFLAGS) $< > $@.tmp; then \
+		mv $@.tmp $@; \
+	elif $(GPERF) --version >/dev/null 2>&1; then \
+		rm $@.tmp; \
+		exit 1; \
+	else \
+		rm $@.tmp; \
+		touch $@; \
+	fi
+
 ## the lib
 libunserding_la_SOURCES = libstuff.c
 
-## the main server binary
-testcli_SOURCES = testcli.c catalogue.c
-testcli_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
-testcli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
-testcli_LDADD = $(LIBEV_LIBS) -lreadline libunserding.la
+## kick
+#testcli_SOURCES = testcli.c catalogue.c
+#testcli_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
+#testcli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+#testcli_LDADD = $(LIBEV_LIBS) -lreadline libunserding.la
 
 # 
 # Help the developers get nice post-processed source files

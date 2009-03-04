@@ -221,7 +221,15 @@ TOK_LS /* in the middle */ {
 } keyvals;
 
 lc_cmd:
-TOK_LC;
+TOK_LC |
+TOK_LC /* in the middle */ {
+	/* init the seqof counter */
+	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_SEQOF;
+	/* set its initial value to naught */
+	hdl->pktchn[0].pbuf[9] = 0;
+	/* set the packet idx */
+	hdl->pktchn[0].plen = 10;
+} keyvals;
 
 cat_cmd:
 TOK_CAT |

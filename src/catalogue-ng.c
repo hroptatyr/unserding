@@ -88,6 +88,26 @@ catalogue_add_instr(catng_t cat, const instr_t instr)
 
 
 /* helpers */
+static inline signed char __attribute__((always_inline, gnu_inline))
+tlv_cmp_f(const ud_tlv_t t1, const ud_tlv_t t2)
+{
+/* returns -1 if t1 < t2, 0 if t1 == t2 and 1 if t1 > t2 */
+#if 1
+	if (t1->tag < t2->tag) {
+		return -1;
+	} else if (t1->tag == t2->tag) {
+		return 0;
+	} else /*if (t1->tag > t2->tag)*/ {
+		return 1;
+	}
+#else
+	uint8_t t1s = ud_tlv_size(t1);
+	uint8_t t2s = ud_tlv_size(t2);
+	uint8_t sz = t1s < t2s ? t1s : t2s;
+	return memcmp((const char*)t1, (const char*)t2, sz);
+#endif
+}
+
 static inline unsigned int
 ud_write_instr_uid(char *restrict buf, ud_tag_t t, instr_uid_t uid)
 {
@@ -304,36 +324,123 @@ serialise_catobj(char *restrict buf, const_instr_t instr)
 }
 
 
+static unsigned int
+sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
+{
+	uint8_t idx = j->buf[9];
+	uint8_t sz;
+	ud_tlv_t tmin, last;
+
+	if (UNLIKELY(j->buf[8] != UDPC_TYPE_SEQOF)) {
+		return 0;
+	} else if (UNLIKELY(idx == 0)) {
+		return 0;
+	} else if (idx == 1) {
+		ud_tlv_t tlv = (ud_tlv_t)&j->buf[10];
+		memcpy(wrkspc, tlv, 2+ud_tlv_size(tlv));
+		tlvs[0] = (ud_tlv_t)wrkspc;
+		return 1;
+	}
+
+	/* do a primitive slection sort, do me properly! */
+	/* we traverse the list once to find the minimum element */
+	tmin = (ud_tlv_t)&j->buf[10];
+
+	for (ud_tlv_t t = (ud_tlv_t)
+		     ((char*)tmin + 2 + ud_tlv_size(tmin));
+	     (char*)t < j->buf + j->blen;
+	     t = (ud_tlv_t)((char*)t + 2 + ud_tlv_size(t))) {
+
+		if (tlv_cmp_f(tmin, t) > 0) {
+			tmin = t;
+		}
+	}
+	/* copy the stuff over to the work space */
+	tlvs[0] = (ud_tlv_t)wrkspc;
+	memcpy(wrkspc, tmin, sz = 2 + ud_tlv_size(tmin));
+	wrkspc += sz;
+
+	/* using this as new maximum */
+	last = tmin;
+
+	for (uint8_t k = 1; k < idx; k++) {
+		/* just choose a tmin */
+		tmin = (ud_tlv_t)&j->buf[10];
+
+		for (ud_tlv_t t = (ud_tlv_t)
+			     ((char*)tmin + 2 + ud_tlv_size(tmin));
+		     (char*)t < j->buf + j->blen;
+		     t = (ud_tlv_t)((char*)t + 2 + ud_tlv_size(t))) {
+
+			if (tlv_cmp_f(tmin, last) <= 0) {
+				tmin = t;
+				continue;
+			}
+			if (tlv_cmp_f(t, last) <= 0) {
+				continue;
+			}
+			if (tlv_cmp_f(tmin, t) > 0) {
+				tmin = t;
+			}
+		}
+		tlvs[k] = (ud_tlv_t)wrkspc;
+		memcpy(wrkspc, tmin, sz = 2 + ud_tlv_size(tmin));
+		wrkspc += sz;
+
+		/* using this as new maximum */
+		last = tmin;
+	}
+	return idx;
+}
+
+static bool
+catobj_filter(const_instr_t instr, ud_tlv_t *sub, uint8_t slen)
+{
+	/* traverse all the filter properties */
+	for (uint8_t j = 0; j < slen; j++) {
+		if (UNLIKELY(sub[j]->tag < UD_TAG_INSTRFILT_FIRST ||
+			     sub[j]->tag > UD_TAG_INSTRFILT_LAST)) {
+			return false;
+		}
+	}
+	return true;
+}
+
 /* another browser */
 extern bool ud_cat_lc_job(job_t j);
 bool
 ud_cat_lc_job(job_t j)
 {
 	unsigned int idx = 10;
-	//unsigned int slen = 0;
-	//char tmp[UDPC_SIMPLE_PKTLEN];
-	//ud_tlv_t sub[8];
+	unsigned int slen = 0;
+	char tmp[UDPC_SIMPLE_PKTLEN];
+	ud_tlv_t sub[8];
 	struct ase_dict_iter_s iter;
 	const void *key;
 	void *val;
+	uint8_t ninstrs = 0;
 
 	UD_DEBUG_CAT("lc job\n");
 	/* filter what the luser sent us */
-	//slen = sort_params(sub, tmp, j);
+	slen = sort_params(sub, tmp, j);
 	/* we are a seqof(UDPC_TYPE_CATOBJ) */
 	j->buf[8] = (udpc_type_t)UDPC_TYPE_SEQOF;
-	/* we are ud_catalen entries wide */
-	j->buf[9] = (uint8_t)ase_htable_fill(instruments);
 
 	ht_iter_init_ll(instruments, &iter);
 	while (ht_iter_next(&iter, &key, &val)) {
 		const_instr_t instr = val;
-		/* filter me one day
-		 * for now we just spill what we've got */
-		idx += serialise_catobj(&j->buf[idx], instr);
+		/* only include matching instruments */
+		if (catobj_filter(instr, sub, slen)) {
+			idx += serialise_catobj(&j->buf[idx], instr);
+			ninstrs++;
+		}
 	}
 	ht_iter_fini_ll(&iter);
 
+	/* the number of instruments output */
+	j->buf[9] = ninstrs;
+	/* the total length of the packet
+	 * CHECKME prone to overflows */
 	j->blen = idx;
 	return false;
 }

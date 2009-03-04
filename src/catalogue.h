@@ -103,6 +103,11 @@ enum ud_tag_e {
 	UD_TAG_GROUP4_RATIO = UD_TAG_GROUP4(2),
 
 	UD_TAG_GROUP5_BARRIER = UD_TAG_GROUP5(0),
+
+	/* first allowed tag for instrument filters */
+	UD_TAG_INSTRFILT_FIRST = UD_TAG_GROUP0_NAME,
+	/* last allowed tag for instrument filters */
+	UD_TAG_INSTRFILT_LAST = UD_TAG_GROUP5_BARRIER,
 };
 
 /**

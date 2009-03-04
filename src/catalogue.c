@@ -365,9 +365,9 @@ ud_fprint_tlv(const char *buf, FILE *fp)
 		break;
 	}
 
-	case UD_TAG_GROUP3_BIRTH: {
+	case UD_TAG_GROUP3_ISSUE: {
 		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
-		fprintf(fp, ":g3-birth %u", tmp);
+		fprintf(fp, ":g3-isse %u", tmp);
 		len = 1 + sizeof(tmp);
 		break;
 	}

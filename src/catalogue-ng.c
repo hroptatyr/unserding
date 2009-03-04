@@ -133,12 +133,20 @@ ud_write_ratio(char *restrict buf, ud_tag_t t, ratio16_t s)
 	return sizeof(s) + 2;
 }
 
+static inline unsigned int
+ud_write_uint32(char *restrict buf, ud_tag_t t, uint32_t i)
+{
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = t;
+	memcpy(buf + 2, (char*)&i, sizeof(i));
+	return sizeof(i) + 2;
+}
+
 
 static unsigned int
 ud_write_g0_name(char *restrict buf, const void *grp)
 {
-	instr_grp_general_t tmp = grp;
-	size_t len = strlen(tmp->name);
+	size_t len = strlen(general_name(grp));
 	if (UNLIKELY(len == 0)) {
 		return 0;
 	}
@@ -146,94 +154,94 @@ ud_write_g0_name(char *restrict buf, const void *grp)
 	buf[0] = UDPC_TYPE_KEYVAL;
 	buf[1] = UD_TAG_GROUP0_NAME;
 	buf[2] = (uint8_t)len;
-	memcpy(buf + 3, tmp->name, len);
+	memcpy(buf + 3, general_name(grp), len);
 	return len + 3;
 }
 
 static unsigned int
 ud_write_g0_cfi(char *restrict buf, const void *grp)
 {
-	instr_grp_general_t tmp = grp;
 	buf[0] = UDPC_TYPE_KEYVAL;
 	buf[1] = UD_TAG_GROUP0_CFI;
-	memcpy(buf + 2, tmp->cfi, sizeof(pfack_10962_t));
+	memcpy(buf + 2, general_cfi(grp), sizeof(pfack_10962_t));
 	return sizeof(pfack_10962_t) + 2;
 }
 
 static unsigned int
 ud_write_g0_opol(char *restrict buf, const void *grp)
 {
-	instr_grp_general_t tmp = grp;
 	/* otherwise */
 	buf[0] = UDPC_TYPE_KEYVAL;
 	buf[1] = UD_TAG_GROUP0_OPOL;
-	memcpy(buf + 2, tmp->opol, sizeof(pfack_10383_t));
+	memcpy(buf + 2, general_opol(grp), sizeof(pfack_10383_t));
 	return sizeof(pfack_10383_t) + 2;
 }
 
 static unsigned int
 ud_write_g0_gaid(char *restrict buf, const void *grp)
 {
-	instr_grp_general_t tmp = grp;
-	return ud_write_instr_uid(buf, UD_TAG_GROUP0_GAID, tmp->ga_id);
+	return ud_write_instr_uid(buf, UD_TAG_GROUP0_GAID, general_ga_id(grp));
 }
 
 static unsigned int
 ud_write_g2_fund_instr(char *restrict buf, const void *grp)
 {
-	instr_grp_funding_t tmp = grp;
 	return ud_write_instr_uid(
-		buf, UD_TAG_GROUP2_FUND_INSTR, tmp->fund_instr);
+		buf, UD_TAG_GROUP2_FUND_INSTR, funding_fund_instr(grp));
 }
 
 static unsigned int
-ud_write_g2_set_instr(char *restrict buf, const void *grp)
+ud_write_g2_setd_instr(char *restrict buf, const void *grp)
 {
-	instr_grp_funding_t tmp = grp;
 	return ud_write_instr_uid(
-		buf, UD_TAG_GROUP2_SETD_INSTR, tmp->set_instr);
+		buf, UD_TAG_GROUP2_SETD_INSTR, funding_setd_instr(grp));
 }
 
 static unsigned int
-ud_write_g3_start(char *restrict buf, const void *grp)
+ud_write_g3_issue(char *restrict buf, const void *grp)
 {
-	instr_grp_delivery_t tmp = grp;
-	return ud_write_date_dse(buf, UD_TAG_GROUP3_BIRTH, tmp->start);
+	return ud_write_date_dse(buf, UD_TAG_GROUP3_ISSUE, delivery_issue(grp));
 }
 
 static unsigned int
 ud_write_g3_expiry(char *restrict buf, const void *grp)
 {
-	instr_grp_delivery_t tmp = grp;
-	return ud_write_date_dse(buf, UD_TAG_GROUP3_EXPIRY, tmp->expiry);
+	return ud_write_date_dse(
+		buf, UD_TAG_GROUP3_EXPIRY, delivery_expiry(grp));
 }
 
 static unsigned int
 ud_write_g3_settle(char *restrict buf, const void *grp)
 {
-	instr_grp_delivery_t tmp = grp;
-	return ud_write_date_dse(buf, UD_TAG_GROUP3_SETTLE, tmp->settle);
+	return ud_write_date_dse(
+		buf, UD_TAG_GROUP3_SETTLE, delivery_settle(grp));
 }
 
 static unsigned int
 ud_write_g4_underlyer(char *restrict buf, const void *grp)
 {
-	instr_grp_referent_t tmp = grp;
-	return ud_write_instr_uid(buf, UD_TAG_GROUP4_UNDERLYER, tmp->underlyer);
+	return ud_write_instr_uid(
+		buf, UD_TAG_GROUP4_UNDERLYER, referent_underlyer(grp));
 }
 
 static unsigned int
 ud_write_g4_strike(char *restrict buf, const void *grp)
 {
-	instr_grp_referent_t tmp = grp;
-	return ud_write_monetary32(buf, UD_TAG_GROUP4_STRIKE, tmp->strike);
+	return ud_write_monetary32(
+		buf, UD_TAG_GROUP4_STRIKE, referent_strike(grp));
 }
 
 static unsigned int
 ud_write_g4_ratio(char *restrict buf, const void *grp)
 {
-	instr_grp_referent_t tmp = grp;
-	return ud_write_ratio(buf, UD_TAG_GROUP4_RATIO, tmp->ratio);
+	return ud_write_ratio(buf, UD_TAG_GROUP4_RATIO, referent_ratio(grp));
+}
+
+static unsigned int
+ud_write_g5_barrier(char *restrict buf, uint8_t idx, const void *grp)
+{
+	return ud_write_uint32(
+		buf, UD_TAG_GROUP5_BARRIER, barrier_barrier(grp, idx));
 }
 
 
@@ -265,24 +273,32 @@ serialise_catobj(char *restrict buf, const_instr_t instr)
 		idx += ud_write_g0_gaid(&buf[idx], tmp);
 	}
 	if ((tmp = instr_funding_group(instr)) != NULL) {
-		/* write group 2, general group */
+		/* write group 2, funding group */
 		/* :fund-instr, :set-instr */
 		idx += ud_write_g2_fund_instr(&buf[idx], tmp);
-		idx += ud_write_g2_set_instr(&buf[idx], tmp);
+		idx += ud_write_g2_setd_instr(&buf[idx], tmp);
 	}
 	if ((tmp = instr_delivery_group(instr)) != NULL) {
-		/* write group 3, general group */
+		/* write group 3, delivery group */
 		/* :start, :expiry, :settle */
-		idx += ud_write_g3_start(&buf[idx], tmp);
+		idx += ud_write_g3_issue(&buf[idx], tmp);
 		idx += ud_write_g3_expiry(&buf[idx], tmp);
 		idx += ud_write_g3_settle(&buf[idx], tmp);
 	}
 	if ((tmp = instr_referent_group(instr)) != NULL) {
-		/* write group 4, general group */
+		/* write group 4, referent group */
 		/* :underlyer, :strike, :ratio */
 		idx += ud_write_g4_underlyer(&buf[idx], tmp);
 		idx += ud_write_g4_strike(&buf[idx], tmp);
 		idx += ud_write_g4_ratio(&buf[idx], tmp);
+	}
+	if ((tmp = instr_barrier_group(instr)) != NULL) {
+		/* write group 5, barrier group */
+		/* 4 kikos */
+		idx += ud_write_g5_barrier(&buf[idx], 0, tmp);
+		idx += ud_write_g5_barrier(&buf[idx], 1, tmp);
+		idx += ud_write_g5_barrier(&buf[idx], 2, tmp);
+		idx += ud_write_g5_barrier(&buf[idx], 3, tmp);
 	}
 	return idx;
 }

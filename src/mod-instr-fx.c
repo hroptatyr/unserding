@@ -191,9 +191,9 @@ obtain_options(void)
 		(instr_id_t)42083U, "S&P C1900 2008-06", "OPEICS", "XCBO");
 	/* set funding */
 	instr_funding_set_fund_instr(tmp, 0x80000002);
-	instr_funding_set_set_instr(tmp, 0x80000002);
+	instr_funding_set_setd_instr(tmp, 0x80000002);
 	/* delivery group */
-	instr_delivery_set_start(tmp, 0);
+	instr_delivery_set_issue(tmp, 0);
 	instr_delivery_set_expiry(tmp, 14049);
 	instr_delivery_set_settle(tmp, 14052);
 	/* referential group */

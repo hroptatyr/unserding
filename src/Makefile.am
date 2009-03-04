@@ -51,7 +51,7 @@ unsercli-scanner.h: scanner.l
 
 ## gperf baloney
 GPERF = gperf
-GPERFFLAGS = --multiple-iterations=8 --language=C
+GPERFFLAGS = --multiple-iterations=8 --language=ANSI-C
 BUILT_SOURCES += keywords.c
 CLEANFILES += keywords.c keywords.c.tmp
 ## gperf target

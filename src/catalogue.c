@@ -354,20 +354,20 @@ ud_fprint_tlv(const char *buf, FILE *fp)
 
 	case UD_TAG_GROUP2_FUND_INSTR: {
 		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
-		fprintf(fp, ":g2-instr %08x", (unsigned int)tmp.dummy);
+		fprintf(fp, ":g2-fund-instr %08x", (unsigned int)tmp.dummy);
 		len = 1 + sizeof(tmp);
 		break;
 	}
-	case UD_TAG_GROUP2_SET_INSTR: {
+	case UD_TAG_GROUP2_SETD_INSTR: {
 		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
-		fprintf(fp, ":g2-instr %08x", (unsigned int)tmp.dummy);
+		fprintf(fp, ":g2-setd-instr %08x", (unsigned int)tmp.dummy);
 		len = 1 + sizeof(tmp);
 		break;
 	}
 
-	case UD_TAG_GROUP3_START: {
+	case UD_TAG_GROUP3_BIRTH: {
 		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
-		fprintf(fp, ":g3-start %u", tmp);
+		fprintf(fp, ":g3-birth %u", tmp);
 		len = 1 + sizeof(tmp);
 		break;
 	}
@@ -396,17 +396,10 @@ ud_fprint_tlv(const char *buf, FILE *fp)
 		len = 1 + sizeof(tmp);
 		break;
 	}
-	case UD_TAG_GROUP4_RATIO_NUMER: {
-		short unsigned int tmp =
-			*(const short unsigned int*const)&buf[1];
-		fprintf(fp, ":g4-ratio-numer %u", tmp);
-		len = 1 + sizeof(tmp);
-		break;
-	}
-	case UD_TAG_GROUP4_RATIO_DENOM: {
-		short unsigned int tmp =
-			*(const short unsigned int*const)&buf[1];
-		fprintf(fp, ":g4-ratio-denom %u", tmp);
+	case UD_TAG_GROUP4_RATIO: {
+		ratio16_t tmp = *(const ratio16_t*const)&buf[1];
+		fprintf(fp, ":g4-ratio %u:%u",
+			ffff_ratio16_numer(tmp), ffff_ratio16_denom(tmp));
 		len = 1 + sizeof(tmp);
 		break;
 	}

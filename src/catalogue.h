@@ -42,6 +42,12 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+#define UD_TAG_GROUP0(_x)	((_x) + 0x20)
+#define UD_TAG_GROUP1(_x)	((_x) + 0x30)
+#define UD_TAG_GROUP2(_x)	((_x) + 0x40)
+#define UD_TAG_GROUP3(_x)	((_x) + 0x50)
+#define UD_TAG_GROUP4(_x)	((_x) + 0x60)
+
 /* tags */
 enum ud_tag_e {
 	UD_TAG_UNK,
@@ -74,23 +80,33 @@ enum ud_tag_e {
 	/* :currency takes UDPC_TYPE_STRING */
 	UD_TAG_CURRENCY,
 
-	/* :group0 0x80 */
-	UD_TAG_GROUP0_NAME = 0x80,
-	UD_TAG_GROUP0_CFI = 0x81,
-	UD_TAG_GROUP0_OPOL = 0x82,
-	UD_TAG_GROUP0_GAID = 0x83,
+	/* :group0 */
+	UD_TAG_GROUP0_NAME = UD_TAG_GROUP0(0),
+	UD_TAG_GROUP0_CFI = UD_TAG_GROUP0(1),
+	UD_TAG_GROUP0_OPOL = UD_TAG_GROUP0(2),
+	UD_TAG_GROUP0_GAID = UD_TAG_GROUP0(3),
 
-	UD_TAG_GROUP2_FUND_INSTR = 0xa0,
-	UD_TAG_GROUP2_SET_INSTR = 0xa1,
+	UD_TAG_GROUP1_ISIN = UD_TAG_GROUP1(0),
+	UD_TAG_GROUP1_RIC = UD_TAG_GROUP1(1),
+	UD_TAG_GROUP1_BBG = UD_TAG_GROUP1(2),
 
-	UD_TAG_GROUP3_START = 0xb0,
-	UD_TAG_GROUP3_EXPIRY = 0xb1,
-	UD_TAG_GROUP3_SETTLE = 0xb2,
+	UD_TAG_GROUP2_FUND_INSTR = UD_TAG_GROUP2(0),
+	UD_TAG_GROUP2_SETD_INSTR = UD_TAG_GROUP2(1),
 
-	UD_TAG_GROUP4_UNDERLYER = 0xc0,
-	UD_TAG_GROUP4_STRIKE = 0xc1,
-	UD_TAG_GROUP4_RATIO_NUMER = 0xc2,
-	UD_TAG_GROUP4_RATIO_DENOM = 0xc3,
+	UD_TAG_GROUP3_BIRTH = UD_TAG_GROUP3(0),
+	UD_TAG_GROUP3_EXPIRY = UD_TAG_GROUP3(1),
+	UD_TAG_GROUP3_SETTLE = UD_TAG_GROUP3(2),
+
+	UD_TAG_GROUP4_UNDERLYER = UD_TAG_GROUP4(0),
+	UD_TAG_GROUP4_STRIKE = UD_TAG_GROUP4(1),
+	UD_TAG_GROUP4_RATIO = UD_TAG_GROUP4(2),
+};
+
+/**
+ * Structure for gperf htables */
+struct ud_tagtbl_s {
+	const char *name;
+	ud_tag_t tag;
 };
 
 /**

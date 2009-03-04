@@ -199,8 +199,7 @@ obtain_options(void)
 	/* referential group */
 	instr_referent_set_underlyer(tmp, (instr_id_t)15);
 	instr_referent_set_strike(tmp, ffff_monetary_get_d(1900.0));
-	instr_referent_set_ratio_numer(tmp, 1);
-	instr_referent_set_ratio_denom(tmp, 1);
+	instr_referent_set_ratio2(tmp, 1, 1);
 	/* now add him */
 	catalogue_add_instr(instruments, tmp);
 	return;

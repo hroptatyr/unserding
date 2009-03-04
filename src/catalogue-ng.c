@@ -52,6 +52,7 @@
 /* other external stuff */
 #include <pfack/instruments.h>
 #include <ffff/hashtable.h>
+#include <ffff/ratio.h>
 
 extern void *instruments;
 
@@ -123,6 +124,15 @@ ud_write_short(char *restrict buf, ud_tag_t t, short int s)
 	return sizeof(s) + 2;
 }
 
+static inline unsigned int
+ud_write_ratio(char *restrict buf, ud_tag_t t, ratio16_t s)
+{
+	buf[0] = UDPC_TYPE_KEYVAL;
+	buf[1] = t;
+	memcpy(buf + 2, (char*)&s, sizeof(s));
+	return sizeof(s) + 2;
+}
+
 
 static unsigned int
 ud_write_g0_name(char *restrict buf, const void *grp)
@@ -181,14 +191,14 @@ ud_write_g2_set_instr(char *restrict buf, const void *grp)
 {
 	instr_grp_funding_t tmp = grp;
 	return ud_write_instr_uid(
-		buf, UD_TAG_GROUP2_SET_INSTR, tmp->set_instr);
+		buf, UD_TAG_GROUP2_SETD_INSTR, tmp->set_instr);
 }
 
 static unsigned int
 ud_write_g3_start(char *restrict buf, const void *grp)
 {
 	instr_grp_delivery_t tmp = grp;
-	return ud_write_date_dse(buf, UD_TAG_GROUP3_START, tmp->start);
+	return ud_write_date_dse(buf, UD_TAG_GROUP3_BIRTH, tmp->start);
 }
 
 static unsigned int
@@ -220,17 +230,10 @@ ud_write_g4_strike(char *restrict buf, const void *grp)
 }
 
 static unsigned int
-ud_write_g4_ratio_numer(char *restrict buf, const void *grp)
+ud_write_g4_ratio(char *restrict buf, const void *grp)
 {
 	instr_grp_referent_t tmp = grp;
-	return ud_write_short(buf, UD_TAG_GROUP4_RATIO_NUMER, tmp->ratio_numer);
-}
-
-static unsigned int
-ud_write_g4_ratio_denom(char *restrict buf, const void *grp)
-{
-	instr_grp_referent_t tmp = grp;
-	return ud_write_short(buf, UD_TAG_GROUP4_RATIO_DENOM, tmp->ratio_denom);
+	return ud_write_ratio(buf, UD_TAG_GROUP4_RATIO, tmp->ratio);
 }
 
 
@@ -276,11 +279,10 @@ serialise_catobj(char *restrict buf, const_instr_t instr)
 	}
 	if ((tmp = instr_referent_group(instr)) != NULL) {
 		/* write group 4, general group */
-		/* :underlyer, :strike, :ratio-numer, :ratio-denom */
+		/* :underlyer, :strike, :ratio */
 		idx += ud_write_g4_underlyer(&buf[idx], tmp);
 		idx += ud_write_g4_strike(&buf[idx], tmp);
-		idx += ud_write_g4_ratio_numer(&buf[idx], tmp);
-		idx += ud_write_g4_ratio_denom(&buf[idx], tmp);
+		idx += ud_write_g4_ratio(&buf[idx], tmp);
 	}
 	return idx;
 }

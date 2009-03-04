@@ -44,7 +44,12 @@ struct ud_tagtbl_s;
 ud_tag_t
 ud_tag_from_s(const char *buf)
 {
-	return __ud_tag_from_s(buf, __builtin_strlen(buf))->tag;
+	const struct ud_tagtbl_s *t =
+		__ud_tag_from_s(buf, __builtin_strlen(buf));
+	if (t != NULL) {
+		return t->tag;
+	}
+	return UD_TAG_UNK;
 }
 
 /* keywords.perf ends here */

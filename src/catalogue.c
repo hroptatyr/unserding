@@ -483,7 +483,11 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 		buf[3] = str[3];
 		break;
 
+		/* guys that take some integer */
 	case UD_TAG_GROUP0_GAID:
+	case UD_TAG_GROUP2_FUND_INSTR:
+	case UD_TAG_GROUP2_SETD_INSTR:
+	case UD_TAG_GROUP4_UNDERLYER:
 		/* detect hex mode */
 		if ((str[0] == '0' || str[0] == '#') && str[1] == 'x') {
 			/* no workie at the mo */
@@ -497,62 +501,16 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 		break;
 
 #if 0
-	case UD_TAG_GROUP2_FUND_INSTR: {
-		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
-		fprintf(fp, ":g2-fund-instr %08x", (unsigned int)tmp.dummy);
-		len = 1 + sizeof(tmp);
-		break;
-	}
-	case UD_TAG_GROUP2_SETD_INSTR: {
-		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
-		fprintf(fp, ":g2-setd-instr %08x", (unsigned int)tmp.dummy);
-		len = 1 + sizeof(tmp);
-		break;
-	}
+		/* date guys */
+	case UD_TAG_GROUP3_ISSUE:
+	case UD_TAG_GROUP3_EXPIRY:
+	case UD_TAG_GROUP3_SETTLE:
 
-	case UD_TAG_GROUP3_ISSUE: {
-		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
-		fprintf(fp, ":g3-isse %u", tmp);
-		len = 1 + sizeof(tmp);
-		break;
-	}
-	case UD_TAG_GROUP3_EXPIRY: {
-		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
-		fprintf(fp, ":g3-expiry %u", tmp);
-		len = 1 + sizeof(tmp);
-		break;
-	}
-	case UD_TAG_GROUP3_SETTLE: {
-		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
-		fprintf(fp, ":g3-settle %u", tmp);
-		len = 1 + sizeof(tmp);
-		break;
-	}
+		/* price guys */
+	case UD_TAG_GROUP4_STRIKE:
 
-	case UD_TAG_GROUP4_UNDERLYER: {
-		unsigned int tmp = *(const unsigned int*const)&buf[1];
-		fprintf(fp, ":g4-underlyer %08x", tmp);
-		len = 1 + sizeof(tmp);
-		break;
-	}
-	case UD_TAG_GROUP4_STRIKE: {
-		monetary32_t tmp = *(const monetary32_t*const)&buf[1];
-		fprintf(fp, ":g4-strike %2.4f", ffff_monetary_d(tmp));
-		len = 1 + sizeof(tmp);
-		break;
-	}
-	case UD_TAG_GROUP4_RATIO: {
-		ratio16_t tmp = *(const ratio16_t*const)&buf[1];
-		fprintf(fp, ":g4-ratio %u:%u",
-			ffff_ratio16_numer(tmp), ffff_ratio16_denom(tmp));
-		len = 1 + sizeof(tmp);
-		break;
-	}
-	case UD_TAG_UNK:
-	default:
-		fprintf(fp, ":key %02x", t);
-		len = 1;
-		break;
+		/* ratio guys */
+	case UD_TAG_GROUP4_RATIO:
 #endif
 
 	case UD_TAG_UNK:

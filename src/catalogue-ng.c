@@ -411,12 +411,12 @@ catobj_filter_one(const_instr_t instr, ud_tlv_t tlv)
 
 	case UD_TAG_GROUP0_CFI: {
 		const char *cfi = instr_general_cfi(instr);
-		return pfack_10962_isap(tlv->data, cfi) == 0;
+		return pfack_10962_isap(tlv->data, cfi);
 	}
 
 	case UD_TAG_GROUP0_OPOL: {
 		const char *opol = instr_general_opol(instr);
-		return pfack_10383_eqp(tlv->data, opol) == 0;
+		return pfack_10383_eqp(tlv->data, opol);
 	}
 
 	case UD_TAG_GROUP0_GAID: {

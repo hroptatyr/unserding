@@ -527,7 +527,7 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 		displen = sizeof(instr_id_t);
 		break;
 
-#if 0
+#if 1
 		/* date guys */
 	case UD_TAG_GROUP3_ISSUE:
 	case UD_TAG_GROUP3_EXPIRY:
@@ -539,6 +539,26 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 		/* ratio guys */
 	case UD_TAG_GROUP4_RATIO:
 #endif
+		abort();
+#if 1
+	case UD_TAG_GROUP1_ISIN:
+	case UD_TAG_GROUP1_RIC:
+	case UD_TAG_GROUP1_BBG:
+	case UD_TAG_GROUP5_BARRIER:
+#endif
+		abort();
+
+	case UD_TAG_NAME:
+	case UD_TAG_DATE:
+	case UD_TAG_EXPIRY:
+	case UD_TAG_PADDR:
+	case UD_TAG_UNDERLYING:
+	case UD_TAG_PRICE:
+	case UD_TAG_STRIKE:
+	case UD_TAG_PLACE:
+	case UD_TAG_SYMBOL:
+	case UD_TAG_CURRENCY:
+		abort();
 
 	case UD_TAG_UNK:
 		displen = 0;

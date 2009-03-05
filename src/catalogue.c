@@ -108,6 +108,7 @@ __ud_fill_catobj(ud_catobj_t co, ...)
 	return;
 }
 
+
 void
 ud_cat_add_obj(ud_catobj_t co)
 {
@@ -416,6 +417,32 @@ ud_fprint_tlv(const char *buf, void *file)
 
 
 #if defined UNSERCLI
+/* helpers first */
+static inline unsigned char __attribute__((always_inline))
+__char_to_i32x(char str)
+{
+	unsigned char res;
+	if (LIKELY((res = (unsigned char)(str - '0')) < 10)) {
+		return res;
+	}
+	return (unsigned char)(str - 'A' + 10) & 0xf;
+}
+
+static inline unsigned int
+ffff_strtoi32x(const char *str)
+{
+/* this one should be in ffff no? */
+/* we're lil endian and assume 32bit ids*/
+	return (unsigned int)__char_to_i32x(str[0]) << 28 |
+		(unsigned int)__char_to_i32x(str[1]) << 24 |
+		(unsigned int)__char_to_i32x(str[2]) << 20 |
+		(unsigned int)__char_to_i32x(str[3]) << 16 |
+		(unsigned int)__char_to_i32x(str[4]) << 12 |
+		(unsigned int)__char_to_i32x(str[5]) << 8 |
+		(unsigned int)__char_to_i32x(str[6]) << 4 |
+		(unsigned int)__char_to_i32x(str[7]);
+}
+
 unsigned int
 ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 {
@@ -490,17 +517,17 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 	case UD_TAG_GROUP4_UNDERLYER:
 		/* detect hex mode */
 		if ((str[0] == '0' || str[0] == '#') && str[1] == 'x') {
-			/* no workie at the mo */
-			;
+			unsigned int gaid = ffff_strtoi32x(str + 2);
+			*(instr_id_t*)buf = gaid;
 		} else {
 			/* read him, regard him as ptr again and print him */
 			long int gaid = ffff_strtol(str, NULL, 0);
-			*(instr_id_t*)buf = gaid;
+			*(instr_id_t*)buf = (unsigned int)gaid;
 		}
 		displen = sizeof(instr_id_t);
 		break;
 
-#if 0
+#if 1
 		/* date guys */
 	case UD_TAG_GROUP3_ISSUE:
 	case UD_TAG_GROUP3_EXPIRY:
@@ -512,6 +539,26 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 		/* ratio guys */
 	case UD_TAG_GROUP4_RATIO:
 #endif
+		abort();
+#if 1
+	case UD_TAG_GROUP1_ISIN:
+	case UD_TAG_GROUP1_RIC:
+	case UD_TAG_GROUP1_BBG:
+	case UD_TAG_GROUP5_BARRIER:
+#endif
+		abort();
+
+	case UD_TAG_NAME:
+	case UD_TAG_DATE:
+	case UD_TAG_EXPIRY:
+	case UD_TAG_PADDR:
+	case UD_TAG_UNDERLYING:
+	case UD_TAG_PRICE:
+	case UD_TAG_STRIKE:
+	case UD_TAG_PLACE:
+	case UD_TAG_SYMBOL:
+	case UD_TAG_CURRENCY:
+		abort();
 
 	case UD_TAG_UNK:
 		displen = 0;

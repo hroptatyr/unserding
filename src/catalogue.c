@@ -414,4 +414,153 @@ ud_fprint_tlv(const char *buf, void *file)
 	return len;
 }
 
+
+#if defined UNSERCLI
+unsigned int
+ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
+{
+	unsigned int displen;
+
+	switch ((enum ud_tag_e)t) {
+	case UD_TAG_CLASS:
+	case UD_TAG_ATTR:
+	case UD_TAG_GROUP0_NAME:
+	default:
+		/* generic string dispatching */
+		buf[0] = (uint8_t)len;
+		memcpy(&buf[1], str, len);
+		displen = 1 + len;
+		break;
+
+
+	case UD_TAG_GROUP0_CFI:
+		/* always dispatch 6 chars, fill up with Xs
+		 * (10962's placeholder) if STR has less than 6 chars */
+		displen = 0;
+		/* use two jump tables */
+		switch (len) {
+		default:
+		case 6:
+			buf[displen] = str[displen], displen++;
+		case 5:
+			buf[displen] = str[displen], displen++;
+		case 4:
+			buf[displen] = str[displen], displen++;
+		case 3:
+			buf[displen] = str[displen], displen++;
+		case 2:
+			buf[displen] = str[displen], displen++;
+		case 1:
+			buf[displen] = str[displen], displen++;
+		case 0:
+			break;
+		}
+
+		switch (len < 6 ? 6 - len : 0) {
+		default:
+		case 6:
+			buf[displen++] = 'X';
+		case 5:
+			buf[displen++] = 'X';
+		case 4:
+			buf[displen++] = 'X';
+		case 3:
+			buf[displen++] = 'X';
+		case 2:
+			buf[displen++] = 'X';
+		case 1:
+			buf[displen++] = 'X';
+		case 0:
+			break;
+		}
+		break;
+
+	case UD_TAG_GROUP0_OPOL:
+		displen = 4;
+		buf[0] = str[0];
+		buf[1] = str[1];
+		buf[2] = str[2];
+		buf[3] = str[3];
+		break;
+
+	case UD_TAG_GROUP0_GAID:
+		/* detect hex mode */
+		if ((str[0] == '0' || str[0] == '#') && str[1] == 'x') {
+			/* no workie at the mo */
+			;
+		} else {
+			/* read him, regard him as ptr again and print him */
+			long int gaid = ffff_strtol(str, NULL, 0);
+			*(instr_id_t*)buf = gaid;
+		}
+		displen = sizeof(instr_id_t);
+		break;
+
+#if 0
+	case UD_TAG_GROUP2_FUND_INSTR: {
+		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
+		fprintf(fp, ":g2-fund-instr %08x", (unsigned int)tmp.dummy);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP2_SETD_INSTR: {
+		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
+		fprintf(fp, ":g2-setd-instr %08x", (unsigned int)tmp.dummy);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP3_ISSUE: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		fprintf(fp, ":g3-isse %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP3_EXPIRY: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		fprintf(fp, ":g3-expiry %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP3_SETTLE: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		fprintf(fp, ":g3-settle %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP4_UNDERLYER: {
+		unsigned int tmp = *(const unsigned int*const)&buf[1];
+		fprintf(fp, ":g4-underlyer %08x", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP4_STRIKE: {
+		monetary32_t tmp = *(const monetary32_t*const)&buf[1];
+		fprintf(fp, ":g4-strike %2.4f", ffff_monetary_d(tmp));
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP4_RATIO: {
+		ratio16_t tmp = *(const ratio16_t*const)&buf[1];
+		fprintf(fp, ":g4-ratio %u:%u",
+			ffff_ratio16_numer(tmp), ffff_ratio16_denom(tmp));
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_UNK:
+	default:
+		fprintf(fp, ":key %02x", t);
+		len = 1;
+		break;
+#endif
+
+	case UD_TAG_UNK:
+		displen = 0;
+		break;
+	}
+	return displen;
+}
+#endif	/* UNSERCLI */
+
 /* catalogue.c ends here */

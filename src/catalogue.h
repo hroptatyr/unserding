@@ -273,4 +273,8 @@ extern uint8_t ud_fprint_tlv(const char *buf, void *fp);
  * At the moment the trie-based approach is supplanted by gperf. */
 extern ud_tag_t ud_tag_from_s(const char *buf, size_t len);
 
+/* tag-dependent dispatching of cli input */
+extern unsigned int
+ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len);
+
 #endif	/* INCLUDED_catalogue_h_ */

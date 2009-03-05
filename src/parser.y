@@ -260,9 +260,8 @@ TOK_KEY {
 val:
 TOK_VAL {
 	char *restrict pbuf = &hdl->pktchn[0].pbuf[hdl->pktchn[0].plen];
-	pbuf[0] = yylval.slen;
-	memcpy(&pbuf[1], yylval.sval, yylval.slen);
-	hdl->pktchn[0].plen += yylval.slen + 1;
+	hdl->pktchn[0].plen +=
+		ud_disp_tag(pbuf, *(pbuf-1), yylval.sval, yylval.slen);
 	/* inc the seqof counter */
 	hdl->pktchn[0].pbuf[9]++;
 };

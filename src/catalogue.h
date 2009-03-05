@@ -186,35 +186,6 @@ free_tlvcons(ud_tlvcons_t tlv)
 	return;
 }
 
-/* tlv goodies */
-extern inline uint8_t __attribute__((always_inline, gnu_inline))
-ud_tlv_size(ud_tlv_t tlv);
-extern inline uint8_t __attribute__((always_inline, gnu_inline))
-ud_tlv_size(ud_tlv_t tlv)
-{
-	switch (tlv->tag) {
-	case UD_TAG_CLASS:
-	case UD_TAG_ATTR:
-	case UD_TAG_NAME:
-
-	case UD_TAG_GROUP0_NAME:
-	case UD_TAG_GROUP0_CFI:
-	case UD_TAG_GROUP0_OPOL:
-		return tlv->data[0];
-
-	case UD_TAG_GROUP0_GAID:
-		return sizeof(unsigned int);
-
-	case UD_TAG_PADDR:
-	case UD_TAG_UNDERLYING:
-		return sizeof(void*);
-
-	case UD_TAG_UNK:
-	default:
-		return 0;
-	}
-}
-
 /* special tlv cells */
 extern inline ud_catobj_t __attribute__((always_inline, gnu_inline))
 ud_make_catobj(ud_tlv_t o, ...);

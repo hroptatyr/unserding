@@ -88,6 +88,36 @@ catalogue_add_instr(catng_t cat, const instr_t instr)
 
 
 /* helpers */
+static inline uint8_t
+ud_tlv_size(ud_tlv_t tlv)
+{
+	switch (tlv->tag) {
+	case UD_TAG_CLASS:
+	case UD_TAG_ATTR:
+	case UD_TAG_NAME:
+
+	case UD_TAG_GROUP0_NAME:
+		return tlv->data[0];
+
+	case UD_TAG_GROUP0_CFI:
+		return sizeof(pfack_10962_t);
+
+	case UD_TAG_GROUP0_OPOL:
+		return sizeof(pfack_10383_t);
+
+	case UD_TAG_GROUP0_GAID:
+		return sizeof(unsigned int);
+
+	case UD_TAG_PADDR:
+	case UD_TAG_UNDERLYING:
+		return sizeof(void*);
+
+	case UD_TAG_UNK:
+	default:
+		return 0;
+	}
+}
+
 static inline signed char __attribute__((always_inline, gnu_inline))
 tlv_cmp_f(const ud_tlv_t t1, const ud_tlv_t t2)
 {
@@ -328,8 +358,6 @@ static unsigned int
 sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 {
 	uint8_t idx = j->buf[9];
-	uint8_t sz;
-	ud_tlv_t tmin, last;
 
 	if (UNLIKELY(j->buf[8] != UDPC_TYPE_SEQOF)) {
 		return 0;
@@ -337,11 +365,23 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 		return 0;
 	} else if (idx == 1) {
 		ud_tlv_t tlv = (ud_tlv_t)&j->buf[10];
-		memcpy(wrkspc, tlv, 2+ud_tlv_size(tlv));
+		memcpy(wrkspc, tlv, 1 + ud_tlv_size(tlv));
 		tlvs[0] = (ud_tlv_t)wrkspc;
 		return 1;
 	}
 
+#if 1
+	/* copy everything */
+	memcpy(wrkspc, &j->buf[10], j->blen - 10);
+	idx = 0;
+	for (uint8_t p = 0; p < j->blen - 10; ) {
+		ud_tlv_t tlv = (ud_tlv_t)&wrkspc[p];
+		tlvs[idx++] = tlv;
+		p += sizeof(tlv->tag) + ud_tlv_size(tlv);
+	}
+
+#else
+/* bullshit in this mode */
 	/* do a primitive slection sort, do me properly! */
 	/* we traverse the list once to find the minimum element */
 	tmin = (ud_tlv_t)&j->buf[10];
@@ -390,6 +430,7 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 		/* using this as new maximum */
 		last = tmin;
 	}
+#endif
 	return idx;
 }
 

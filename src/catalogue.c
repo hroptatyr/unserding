@@ -66,8 +66,8 @@ static inline signed char __attribute__((always_inline, gnu_inline))
 tlv_cmp_f(const ud_tlv_t t1, const ud_tlv_t t2)
 {
 /* returns -1 if t1 < t2, 0 if t1 == t2 and 1 if t1 > t2 */
-	uint8_t t1s = ud_tlv_size(t1);
-	uint8_t t2s = ud_tlv_size(t2);
+	uint8_t t1s = 0; //ud_tlv_size(t1);
+	uint8_t t2s = 0; //ud_tlv_size(t2);
 	uint8_t sz = t1s < t2s ? t1s : t2s;
 	return memcmp((const char*)t1, (const char*)t2, sz);
 }
@@ -171,7 +171,7 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 		return 0;
 	} else if (idx == 1) {
 		ud_tlv_t tlv = (ud_tlv_t)&j->buf[10];
-		memcpy(wrkspc, tlv, 2+ud_tlv_size(tlv));
+		memcpy(wrkspc, tlv, 1+0 /*ud_tlv_size(tlv)*/);
 		tlvs[0] = (ud_tlv_t)wrkspc;
 		return 1;
 	}
@@ -181,9 +181,9 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 	tmin = (ud_tlv_t)&j->buf[10];
 
 	for (ud_tlv_t t = (ud_tlv_t)
-		     ((char*)tmin + 2 + ud_tlv_size(tmin));
+		     ((char*)tmin + 2 + 0 /*ud_tlv_size(tmin)*/);
 	     (char*)t < j->buf + j->blen;
-	     t = (ud_tlv_t)((char*)t + 2 + ud_tlv_size(t))) {
+	     t = (ud_tlv_t)((char*)t + 1 + 0 /*ud_tlv_size(t)*/)) {
 
 		if (tlv_cmp_f(tmin, t) > 0) {
 			tmin = t;
@@ -191,7 +191,7 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 	}
 	/* copy the stuff over to the work space */
 	tlvs[0] = (ud_tlv_t)wrkspc;
-	memcpy(wrkspc, tmin, sz = 2 + ud_tlv_size(tmin));
+	memcpy(wrkspc, tmin, sz = 1 + 0 /*ud_tlv_size(tmin)*/);
 	wrkspc += sz;
 
 	/* using this as new maximum */
@@ -202,9 +202,9 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 		tmin = (ud_tlv_t)&j->buf[10];
 
 		for (ud_tlv_t t = (ud_tlv_t)
-			     ((char*)tmin + 2 + ud_tlv_size(tmin));
+			     ((char*)tmin + 2 + 0 /*ud_tlv_size(tmin)*/);
 		     (char*)t < j->buf + j->blen;
-		     t = (ud_tlv_t)((char*)t + 2 + ud_tlv_size(t))) {
+		     t = (ud_tlv_t)((char*)t + 2 + 0 /*ud_tlv_size(t)*/)) {
 
 			if (tlv_cmp_f(tmin, last) <= 0) {
 				tmin = t;
@@ -218,7 +218,7 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 			}
 		}
 		tlvs[k] = (ud_tlv_t)wrkspc;
-		memcpy(wrkspc, tmin, sz = 2 + ud_tlv_size(tmin));
+		memcpy(wrkspc, tmin, sz = 2 + 0 /*ud_tlv_size(tmin)*/);
 		wrkspc += sz;
 
 		/* using this as new maximum */

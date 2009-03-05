@@ -402,24 +402,22 @@ catobj_filter_one(const_instr_t instr, ud_tlv_t tlv)
 	}
 	/* switch by tags now */
 	switch ((uint8_t)tlv->tag) {
-	case UD_TAG_GROUP0_NAME:
+	case UD_TAG_GROUP0_NAME: {
 		/* allows substring search automagically */
-		return memcmp(tlv->data + 1,
-			      instr_general_name(instr),
-			      (unsigned char)tlv->data[0]) == 0;
-
-	case UD_TAG_GROUP0_CFI: {
-		/* allows substring search automagically */
-		unsigned char len = tlv->data[0];
-		const char *cfi = instr_general_cfi(instr);
-		return memcmp(tlv->data + 1, cfi, len) == 0;
+		size_t len = (unsigned char)tlv->data[0];
+		const char *name = instr_general_name(instr);
+		return memcmp(tlv->data + 1, name, len) == 0;
 	}
 
-	case UD_TAG_GROUP0_OPOL:
-		/* allows substring search automagically */
-		return memcmp(tlv->data + 1,
-			      instr_general_opol(instr),
-			      (unsigned char)tlv->data[0]) == 0;
+	case UD_TAG_GROUP0_CFI: {
+		const char *cfi = instr_general_cfi(instr);
+		return pfack_10962_isap(tlv->data, cfi) == 0;
+	}
+
+	case UD_TAG_GROUP0_OPOL: {
+		const char *opol = instr_general_opol(instr);
+		return pfack_10383_eqp(tlv->data, opol) == 0;
+	}
 
 	case UD_TAG_GROUP0_GAID: {
 		instr_id_t tmp = *(const instr_id_t*const)tlv->data;

@@ -196,7 +196,14 @@ ud_tlv_size(ud_tlv_t tlv)
 	case UD_TAG_CLASS:
 	case UD_TAG_ATTR:
 	case UD_TAG_NAME:
+
+	case UD_TAG_GROUP0_NAME:
+	case UD_TAG_GROUP0_CFI:
+	case UD_TAG_GROUP0_OPOL:
 		return tlv->data[0];
+
+	case UD_TAG_GROUP0_GAID:
+		return sizeof(unsigned int);
 
 	case UD_TAG_PADDR:
 	case UD_TAG_UNDERLYING:

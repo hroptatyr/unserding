@@ -13,6 +13,8 @@ __ud_tag_from_s (register const char *str, register unsigned int len);
 %7bit
 %struct-type
 %define lookup-function-name __ud_tag_from_s
+%define word-array-name keywords
+%global-table
 
 struct ud_tagtbl_s;
 

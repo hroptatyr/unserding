@@ -393,13 +393,54 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 	return idx;
 }
 
+static inline bool
+catobj_filter_one(const_instr_t instr, ud_tlv_t tlv)
+{
+	if (UNLIKELY(tlv->tag < UD_TAG_INSTRFILT_FIRST ||
+		     tlv->tag > UD_TAG_INSTRFILT_LAST)) {
+		return false;
+	}
+	/* switch by tags now */
+	switch ((uint8_t)tlv->tag) {
+	case UD_TAG_GROUP0_NAME:
+		/* allows substring search automagically */
+		return memcmp(tlv->data + 1,
+			      instr_general_name(instr),
+			      (unsigned char)tlv->data[0]) == 0;
+
+	case UD_TAG_GROUP0_CFI: {
+		/* allows substring search automagically */
+		unsigned char len = tlv->data[0];
+		const char *cfi = instr_general_cfi(instr);
+		return memcmp(tlv->data + 1, cfi, len) == 0;
+	}
+
+	case UD_TAG_GROUP0_OPOL:
+		/* allows substring search automagically */
+		return memcmp(tlv->data + 1,
+			      instr_general_opol(instr),
+			      (unsigned char)tlv->data[0]) == 0;
+
+	case UD_TAG_GROUP0_GAID: {
+		instr_id_t tmp = *(const instr_id_t*const)tlv->data;
+		if (instr_general_ga_id(instr) == tmp) {
+			return true;
+		}
+		break;
+	}
+
+	default:
+		break;
+	}
+	return false;
+}
+
 static bool
 catobj_filter(const_instr_t instr, ud_tlv_t *sub, uint8_t slen)
 {
 	/* traverse all the filter properties */
 	for (uint8_t j = 0; j < slen; j++) {
-		if (UNLIKELY(sub[j]->tag < UD_TAG_INSTRFILT_FIRST ||
-			     sub[j]->tag > UD_TAG_INSTRFILT_LAST)) {
+		if (!catobj_filter_one(instr, sub[j])) {
 			return false;
 		}
 	}
@@ -425,6 +466,10 @@ ud_cat_lc_job(job_t j)
 	slen = sort_params(sub, tmp, j);
 	/* we are a seqof(UDPC_TYPE_CATOBJ) */
 	j->buf[8] = (udpc_type_t)UDPC_TYPE_SEQOF;
+
+	/* we should have a query planner here to determine whether
+	 * or not a seqscan is feasible or if there's a more direct way
+	 * to access the bugger */
 
 	ht_iter_init_ll(instruments, &iter);
 	while (ht_iter_next(&iter, &key, &val)) {

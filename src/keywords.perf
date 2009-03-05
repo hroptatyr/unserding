@@ -44,10 +44,9 @@ struct ud_tagtbl_s;
 %%
 
 ud_tag_t
-ud_tag_from_s(const char *buf)
+ud_tag_from_s(const char *buf, size_t len)
 {
-	const struct ud_tagtbl_s *t =
-		__ud_tag_from_s(buf, __builtin_strlen(buf));
+	const struct ud_tagtbl_s *t = __ud_tag_from_s(buf, (unsigned int)len);
 	if (t != NULL) {
 		return t->tag;
 	}

@@ -271,6 +271,6 @@ extern uint8_t ud_fprint_tlv(const char *buf, void *fp);
  * This can also parse stuff like :0x7e or :7e to allow for raw keys.
  *
  * At the moment the trie-based approach is supplanted by gperf. */
-extern ud_tag_t ud_tag_from_s(const char *buf);
+extern ud_tag_t ud_tag_from_s(const char *buf, size_t len);
 
 #endif	/* INCLUDED_catalogue_h_ */

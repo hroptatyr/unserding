@@ -253,7 +253,7 @@ key val;
 
 key:
 TOK_KEY {
-	ud_tag_t t = ud_tag_from_s(yylval.sval);
+	ud_tag_t t = ud_tag_from_s(yylval.sval, yylval.slen);
 	hdl->pktchn[0].pbuf[hdl->pktchn[0].plen++] = t;
 };
 

@@ -119,6 +119,7 @@ cat		{ RETURN_TOKEN(TOK_CAT); }
 
 {int}		{ RETURN_TOKEN(TOK_INTEGER); }
 {key}		{
+	yylval->slen = cli_yyget_leng(yyscanner);
 	yylval->sval = cli_yyget_text(yyscanner);
 	RETURN_TOKEN(TOK_KEY);
 }

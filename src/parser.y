@@ -90,7 +90,7 @@ static const char help_rpl[] =
 	"help   this help screen\n"
 	"cheers [time]  store last result for TIME seconds (default 86400)\n"
 	"nvm    immediately flush last result\n"
-	"ls     list catalogue entries of current directory\n"
+	"ls <filter>    list catalogue entries of current directory\n"
 	"spot <options> obtain spot price\n"
 	;
 
@@ -113,7 +113,6 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 	TOK_CYA
 	TOK_SUP
 	TOK_LS
-	TOK_LC
 	TOK_CAT
 	TOK_IMPORT
 	TOK_INTEGER
@@ -162,15 +161,6 @@ ls_cmd {
 
 	YYACCEPT;
 } |
-lc_cmd {
-	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_LC);
-	ud_send_raw(hdl, hdl->pktchn[0]);
-
-	/* the packet we're gonna send in raw shape */
-	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
-
-	YYACCEPT;
-} |
 cat_cmd {
 	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_CAT);
 	ud_send_raw(hdl, hdl->pktchn[0]);
@@ -212,17 +202,6 @@ TOK_SUP;
 ls_cmd:
 TOK_LS |
 TOK_LS /* in the middle */ {
-	/* init the seqof counter */
-	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_SEQOF;
-	/* set its initial value to naught */
-	hdl->pktchn[0].pbuf[9] = 0;
-	/* set the packet idx */
-	hdl->pktchn[0].plen = 10;
-} keyvals;
-
-lc_cmd:
-TOK_LC |
-TOK_LC /* in the middle */ {
 	/* init the seqof counter */
 	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_SEQOF;
 	/* set its initial value to naught */

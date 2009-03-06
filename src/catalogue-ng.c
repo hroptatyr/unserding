@@ -487,9 +487,9 @@ catobj_filter(const_instr_t instr, ud_tlv_t *sub, uint8_t slen)
 }
 
 /* another browser */
-extern bool ud_cat_lc_job(job_t j);
+extern bool ud_cat_ls_job(job_t j);
 bool
-ud_cat_lc_job(job_t j)
+ud_cat_ls_job(job_t j)
 {
 	unsigned int idx = 10;
 	unsigned int slen = 0;
@@ -500,7 +500,7 @@ ud_cat_lc_job(job_t j)
 	void *val;
 	uint8_t ninstrs = 0;
 
-	UD_DEBUG_CAT("lc job\n");
+	UD_DEBUG_CAT("ls job\n");
 	/* filter what the luser sent us */
 	slen = sort_params(sub, tmp, j);
 	/* we are a seqof(UDPC_TYPE_CATOBJ) */

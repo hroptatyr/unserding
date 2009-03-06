@@ -66,7 +66,7 @@
 /* proto stuff */
 #include "protocore.h"
 /* catalogue stuff */
-#include "catalogue-ng.h"
+#include "catalogue.h"
 
 #define USE_COROUTINES		1
 

@@ -88,6 +88,14 @@ catalogue_add_ti_instr(instr_id_t id, const char *name)
 }
 
 static void
+catalogue_add_tr_instr(instr_id_t id, const char *name)
+{
+	instr_t tmp = make_txxxxx(id, name, "TRXXXX");
+	catalogue_add_instr(instruments, tmp);
+	return;
+}
+
+static void
 obtain_some_4217s(void)
 {
 	/* currencies */
@@ -183,6 +191,40 @@ obtain_indices(void)
 }
 
 static void
+obtain_interests(void)
+{
+	catalogue_add_tr_instr(0xe0000001, "FFD");
+	/* EONIA Eonia is computed as a weighted average of all overnight
+	   unsecured lending transactions in the interbank market, initiated
+	   within the euro area by the Panel Banks. It is reported on an act/360
+	   day count convention and is displayed to two decimal places. Eonia
+	   is to move to 3 decimals on 3rd September 2007 (view Press Release).
+
+	   'Overnight' means from one TARGET day (i.e. day on which the
+	   Trans-European Automated Real-Time Gross-Settlement Express Transfer
+	   system is open) to the next TARGET day.
+
+	   The panel of reporting banks is the same as for Euribor, so that
+	   only the most active banks located in the euro area are represented
+	   on the panel and the geographical diversity of banks in the panel is
+	   maintained. */
+	catalogue_add_tr_instr(0xe0000002, "EONIA");
+
+	/* EURIBOR A representative panel of banks provide daily quotes of the
+	   rate, rounded to two decimal places, that each panel bank believes
+	   one prime bank is quoting to another prime bank for interbank term
+	   deposits within the euro zone.
+
+	   Euribor is quoted for spot value (T+2) and on an act/360 day-count
+	   convention. It is displayed to three decimal places.
+
+	   Panel Banks contribute for one, two and three weeks and for twelve
+	   maturities from one to twelve months. */
+	catalogue_add_tr_instr(0xe0000003, "Euribor");
+	return;
+}
+
+static void
 obtain_options(void)
 {
 	/* just the S&P P3800 example */
@@ -209,6 +251,7 @@ mod_instr_fx_LTX_init(void)
 {
 	obtain_some_4217s();
 	obtain_indices();
+	obtain_interests();
 	obtain_options();
 	return;
 }

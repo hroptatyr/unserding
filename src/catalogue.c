@@ -120,6 +120,36 @@ ud_tlv_size(ud_tlv_t tlv)
 	}
 }
 
+static inline uint8_t
+ud_tlv_total_size(ud_tlv_t tlv)
+{
+	switch (tlv->tag) {
+	case UD_TAG_CLASS:
+	case UD_TAG_ATTR:
+	case UD_TAG_NAME:
+
+	case UD_TAG_GROUP0_NAME:
+		return sizeof(tlv->tag) + sizeof(uint8_t) + tlv->data[0];
+
+	case UD_TAG_GROUP0_CFI:
+		return sizeof(tlv->tag) + sizeof(pfack_10962_t);
+
+	case UD_TAG_GROUP0_OPOL:
+		return sizeof(tlv->tag) + sizeof(pfack_10383_t);
+
+	case UD_TAG_GROUP0_GAID:
+		return sizeof(tlv->tag) + sizeof(unsigned int);
+
+	case UD_TAG_PADDR:
+	case UD_TAG_UNDERLYING:
+		return sizeof(tlv->tag) + sizeof(void*);
+
+	case UD_TAG_UNK:
+	default:
+		return 0;
+	}
+}
+
 static inline signed char __attribute__((always_inline, gnu_inline))
 tlv_cmp_f(const ud_tlv_t t1, const ud_tlv_t t2)
 {
@@ -133,8 +163,8 @@ tlv_cmp_f(const ud_tlv_t t1, const ud_tlv_t t2)
 		return 1;
 	}
 #else
-	uint8_t t1s = ud_tlv_size(t1);
-	uint8_t t2s = ud_tlv_size(t2);
+	uint8_t t1s = ud_tlv_total_size(t1);
+	uint8_t t2s = ud_tlv_total_size(t2);
 	uint8_t sz = t1s < t2s ? t1s : t2s;
 	return memcmp((const char*)t1, (const char*)t2, sz);
 #endif
@@ -519,7 +549,7 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 		return 0;
 	} else if (idx == 1) {
 		ud_tlv_t tlv = (ud_tlv_t)&j->buf[10];
-		memcpy(wrkspc, tlv, 1 + ud_tlv_size(tlv));
+		memcpy(wrkspc, tlv, ud_tlv_total_size(tlv));
 		tlvs[0] = (ud_tlv_t)wrkspc;
 		return 1;
 	}
@@ -531,7 +561,7 @@ sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 	for (uint8_t p = 0; p < j->blen - 10; ) {
 		ud_tlv_t tlv = (ud_tlv_t)&wrkspc[p];
 		tlvs[idx++] = tlv;
-		p += sizeof(tlv->tag) + ud_tlv_size(tlv);
+		p += ud_tlv_total_size(tlv);
 	}
 
 #else

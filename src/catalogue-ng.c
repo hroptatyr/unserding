@@ -55,6 +55,8 @@
 
 extern void *instruments;
 
+
+#if defined UNSERSRV
 /* ctor, dtor */
 catng_t
 make_catalogue(void)
@@ -84,6 +86,7 @@ catalogue_add_instr(catng_t cat, const instr_t instr)
 	ase_htable_put(cat, cod, key/*val-only?*/, instr);
 	return;
 }
+#endif	/* UNSERSRV */
 
 
 /* helpers */
@@ -192,6 +195,7 @@ ud_write_uint32(char *restrict buf, ud_tag_t t, uint32_t i)
 }
 
 
+#if defined UNSERSRV
 static unsigned int
 ud_write_g0_name(char *restrict buf, const void *grp)
 {
@@ -292,8 +296,47 @@ ud_write_g5_barrier(char *restrict buf, uint8_t idx, const void *grp)
 	return ud_write_uint32(
 		buf, UD_TAG_GROUP5_BARRIER, barrier_barrier(grp, idx));
 }
+#endif	/* UNSERSRV */
 
 
+void
+__ud_fill_catobj(ud_catobj_t co, ...)
+{
+	va_list args;
+
+        /* prepare list for va_arg */
+        va_start(args, co);
+	/* traverse the varargs list */
+        for (uint8_t i = 0; i < co->nattrs; ++i ) {
+		co->attrs[i] = va_arg(args, ud_tlv_t);
+	}
+	va_end(args);
+	/* sort the args, is a selection sort now, will be heap sort one day */
+	for (uint8_t j = 0; j < co->nattrs-1; j++) {
+		uint8_t imin = j;
+		ud_tlv_t tmin = co->attrs[imin];
+
+		/* traverse the rest of the bugger, try and find the
+		 * minimum element there */
+		for (uint8_t i = imin; i < co->nattrs; ++i) {
+			ud_tlv_t t = co->attrs[i];
+			if (tlv_cmp_f(tmin, t) > 0) {
+				tmin = t, imin = i;
+			}
+		}
+		/* tmin @ imin is minimum element, swap co->attrs[j]
+		 * and co->attrs[imin] */
+		if (imin != j) {
+			ud_tlv_t tmp = co->attrs[j];
+			co->attrs[j] = co->attrs[imin];
+			co->attrs[imin] = tmp;
+		}
+	}
+	return;
+}
+
+
+#if defined UNSERSRV
 /* unserding serialiser */
 static unsigned int
 serialise_catobj(char *restrict buf, const_instr_t instr)
@@ -351,8 +394,120 @@ serialise_catobj(char *restrict buf, const_instr_t instr)
 	}
 	return idx;
 }
+#endif	/* UNSERSRV */
+
+uint8_t
+ud_fprint_tlv(const char *buf, void *file)
+{
+	ud_tag_t t;
+	uint8_t len;
+	FILE *fp = file;
+
+	switch ((t = buf[0])) {
+	case UD_TAG_CLASS:
+		fputs(":class ", fp);
+		len = buf[1];
+		ud_fputs(len, buf + 2, fp);
+		len += 2;
+		break;
+
+	case UD_TAG_NAME:
+		fputs(":name ", fp);
+		len = buf[1];
+		ud_fputs(len, buf + 2, fp);
+		len += 2;
+		break;
+
+	case UD_TAG_GROUP0_NAME:
+		fputs(":g0-name ", fp);
+		len = buf[1];
+		ud_fputs(len, buf + 2, fp);
+		len += 2;
+		break;
+
+	case UD_TAG_GROUP0_CFI:
+		fputs(":g0-cfi ", fp);
+		ud_fputs(sizeof(pfack_10962_t), buf + 1, fp);
+		len = 1 + sizeof(pfack_10962_t);
+		break;
+
+	case UD_TAG_GROUP0_OPOL:
+		fputs(":g0-opol ", fp);
+		ud_fputs(sizeof(pfack_10383_t), buf + 1, fp);
+		len = 1 + sizeof(pfack_10383_t);
+		break;
+
+	case UD_TAG_GROUP0_GAID: {
+		instr_id_t tmp = *(const instr_id_t*const)&buf[1];
+		fprintf(fp, ":g0-gaid %08x", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP2_FUND_INSTR: {
+		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
+		fprintf(fp, ":g2-fund-instr %08x", (unsigned int)tmp.dummy);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP2_SETD_INSTR: {
+		instr_uid_t tmp = *(const instr_uid_t*const)&buf[1];
+		fprintf(fp, ":g2-setd-instr %08x", (unsigned int)tmp.dummy);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP3_ISSUE: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		fprintf(fp, ":g3-isse %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP3_EXPIRY: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		fprintf(fp, ":g3-expiry %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP3_SETTLE: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		fprintf(fp, ":g3-settle %u", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP4_UNDERLYER: {
+		unsigned int tmp = *(const unsigned int*const)&buf[1];
+		fprintf(fp, ":g4-underlyer %08x", tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP4_STRIKE: {
+		monetary32_t tmp = *(const monetary32_t*const)&buf[1];
+		fprintf(fp, ":g4-strike %2.4f", ffff_monetary_d(tmp));
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP4_RATIO: {
+		ratio16_t tmp = *(const ratio16_t*const)&buf[1];
+		fprintf(fp, ":g4-ratio %u:%u",
+			ffff_ratio16_numer(tmp), ffff_ratio16_denom(tmp));
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_UNK:
+	default:
+		fprintf(fp, ":key %02x", t);
+		len = 1;
+		break;
+	}
+	fputc(' ', fp);
+	return len;
+}
 
 
+/* server only */
+#if defined UNSERSRV
 static unsigned int
 sort_params(ud_tlv_t *tlvs, char *restrict wrkspc, job_t j)
 {
@@ -527,5 +682,197 @@ ud_cat_ls_job(job_t j)
 	j->blen = idx;
 	return false;
 }
+#endif	/* UNSERSRV */
+
+
+#if defined UNSERSRV
+extern bool ud_cat_cat_job(job_t j);
+bool
+ud_cat_cat_job(job_t j)
+{
+	unsigned int idx = 10;
+#if 0
+/* DO ME! */
+	unsigned int slen = 0;
+	char tmp[UDPC_SIMPLE_PKTLEN];
+	ud_tlv_t sub[8];
+
+	UD_DEBUG_CAT("cat job\n");
+	/* filter what the luser sent us */
+	slen = sort_params(sub, tmp, j);
+	/* we are a seqof(UDPC_TYPE_CATOBJ) */
+	j->buf[8] = (udpc_type_t)UDPC_TYPE_SEQOF;
+	/* we are ud_catalen entries wide */
+	j->buf[9] = (uint8_t)ud_catalen;
+
+	for (ud_cat_t c = ud_catalogue; c; c = c->next) {
+		ud_catobj_t dat = c->data;
+		if (catobj_filter(dat, sub, slen)) {
+			idx += serialise_catobj(&j->buf[idx], dat);
+		}
+	}
+#else
+	/* we are a seqof(UDPC_TYPE_CATOBJ) */
+	j->buf[8] = (udpc_type_t)UDPC_TYPE_SEQOF;
+	/* we are ud_catalen entries wide */
+	j->buf[9] = (uint8_t)0;
+#endif
+	j->blen = idx;
+	return false;
+}
+#endif	/* UNSERSRV */
+
+
+#if defined UNSERCLI
+/* helpers first */
+static inline unsigned char __attribute__((always_inline))
+__char_to_i32x(char str)
+{
+	unsigned char res;
+	if (LIKELY((res = (unsigned char)(str - '0')) < 10)) {
+		return res;
+	}
+	return (unsigned char)(str - 'A' + 10) & 0xf;
+}
+
+static inline unsigned int
+ffff_strtoi32x(const char *str)
+{
+/* this one should be in ffff no? */
+/* we're lil endian and assume 32bit ids*/
+	return (unsigned int)__char_to_i32x(str[0]) << 28 |
+		(unsigned int)__char_to_i32x(str[1]) << 24 |
+		(unsigned int)__char_to_i32x(str[2]) << 20 |
+		(unsigned int)__char_to_i32x(str[3]) << 16 |
+		(unsigned int)__char_to_i32x(str[4]) << 12 |
+		(unsigned int)__char_to_i32x(str[5]) << 8 |
+		(unsigned int)__char_to_i32x(str[6]) << 4 |
+		(unsigned int)__char_to_i32x(str[7]);
+}
+
+unsigned int
+ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
+{
+	unsigned int displen;
+
+	switch ((enum ud_tag_e)t) {
+	case UD_TAG_CLASS:
+	case UD_TAG_ATTR:
+	case UD_TAG_GROUP0_NAME:
+	default:
+		/* generic string dispatching */
+		buf[0] = (uint8_t)len;
+		memcpy(&buf[1], str, len);
+		displen = 1 + len;
+		break;
+
+
+	case UD_TAG_GROUP0_CFI:
+		/* always dispatch 6 chars, fill up with Xs
+		 * (10962's placeholder) if STR has less than 6 chars */
+		displen = 0;
+		/* use two jump tables */
+		switch (len) {
+		default:
+		case 6:
+			buf[displen] = str[displen], displen++;
+		case 5:
+			buf[displen] = str[displen], displen++;
+		case 4:
+			buf[displen] = str[displen], displen++;
+		case 3:
+			buf[displen] = str[displen], displen++;
+		case 2:
+			buf[displen] = str[displen], displen++;
+		case 1:
+			buf[displen] = str[displen], displen++;
+		case 0:
+			break;
+		}
+
+		switch (len < 6 ? 6 - len : 0) {
+		default:
+		case 6:
+			buf[displen++] = 'X';
+		case 5:
+			buf[displen++] = 'X';
+		case 4:
+			buf[displen++] = 'X';
+		case 3:
+			buf[displen++] = 'X';
+		case 2:
+			buf[displen++] = 'X';
+		case 1:
+			buf[displen++] = 'X';
+		case 0:
+			break;
+		}
+		break;
+
+	case UD_TAG_GROUP0_OPOL:
+		displen = 4;
+		buf[0] = str[0];
+		buf[1] = str[1];
+		buf[2] = str[2];
+		buf[3] = str[3];
+		break;
+
+		/* guys that take some integer */
+	case UD_TAG_GROUP0_GAID:
+	case UD_TAG_GROUP2_FUND_INSTR:
+	case UD_TAG_GROUP2_SETD_INSTR:
+	case UD_TAG_GROUP4_UNDERLYER:
+		/* detect hex mode */
+		if ((str[0] == '0' || str[0] == '#') && str[1] == 'x') {
+			unsigned int gaid = ffff_strtoi32x(str + 2);
+			*(instr_id_t*)buf = gaid;
+		} else {
+			/* read him, regard him as ptr again and print him */
+			long int gaid = ffff_strtol(str, NULL, 0);
+			*(instr_id_t*)buf = (unsigned int)gaid;
+		}
+		displen = sizeof(instr_id_t);
+		break;
+
+#if 1
+		/* date guys */
+	case UD_TAG_GROUP3_ISSUE:
+	case UD_TAG_GROUP3_EXPIRY:
+	case UD_TAG_GROUP3_SETTLE:
+
+		/* price guys */
+	case UD_TAG_GROUP4_STRIKE:
+
+		/* ratio guys */
+	case UD_TAG_GROUP4_RATIO:
+#endif
+		abort();
+#if 1
+	case UD_TAG_GROUP1_ISIN:
+	case UD_TAG_GROUP1_RIC:
+	case UD_TAG_GROUP1_BBG:
+	case UD_TAG_GROUP5_BARRIER:
+#endif
+		abort();
+
+	case UD_TAG_NAME:
+	case UD_TAG_DATE:
+	case UD_TAG_EXPIRY:
+	case UD_TAG_PADDR:
+	case UD_TAG_UNDERLYING:
+	case UD_TAG_PRICE:
+	case UD_TAG_STRIKE:
+	case UD_TAG_PLACE:
+	case UD_TAG_SYMBOL:
+	case UD_TAG_CURRENCY:
+		abort();
+
+	case UD_TAG_UNK:
+		displen = 0;
+		break;
+	}
+	return displen;
+}
+#endif	/* UNSERCLI */
 
 /* catalogue-ng.c ends here */

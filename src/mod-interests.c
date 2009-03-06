@@ -204,8 +204,8 @@ mod_interests_LTX_init(void)
 		UD_MAKE_CLASS("interest"),
 		UD_MAKE_NAME("EONIA"));
 
-	ud_cat_add_obj(c_ffd);
-	ud_cat_add_obj(c_eonia);
+	//ud_cat_add_obj(c_ffd);
+	//ud_cat_add_obj(c_eonia);
 
 	/* and close the database */
 	pfack_sql_close(loc_conn);

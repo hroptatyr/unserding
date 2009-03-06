@@ -133,8 +133,8 @@ mod_pseu_index_LTX_init(void)
 		UD_MAKE_CLASS("index"),
 		UD_MAKE_NAME("BUGG"));
 
-	ud_cat_add_obj(c_pseu);
-	ud_cat_add_obj(c_bugg);
+	//ud_cat_add_obj(c_pseu);
+	//ud_cat_add_obj(c_bugg);
 
 	return;
 }

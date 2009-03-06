@@ -45,6 +45,10 @@
 # include <pfack/instruments.h>
 #endif	/* UNSERSRV */
 
+/**
+ * The catalogue data type, just a husk. */
+typedef void *catng_t;
+
 #define UD_TAG_GROUP0(_x)	((_x) + 0x20)
 #define UD_TAG_GROUP1(_x)	((_x) + 0x30)
 #define UD_TAG_GROUP2(_x)	((_x) + 0x40)
@@ -254,7 +258,6 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len);
 
 /* server specific stuff */
 #if defined UNSERSRV
-typedef void *catng_t;
 typedef long unsigned int hcode_t;
 
 extern catng_t make_catalogue(void);

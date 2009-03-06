@@ -13,7 +13,7 @@ CLEANFILES = $(BUILT_SOURCES)
 header_HEADERS = unserding.h catalogue.h protocore.h
 
 ## the main server binary
-unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c catalogue.c
+unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c
 unserdingd_SOURCES += catalogue-ng.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
@@ -33,7 +33,7 @@ unserdingd_SOURCES += mod-instr-fx.c
 ## the main server binary
 unsercli_SOURCES = unsercli.c stdin.c
 unsercli_SOURCES += scanner.l parser.y keywords.c
-unsercli_SOURCES += protocore.c catalogue.c
+unsercli_SOURCES += protocore.c catalogue-ng.c
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_YFLAGS = -d -p "cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
@@ -70,7 +70,7 @@ keywords.c: keywords.perf
 libunserding_la_SOURCES = libstuff.c
 
 ## kick
-#testcli_SOURCES = testcli.c catalogue.c
+#testcli_SOURCES = testcli.c
 #testcli_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 #testcli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 #testcli_LDADD = $(LIBEV_LIBS) -lreadline libunserding.la

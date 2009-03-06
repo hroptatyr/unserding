@@ -46,7 +46,6 @@
 /* our master include */
 #include "unserding.h"
 #include "unserding-private.h"
-#include "catalogue-ng.h"
 #include "protocore.h"
 #include "catalogue.h"
 /* other external stuff */

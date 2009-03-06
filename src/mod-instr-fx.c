@@ -57,7 +57,6 @@
 /* posix */
 # include <math.h>
 #endif	/* FFFF */
-#include "catalogue-ng.h"
 
 typedef long int timestamptz_t;
 extern void mod_instr_fx_LTX_init(void);

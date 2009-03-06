@@ -41,6 +41,9 @@
 #include "unserding.h"
 #include <stdarg.h>
 #include <stddef.h>
+#if defined UNSERSRV
+# include <pfack/instruments.h>
+#endif	/* UNSERSRV */
 
 #define UD_TAG_GROUP0(_x)	((_x) + 0x20)
 #define UD_TAG_GROUP1(_x)	((_x) + 0x30)
@@ -247,5 +250,17 @@ extern ud_tag_t ud_tag_from_s(const char *buf, size_t len);
 /* tag-dependent dispatching of cli input */
 extern unsigned int
 ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len);
+
+
+/* server specific stuff */
+#if defined UNSERSRV
+typedef void *catng_t;
+typedef long unsigned int hcode_t;
+
+extern catng_t make_catalogue(void);
+extern void free_catalogue(catng_t cat);
+
+extern void catalogue_add_instr(catng_t cat, const instr_t);
+#endif	/* UNSERSRV */
 
 #endif	/* INCLUDED_catalogue_h_ */

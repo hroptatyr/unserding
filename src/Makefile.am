@@ -68,6 +68,9 @@ keywords.c: keywords.perf
 
 ## the lib
 libunserding_la_SOURCES = libstuff.c protocore.c catalogue.c
+libunserding_la_CPPFLAGS = -DUNSERLIB $(LIBPFACK_CPPFLAGS)
+libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(LIBPFACK_LDFLAGS)
+libunserding_la_LIBADD = $(LIBPFACK_LIBS)
 
 ## kick
 #testcli_SOURCES = testcli.c

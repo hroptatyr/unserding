@@ -67,7 +67,7 @@ keywords.c: keywords.perf
 	fi
 
 ## the lib
-libunserding_la_SOURCES = libstuff.c
+libunserding_la_SOURCES = libstuff.c protocore.c catalogue.c
 
 ## kick
 #testcli_SOURCES = testcli.c

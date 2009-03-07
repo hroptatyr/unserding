@@ -132,7 +132,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout);
 /**
  * Like ud_recv_raw() but only receive packets that belong to convo CNO. */
 extern void
-ud_recv_convo(ud_handle_t hdl, ud_packet_t pkt, int timeout, ud_convo_t cno);
+ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int timeout, ud_convo_t cno);
 /**
  * Return the current conversation id of HDL. */
 extern inline ud_convo_t __attribute__((always_inline, gnu_inline))

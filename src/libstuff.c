@@ -174,7 +174,7 @@ out:
 }
 
 void
-ud_recv_convo(ud_handle_t hdl, ud_packet_t pkt, int to, ud_convo_t cno)
+ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_convo_t cno)
 {
 	int s = ud_handle_sock(hdl);
 	int epfd = ud_handle_epfd(hdl);
@@ -184,7 +184,7 @@ ud_recv_convo(ud_handle_t hdl, ud_packet_t pkt, int to, ud_convo_t cno)
 	char buf[UDPC_SIMPLE_PKTLEN];
 	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
 
-	if (UNLIKELY(pkt.plen == 0)) {
+	if (UNLIKELY(pkt->plen == 0)) {
 		return;
 	}
 
@@ -200,19 +200,19 @@ ud_recv_convo(ud_handle_t hdl, ud_packet_t pkt, int to, ud_convo_t cno)
 		/* no need to loop atm, nfds can be 0 or 1 */
 		if (UNLIKELY(nfds == 0)) {
 			/* nothing received */
-			pkt.plen = 0;
+			pkt->plen = 0;
 			goto out;
 		}
 		/* otherwise NFDS was 1 and it MUST be our socket */
 		nread = recvfrom(s, buf, countof(buf), 0, NULL, 0);
 	} while (!udpc_pkt_for_us_p(tmp, cno));
 	if (LIKELY(nread > 0)) {
-		if (LIKELY((size_t)nread < pkt.plen)) {
-			pkt.plen = nread;
+		if (LIKELY((size_t)nread < pkt->plen)) {
+			pkt->plen = nread;
 		}
-		memcpy(pkt.pbuf, buf, pkt.plen);
+		memcpy(pkt->pbuf, buf, pkt->plen);
 	} else {
-		pkt.plen = 0;
+		pkt->plen = 0;
 	}
 out:
 	/* remove S from the epoll descriptor EPFD */

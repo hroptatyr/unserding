@@ -924,102 +924,119 @@ __stuff_prop(instr_t instr, const char *buf)
 	uint16_t len = 0;
 	ud_tag_t t;
 
+#define PCTY_OFFSET	0x00
+#define TLV_OFFSET	0x01
+#define VAL_OFFSET	0x02
+
 	/* we're only interested in tlvs */
-	if (UNLIKELY((udpc_type_t)buf[0] != UDPC_TYPE_KEYVAL)) {
+	if (UNLIKELY((udpc_type_t)buf[PCTY_OFFSET] != UDPC_TYPE_KEYVAL)) {
 		/* advance by one which is probably bullshit
 		 * but we cant help it */
 		return 1;
 	}
 
-	switch ((t = buf[0])) {
-	case UD_TAG_GROUP0_NAME:
-		instr_general_set_name(instr, &buf[2], (uint8_t)buf[1]);
-		len = buf[1] + 2;
+	switch ((t = buf[TLV_OFFSET])) {
+	case UD_TAG_GROUP0_NAME: {
+		const char *name = &buf[VAL_OFFSET + 1];
+		uint8_t tmplen = (uint8_t)buf[VAL_OFFSET];
+		instr_general_set_name(instr, name, tmplen);
+		len = tmplen + VAL_OFFSET + 1;
 		break;
+	}
 
 	case UD_TAG_GROUP0_CFI:
-		instr_general_set_cfi(instr, &buf[1]);
-		len = 1 + sizeof(pfack_10962_t);
+		instr_general_set_cfi(instr, &buf[VAL_OFFSET]);
+		len = VAL_OFFSET + sizeof(pfack_10962_t);
 		break;
 
 	case UD_TAG_GROUP0_OPOL:
-		instr_general_set_opol(instr, &buf[1]);
-		len = 1 + sizeof(pfack_10383_t);
+		instr_general_set_opol(instr, &buf[VAL_OFFSET]);
+		len = VAL_OFFSET + sizeof(pfack_10383_t);
 		break;
 
 	case UD_TAG_GROUP0_GAID: {
-		instr_id_t tmp = *(const instr_id_t*const)&buf[1];
+		instr_id_t tmp = *(const instr_id_t*const)&buf[VAL_OFFSET];
 		instr_general_set_ga_id(instr, tmp);
-		len = 1 + sizeof(tmp);
+		len = VAL_OFFSET + sizeof(tmp);
 		break;
 	}
 
 	case UD_TAG_GROUP2_FUND_INSTR: {
-		instr_id_t tmp = *(const instr_id_t*const)&buf[1];
+		instr_id_t tmp = *(const instr_id_t*const)&buf[VAL_OFFSET];
 		instr_funding_set_fund_instr(instr, tmp);
-		len = 1 + sizeof(tmp);
+		len = VAL_OFFSET + sizeof(tmp);
 		break;
 	}
 	case UD_TAG_GROUP2_SETD_INSTR: {
-		instr_id_t tmp = *(const instr_id_t*const)&buf[1];
+		instr_id_t tmp = *(const instr_id_t*const)&buf[VAL_OFFSET];
 		instr_funding_set_setd_instr(instr, tmp);
-		len = 1 + sizeof(tmp);
+		len = VAL_OFFSET + sizeof(tmp);
 		break;
 	}
 
 	case UD_TAG_GROUP3_ISSUE: {
-		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		ffff_date_dse_t tmp =
+			*(const ffff_date_dse_t*const)&buf[VAL_OFFSET];
 		instr_delivery_set_issue(instr, tmp);
-		len = 1 + sizeof(tmp);
+		len = VAL_OFFSET + sizeof(tmp);
 		break;
 	}
 	case UD_TAG_GROUP3_EXPIRY: {
-		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		ffff_date_dse_t tmp =
+			*(const ffff_date_dse_t*const)&buf[VAL_OFFSET];
 		instr_delivery_set_expiry(instr, tmp);
-		len = 1 + sizeof(tmp);
+		len = VAL_OFFSET + sizeof(tmp);
 		break;
 	}
 	case UD_TAG_GROUP3_SETTLE: {
-		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		ffff_date_dse_t tmp =
+			*(const ffff_date_dse_t*const)&buf[VAL_OFFSET];
 		instr_delivery_set_settle(instr, tmp);
-		len = 1 + sizeof(tmp);
+		len = VAL_OFFSET + sizeof(tmp);
 		break;
 	}
 
 	case UD_TAG_GROUP4_UNDERLYER: {
-		unsigned int tmp = *(const unsigned int*const)&buf[1];
+		unsigned int tmp =
+			*(const unsigned int*const)&buf[VAL_OFFSET];
 		instr_referent_set_underlyer(instr, tmp);
-		len = 1 + sizeof(tmp);
+		len = VAL_OFFSET + sizeof(tmp);
 		break;
 	}
 	case UD_TAG_GROUP4_STRIKE: {
-		monetary32_t tmp = *(const monetary32_t*const)&buf[1];
+		monetary32_t tmp =
+			*(const monetary32_t*const)&buf[VAL_OFFSET];
 		instr_referent_set_strike(instr, tmp);
-		len = 1 + sizeof(tmp);
+		len = VAL_OFFSET + sizeof(tmp);
 		break;
 	}
 	case UD_TAG_GROUP4_RATIO: {
-		ratio16_t tmp = *(const ratio16_t*const)&buf[1];
+		ratio16_t tmp =
+			*(const ratio16_t*const)&buf[VAL_OFFSET];
 		instr_referent_set_ratio(instr, tmp);
-		len = 1 + sizeof(tmp);
+		len = VAL_OFFSET + sizeof(tmp);
 		break;
 	}
 
 	case UD_TAG_CLASS:
-		len = buf[1] + 2;
+		len = buf[VAL_OFFSET] + VAL_OFFSET;
 		break;
 
 	case UD_TAG_NAME:
-		len = buf[1] + 2;
+		len = buf[VAL_OFFSET] + VAL_OFFSET;
 		break;
 
 	case UD_TAG_UNK:
 	default:
 		/* bollocks, step by one */
-		len = 1;
+		len = VAL_OFFSET;
 		break;
 	}
 	return len;
+
+#undef PCTY_OFFSET
+#undef TLV_OFFSET
+#undef VAL_OFFSET
 }
 
 void*

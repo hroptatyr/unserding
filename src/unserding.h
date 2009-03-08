@@ -170,6 +170,9 @@ typedef struct ud_tlvcons_s *ud_tlvcons_t;
 
 extern void ud_cat_add_obj(ud_catobj_t co);
 
+/* some convenience funs */
+extern void *ud_cat_ls_by_gaid(ud_handle_t hdl, unsigned int gaid);
+
 /* instruments */
 extern void init_instr(void);
 

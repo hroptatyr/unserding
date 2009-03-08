@@ -905,4 +905,166 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 }
 #endif	/* UNSERCLI */
 
+
+/* specialised queries */
+#if defined UNSERLIB
+static instr_grpset_t
+extract_grpset(const char *instrpack)
+{
+	/* we expect 0x0f 0x02 xx xx */
+	if (UNLIKELY(instrpack[0] != 0x0f || instrpack[1] != 0x02)) {
+		return 0;
+	}
+	return *(const instr_grpset_t*)&instrpack[2];
+}
+
+static uint16_t
+__stuff_prop(instr_t instr, const char *buf)
+{
+	uint16_t len = 0;
+	ud_tag_t t;
+
+	/* we're only interested in tlvs */
+	if (UNLIKELY((udpc_type_t)buf[0] != UDPC_TYPE_KEYVAL)) {
+		/* advance by one which is probably bullshit
+		 * but we cant help it */
+		return 1;
+	}
+
+	switch ((t = buf[0])) {
+	case UD_TAG_GROUP0_NAME:
+		instr_general_set_name(instr, &buf[2], (uint8_t)buf[1]);
+		len = buf[1] + 2;
+		break;
+
+	case UD_TAG_GROUP0_CFI:
+		instr_general_set_cfi(instr, &buf[1]);
+		len = 1 + sizeof(pfack_10962_t);
+		break;
+
+	case UD_TAG_GROUP0_OPOL:
+		instr_general_set_opol(instr, &buf[1]);
+		len = 1 + sizeof(pfack_10383_t);
+		break;
+
+	case UD_TAG_GROUP0_GAID: {
+		instr_id_t tmp = *(const instr_id_t*const)&buf[1];
+		instr_general_set_ga_id(instr, tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP2_FUND_INSTR: {
+		instr_id_t tmp = *(const instr_id_t*const)&buf[1];
+		instr_funding_set_fund_instr(instr, tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP2_SETD_INSTR: {
+		instr_id_t tmp = *(const instr_id_t*const)&buf[1];
+		instr_funding_set_setd_instr(instr, tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP3_ISSUE: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		instr_delivery_set_issue(instr, tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP3_EXPIRY: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		instr_delivery_set_expiry(instr, tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP3_SETTLE: {
+		ffff_date_dse_t tmp = *(const ffff_date_dse_t*const)&buf[1];
+		instr_delivery_set_settle(instr, tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_GROUP4_UNDERLYER: {
+		unsigned int tmp = *(const unsigned int*const)&buf[1];
+		instr_referent_set_underlyer(instr, tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP4_STRIKE: {
+		monetary32_t tmp = *(const monetary32_t*const)&buf[1];
+		instr_referent_set_strike(instr, tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+	case UD_TAG_GROUP4_RATIO: {
+		ratio16_t tmp = *(const ratio16_t*const)&buf[1];
+		instr_referent_set_ratio(instr, tmp);
+		len = 1 + sizeof(tmp);
+		break;
+	}
+
+	case UD_TAG_CLASS:
+		len = buf[1] + 2;
+		break;
+
+	case UD_TAG_NAME:
+		len = buf[1] + 2;
+		break;
+
+	case UD_TAG_UNK:
+	default:
+		/* bollocks, step by one */
+		len = 1;
+		break;
+	}
+	return len;
+}
+
+void*
+ud_cat_ls_by_gaid(ud_handle_t hdl, unsigned int gaid)
+{
+	char buf[UDPC_SIMPLE_PKTLEN];
+	ud_packet_t pkt = {sizeof(buf), buf};
+	ud_convo_t cno;
+	instr_t res;
+	instr_grpset_t grpset;
+
+	/* fun-ify me */
+	cno = ud_handle_convo(hdl);
+	udpc_make_pkt(pkt, cno, /*pno*/0, UDPC_PKT_LS);
+	/* add the ls args */
+	pkt.pbuf[8] = 0x0c;
+	pkt.pbuf[9] = 0x01;
+	pkt.pbuf[10] = UD_TAG_GROUP0_GAID;
+	*(instr_id_t*)&pkt.pbuf[11] = (instr_id_t)gaid;
+	pkt.plen = 15;
+	/* send him */
+	ud_send_raw(hdl, pkt);
+	/* reset the size again */
+	pkt.plen = sizeof(buf);
+	/* lettest ye answers rolle in */
+	ud_recv_convo(hdl, &pkt, 200, cno);
+
+	if (UNLIKELY(pkt.pbuf[8] != 0x0c || pkt.pbuf[9] == 0x00)) {
+		/* just fuck off immediately if it's not a seq
+		 * or the seq's fucking empty */
+		return NULL;
+	}
+
+	/* now construct an instr from the answer, in case there's
+	 * more than one just pick the first one
+	 * first off, extract the grpset */
+	grpset = extract_grpset(&pkt.pbuf[10]);
+	res = make_instr(grpset);
+
+	/* stuff the instrument with goodness, start at instr data */
+	for (uint16_t i = /*hdr*/8 + /*seq*/2 + /*pfinstr tag*/1 + /*grpset*/3;
+	     i < pkt.plen;
+	     i += __stuff_prop(res, &pkt.pbuf[i]));
+	return res;
+}
+#endif	/* UNSERLIB */
+
 /* catalogue-ng.c ends here */

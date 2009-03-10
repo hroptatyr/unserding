@@ -908,6 +908,9 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 
 /* specialised queries */
 #if defined UNSERLIB
+
+# define UD_SENDRECV_TIMEOUT	100
+
 static instr_grpset_t
 extract_grpset(const char *instrpack)
 {
@@ -1039,6 +1042,35 @@ __stuff_prop(instr_t instr, const char *buf)
 #undef VAL_OFFSET
 }
 
+static bool
+__pkt_gaid_eqp(ud_packet_t pkt, unsigned int gaid)
+{
+	/* trivial cases early */
+	if (UNLIKELY(pkt.plen == 0)) {
+		return true;
+	}
+	/* quick check */
+	if (UNLIKELY(pkt.pbuf[8] != 0x0c || pkt.pbuf[9] == 0x00)) {
+		/* just fuck off immediately if it's not a seq
+		 * or the seq's fucking empty */
+		return false;
+	}
+	/* skip header(8), seq(2), pfinstr tag(1), grpset(3) bytes
+	 * and scan for 0x0e23 (tlv UD_TAG_GROUP0_GAID) */
+	for (uint16_t i = 8 + 2 + 1 + 3; i < pkt.plen; ) {
+		if (pkt.pbuf[i++] != UDPC_TYPE_KEYVAL) {
+			continue;
+		} else if (pkt.pbuf[i++] != UD_TAG_GROUP0_GAID) {
+			continue;
+		} else if (*(const instr_id_t*const)&pkt.pbuf[i] == gaid) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+	return false;
+}
+
 void*
 ud_cat_ls_by_gaid(ud_handle_t hdl, unsigned int gaid)
 {
@@ -1062,13 +1094,9 @@ ud_cat_ls_by_gaid(ud_handle_t hdl, unsigned int gaid)
 	/* reset the size again */
 	pkt.plen = sizeof(buf);
 	/* lettest ye answers rolle in */
-	ud_recv_convo(hdl, &pkt, 200, cno);
-
-	if (UNLIKELY(pkt.pbuf[8] != 0x0c || pkt.pbuf[9] == 0x00)) {
-		/* just fuck off immediately if it's not a seq
-		 * or the seq's fucking empty */
-		return NULL;
-	}
+	do {
+		ud_recv_convo(hdl, &pkt, UD_SENDRECV_TIMEOUT, cno);
+	} while (!__pkt_gaid_eqp(pkt, gaid));
 
 	/* now construct an instr from the answer, in case there's
 	 * more than one just pick the first one

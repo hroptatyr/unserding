@@ -103,9 +103,9 @@ udpc_print_pkt(const ud_packet_t pkt)
 int
 main (void)
 {
-#if 0
+#if 1
 	struct ud_handle_s __hdl;
-	char buf[16];
+	char buf[UDPC_SIMPLE_PKTLEN];
 	ud_packet_t pkt = {sizeof(buf), buf};
 	ud_convo_t cno;
 
@@ -115,7 +115,7 @@ main (void)
 	for (int i = 0; i < 1000; i++) {
 		cno = ud_send_simple(&__hdl, UDPC_PKT_HY);
 		pkt.plen = sizeof(buf);
-		ud_recv_convo(&__hdl, pkt, 200, cno);
+		ud_recv_convo(&__hdl, &pkt, 200, cno);
 	}
 
 	/* free the handle */

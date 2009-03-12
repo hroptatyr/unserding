@@ -6,6 +6,7 @@ AM_LDFLAGS = -lpthread
 headerdir = $(includedir)/unserding
 
 bin_PROGRAMS = unserdingd unsercli
+noinst_PROGRAMS = libtest
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
@@ -73,10 +74,10 @@ libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(LIBPFACK_LDFLAGS)
 libunserding_la_LIBADD = $(LIBPFACK_LIBS)
 
 ## kick
-#testcli_SOURCES = testcli.c
-#testcli_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
-#testcli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
-#testcli_LDADD = $(LIBEV_LIBS) -lreadline libunserding.la
+libtest_SOURCES = libtest.c
+libtest_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
+libtest_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+libtest_LDADD = $(LIBEV_LIBS) libunserding.la
 
 # 
 # Help the developers get nice post-processed source files

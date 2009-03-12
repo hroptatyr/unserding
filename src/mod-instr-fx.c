@@ -62,6 +62,10 @@ typedef long int timestamptz_t;
 extern void mod_instr_fx_LTX_init(void);
 extern void mod_instr_fx_LTX_deinit(void);
 
+#define UD_IDXOF(_x)	(PFACK_4217_##_x##_IDX)
+#define UD_CCY_ID(_x)	(UD_IDXOF(_x) | 0x80000000)
+#define UD_4217_ID(_x)	((_x) & ~0x80000000)
+
 static inline void __attribute__((always_inline))
 catalogue_add_ccy_instr(const_pfack_4217_t ccy, unsigned int cod)
 {
@@ -99,78 +103,56 @@ static void
 obtain_some_4217s(void)
 {
 	/* currencies */
-	catalogue_add_ccy_instr(PFACK_4217_EUR, 0x80000001);
-	catalogue_add_ccy_instr(PFACK_4217_USD, 0x80000002);
-	catalogue_add_ccy_instr(PFACK_4217_GBP, 0x80000003);
-	catalogue_add_ccy_instr(PFACK_4217_CAD, 0x80000004);
-	catalogue_add_ccy_instr(PFACK_4217_AUD, 0x80000005);
-	catalogue_add_ccy_instr(PFACK_4217_KRW, 0x80000006);
-	catalogue_add_ccy_instr(PFACK_4217_JPY, 0x80000007);
-	catalogue_add_ccy_instr(PFACK_4217_INR, 0x80000008);
-	catalogue_add_ccy_instr(PFACK_4217_HKD, 0x80000009);
-	catalogue_add_ccy_instr(PFACK_4217_CHF, 0x8000000a);
-	catalogue_add_ccy_instr(PFACK_4217_CNY, 0x8000000b);
-	catalogue_add_ccy_instr(PFACK_4217_RUB, 0x8000000c);
-	catalogue_add_ccy_instr(PFACK_4217_BRL, 0x8000000d);
-	catalogue_add_ccy_instr(PFACK_4217_MXN, 0x8000000e);
-	catalogue_add_ccy_instr(PFACK_4217_SEK, 0x8000000f);
-	catalogue_add_ccy_instr(PFACK_4217_NOK, 0x80000010);
-	catalogue_add_ccy_instr(PFACK_4217_NZD, 0x80000011);
-	catalogue_add_ccy_instr(PFACK_4217_CLP, 0x80000012);
+	catalogue_add_ccy_instr(PFACK_4217_EUR, UD_CCY_ID(EUR));
+	catalogue_add_ccy_instr(PFACK_4217_USD, UD_CCY_ID(USD));
+	catalogue_add_ccy_instr(PFACK_4217_GBP, UD_CCY_ID(GBP));
+	catalogue_add_ccy_instr(PFACK_4217_CAD, UD_CCY_ID(CAD));
+	catalogue_add_ccy_instr(PFACK_4217_AUD, UD_CCY_ID(AUD));
+	catalogue_add_ccy_instr(PFACK_4217_KRW, UD_CCY_ID(KRW));
+	catalogue_add_ccy_instr(PFACK_4217_JPY, UD_CCY_ID(JPY));
+	catalogue_add_ccy_instr(PFACK_4217_INR, UD_CCY_ID(INR));
+	catalogue_add_ccy_instr(PFACK_4217_HKD, UD_CCY_ID(HKD));
+	catalogue_add_ccy_instr(PFACK_4217_CHF, UD_CCY_ID(CHF));
+	catalogue_add_ccy_instr(PFACK_4217_CNY, UD_CCY_ID(CNY));
+	catalogue_add_ccy_instr(PFACK_4217_RUB, UD_CCY_ID(RUB));
+	catalogue_add_ccy_instr(PFACK_4217_BRL, UD_CCY_ID(BRL));
+	catalogue_add_ccy_instr(PFACK_4217_MXN, UD_CCY_ID(MXN));
+	catalogue_add_ccy_instr(PFACK_4217_SEK, UD_CCY_ID(SEK));
+	catalogue_add_ccy_instr(PFACK_4217_NOK, UD_CCY_ID(NOK));
+	catalogue_add_ccy_instr(PFACK_4217_NZD, UD_CCY_ID(NZD));
+	catalogue_add_ccy_instr(PFACK_4217_CLP, UD_CCY_ID(CLP));
 
 	/* precious metals, they should be TIXXXX */
-	catalogue_add_ccy_instr(PFACK_4217_XAU, 0x80000100);
-	catalogue_add_ccy_instr(PFACK_4217_XAG, 0x80000101);
-	catalogue_add_ccy_instr(PFACK_4217_XPT, 0x80000102);
+	catalogue_add_ccy_instr(PFACK_4217_XAU, UD_CCY_ID(XAU));
+	catalogue_add_ccy_instr(PFACK_4217_XAG, UD_CCY_ID(XAG));
+	catalogue_add_ccy_instr(PFACK_4217_XPT, UD_CCY_ID(XPT));
 
 	/* some usual pairs */
-	catalogue_add_fx_instr(
-		PFACK_4217_EUR_IDX, PFACK_4217_USD_IDX, 0xc0000001);
-	catalogue_add_fx_instr(
-		PFACK_4217_EUR_IDX, PFACK_4217_GBP_IDX, 0xc0000002);
-	catalogue_add_fx_instr(
-		PFACK_4217_EUR_IDX, PFACK_4217_CAD_IDX, 0xc0000003);
-	catalogue_add_fx_instr(
-		PFACK_4217_EUR_IDX, PFACK_4217_AUD_IDX, 0xc0000004);
-	catalogue_add_fx_instr(
-		PFACK_4217_EUR_IDX, PFACK_4217_KRW_IDX, 0xc0000005);
-	catalogue_add_fx_instr(
-		PFACK_4217_EUR_IDX, PFACK_4217_JPY_IDX, 0xc0000006);
-	catalogue_add_fx_instr(
-		PFACK_4217_EUR_IDX, PFACK_4217_INR_IDX, 0xc0000007);
-	catalogue_add_fx_instr(
-		PFACK_4217_EUR_IDX, PFACK_4217_HKD_IDX, 0xc0000008);
-	catalogue_add_fx_instr(
-		PFACK_4217_EUR_IDX, PFACK_4217_CHF_IDX, 0xc0000009);
+	catalogue_add_fx_instr(UD_IDXOF(EUR), UD_IDXOF(USD), 0xc0000001);
+	catalogue_add_fx_instr(UD_IDXOF(EUR), UD_IDXOF(GBP), 0xc0000002);
+	catalogue_add_fx_instr(UD_IDXOF(EUR), UD_IDXOF(CAD), 0xc0000003);
+	catalogue_add_fx_instr(UD_IDXOF(EUR), UD_IDXOF(AUD), 0xc0000004);
+	catalogue_add_fx_instr(UD_IDXOF(EUR), UD_IDXOF(KRW), 0xc0000005);
+	catalogue_add_fx_instr(UD_IDXOF(EUR), UD_IDXOF(JPY), 0xc0000006);
+	catalogue_add_fx_instr(UD_IDXOF(EUR), UD_IDXOF(INR), 0xc0000007);
+	catalogue_add_fx_instr(UD_IDXOF(EUR), UD_IDXOF(HKD), 0xc0000008);
+	catalogue_add_fx_instr(UD_IDXOF(EUR), UD_IDXOF(CHF), 0xc0000009);
 
-	catalogue_add_fx_instr(
-		PFACK_4217_USD_IDX, PFACK_4217_CAD_IDX, 0xc0000010);
-	catalogue_add_fx_instr(
-		PFACK_4217_USD_IDX, PFACK_4217_AUD_IDX, 0xc0000011);
-	catalogue_add_fx_instr(
-		PFACK_4217_USD_IDX, PFACK_4217_KRW_IDX, 0xc0000012);
-	catalogue_add_fx_instr(
-		PFACK_4217_USD_IDX, PFACK_4217_JPY_IDX, 0xc0000013);
-	catalogue_add_fx_instr(
-		PFACK_4217_USD_IDX, PFACK_4217_INR_IDX, 0xc0000014);
-	catalogue_add_fx_instr(
-		PFACK_4217_USD_IDX, PFACK_4217_HKD_IDX, 0xc0000015);
-	catalogue_add_fx_instr(
-		PFACK_4217_USD_IDX, PFACK_4217_CHF_IDX, 0xc0000016);
+	catalogue_add_fx_instr(UD_IDXOF(USD), UD_IDXOF(CAD), 0xc0000010);
+	catalogue_add_fx_instr(UD_IDXOF(USD), UD_IDXOF(AUD), 0xc0000011);
+	catalogue_add_fx_instr(UD_IDXOF(USD), UD_IDXOF(KRW), 0xc0000012);
+	catalogue_add_fx_instr(UD_IDXOF(USD), UD_IDXOF(JPY), 0xc0000013);
+	catalogue_add_fx_instr(UD_IDXOF(USD), UD_IDXOF(INR), 0xc0000014);
+	catalogue_add_fx_instr(UD_IDXOF(USD), UD_IDXOF(HKD), 0xc0000015);
+	catalogue_add_fx_instr(UD_IDXOF(USD), UD_IDXOF(CHF), 0xc0000016);
 
-	catalogue_add_fx_instr(
-		PFACK_4217_GBP_IDX, PFACK_4217_USD_IDX, 0xc0000020);
-	catalogue_add_fx_instr(
-		PFACK_4217_GBP_IDX, PFACK_4217_CAD_IDX, 0xc0000021);
-	catalogue_add_fx_instr(
-		PFACK_4217_GBP_IDX, PFACK_4217_AUD_IDX, 0xc0000022);
+	catalogue_add_fx_instr(UD_IDXOF(GBP), UD_IDXOF(USD), 0xc0000020);
+	catalogue_add_fx_instr(UD_IDXOF(GBP), UD_IDXOF(CAD), 0xc0000021);
+	catalogue_add_fx_instr(UD_IDXOF(GBP), UD_IDXOF(AUD), 0xc0000022);
 
-	catalogue_add_fx_instr(
-		PFACK_4217_XAU_IDX, PFACK_4217_USD_IDX, 0xc0000100);
-	catalogue_add_fx_instr(
-		PFACK_4217_XAG_IDX, PFACK_4217_USD_IDX, 0xc0000101);
-	catalogue_add_fx_instr(
-		PFACK_4217_XPT_IDX, PFACK_4217_USD_IDX, 0xc0000102);
+	catalogue_add_fx_instr(UD_IDXOF(XAU), UD_IDXOF(USD), 0xc0000100);
+	catalogue_add_fx_instr(UD_IDXOF(XAG), UD_IDXOF(USD), 0xc0000101);
+	catalogue_add_fx_instr(UD_IDXOF(XPT), UD_IDXOF(USD), 0xc0000102);
 	return;
 }
 
@@ -231,8 +213,8 @@ obtain_options(void)
 	instr_t tmp = make_oxxxxx(
 		(instr_id_t)42083U, "S&P C1900 2008-06", "OPEICS", "XCBO");
 	/* set funding */
-	instr_funding_set_fund_instr(tmp, 0x80000002);
-	instr_funding_set_setd_instr(tmp, 0x80000002);
+	instr_funding_set_fund_instr(tmp, UD_CCY_ID(USD));
+	instr_funding_set_setd_instr(tmp, UD_CCY_ID(USD));
 	/* delivery group */
 	instr_delivery_set_issue(tmp, 0);
 	instr_delivery_set_expiry(tmp, 14049);

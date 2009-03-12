@@ -63,6 +63,8 @@
 #include "protocore.h"
 #include "catalogue.h"
 
+#include <pfack/instruments.h>
+
 #if defined TIME_WITH_SYS_TIME
 # include <sys/time.h>
 # include <time.h>
@@ -110,15 +112,27 @@ udpc_print_pkt(const ud_packet_t pkt)
 	return;
 }
 
+static inline void
+duration(struct timespec *res, struct timespec *sta, struct timespec *end)
+{
+	if (end->tv_nsec >= sta->tv_nsec) {
+		res->tv_nsec = end->tv_nsec - sta->tv_nsec;
+		res->tv_sec = end->tv_sec - sta->tv_sec;
+	} else {
+		res->tv_nsec = 1000000000 + end->tv_nsec - sta->tv_nsec;
+		res->tv_sec = end->tv_sec - sta->tv_sec - 1;
+	}
+}
+
 int
 main (void)
 {
-#if 1
 	struct ud_handle_s __hdl;
+	struct timespec sta, end, diff;
+#if 0
 	char buf[UDPC_SIMPLE_PKTLEN];
 	ud_packet_t pkt = {sizeof(buf), buf};
 	ud_convo_t cno;
-	struct timespec sta, end, diff;
 
 	/* obtain us a new handle */
 	init_unserding_handle(&__hdl);
@@ -131,13 +145,7 @@ main (void)
 		ud_recv_convo(&__hdl, &pkt, 200, cno);
 		clock_gettime(CLOCK_REALTIME, &end);
 
-		if (end.tv_nsec >= sta.tv_nsec) {
-			diff.tv_nsec = end.tv_nsec - sta.tv_nsec;
-			diff.tv_sec = end.tv_sec - sta.tv_sec;
-		} else {
-			diff.tv_nsec = 1000000000 + end.tv_nsec - sta.tv_nsec;
-			diff.tv_sec = end.tv_sec - sta.tv_sec - 1;
-		}
+		duration(&diff, &sta, &end);
 		fprintf(stderr, "wallclock %lu.%09ld\n",
 			diff.tv_sec, diff.tv_nsec);
 	}
@@ -146,6 +154,28 @@ main (void)
 	free_unserding_handle(&__hdl);
 
 	return 0;
+#elif 1
+	/* obtain us a new handle */
+	init_unserding_handle(&__hdl);
+
+	for (int i = 0; i < 1000; i++) {
+		void *bar;
+
+		clock_gettime(CLOCK_REALTIME, &sta);
+		bar = ud_cat_ls_by_gaid(&__hdl, 2147483797);
+		clock_gettime(CLOCK_REALTIME, &end);
+
+		duration(&diff, &sta, &end);
+		fprintf(stderr, "wallclock %lu.%09ld  :instr ",
+			diff.tv_sec, diff.tv_nsec);
+		print_instr(stderr, bar);
+		fputc('\n', stderr);
+	}
+
+	/* free the handle */
+	free_unserding_handle(&__hdl);
+	return 0;
+
 #elif 1
 	volatile int a = 0;
 

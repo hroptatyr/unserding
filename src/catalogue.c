@@ -1042,6 +1042,22 @@ __stuff_prop(instr_t instr, const char *buf)
 #undef VAL_OFFSET
 }
 
+static inline bool
+__no_result_p(ud_packet_t pkt)
+{
+	/* trivial cases early */
+	if (UNLIKELY(pkt.plen == 0)) {
+		return true;
+	}
+	/* quick check */
+	if (UNLIKELY(pkt.pbuf[8] != 0x0c || pkt.pbuf[9] == 0x00)) {
+		/* just fuck off immediately if it's not a seq
+		 * or the seq's fucking empty */
+		return true;
+	}
+	return false;
+}
+
 static bool
 __pkt_gaid_eqp(ud_packet_t pkt, unsigned int gaid)
 {
@@ -1097,6 +1113,10 @@ ud_cat_ls_by_gaid(ud_handle_t hdl, unsigned int gaid)
 	do {
 		ud_recv_convo(hdl, &pkt, UD_SENDRECV_TIMEOUT, cno);
 	} while (!__pkt_gaid_eqp(pkt, gaid));
+
+	if (UNLIKELY(__no_result_p(pkt))) {
+		return NULL;
+	}
 
 	/* now construct an instr from the answer, in case there's
 	 * more than one just pick the first one

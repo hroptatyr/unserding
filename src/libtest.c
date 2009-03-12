@@ -63,6 +63,16 @@
 #include "protocore.h"
 #include "catalogue.h"
 
+#if defined TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else  /* !TIME_WITH_SYS_TIME */
+# if defined HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# elif defined HAVE_TIME_H
+#  include <time.h>
+# endif
+#endif
 
 static inline ud_convo_t __attribute__((always_inline, gnu_inline))
 udpc_pkt_cno(const ud_packet_t pkt)
@@ -108,14 +118,28 @@ main (void)
 	char buf[UDPC_SIMPLE_PKTLEN];
 	ud_packet_t pkt = {sizeof(buf), buf};
 	ud_convo_t cno;
+	struct timespec sta, end, diff;
 
 	/* obtain us a new handle */
 	init_unserding_handle(&__hdl);
 
 	for (int i = 0; i < 1000; i++) {
 		cno = ud_send_simple(&__hdl, UDPC_PKT_HY);
+		clock_gettime(CLOCK_REALTIME, &sta);
+		
 		pkt.plen = sizeof(buf);
 		ud_recv_convo(&__hdl, &pkt, 200, cno);
+		clock_gettime(CLOCK_REALTIME, &end);
+
+		if (end.tv_nsec >= sta.tv_nsec) {
+			diff.tv_nsec = end.tv_nsec - sta.tv_nsec;
+			diff.tv_sec = end.tv_sec - sta.tv_sec;
+		} else {
+			diff.tv_nsec = 1000000000 + end.tv_nsec - sta.tv_nsec;
+			diff.tv_sec = end.tv_sec - sta.tv_sec - 1;
+		}
+		fprintf(stderr, "wallclock %lu.%09ld\n",
+			diff.tv_sec, diff.tv_nsec);
 	}
 
 	/* free the handle */

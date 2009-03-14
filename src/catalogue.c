@@ -1058,12 +1058,23 @@ __no_result_p(ud_packet_t pkt)
 	return false;
 }
 
+struct __gaid_eqp_clo_s {
+	id_t gaid;
+	ud_convo_t cno;
+};
+
 static bool
-__pkt_gaid_eqp(ud_packet_t pkt, unsigned int gaid)
+__gaid_eqp(ud_packet_t pkt, void *closure)
 {
+	struct __gaid_eqp_clo_s *clo = closure;
+
 	/* trivial cases early */
 	if (UNLIKELY(pkt.plen == 0)) {
-		return true;
+		return false;
+	}
+	/* check for the convo number */
+	if (UNLIKELY(udpc_pkt_cno(pkt) != clo->cno)) {
+		return false;
 	}
 	/* quick check */
 	if (UNLIKELY(pkt.pbuf[8] != 0x0c || pkt.pbuf[9] == 0x00)) {
@@ -1078,7 +1089,7 @@ __pkt_gaid_eqp(ud_packet_t pkt, unsigned int gaid)
 			continue;
 		} else if (pkt.pbuf[i++] != UD_TAG_GROUP0_GAID) {
 			continue;
-		} else if (*(const instr_id_t*const)&pkt.pbuf[i] == gaid) {
+		} else if (*(const instr_id_t*const)&pkt.pbuf[i] == clo->gaid) {
 			return true;
 		} else {
 			return false;
@@ -1107,12 +1118,16 @@ ud_cat_ls_by_gaid(ud_handle_t hdl, unsigned int gaid)
 	pkt.plen = 15;
 	/* send him */
 	ud_send_raw(hdl, pkt);
+	hdl->convo++;
 	/* reset the size again */
 	pkt.plen = sizeof(buf);
 	/* lettest ye answers rolle in */
-	do {
-		ud_recv_convo(hdl, &pkt, UD_SENDRECV_TIMEOUT, cno);
-	} while (!__pkt_gaid_eqp(pkt, gaid));
+	memset(buf, 0, sizeof(buf));
+	{
+		struct __gaid_eqp_clo_s clo = {.gaid = gaid, .cno = cno};
+		fprintf(stderr, "sending out convo %u\n", cno);
+		ud_recv_pred(hdl, &pkt, UD_SENDRECV_TIMEOUT, __gaid_eqp, &clo);
+	}
 
 	if (UNLIKELY(__no_result_p(pkt))) {
 		return NULL;

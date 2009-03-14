@@ -122,6 +122,13 @@ ud_handle_epfd(ud_handle_t hdl)
 	return hdl->epfd;
 }
 
+static bool
+__pkt_our_convo_p(const ud_packet_t pkt, void *clo)
+{
+	ud_convo_t cno = (long unsigned int)clo;
+	return udpc_pkt_cno(pkt) == cno;
+}
+
 
 /* public funs */
 void
@@ -179,44 +186,8 @@ out:
 void
 ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_convo_t cno)
 {
-	int s = ud_handle_sock(hdl);
-	int epfd = ud_handle_epfd(hdl);
-	int nfds;
-	ssize_t nread;
-	struct epoll_event ev, *events = NULL;
-	char buf[UDPC_SIMPLE_PKTLEN];
-	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
-
-	/* register for input, oob, error and hangups */
-	ev.events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
-	/* register our data */
-	ev.data.ptr = hdl;
-	/* add S to the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ev);
-	/* now wait */
-	do {
-		nfds = epoll_wait(epfd, events, 1, to);
-		/* no need to loop atm, nfds can be 0 or 1 */
-		if (UNLIKELY(nfds == 0)) {
-			/* nothing received */
-			pkt->plen = 0;
-			goto out;
-		}
-		/* otherwise NFDS was 1 and it MUST be our socket */
-		nread = recvfrom(s, buf, countof(buf), 0, NULL, 0);
-		tmp.plen = nread;
-	} while (!udpc_pkt_for_us_p(tmp, cno));
-	if (LIKELY(nread > 0)) {
-		if (LIKELY((size_t)nread < pkt->plen)) {
-			pkt->plen = nread;
-		}
-		memcpy(pkt->pbuf, buf, pkt->plen);
-	} else {
-		pkt->plen = 0;
-	}
-out:
-	/* remove S from the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, &ev);
+	void *clo = (void*)(long unsigned int)cno;
+	ud_recv_pred(hdl, pkt, to, __pkt_our_convo_p, clo);
 	return;
 }
 

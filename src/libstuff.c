@@ -63,6 +63,8 @@
 #endif
 /* conditionalise on me */
 #include <sys/epoll.h>
+/* conditionalise on me too */
+#include <fcntl.h>
 
 /* our master include */
 #define SA_STRUCT		struct sockaddr_in6
@@ -112,11 +114,12 @@ mcast_init(void)
 static inline int __attribute__((always_inline, gnu_inline))
 ud_handle_epfd(ud_handle_t hdl)
 {
-	if (LIKELY(hdl->epfd >= 0)) {
-		return hdl->epfd;
-	} else {
-		return hdl->epfd = epoll_create(1);
+	if (UNLIKELY(hdl->epfd < 0)) {
+		hdl->epfd = epoll_create(4);
+		/* set non-blocking */
+		(void)fcntl(hdl->epfd, F_SETFL, O_NONBLOCK);
 	}
+	return hdl->epfd;
 }
 
 
@@ -184,10 +187,6 @@ ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_convo_t cno)
 	char buf[UDPC_SIMPLE_PKTLEN];
 	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
 
-	if (UNLIKELY(pkt->plen == 0)) {
-		return;
-	}
-
 	/* register for input, oob, error and hangups */
 	ev.events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
 	/* register our data */
@@ -205,7 +204,58 @@ ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_convo_t cno)
 		}
 		/* otherwise NFDS was 1 and it MUST be our socket */
 		nread = recvfrom(s, buf, countof(buf), 0, NULL, 0);
+		tmp.plen = nread;
 	} while (!udpc_pkt_for_us_p(tmp, cno));
+	if (LIKELY(nread > 0)) {
+		if (LIKELY((size_t)nread < pkt->plen)) {
+			pkt->plen = nread;
+		}
+		memcpy(pkt->pbuf, buf, pkt->plen);
+	} else {
+		pkt->plen = 0;
+	}
+out:
+	/* remove S from the epoll descriptor EPFD */
+	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, &ev);
+	return;
+}
+
+void
+ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_pred_f pf, void *clo)
+{
+	int s = ud_handle_sock(hdl);
+	int epfd = ud_handle_epfd(hdl);
+	int nfds;
+	ssize_t nread;
+	struct epoll_event ev, *events = NULL;
+	char buf[UDPC_SIMPLE_PKTLEN];
+	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
+
+	/* register for input, oob, error and hangups */
+	ev.events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLET;
+	/* register our data */
+	ev.data.ptr = hdl;
+	/* add S to the epoll descriptor EPFD */
+	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ev);
+	/* now wait */
+wait:
+	nfds = epoll_wait(epfd, events, 1, to);
+	/* no need to loop atm, nfds can be 0 or 1 */
+	if (UNLIKELY(nfds == 0)) {
+		/* nothing received */
+		pkt->plen = 0;
+		goto out;
+	}
+	/* otherwise NFDS was 1 and it MUST be our socket */
+	do {
+		if ((nread = recvfrom(s, buf, countof(buf), 0, NULL, 0)) < 0) {
+			/* batshit! start over */
+			goto wait;
+		}
+		tmp.plen = nread;
+		ud_fprint_pkt_raw(tmp, stderr);
+	} while (!udpc_pkt_valid_p(tmp) || !pf(tmp, clo));
+
 	if (LIKELY(nread > 0)) {
 		if (LIKELY((size_t)nread < pkt->plen)) {
 			pkt->plen = nread;

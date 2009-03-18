@@ -17,7 +17,7 @@ header_HEADERS = unserding.h catalogue.h protocore.h
 unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c
 unserdingd_SOURCES += catalogue.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
-unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
 unserdingd_LDADD = $(LIBEV_LIBS) $(LIBPFACK_LIBS)
 ## additional modules
 unserdingd_SOURCES += mod-pseu-index.c
@@ -76,7 +76,7 @@ libunserding_la_LIBADD = $(LIBPFACK_LIBS)
 ## kick
 libtest_SOURCES = libtest.c
 libtest_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
-libtest_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+libtest_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
 libtest_LDADD = $(LIBEV_LIBS) libunserding.la
 
 # 

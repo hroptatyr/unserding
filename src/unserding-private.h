@@ -369,11 +369,11 @@ static inline job_t __attribute__((always_inline, gnu_inline))
 obtain_job(job_queue_t jq)
 {
 	job_t j;
-	pthread_mutex_lock(&jq->mtx);
+	//pthread_mutex_lock(&jq->mtx);
 	j = &jq->jobs[jq->ji];
 	jq->ji = __next_job(jq);
 	__job_set_prepd(j);
-	pthread_mutex_unlock(&jq->mtx);
+	//pthread_mutex_unlock(&jq->mtx);
 	return j;
 }
 
@@ -382,9 +382,9 @@ enqueue_job(job_queue_t jq, job_t j)
 {
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
-	pthread_mutex_lock(&jq->mtx);
+	//pthread_mutex_lock(&jq->mtx);
 	__job_set_ready(j);
-	pthread_mutex_unlock(&jq->mtx);
+	//pthread_mutex_unlock(&jq->mtx);
 	return;
 }
 

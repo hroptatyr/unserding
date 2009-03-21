@@ -115,6 +115,7 @@ nvm		{ RETURN_TOKEN(TOK_NVM); }
 bugger		{ RETURN_TOKEN(TOK_NVM); }
 impo(rt)?	{ RETURN_TOKEN(TOK_IMPORT); }
 cat		{ RETURN_TOKEN(TOK_CAT); }
+e123ify		{ RETURN_TOKEN(TOK_E123); }
 
  /* don't do that at the moment, we can parse the string based on the context
   * ourselves, and much more efficiently */

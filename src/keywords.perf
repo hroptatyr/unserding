@@ -41,6 +41,7 @@ struct ud_tagtbl_s;
 :ratio, UD_TAG_GROUP4_RATIO
 :kiko, UD_TAG_GROUP5_BARRIER
 :barrier, UD_TAG_GROUP5_BARRIER
+:string, UD_TAG_STRING
 %%
 
 ud_tag_t

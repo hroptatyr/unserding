@@ -788,6 +788,7 @@ ud_disp_tag(char *restrict buf, ud_tag_t t, const char *str, size_t len)
 	switch ((enum ud_tag_e)t) {
 	case UD_TAG_CLASS:
 	case UD_TAG_ATTR:
+	case UD_TAG_STRING:
 	case UD_TAG_GROUP0_NAME:
 	default:
 		/* generic string dispatching */

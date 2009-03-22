@@ -112,21 +112,42 @@ struct arrpq_s {
 extern arrpq_t make_arrpq(size_t size);
 extern void free_arrpq(arrpq_t q);
 
-static void __attribute__((unused))
+/**
+ * Return the allocated size of the queue Q. */
+static inline size_t __attribute__((always_inline, gnu_inline))
+arrpq_alloc_size(arrpq_t q)
+{
+	return q->size;
+}
+
+/**
+ * Return the number of elements held in the queue Q. */
+static inline unsigned int __attribute__((always_inline, gnu_inline))
+arrpq_size(arrpq_t q)
+{
+	unsigned int res;
+	pthread_mutex_lock(&q->mtx);
+	res = (unsigned int)(((int)q->head - (int)q->tail) % q->size);
+	pthread_mutex_unlock(&q->mtx);
+	return res;
+}
+
+static bool __attribute__((unused))
 arrpq_enqueue(arrpq_t q, void *data)
 {
 	pthread_mutex_lock(&q->mtx);
 	/* check if there's room in the queue */
 	if (UNLIKELY((q->head + 1 == q->tail) ||
 		     (q->head + 1 == q->size && q->tail == 0))) {
-		return;
+		pthread_mutex_unlock(&q->mtx);
+		return false;
 	}
 	/* lodge data */
 	q->queue[q->head] = data;
 	/* step the head */
 	q->head = (q->head + 1) % q->size;
 	pthread_mutex_unlock(&q->mtx);
-	return;
+	return true;
 }
 
 static void __attribute__((unused))*

@@ -150,64 +150,8 @@ worker_killw(ud_worker_t wk)
 }
 
 /* the global job queue */
-static struct job_queue_s __glob_jq = {
-	.head = 0, .tail = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
-};
+static struct job_queue_s __glob_jq;
 job_queue_t glob_jq;
-
-static job_t __attribute__((noinline))
-dequeue_job(job_queue_t jq)
-{
-#if 0
-/* we need a job pool, badly */
-	short unsigned int idx;
-
-	pthread_mutex_lock(&jq->mtx);
-	if (LIKELY((idx = jq->ri) == jq->ji)) {
-		pthread_mutex_unlock(&jq->mtx);
-		return NO_JOB;
-	}
-	/* try the job at jq->ri */
-	if (LIKELY(__job_readyp(&jq->jobs[idx]))) {
-		/* brilliant */
-		jq->ri = (jq->ri + 1) % NJOBS;
-		pthread_mutex_unlock(&jq->mtx);
-		return &jq->jobs[idx];
-	} else if (__job_prepdp(&jq->jobs[idx])) {
-		/* grrrrr */
-		idx = (idx + 1) % NJOBS;
-	} else {
-		/* must be res->readyp == 0, and hence jq->ri
-		 * points to an empty job */
-		idx = jq->ri = (idx + 1) % NJOBS;
-	}
-	while (UNLIKELY(idx != jq->ji)) {
-		if (LIKELY(__job_readyp(&jq->jobs[idx]))) {
-			/* brilliant */
-			if (idx == jq->ri) {
-				jq->ri = (jq->ri + 1) % NJOBS;
-			}
-			pthread_mutex_unlock(&jq->mtx);
-			return &jq->jobs[idx];
-		} else if (__job_prepdp(&jq->jobs[idx])) {
-			/* grrrrr */
-			idx = (idx + 1) % NJOBS;
-		} else if (idx == jq->ri) {
-			/* must be res->readyp == 0
-			 * update jq->ri only if no half-ready jobs
-			 * have been encountered */
-			idx = jq->ri = (idx + 1) % NJOBS;
-		} else {
-			/* just break and hope for the better */
-			break;
-		}
-	}
-	pthread_mutex_unlock(&jq->mtx);
-	return NO_JOB;
-#else
-	return arrpq_dequeue(jq->wq);
-#endif
-}
 
 
 inline void __attribute__((always_inline, gnu_inline))
@@ -392,6 +336,11 @@ init_glob_jq(void)
 {
 	glob_jq = &__glob_jq;
 	glob_jq->wq = make_arrpq(NJOBS);
+	glob_jq->fq = make_arrpq(NJOBS);
+	/* enqueue all jobs in the free queue */
+	for (int i = 0; i < NJOBS; i++) {
+		arrpq_enqueue(glob_jq->fq, &glob_jq->jobs[i]);
+	}
 	return;
 }
 

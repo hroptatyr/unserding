@@ -239,15 +239,10 @@ struct job_s {
 struct job_queue_s {
 	/* the queue for the workers */
 	arrpq_t wq;
-
-	/* job index, always points to a free job */
-	short unsigned int head;
-	/* read index, always points to */
-	short unsigned int tail;
-	/* en/de-queuing mutex */
-	pthread_mutex_t mtx;
+	/* the queue for free jobs */
+	arrpq_t fq;
 	/* the jobs vector */
-	struct job_s jobs[NJOBS];
+	struct job_s jobs[NJOBS] __attribute__((aligned(16)));
 };
 
 static inline uint8_t __attribute__((always_inline, gnu_inline))
@@ -354,81 +349,39 @@ __job_set_trans(job_t j)
 	return;
 }
 
-#if 0
-/* we've got to switch to a pool implementation */
-static inline job_t __attribute__((always_inline, gnu_inline))
-obtain_job(job_queue_t jq)
-{
-	job_t j;
-	short unsigned int k;
+/**
+ * Global job queue. */
+extern job_queue_t glob_jq;
 
-	UD_CRITICAL("obtain job\n");
-	pthread_mutex_lock(&jq->mtx);
-	for (k = 0; !__job_emptyp(&jq->jobs[k]) && k < NJOBS; k++) {
-		UD_CRITICAL("slot %d flags %d\n", k, jq->jobs[k].flags);
-	}
-	if (k < NJOBS) {
-		jq->ji = k;
-		__job_set_prepd(j = &jq->jobs[k]);
-	} else {
-		jq->ji = 0;
-		j = NULL;
-	}
-	pthread_mutex_unlock(&jq->mtx);
-	return j;
-}
-#else
-/* stupid implementation */
 static inline job_t __attribute__((always_inline, gnu_inline))
-obtain_job(job_queue_t jq)
+make_job(void)
 {
-	job_t res;
-
-	/* only hand out a job if the queue isnt too full up */
-	if (UNLIKELY(arrpq_size(jq->wq) >= NJOBS - 1)) {
-		return NULL;
-	}
-	res = malloc(SIZEOF_JOB_S);
-	memset(res, 0, SIZEOF_JOB_S);
-	return res;
+	/* dequeue from the free queue */
+	return arrpq_dequeue(glob_jq->fq);
 }
-#endif	/* 0 */
 
 static inline void __attribute__((always_inline, gnu_inline))
 free_job(job_t j)
 {
-#if 0
-/* mempools? */
-#if 0
-	if (UNLIKELY(j->freef != NULL)) {
-		j->freef(j);
-	}
-#endif
+	/* enqueue in the free queue */
 	memset(j, 0, SIZEOF_JOB_S);
-
-#else
-	free(j);
-#endif
+	arrpq_enqueue(glob_jq->fq, j);
 	return;
 }
 
 static inline void __attribute__((always_inline, gnu_inline))
 enqueue_job(job_queue_t jq, job_t j)
 {
-#if 0
-	/* ugly ugly ugly */
-	while (!arrpq_enqueue(jq->wq, j)) {
-		UD_CRITICAL("no queue space ... sleeping\n");
-		usleep(1000);
-	}
-#else
-	/* ugly ugly ugly too */
-	if (!arrpq_enqueue(jq->wq, j)) {
-		UD_CRITICAL("no queue space ... chucking job\n");
-		free_job(j);
-	}
-#endif
+	/* enqueue in the worker queue */
+	arrpq_enqueue(jq->wq, j);
 	return;
+}
+
+static inline job_t __attribute__((always_inline, gnu_inline))
+dequeue_job(job_queue_t jq)
+{
+	/* dequeue from the worker queue */
+	return arrpq_dequeue(jq->wq);
 }
 
 /* helper macro to use a job as packet */
@@ -436,10 +389,6 @@ enqueue_job(job_queue_t jq, job_t j)
 /* helper macro to use a char buffer as packet */
 #define BUF_PACKET(b)	((ud_packet_t){.plen = countof(b), .pbuf = b})
 #define PACKET(a, b)	((ud_packet_t){.plen = a, .pbuf = b})
-
-/**
- * Global job queue. */
-extern job_queue_t glob_jq;
 
 /**
  * Job that looks up the parser routine in ud_parsef(). */

@@ -315,10 +315,11 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	socklen_t lsa = sizeof(j->sa);
 
 	UD_DEBUG_MCAST("incoming connexion\n");
-	if (UNLIKELY((j = obtain_job(glob_jq)) == NULL)) {
+	if (UNLIKELY((j = make_job()) == NULL)) {
 		UD_CRITICAL("no job slots ... leaping\n");
 		/* just read the packet off of the wire */
 		(void)recv(w->fd, scratch_buf, UDPC_SIMPLE_PKTLEN, 0);
+		trigger_job_queue();
 		return;
 	}
 

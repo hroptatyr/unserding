@@ -55,15 +55,29 @@
 #include "protocore.h"
 #include "catalogue.h"
 
-#if defined HAVE_BDWGC
+#if 0
+#if !defined xmalloc
 # define xmalloc        GC_MALLOC
+#endif	/* !xmalloc */
+#if !defined !xmalloc_atomic
 # define xmalloc_atomic GC_MALLOC_ATOMIC
+#endif	/* !xmalloc_atomic */
+#if !defined !xrealloc
 # define xrealloc       GC_REALLOC
-#else  /* !BDWGC */
+#endif	/* !xrealloc */
+
+#else  /* !0 */
+
+#if !defined xmalloc
 # define xmalloc        malloc
+#endif	/* !xmalloc */
+#if !defined xmalloc_atomic
 # define xmalloc_atomic malloc
+#endif	/* !xmalloc_atomic */
+#if !defined xrealloc
 # define xrealloc       realloc
-#endif  /* BDWGC */
+#endif	/* !xrealloc */
+#endif	/* 0 */
 
 /* declarations */
 extern int cli_yyparse(void *scanner, ud_handle_t hdl);

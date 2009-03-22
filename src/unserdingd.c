@@ -420,9 +420,6 @@ main(int argc, char *argv[])
 	/* initialise the proto core */
 	init_proto();
 
-	/* attach a multicast listener */
-	ud_attach_mcast4(EV_A);
-
 	/* initialise instruments */
 	instruments = make_catalogue();
 	/* initialise interests module */
@@ -470,6 +467,12 @@ main(int argc, char *argv[])
 #endif	/* !USE_COROUTINES */
 		add_worker(secl);
 	}
+
+	/* attach a multicast listener
+	 * we add this quite late so that it's unlikely that a plethora of
+	 * events has already been injected into our precious queue
+	 * causing the libev main loop to crash. */
+	ud_attach_mcast4(EV_A);
 
 	/* reset the round robin var */
 	rr_wrk = 0;

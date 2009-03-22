@@ -349,7 +349,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	}
 
 	j->blen = nread;
-	__job_set_ready(j);
 
 	/* spit the packet in its raw shape */
 	ud_fprint_pkt_raw(JOB_PACKET(j), logout);

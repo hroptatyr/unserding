@@ -260,66 +260,6 @@ __job_trans_bits(job_t j)
 }
 
 static inline bool __attribute__((always_inline, gnu_inline))
-__job_emptyp(job_t j)
-{
-/* return true iff job slot is empty */
-	return __job_ready_bits(j) == 0;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-__job_set_empty(job_t j)
-{
-/* make J empty */
-	j->flags &= ~0x11;
-	return;
-}
-
-static inline bool __attribute__((always_inline, gnu_inline))
-__job_prepdp(job_t j)
-{
-/* return true iff job slot is currently being prepared */
-	return __job_ready_bits(j) == 1;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-__job_set_prepd(job_t j)
-{
-/* turn job into a prepared one */
-	j->flags = (j->flags & ~0x11) | 1;
-	return;
-}
-
-static inline bool __attribute__((always_inline, gnu_inline))
-__job_readyp(job_t j)
-{
-/* return true iff job slot is ready */
-	return __job_ready_bits(j) == 2;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-__job_set_ready(job_t j)
-{
-/* turn job into a ready one */
-	j->flags = (j->flags & ~0x11) | 2;
-	return;
-}
-
-static inline bool __attribute__((always_inline, gnu_inline))
-__job_finip(job_t j)
-{
-/* return true iff job in the job slot is finished */
-	return __job_ready_bits(j) == 3;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-__job_set_fini(job_t j)
-{
-/* turn job into a finished one */
-	j->flags |= 3;
-	return;
-}
-
-static inline bool __attribute__((always_inline, gnu_inline))
 __job_notransp(job_t j)
 {
 /* return true iff job is not to be transmitted back */

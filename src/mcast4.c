@@ -309,10 +309,15 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	/* the port (in host-byte order) */
 	uint16_t p;
 	/* a job */
-	job_t j = obtain_job(glob_jq);
+	job_t j;
 	socklen_t lsa = sizeof(j->sa);
 
-	UD_DEBUG_MCAST("incoming connexion\n");
+	UD_CRITICAL/*UD_DEBUG_MCAST*/("incoming connexion\n");
+	if (UNLIKELY((j = obtain_job(glob_jq)) == NULL)) {
+		UD_CRITICAL("no job slots ... leaping\n");
+		return;
+	}
+
 	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
 	/* obtain the address in human readable form */
 	a = inet_ntop(j->sa.sin6_family,

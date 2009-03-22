@@ -106,7 +106,8 @@ typedef size_t index_t;
 # define UD_DEBUG_CAT(args...)
 
 #else  /* aux stuff */
-# define UD_CRITICAL(args...)
+# define UD_CRITICAL(args...)			\
+	fprintf(logout, "[unserding] CRITICAL " args)
 # define UD_DEBUG(args...)
 # define UD_CRITICAL_MCAST(args...)
 # define UD_DEBUG_MCAST(args...)
@@ -185,11 +186,13 @@ __ud_log(const char *restrict fmt, ...)
 #endif	/* UNSERSRV */
 
 
+#include "arrqueue.h"
+
 /* job queue magic */
 /* we use a fairly simplistic approach: one vector with two index pointers */
 /* number of simultaneous jobs */
 #define NJOBS		256
-#define NO_JOB		((job_t)-1)
+#define NO_JOB		((job_t)0)
 
 typedef struct job_queue_s *job_queue_t;
 typedef struct job_s *job_t;
@@ -233,10 +236,13 @@ struct job_s {
 	SIZEOF_JOB_S - offsetof(struct job_s, buf)
 
 struct job_queue_s {
+	/* the queue for the workers */
+	arrpq_t wq;
+
 	/* job index, always points to a free job */
-	short unsigned int ji;
+	short unsigned int head;
 	/* read index, always points to */
-	short unsigned int ri;
+	short unsigned int tail;
 	/* en/de-queuing mutex */
 	pthread_mutex_t mtx;
 	/* the jobs vector */
@@ -347,44 +353,44 @@ __job_set_trans(job_t j)
 	return;
 }
 
-
-static inline index_t __attribute__((always_inline, gnu_inline))
-__next_job(job_queue_t jq)
-{
-	short unsigned int res = (jq->ji + 1) % NJOBS;
-
-	if (LIKELY(__job_emptyp(&jq->jobs[res]))) {
-		return res;
-	}
-	do {
-		if (LIKELY(++res < NJOBS));
-		else {
-			res = 0;
-		}
-	} while (!__job_emptyp(&jq->jobs[res]));
-	return res;
-}
-
+#if 0
+/* we've got to switch to a pool implementation */
 static inline job_t __attribute__((always_inline, gnu_inline))
 obtain_job(job_queue_t jq)
 {
 	job_t j;
+	short unsigned int k;
+
+	UD_CRITICAL("obtain job\n");
 	pthread_mutex_lock(&jq->mtx);
-	j = &jq->jobs[jq->ji];
-	jq->ji = __next_job(jq);
-	__job_set_prepd(j);
+	for (k = 0; !__job_emptyp(&jq->jobs[k]) && k < NJOBS; k++) {
+		UD_CRITICAL("slot %d flags %d\n", k, jq->jobs[k].flags);
+	}
+	if (k < NJOBS) {
+		jq->ji = k;
+		__job_set_prepd(j = &jq->jobs[k]);
+	} else {
+		jq->ji = 0;
+		j = NULL;
+	}
 	pthread_mutex_unlock(&jq->mtx);
 	return j;
 }
+#else
+/* stupid implementation */
+static inline job_t __attribute__((always_inline, gnu_inline))
+obtain_job(job_queue_t jq)
+{
+	job_t res = malloc(SIZEOF_JOB_S);
+	memset(res, 0, SIZEOF_JOB_S);
+	return res;
+}
+#endif	/* 0 */
 
 static inline void __attribute__((always_inline, gnu_inline))
 enqueue_job(job_queue_t jq, job_t j)
 {
-	/* dont check if the queue is full, just go assume our pipes are
-	 * always large enough */
-	pthread_mutex_lock(&jq->mtx);
-	__job_set_ready(j);
-	pthread_mutex_unlock(&jq->mtx);
+	arrpq_enqueue(jq->wq, j);
 	return;
 }
 
@@ -392,11 +398,17 @@ static inline void __attribute__((always_inline, gnu_inline))
 free_job(job_t j)
 {
 #if 0
+/* mempools? */
+#if 0
 	if (UNLIKELY(j->freef != NULL)) {
 		j->freef(j);
 	}
 #endif
 	memset(j, 0, SIZEOF_JOB_S);
+
+#else
+	free(j);
+#endif
 	return;
 }
 

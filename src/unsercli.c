@@ -84,7 +84,7 @@ ev_async *glob_notify;
 
 /* the global job queue */
 static struct job_queue_s __glob_jq = {
-	.ji = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
+	.head = 0, .tail = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
 };
 job_queue_t glob_jq;
 

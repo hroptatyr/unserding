@@ -151,13 +151,15 @@ worker_killw(ud_worker_t wk)
 
 /* the global job queue */
 static struct job_queue_s __glob_jq = {
-	.ji = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
+	.head = 0, .tail = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
 };
 job_queue_t glob_jq;
 
 static job_t __attribute__((noinline))
 dequeue_job(job_queue_t jq)
 {
+#if 0
+/* we need a job pool, badly */
 	short unsigned int idx;
 
 	pthread_mutex_lock(&jq->mtx);
@@ -202,6 +204,9 @@ dequeue_job(job_queue_t jq)
 	}
 	pthread_mutex_unlock(&jq->mtx);
 	return NO_JOB;
+#else
+	return arrpq_dequeue(jq->wq);
+#endif
 }
 
 
@@ -386,6 +391,7 @@ static void
 init_glob_jq(void)
 {
 	glob_jq = &__glob_jq;
+	glob_jq->wq = make_arrpq(NJOBS);
 	return;
 }
 

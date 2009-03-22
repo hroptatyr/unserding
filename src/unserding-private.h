@@ -42,6 +42,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <unistd.h>
 
 #if defined HAVE_EV_H
 # include <ev.h>
@@ -106,7 +107,8 @@ typedef size_t index_t;
 # define UD_DEBUG_CAT(args...)
 
 #else  /* aux stuff */
-# define UD_CRITICAL(args...)
+# define UD_CRITICAL(args...)			\
+	fprintf(logout, "[unserding] CRITICAL " args)
 # define UD_DEBUG(args...)
 # define UD_CRITICAL_MCAST(args...)
 # define UD_DEBUG_MCAST(args...)
@@ -185,11 +187,13 @@ __ud_log(const char *restrict fmt, ...)
 #endif	/* UNSERSRV */
 
 
+#include "arrqueue.h"
+
 /* job queue magic */
 /* we use a fairly simplistic approach: one vector with two index pointers */
 /* number of simultaneous jobs */
 #define NJOBS		256
-#define NO_JOB		((job_t)-1)
+#define NO_JOB		((job_t)0)
 
 typedef struct job_queue_s *job_queue_t;
 typedef struct job_s *job_t;
@@ -233,14 +237,12 @@ struct job_s {
 	SIZEOF_JOB_S - offsetof(struct job_s, buf)
 
 struct job_queue_s {
-	/* job index, always points to a free job */
-	short unsigned int ji;
-	/* read index, always points to */
-	short unsigned int ri;
-	/* en/de-queuing mutex */
-	pthread_mutex_t mtx;
+	/* the queue for the workers */
+	arrpq_t wq;
+	/* the queue for free jobs */
+	arrpq_t fq;
 	/* the jobs vector */
-	struct job_s jobs[NJOBS];
+	struct job_s jobs[NJOBS] __attribute__((aligned(16)));
 };
 
 static inline uint8_t __attribute__((always_inline, gnu_inline))
@@ -255,66 +257,6 @@ __job_trans_bits(job_t j)
 {
 /* the bits of the flags slot that deal with the transmission of a job */
 	return j->flags & 0xc;
-}
-
-static inline bool __attribute__((always_inline, gnu_inline))
-__job_emptyp(job_t j)
-{
-/* return true iff job slot is empty */
-	return __job_ready_bits(j) == 0;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-__job_set_empty(job_t j)
-{
-/* make J empty */
-	j->flags &= ~0x11;
-	return;
-}
-
-static inline bool __attribute__((always_inline, gnu_inline))
-__job_prepdp(job_t j)
-{
-/* return true iff job slot is currently being prepared */
-	return __job_ready_bits(j) == 1;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-__job_set_prepd(job_t j)
-{
-/* turn job into a prepared one */
-	j->flags = (j->flags & ~0x11) | 1;
-	return;
-}
-
-static inline bool __attribute__((always_inline, gnu_inline))
-__job_readyp(job_t j)
-{
-/* return true iff job slot is ready */
-	return __job_ready_bits(j) == 2;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-__job_set_ready(job_t j)
-{
-/* turn job into a ready one */
-	j->flags = (j->flags & ~0x11) | 2;
-	return;
-}
-
-static inline bool __attribute__((always_inline, gnu_inline))
-__job_finip(job_t j)
-{
-/* return true iff job in the job slot is finished */
-	return __job_ready_bits(j) == 3;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-__job_set_fini(job_t j)
-{
-/* turn job into a finished one */
-	j->flags |= 3;
-	return;
 }
 
 static inline bool __attribute__((always_inline, gnu_inline))
@@ -347,57 +289,39 @@ __job_set_trans(job_t j)
 	return;
 }
 
-
-static inline index_t __attribute__((always_inline, gnu_inline))
-__next_job(job_queue_t jq)
-{
-	short unsigned int res = (jq->ji + 1) % NJOBS;
-
-	if (LIKELY(__job_emptyp(&jq->jobs[res]))) {
-		return res;
-	}
-	do {
-		if (LIKELY(++res < NJOBS));
-		else {
-			res = 0;
-		}
-	} while (!__job_emptyp(&jq->jobs[res]));
-	return res;
-}
+/**
+ * Global job queue. */
+extern job_queue_t glob_jq;
 
 static inline job_t __attribute__((always_inline, gnu_inline))
-obtain_job(job_queue_t jq)
+make_job(void)
 {
-	job_t j;
-	pthread_mutex_lock(&jq->mtx);
-	j = &jq->jobs[jq->ji];
-	jq->ji = __next_job(jq);
-	__job_set_prepd(j);
-	pthread_mutex_unlock(&jq->mtx);
-	return j;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-enqueue_job(job_queue_t jq, job_t j)
-{
-	/* dont check if the queue is full, just go assume our pipes are
-	 * always large enough */
-	pthread_mutex_lock(&jq->mtx);
-	__job_set_ready(j);
-	pthread_mutex_unlock(&jq->mtx);
-	return;
+	/* dequeue from the free queue */
+	return arrpq_dequeue(glob_jq->fq);
 }
 
 static inline void __attribute__((always_inline, gnu_inline))
 free_job(job_t j)
 {
-#if 0
-	if (UNLIKELY(j->freef != NULL)) {
-		j->freef(j);
-	}
-#endif
+	/* enqueue in the free queue */
 	memset(j, 0, SIZEOF_JOB_S);
+	arrpq_enqueue(glob_jq->fq, j);
 	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+enqueue_job(job_queue_t jq, job_t j)
+{
+	/* enqueue in the worker queue */
+	arrpq_enqueue(jq->wq, j);
+	return;
+}
+
+static inline job_t __attribute__((always_inline, gnu_inline))
+dequeue_job(job_queue_t jq)
+{
+	/* dequeue from the worker queue */
+	return arrpq_dequeue(jq->wq);
 }
 
 /* helper macro to use a job as packet */
@@ -405,10 +329,6 @@ free_job(job_t j)
 /* helper macro to use a char buffer as packet */
 #define BUF_PACKET(b)	((ud_packet_t){.plen = countof(b), .pbuf = b})
 #define PACKET(a, b)	((ud_packet_t){.plen = a, .pbuf = b})
-
-/**
- * Global job queue. */
-extern job_queue_t glob_jq;
 
 /**
  * Job that looks up the parser routine in ud_parsef(). */

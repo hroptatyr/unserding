@@ -298,6 +298,8 @@ mcast_listener_deinit(int sock)
 }
 
 
+static char scratch_buf[UDPC_SIMPLE_PKTLEN];
+
 /* this callback is called when data is readable on the main server socket */
 static void
 mcast_inco_cb(EV_P_ ev_io *w, int revents)
@@ -309,10 +311,18 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	/* the port (in host-byte order) */
 	uint16_t p;
 	/* a job */
-	job_t j = obtain_job(glob_jq);
+	job_t j;
 	socklen_t lsa = sizeof(j->sa);
 
 	UD_DEBUG_MCAST("incoming connexion\n");
+	if (UNLIKELY((j = make_job()) == NULL)) {
+		UD_CRITICAL("no job slots ... leaping\n");
+		/* just read the packet off of the wire */
+		(void)recv(w->fd, scratch_buf, UDPC_SIMPLE_PKTLEN, 0);
+		trigger_job_queue();
+		return;
+	}
+
 	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
 	/* obtain the address in human readable form */
 	a = inet_ntop(j->sa.sin6_family,
@@ -339,7 +349,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	}
 
 	j->blen = nread;
-	__job_set_ready(j);
 
 	/* spit the packet in its raw shape */
 	ud_fprint_pkt_raw(JOB_PACKET(j), logout);

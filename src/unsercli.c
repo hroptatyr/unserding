@@ -82,12 +82,6 @@ static ev_signal ALGN16(__sigpipe_watcher);
 static ev_io ALGN16(__srv_watcher);
 ev_async *glob_notify;
 
-/* the global job queue */
-static struct job_queue_s __glob_jq = {
-	.head = 0, .tail = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
-};
-job_queue_t glob_jq;
-
 /* our global handle space, closured because */
 static struct ud_handle_s __hdl;
 static char __pktbuf[UDPC_SIMPLE_PKTLEN];
@@ -156,13 +150,6 @@ ud_parse(const ud_packet_t pkt)
 }
 
 
-static void
-init_glob_jq(void)
-{
-	glob_jq = &__glob_jq;
-	return;
-}
-
 int
 main (void)
 {
@@ -174,9 +161,6 @@ main (void)
 
 	/* where to log */
 	logout = stderr;
-
-	/* initialise global job q */
-	init_glob_jq();
 
 	/* get us some nice handle */
 	init_unserding_handle(&__hdl);

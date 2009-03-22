@@ -312,7 +312,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	job_t j;
 	socklen_t lsa = sizeof(j->sa);
 
-	UD_CRITICAL/*UD_DEBUG_MCAST*/("incoming connexion\n");
+	UD_DEBUG_MCAST("incoming connexion\n");
 	if (UNLIKELY((j = obtain_job(glob_jq)) == NULL)) {
 		UD_CRITICAL("no job slots ... leaping\n");
 		return;

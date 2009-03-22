@@ -298,6 +298,8 @@ mcast_listener_deinit(int sock)
 }
 
 
+static char scratch_buf[UDPC_SIMPLE_PKTLEN];
+
 /* this callback is called when data is readable on the main server socket */
 static void
 mcast_inco_cb(EV_P_ ev_io *w, int revents)
@@ -315,6 +317,8 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	UD_DEBUG_MCAST("incoming connexion\n");
 	if (UNLIKELY((j = obtain_job(glob_jq)) == NULL)) {
 		UD_CRITICAL("no job slots ... leaping\n");
+		/* just read the packet off of the wire */
+		(void)recv(w->fd, scratch_buf, UDPC_SIMPLE_PKTLEN, 0);
 		return;
 	}
 

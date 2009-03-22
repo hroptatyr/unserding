@@ -158,6 +158,8 @@ arrpq_dequeue(arrpq_t q)
 	if (LIKELY(q->tail != q->head)) {
 		/* fetch data */
 		res = q->queue[q->tail];
+		/* put a NULL into it */
+		q->queue[q->tail] = NULL;
 		/* step the tail */
 		q->tail = (q->tail + 1) % q->size;
 	}

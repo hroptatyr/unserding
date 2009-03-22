@@ -42,6 +42,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <unistd.h>
 
 #if defined HAVE_EV_H
 # include <ev.h>
@@ -381,18 +382,17 @@ obtain_job(job_queue_t jq)
 static inline job_t __attribute__((always_inline, gnu_inline))
 obtain_job(job_queue_t jq)
 {
-	job_t res = malloc(SIZEOF_JOB_S);
+	job_t res;
+
+	/* only hand out a job if the queue isnt too full up */
+	if (UNLIKELY(arrpq_size(jq->wq) >= NJOBS - 1)) {
+		return NULL;
+	}
+	res = malloc(SIZEOF_JOB_S);
 	memset(res, 0, SIZEOF_JOB_S);
 	return res;
 }
 #endif	/* 0 */
-
-static inline void __attribute__((always_inline, gnu_inline))
-enqueue_job(job_queue_t jq, job_t j)
-{
-	arrpq_enqueue(jq->wq, j);
-	return;
-}
 
 static inline void __attribute__((always_inline, gnu_inline))
 free_job(job_t j)
@@ -408,6 +408,25 @@ free_job(job_t j)
 
 #else
 	free(j);
+#endif
+	return;
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+enqueue_job(job_queue_t jq, job_t j)
+{
+#if 0
+	/* ugly ugly ugly */
+	while (!arrpq_enqueue(jq->wq, j)) {
+		UD_CRITICAL("no queue space ... sleeping\n");
+		usleep(1000);
+	}
+#else
+	/* ugly ugly ugly too */
+	if (!arrpq_enqueue(jq->wq, j)) {
+		UD_CRITICAL("no queue space ... chucking job\n");
+		free_job(j);
+	}
 #endif
 	return;
 }

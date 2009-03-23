@@ -129,21 +129,6 @@ enum udpc_type_e {
 #define UDPC_PKT_E123_RPL	UDPC_PKT_RPL(UDPC_PKT_E123)
 
 
-extern inline void __attribute__((always_inline, gnu_inline))
-ud_fputs(uint8_t len, const char *s, FILE *f);
-extern inline void __attribute__((always_inline, gnu_inline))
-ud_fputs(uint8_t len, const char *s, FILE *f)
-{
-	for (uint8_t i = 0; i < len; i++) {
-		putc_unlocked(s[i], f);
-	}
-	return;
-}
-
-extern void ud_fprint_pkthdr(ud_packet_t pkt, FILE *fp);
-extern void ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp);
-extern void ud_fprint_pkt_pretty(ud_packet_t pkt, FILE *fp);
-
 #if !defined TYPEDEFD_job_t
 typedef void *job_t;
 #endif	/* TYPEDEFD_job_t */

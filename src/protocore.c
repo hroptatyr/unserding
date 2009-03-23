@@ -54,6 +54,7 @@
 #include "unserding-private.h"
 #include "protocore.h"
 #include "catalogue.h"
+#include "protocore-private.h"
 
 #if defined UNSERSRV
 /**

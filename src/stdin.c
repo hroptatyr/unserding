@@ -70,6 +70,7 @@
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"
+#include "protocore-private.h"
 
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));

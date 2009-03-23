@@ -70,6 +70,7 @@
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"
+#include "protocore-private.h"
 
 /**
  * Rate used for keep-alive pings to neighbours in seconds. */

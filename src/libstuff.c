@@ -1,6 +1,6 @@
 /*** libstuff.c -- unserding library definitions
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008, 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
@@ -70,6 +70,7 @@
 #define SA_STRUCT		struct sockaddr_in6
 #include "unserding.h"
 #include "protocore.h"
+#include "protocore-private.h"
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)

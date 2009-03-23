@@ -47,6 +47,7 @@
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"
+#include "protocore-private.h"
 #include "catalogue.h"
 /* other external stuff */
 #include <pfack/instruments.h>

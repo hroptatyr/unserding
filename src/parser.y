@@ -53,6 +53,7 @@
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"
+#include "protocore-private.h"
 #include "catalogue.h"
 
 #if 0

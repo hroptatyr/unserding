@@ -160,11 +160,9 @@ ud_pktwrk_f ud_fam7e[256] = {
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
-static void f5e_e123ify(job_t j);
-
 ud_pktwrk_f ud_fam5e[256] = {
 	/* 0 */
-	NULL, NULL, f5e_e123ify, NULL /* no rpl */, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	/* 16 */
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -233,24 +231,6 @@ f7e_54(job_t j)
 	j->buf[8] = UDPC_TYPE_UNK;
 	j->blen = 9;
 	UD_DEBUG_PROTO("sending 54 RPL\n");
-	/* and send him back */
-	send_cl(j);
-	return;
-}
-
-/* service stuff */
-static void
-f5e_e123ify(job_t j)
-{
-	/* generate the answer packet */
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-
-	/* we're a string, soon will be a seqof(string) */
-	j->buf[8] = UDPC_TYPE_STRING;
-	/* attach the hostname now */
-	j->buf[9] = ud_5e_e123ify_job(&j->buf[10], &j->buf[12]);
-
-	UD_DEBUG_PROTO("sending 5e/02 RPL\n");
 	/* and send him back */
 	send_cl(j);
 	return;

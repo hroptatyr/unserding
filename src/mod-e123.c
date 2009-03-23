@@ -49,6 +49,7 @@
 /* our master include */
 #include "unserding.h"
 #include "unserding-private.h"
+#include "protocore.h"
 
 extern void mod_e123_LTX_init(void);
 extern void mod_e123_LTX_deinit(void);
@@ -107,13 +108,36 @@ ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
 	/* query for the number */
 	cp_trie_prefix_match(loc_trie, inbuf, &match);
 	if (match != NULL) {
-		//printf("\"%s\"\n", (const char*)match);
-		return (uint8_t)strlen(match);
+		uint8_t res = (uint8_t)strlen(match);
+		memcpy(resbuf, match, (size_t)res);
+		return res;
 	}
 	return 0;
 }
 
+/* service stuff */
+static void
+f5e_e123ify(job_t j)
+{
+	/* generate the answer packet */
+	udpc_make_rpl_pkt(JOB_PACKET(j));
+
+	/* we're a string, soon will be a seqof(string) */
+	j->buf[8] = UDPC_TYPE_STRING;
+	/* attach the hostname now */
+	j->buf[9] = ud_5e_e123ify_job(&j->buf[10], &j->buf[10]);
+
+	j->blen = 8 + 2 + j->buf[9];
+
+	UD_DEBUG_PROTO("sending 5e/02 RPL\n");
+	/* and send him back */
+	send_cl(j);
+	return;
+}
+
 
+extern ud_pktwrk_f ud_fam5e[];
+
 void
 mod_e123_LTX_init(void)
 {
@@ -124,6 +148,8 @@ mod_e123_LTX_init(void)
 	} else {
 		UD_CRITICAL("can\'t create trie\n");
 	}
+	/* put it into fam5e array */
+	ud_fam5e[2] = f5e_e123ify;
 	return;
 }
 

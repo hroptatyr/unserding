@@ -91,10 +91,16 @@ int		[-+]?[0-9]+
 
 abs		\|
 
-%x BINOP
-%x RVAL
+%x STRING
 
 %%
+\"		{ BEGIN(STRING); }
+<STRING>[^\"]*\"	{
+	BEGIN(INITIAL);
+	yylval->slen = cli_yyget_leng(yyscanner) - /* the final quote */ 1;
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_STRING);
+}
 
 hy		{ RETURN_TOKEN(TOK_HY); }
 oi		{ RETURN_TOKEN(TOK_HY); }

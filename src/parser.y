@@ -135,6 +135,7 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 %token <sval>
 	TOK_KEY
 	TOK_VAL
+	TOK_STRING
 
 %%
 
@@ -250,14 +251,14 @@ impo_cmd:
 TOK_IMPORT;
 
 e123_cmd:
-TOK_E123 /* in the middle */ {
+TOK_E123 TOK_STRING {
 	/* init the seqof counter */
-	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_SEQOF;
-	/* set its initial value to naught */
-	hdl->pktchn[0].pbuf[9] = 0;
-	/* set the packet idx */
-	hdl->pktchn[0].plen = 10;
-} keyvals;
+	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_STRING;
+	/* set its initial length to naught */
+	hdl->pktchn[0].plen += 2 +
+		(hdl->pktchn[0].pbuf[9] = (uint8_t)yylval.slen);
+	memcpy(&hdl->pktchn[0].pbuf[10], yylval.sval, (uint8_t)yylval.slen);
+};
 
 
 keyvals:

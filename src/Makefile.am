@@ -6,7 +6,7 @@ AM_LDFLAGS = -lpthread
 headerdir = $(includedir)/unserding
 
 bin_PROGRAMS = unserdingd unsercli
-noinst_PROGRAMS = libtest
+noinst_PROGRAMS = libtest e123ify
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
@@ -82,6 +82,12 @@ libtest_SOURCES = libtest.c
 libtest_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 libtest_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
 libtest_LDADD = $(LIBEV_LIBS) libunserding.la
+
+## example app to access unserding's E.123 service
+e123ify_SOURCES = e123ify.c
+e123ify_CPPFLAGS = $(AM_CPPFLAGS)
+e123ify_LDFLAGS = $(AM_LDFLAGS)
+e123ify_LDADD = libunserding.la
 
 # 
 # Help the developers get nice post-processed source files

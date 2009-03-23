@@ -60,6 +60,10 @@
  *
  ***/
 
+#if !defined htons || !defined ntohs
+# error "Cannot find htons()/ntohs()"
+#endif	/* !htons || !ntohs */
+
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
 
 typedef uint8_t udpc_type_t;
@@ -188,10 +192,6 @@ udpc_cmd_wrk(const ud_pkt_cmd_t cmd);
 extern inline void __attribute__((always_inline, gnu_inline))
 udpc_pkt_set_cmd(ud_packet_t pkt, ud_pkt_cmd_t cmd);
 /**
- * Print the packet header. temporary. */
-extern inline void __attribute__((always_inline, gnu_inline))
-udpc_print_pkt(const ud_packet_t pkt);
-/**
  * Return true if CMD is a reply command. */
 extern inline bool __attribute__((always_inline, gnu_inline))
 udpc_reply_p(ud_pkt_cmd_t cmd);
@@ -221,16 +221,6 @@ extern inline bool __attribute__((always_inline, gnu_inline))
 udpc_pkt_for_us_p(const ud_packet_t pkt, ud_convo_t cno)
 {
 	return udpc_pkt_valid_p(pkt) && udpc_pkt_cno(pkt) == cno;
-}
-
-extern inline void __attribute__((always_inline, gnu_inline))
-udpc_print_pkt(const ud_packet_t pkt)
-{
-	printf(":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-	       (unsigned int)pkt.plen,
-	       udpc_pkt_cno(pkt), udpc_pkt_pno(pkt), udpc_pkt_cmd(pkt),
-	       ntohs(((const uint16_t*)pkt.pbuf)[3]));
-	return;
 }
 
 extern inline uint32_t __attribute__((always_inline, gnu_inline))

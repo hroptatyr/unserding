@@ -56,4 +56,21 @@ extern void ud_fprint_pkthdr(ud_packet_t pkt, FILE *fp);
 extern void ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp);
 extern void ud_fprint_pkt_pretty(ud_packet_t pkt, FILE *fp);
 
+/**
+ * Print the packet header. temporary. */
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_print_pkt(const ud_packet_t pkt);
+
+
+/* inlines */
+extern inline void __attribute__((always_inline, gnu_inline))
+udpc_print_pkt(const ud_packet_t pkt)
+{
+	printf(":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+	       (unsigned int)pkt.plen,
+	       udpc_pkt_cno(pkt), udpc_pkt_pno(pkt), udpc_pkt_cmd(pkt),
+	       ntohs(((const uint16_t*)pkt.pbuf)[3]));
+	return;
+}
+
 #endif	/* INCLUDED_protocore_private_h_ */

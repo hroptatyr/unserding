@@ -87,7 +87,7 @@ libtest_LDADD = $(LIBEV_LIBS) libunserding.la
 e123ify_SOURCES = e123ify.c
 e123ify_CPPFLAGS = $(AM_CPPFLAGS)
 e123ify_LDFLAGS = $(AM_LDFLAGS)
-e123ify_LDADD = libunserding.la
+e123ify_LDADD = libunserding.la -lpopt
 
 # 
 # Help the developers get nice post-processed source files

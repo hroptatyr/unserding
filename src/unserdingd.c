@@ -150,9 +150,7 @@ worker_killw(ud_worker_t wk)
 }
 
 /* the global job queue */
-static struct job_queue_s __glob_jq = {
-	.ji = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
-};
+static struct job_queue_s __glob_jq;
 job_queue_t glob_jq;
 
 static job_t __attribute__((noinline))
@@ -386,6 +384,12 @@ static void
 init_glob_jq(void)
 {
 	glob_jq = &__glob_jq;
+	glob_jq->wq = make_arrpq(NJOBS);
+	glob_jq->fq = make_arrpq(NJOBS);
+	/* enqueue all jobs in the free queue */
+	for (int i = 0; i < NJOBS; i++) {
+		arrpq_enqueue(glob_jq->fq, &glob_jq->jobs[i]);
+	}
 	return;
 }
 
@@ -413,9 +417,6 @@ main(int argc, char *argv[])
 
 	/* initialise the proto core */
 	init_proto();
-
-	/* attach a multicast listener */
-	ud_attach_mcast4(EV_A);
 
 	/* initialise instruments */
 	instruments = make_catalogue();
@@ -464,6 +465,12 @@ main(int argc, char *argv[])
 #endif	/* !USE_COROUTINES */
 		add_worker(secl);
 	}
+
+	/* attach a multicast listener
+	 * we add this quite late so that it's unlikely that a plethora of
+	 * events has already been injected into our precious queue
+	 * causing the libev main loop to crash. */
+	ud_attach_mcast4(EV_A);
 
 	/* reset the round robin var */
 	rr_wrk = 0;

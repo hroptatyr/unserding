@@ -11,10 +11,10 @@ lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
-header_HEADERS = unserding.h catalogue.h protocore.h
+header_HEADERS = unserding.h catalogue.h protocore.h arrqueue.h
 
 ## the main server binary
-unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c
+unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c arrqueue.c
 unserdingd_SOURCES += catalogue.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt

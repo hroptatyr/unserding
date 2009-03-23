@@ -82,6 +82,13 @@
 # define countof(_x)	(sizeof(_x) / sizeof(*_x))
 #endif
 
+#if defined DEBUG_FLAG
+# define UD_DEBUG_SENDRECV(args...)		\
+	fprintf(stderr, "[libunserding/sendrecv] " args)
+#else  /* !DEBUG_FLAG */
+# define UD_DEBUG_SENDRECV(args...)
+#endif	/* DEBUG_FLAG */
+
 /**
  * Timeout in seconds. */
 #define UD_SENDRECV_TIMEOUT	10
@@ -93,6 +100,21 @@ static struct sockaddr_in6 __sa6;
 static struct sockaddr_in __sa4;
 
 
+static void
+__set_nonblck(int sock)
+{
+	int opts;
+
+	/* get former options */
+	opts = fcntl(sock, F_GETFL);
+	if (opts < 0) {
+		return;
+	}
+	opts |= O_NONBLOCK;
+	(void)fcntl(sock, F_SETFL, opts);
+	return;
+}
+
 static int
 mcast_init(void)
 {
@@ -192,6 +214,9 @@ ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_convo_t cno)
 	return;
 }
 
+#define MAX_EVENTS	4
+static struct epoll_event evbuf[MAX_EVENTS];
+
 void
 ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_pred_f pf, void *clo)
 {
@@ -199,7 +224,7 @@ ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_pred_f pf, void *clo)
 	int epfd = ud_handle_epfd(hdl);
 	int nfds;
 	ssize_t nread;
-	struct epoll_event ev, *events = NULL;
+	struct epoll_event ev, *events = evbuf;
 	char buf[UDPC_SIMPLE_PKTLEN];
 	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
 
@@ -211,21 +236,29 @@ ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_pred_f pf, void *clo)
 	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ev);
 	/* now wait */
 wait:
-	nfds = epoll_wait(epfd, events, 1, to);
+	memset(events, 0, sizeof(evbuf));
+	nfds = epoll_wait(epfd, events, MAX_EVENTS, to);
+	UD_DEBUG_SENDRECV("received %d events on socket %d\n", nfds, s);
+
 	/* no need to loop atm, nfds can be 0 or 1 */
-	if (UNLIKELY(nfds == 0)) {
+	if (UNLIKELY(nfds == 0 || nfds == -1)) {
 		/* nothing received */
 		pkt->plen = 0;
 		goto out;
 	}
 	/* otherwise NFDS was 1 and it MUST be our socket */
 	do {
-		if ((nread = recvfrom(s, buf, countof(buf), 0, NULL, 0)) < 0) {
-			/* batshit! start over */
+		if ((nread = recv(s, buf, countof(buf), 0)) < 0) {
+			/* batshit! start over
+			 * we could assert(errno == EAGAIN); */
+			UD_DEBUG_SENDRECV("read failed ... starting over\n");
 			goto wait;
 		}
+		UD_DEBUG_SENDRECV("read %ld bytes\n", (long int)nread);
 		tmp.plen = nread;
+#if defined DEBUG_FLAG
 		ud_fprint_pkt_raw(tmp, stderr);
+#endif	/* DEBUG_FLAG */
 	} while (!udpc_pkt_valid_p(tmp) || !pf(tmp, clo));
 
 	if (LIKELY(nread > 0)) {
@@ -264,6 +297,8 @@ init_unserding_handle(ud_handle_t hdl)
 	hdl->convo = 0;
 	hdl->sock = mcast_init();
 	hdl->epfd = -1;
+	/* operate in non-blocking mode */
+	__set_nonblck(hdl->sock);
 	return;
 }
 

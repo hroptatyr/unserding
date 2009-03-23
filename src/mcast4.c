@@ -314,10 +314,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	job_t j;
 	socklen_t lsa = sizeof(j->sa);
 
-	/* lock the queue and get us a job ticket */
-	pthread_mutex_lock(&glob_jq->mtx);
-	j = obtain_job(glob_jq);
-
 	UD_DEBUG_MCAST("incoming connexion\n");
 	if (UNLIKELY((j = make_job()) == NULL)) {
 		UD_CRITICAL("no job slots ... leaping\n");
@@ -360,10 +356,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
 	enqueue_job(glob_jq, j);
-
-	/* let loose now */
-	pthread_mutex_unlock(&glob_jq->mtx);
-
 	/* now notify the slaves */
 	trigger_job_queue();
 	return;

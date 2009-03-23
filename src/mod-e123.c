@@ -99,6 +99,45 @@ build_trie(cp_trie *t, const char *file)
 }
 
 
+/* reformat the inbuf */
+static uint8_t
+__e123ify(char *restrict resbuf, const char *inbuf, void *match)
+{
+	size_t inblen = strlen(inbuf);
+	char tmpin[256], *mp = match;
+	uint8_t ii = 0, ri = 0;
+
+	if (UNLIKELY(match == NULL)) {
+		return 0;
+	}
+	if (*mp++ != '[') {
+		return 0;
+	}
+
+#define WILDCARD	'#'
+	/* buffer inbuf temporarily, assume stripped string */
+	memset(tmpin, WILDCARD, 256);
+	memcpy(tmpin, inbuf, inblen);
+
+	/* go through the format specs */
+	/* copy the initial '+' */
+	resbuf[ri++] = tmpin[ii++];
+
+	while (*mp >= '0' && *mp <= '9') {
+		for (int i = 0, n = *mp++ - '0'; i < n; i++) {
+			resbuf[ri++] = tmpin[ii++];
+		}
+		resbuf[ri++] = ' ';
+		++mp;
+	}
+	/* copy the rest */
+	while (ii < inblen) {
+		resbuf[ri++] = tmpin[ii++];
+	}
+	return ri;
+}
+
+
 /* public job fun, as announced in unserding-private.h */
 uint8_t
 ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
@@ -107,12 +146,7 @@ ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
 
 	/* query for the number */
 	cp_trie_prefix_match(loc_trie, inbuf, &match);
-	if (match != NULL) {
-		uint8_t res = (uint8_t)strlen(match);
-		memcpy(resbuf, match, (size_t)res);
-		return res;
-	}
-	return 0;
+	return __e123ify(resbuf, inbuf, match);
 }
 
 /* service stuff */
@@ -126,7 +160,7 @@ f5e_e123ify(job_t j)
 	j->buf[8] = UDPC_TYPE_STRING;
 	/* attach the hostname now */
 	j->buf[9] = ud_5e_e123ify_job(&j->buf[10], &j->buf[10]);
-
+	/* compute the overall length */
 	j->blen = 8 + 2 + j->buf[9];
 
 	UD_DEBUG_PROTO("sending 5e/02 RPL\n");

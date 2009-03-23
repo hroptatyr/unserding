@@ -369,11 +369,11 @@ static inline job_t __attribute__((always_inline, gnu_inline))
 obtain_job(job_queue_t jq)
 {
 	job_t j;
-	pthread_mutex_lock(&jq->mtx);
+	//pthread_mutex_lock(&jq->mtx);
 	j = &jq->jobs[jq->ji];
 	jq->ji = __next_job(jq);
 	__job_set_prepd(j);
-	pthread_mutex_unlock(&jq->mtx);
+	//pthread_mutex_unlock(&jq->mtx);
 	return j;
 }
 
@@ -382,56 +382,10 @@ enqueue_job(job_queue_t jq, job_t j)
 {
 	/* dont check if the queue is full, just go assume our pipes are
 	 * always large enough */
-	pthread_mutex_lock(&jq->mtx);
+	//pthread_mutex_lock(&jq->mtx);
 	__job_set_ready(j);
-	pthread_mutex_unlock(&jq->mtx);
+	//pthread_mutex_unlock(&jq->mtx);
 	return;
-}
-
-static inline job_t __attribute__((always_inline, gnu_inline))
-dequeue_job(job_queue_t jq)
-{
-	short unsigned int idx;
-
-	pthread_mutex_lock(&jq->mtx);
-	if (LIKELY((idx = jq->ri) == jq->ji)) {
-		pthread_mutex_unlock(&jq->mtx);
-		return NO_JOB;
-	}
-	/* try the job at jq->ri */
-	if (LIKELY(__job_readyp(&jq->jobs[idx]))) {
-		/* brilliant */
-		jq->ri = (jq->ri + 1) % NJOBS;
-		pthread_mutex_unlock(&jq->mtx);
-		return &jq->jobs[idx];
-	} else if (__job_prepdp(&jq->jobs[idx])) {
-		/* grrrrr */
-		idx = (idx + 1) % NJOBS;
-	} else {
-		/* must be res->readyp == 0, and hence jq->ri
-		 * points to an empty job */
-		idx = jq->ri = (idx + 1) % NJOBS;
-	}
-	while (UNLIKELY(idx != jq->ji)) {
-		if (LIKELY(__job_readyp(&jq->jobs[idx]))) {
-			/* brilliant */
-			if (idx == jq->ri) {
-				jq->ri = (jq->ri + 1) % NJOBS;
-			}
-			pthread_mutex_unlock(&jq->mtx);
-			return &jq->jobs[idx];
-		} else if (__job_prepdp(&jq->jobs[idx])) {
-			/* grrrrr */
-			idx = (idx + 1) % NJOBS;
-		} else if (idx == jq->ri) {
-			/* must be res->readyp == 0
-			 * update jq->ri only if no half-ready jobs
-			 * have been encountered */
-			idx = jq->ri = (idx + 1) % NJOBS;
-		}
-	}
-	pthread_mutex_unlock(&jq->mtx);
-	return NO_JOB;
 }
 
 static inline void __attribute__((always_inline, gnu_inline))

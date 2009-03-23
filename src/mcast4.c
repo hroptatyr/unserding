@@ -309,8 +309,12 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	/* the port (in host-byte order) */
 	uint16_t p;
 	/* a job */
-	job_t j = obtain_job(glob_jq);
+	job_t j;
 	socklen_t lsa = sizeof(j->sa);
+
+	/* lock the queue and get us a job ticket */
+	pthread_mutex_lock(&glob_jq->mtx);
+	j = obtain_job(glob_jq);
 
 	UD_DEBUG_MCAST("incoming connexion\n");
 	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
@@ -347,6 +351,10 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space */
 	enqueue_job(glob_jq, j);
+
+	/* let loose now */
+	pthread_mutex_unlock(&glob_jq->mtx);
+
 	/* now notify the slaves */
 	trigger_job_queue();
 	return;

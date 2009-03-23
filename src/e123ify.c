@@ -109,6 +109,7 @@ e123ify_send(ud_handle_t hdl, const char *number)
 	ud_convo_t cno;
 
 	/* set up the packet, should be a fun? */
+	memset(buf, 0, sizeof(buf));
 	cno = ud_handle_convo(hdl);
 	udpc_make_pkt(pkt, cno, /*pno*/0, UDPC_PKT_E123);
 
@@ -151,25 +152,61 @@ e123ify_recv(ud_handle_t hdl, ud_convo_t cno)
 }
 
 
+/* modes */
+static void
+cli_mode(ud_handle_t hdl, int argc, const char *argv[])
+{
+	ud_convo_t cno;
+
+	for (int i = 1; i < argc; i++) {
+		/* query the bugger */
+		cno = e123ify_send(hdl, argv[i]);
+		/* receive */
+		(void)e123ify_recv(hdl, cno);
+	}
+	return;
+}
+
+static void
+stdio_mode(ud_handle_t hdl)
+{
+	ssize_t nread;
+	size_t llen = 256;
+	ud_convo_t cno;
+	char *lbuf;
+
+	/* get a line buffer */
+	lbuf = malloc(llen);
+	/* process line by line */
+	while ((nread = getline(&lbuf, &llen, stdin)) > 0) {
+		/* query the bugger */
+		cno = e123ify_send(hdl, lbuf);
+		/* receive */
+		(void)e123ify_recv(hdl, cno);
+	}
+	/* free the line buffer */
+	free(lbuf);
+	return;
+}
+
+
 int
 main(int argc, const char *argv[])
 {
 	struct ud_handle_s __hdl;
-	int res = 0;
-	ud_convo_t cno;
 
 	/* obtain us a new handle */
 	init_unserding_handle(&__hdl);
 
-	/* query the bugger */
-	cno = e123ify_send(&__hdl, argv[1]);
-
-	/* receive */
-	res += e123ify_recv(&__hdl, cno);
+	if (argc > 1) {
+		cli_mode(&__hdl, argc, argv);
+	} else {
+		stdio_mode(&__hdl);
+	}
 
 	/* free the handle */
 	free_unserding_handle(&__hdl);
-	return res;
+	return 0;
 }
 
 /* e123ify.c ends here */

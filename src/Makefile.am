@@ -30,6 +30,9 @@ unserdingd_SOURCES += mod-interests.c
 endif
 ## and yet more modules, 4217 (ccys)
 unserdingd_SOURCES += mod-instr-fx.c
+## service modules
+unserdingd_SOURCES += mod-e123.c
+unserdingd_LDADD += -lcprops
 
 ## the main server binary
 unsercli_SOURCES = unsercli.c stdin.c

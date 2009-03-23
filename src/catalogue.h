@@ -87,6 +87,8 @@ enum ud_tag_e {
 	UD_TAG_SYMBOL,
 	/* :currency takes UDPC_TYPE_STRING */
 	UD_TAG_CURRENCY,
+	/* :string is effectively just a UDPC_TYPE_STRING */
+	UD_TAG_STRING,
 
 	/* :group0 */
 	UD_TAG_GROUP0_NAME = UD_TAG_GROUP0(0),

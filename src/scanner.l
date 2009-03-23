@@ -91,10 +91,16 @@ int		[-+]?[0-9]+
 
 abs		\|
 
-%x BINOP
-%x RVAL
+%x STRING
 
 %%
+\"		{ BEGIN(STRING); }
+<STRING>[^\"]*\"	{
+	BEGIN(INITIAL);
+	yylval->slen = cli_yyget_leng(yyscanner) - /* the final quote */ 1;
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_STRING);
+}
 
 hy		{ RETURN_TOKEN(TOK_HY); }
 oi		{ RETURN_TOKEN(TOK_HY); }
@@ -115,6 +121,7 @@ nvm		{ RETURN_TOKEN(TOK_NVM); }
 bugger		{ RETURN_TOKEN(TOK_NVM); }
 impo(rt)?	{ RETURN_TOKEN(TOK_IMPORT); }
 cat		{ RETURN_TOKEN(TOK_CAT); }
+e123ify		{ RETURN_TOKEN(TOK_E123); }
 
  /* don't do that at the moment, we can parse the string based on the context
   * ourselves, and much more efficiently */

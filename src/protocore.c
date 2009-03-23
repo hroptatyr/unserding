@@ -70,6 +70,10 @@ extern ud_pktwrk_f ud_fam01[];
  * Family 7e, test stuff. */
 extern ud_pktwrk_f ud_fam7e[];
 
+/**
+ * Family 5e, additional services */
+extern ud_pktwrk_f ud_fam5e[];
+
 
 ud_pktfam_t ud_pktfam[128] = {
 	/* family 0 */
@@ -103,7 +107,7 @@ ud_pktfam_t ud_pktfam[128] = {
 	NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
+	NULL, NULL, ud_fam5e, NULL,
 	/* fam 96 */
 	NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL,
@@ -153,6 +157,27 @@ ud_pktwrk_f ud_fam7e[256] = {
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	/* 80 */
 	NULL, NULL, NULL, NULL, f7e_54, NULL /* no rpl */, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+};
+
+ud_pktwrk_f ud_fam5e[256] = {
+	/* 0 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 16 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 32 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 48 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 64 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	/* 80 */
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 

@@ -129,11 +129,13 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 	TOK_LS
 	TOK_CAT
 	TOK_IMPORT
+	TOK_E123
 	TOK_INTEGER
 
 %token <sval>
 	TOK_KEY
 	TOK_VAL
+	TOK_STRING
 
 %%
 
@@ -192,7 +194,17 @@ impo_cmd {
 	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
 
 	YYACCEPT;
-};
+} |
+/* services are somewhat generic */
+e123_cmd {
+	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_E123);
+	ud_send_raw(hdl, hdl->pktchn[0]);
+
+	/* the packet we're gonna send in raw shape */
+	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
+
+	YYACCEPT;
+}
 
 
 hy_cmd:
@@ -237,6 +249,17 @@ TOK_CAT /* in the middle */ {
 
 impo_cmd:
 TOK_IMPORT;
+
+e123_cmd:
+TOK_E123 TOK_STRING {
+	/* init the seqof counter */
+	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_STRING;
+	/* set its initial length to naught */
+	hdl->pktchn[0].plen += 2 +
+		(hdl->pktchn[0].pbuf[9] = (uint8_t)yylval.slen);
+	memcpy(&hdl->pktchn[0].pbuf[10], yylval.sval, (uint8_t)yylval.slen);
+};
+
 
 keyvals:
 keyval | keyvals keyval;

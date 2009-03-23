@@ -372,4 +372,9 @@ trigger_evloop(EV_P)
 	return;
 }
 
+
+/* specific jobs */
+extern uint8_t ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf);
+
+
 #endif	/* INCLUDED_unserding_private_h_ */

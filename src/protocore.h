@@ -122,6 +122,12 @@ enum udpc_type_e {
 #define UDPC_PKT_CAT		(ud_pkt_cmd_t)(0x0102)
 #define UDPC_PKT_CAT_RPL	UDPC_PKT_RPL(UDPC_PKT_CAT)
 
+/* services */
+/**
+ * E123ify packet, used to say `e.123ify [seqof(keyval)]' */
+#define UDPC_PKT_E123		(ud_pkt_cmd_t)(0x5e02)
+#define UDPC_PKT_E123_RPL	UDPC_PKT_RPL(UDPC_PKT_E123)
+
 
 extern inline void __attribute__((always_inline, gnu_inline))
 ud_fputs(uint8_t len, const char *s, FILE *f);

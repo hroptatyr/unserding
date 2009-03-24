@@ -424,6 +424,14 @@ __fprint_one(const char *buf, FILE *fp)
 		len = buf[1] + 2;
 		break;
 
+	case UDPC_TYPE_VOID:
+		fputs("(data)", fp);
+		for (uint8_t i = 2; i < buf[1] + 2; i++) {
+			fprintf(fp, "(%02x)", buf[i]);
+		}
+		len = buf[1] + 2;
+		break;
+
 	case UDPC_TYPE_SEQOF:
 		fprintf(fp, "(seqof(#%d))", buf[1]);
 		len = 2;

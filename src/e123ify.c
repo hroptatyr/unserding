@@ -43,6 +43,7 @@
 #include <popt.h>
 
 #include "unserding.h"
+#include "unserding-private.h"
 #include "protocore.h"
 
 /* could be used like so:
@@ -51,6 +52,27 @@
  *   [- .()[:digit:]]\\{6,\\}[- /.,()[:alnum:]]*\"" \
  *   <infile> | e123ify -s */
 
+/* our format structs */
+typedef struct e123_fmt_s *e123_fmt_t;
+typedef struct e123_fmtvec_s *e123_fmtvec_t;
+
+struct e123_fmt_s {
+	uint8_t idclen;
+	uint8_t ndclen;
+	uint8_t grplen[6];
+	char idc[8];
+	char ndc[8];
+	uint8_t totlen;
+	bool future;
+	bool ndc_drops_naught;
+};
+
+struct e123_fmtvec_s {
+	size_t nfmts;
+	struct e123_fmt_s fmts[] __attribute__((aligned(16)));
+};
+
+
 static int sed_mode = 0;
 
 #define TIMEOUT		100 /* milliseconds */
@@ -102,11 +124,24 @@ usefulp(ud_packet_t pkt, void *closure)
 		/* it's not our convo */
 		return false;
 	}
-	if (pkt.pbuf[8] != UDPC_TYPE_STRING || pkt.pbuf[9] == 0x00) {
+	if (pkt.pbuf[8] != UDPC_TYPE_SEQOF || pkt.pbuf[9] == 0x00) {
 		/* answer is empty */
 		return false;
 	}
 	return true;
+}
+
+static uint8_t
+__ndigits(const char *number)
+{
+	uint8_t res = 0;
+
+	for (const char *np = number; *np; np++) {
+		if (*np >= '0' && *np <= '9') {
+			res++;
+		}
+	}
+	return res;
 }
 
 
@@ -118,19 +153,22 @@ e123ify_send(ud_handle_t hdl, const char *number)
 	char *restrict work_space;
 	ud_packet_t pkt = {sizeof(buf), buf};
 	ud_convo_t cno;
+	uint8_t len;
 
 	/* set up the packet, should be a fun? */
 	memset(buf, 0, sizeof(buf));
 	cno = ud_handle_convo(hdl);
 	udpc_make_pkt(pkt, cno, /*pno*/0, UDPC_PKT_E123);
 
+#define QRY_OFFSET	8
+#define WS_OFFSET	QRY_OFFSET + 2
 	/* add their args, the length is taken from the stripper */
-	pkt.pbuf[8] = UDPC_TYPE_STRING;
-	work_space = &pkt.pbuf[10];
-	pkt.pbuf[9] = strip_number(work_space, number);
+	pkt.pbuf[QRY_OFFSET] = UDPC_TYPE_STRING;
+	work_space = &pkt.pbuf[WS_OFFSET];
+	len = pkt.pbuf[QRY_OFFSET + 1] = strip_number(work_space, number);
 
 	/* set packet size and fill in any remaining args */
-	pkt.plen = 8 + 2 + (pkt.pbuf[9] = strlen(work_space));
+	pkt.plen = QRY_OFFSET + 2 + len;
 	/* send him */
 	ud_send_raw(hdl, pkt);
 	hdl->convo++;
@@ -138,38 +176,136 @@ e123ify_send(ud_handle_t hdl, const char *number)
 }
 
 static char buf[UDPC_SIMPLE_PKTLEN];
-static char *output = &buf[10];
+static char *output = &buf[WS_OFFSET];
 
-static int
+static uint8_t
+__nfmts(const char *pbuf)
+{
+	/* return the number of fmt specs of the packet lying in buf */
+	uint8_t res = pbuf[QRY_OFFSET + 1];
+	/* check if it's maybe the empty fmt spec, as in future or unknown */
+	if (res == 1 && pbuf[WS_OFFSET + 1] == 0) {
+		return 0;
+	}
+	return res;
+}
+
+static uint8_t
+__deser_e123_fmt(e123_fmt_t fmt, const char *pbuf)
+{
+	memset(fmt, 0, sizeof(*fmt));
+
+#define IDC_OFFSET	3
+#define NDC_OFFSET	IDC_OFFSET + 1 + fmt->idclen + 1
+	fmt->idclen = pbuf[IDC_OFFSET + 1];
+	fmt->ndclen = pbuf[NDC_OFFSET + 1];
+	for (uint8_t i = 0, j = 4 + fmt->idclen + 2 + fmt->ndclen + 1;
+	     j < pbuf[1] + 2; i++, j++) {
+		fmt->grplen[i] = pbuf[j];
+	}
+	fmt->totlen = pbuf[2];
+
+	/* copy the idc and ndc */
+	memcpy(fmt->idc, &pbuf[IDC_OFFSET + 2], fmt->idclen);
+	memcpy(fmt->ndc, &pbuf[NDC_OFFSET + 2], fmt->ndclen);
+
+	return pbuf[1] + 2;
+}
+
+static void
+__deser_e123_fmtvec(e123_fmtvec_t fmtvec, const char *pbuf)
+{
+	uint8_t offs = WS_OFFSET;
+
+	/* store the number of format specs */
+	fmtvec->nfmts = __nfmts(pbuf);
+	/* and deserialise them one by one */
+	for (uint8_t i = 0; i < fmtvec->nfmts; i++) {
+		offs += __deser_e123_fmt(&fmtvec->fmts[i], &pbuf[offs]);
+	}
+	return;
+}
+
+static e123_fmtvec_t
 e123ify_recv(ud_handle_t hdl, ud_convo_t cno)
 {
 	ud_packet_t pkt = {sizeof(buf), buf};
 	void *clo = (void*)(long unsigned int)cno;
+	e123_fmtvec_t res;
+	uint8_t nfmts;
 
 	/* clean the packet space */
 	memset(pkt.pbuf, 0, UDPC_SIMPLE_PKTLEN);
 	ud_recv_pred(hdl, &pkt, TIMEOUT, usefulp, clo);
 
 	if (!usefulp(pkt, clo)) {
-		return 1;
+		return NULL;
 	}
-	/* prepare the buffer for string output */
-	output[pkt.pbuf[9]] = '\0';
-	return 0;
+	/* otherwise just deserialise the data into a fmtvec structure */
+	if ((nfmts = __nfmts(pkt.pbuf)) == 0) {
+		return NULL;
+	}
+	/* make room for the format specs */
+	res = malloc(aligned_sizeof(struct e123_fmtvec_s) +
+		     aligned_sizeof(struct e123_fmt_s));
+	/* deserialise */
+	__deser_e123_fmtvec(res, pkt.pbuf);
+	return res;
 }
 
-static void
-__e123ify(ud_handle_t hdl, const char *arg)
+#if 0
+/* reformat the inbuf */
+static uint8_t
+__e123ify_1(char *restrict resbuf, const char *inbuf, e123_fmt_t fmt)
 {
-	ud_convo_t cno;	
+	size_t inblen = strlen(inbuf);
+	char tmpin[256], *mp = match;
+	uint8_t ii = 0, ri = 0;
 
-	/* query the bugger */
-	cno = e123ify_send(hdl, arg);
-	/* receive */
-	if (e123ify_recv(hdl, cno)) {
-		fprintf(stderr, "No answers\n");
-		return;
+	if (UNLIKELY(match == NULL)) {
+		return 0;
 	}
+	if (*mp++ != '[') {
+		return 0;
+	}
+
+#define WILDCARD	'#'
+	/* buffer inbuf temporarily, assume stripped string */
+	memset(tmpin, WILDCARD, sizeof(tmpin));
+	memcpy(tmpin, inbuf, inblen);
+
+	/* go through the format specs */
+	/* copy the initial '+' */
+	resbuf[ri++] = tmpin[ii++];
+
+	do {
+		for (int i = 0, n = *mp++ - '0'; i < n; i++) {
+			resbuf[ri++] = tmpin[ii++];
+		}
+		resbuf[ri++] = ' ';
+		++mp;
+	} while ((*mp >= '0' && *mp <= '9') ||
+		 /* always false */
+		 (resbuf[--ri] = '\0'));
+	/* copy the rest */
+	while (ii < inblen) {
+		resbuf[ri++] = tmpin[ii++];
+	}
+	return ri;
+}
+#endif
+static char missing_char = '#';
+static char excess_char = ' ';
+
+static void
+__e123_apply(e123_fmt_t fmt, uint8_t ndigs, const char *arg)
+{
+	fputc('+', stdout);
+	fputs(fmt->idc, stdout);
+	fputc(' ', stdout);
+	fputs(fmt->ndc, stdout);
+	fputc('\n', stdout);
+	return;
 	/* otherwise care about the output */
 	if (!sed_mode) {
 		fputs(output, stdout);
@@ -183,6 +319,34 @@ __e123ify(ud_handle_t hdl, const char *arg)
 		fputc('/', stdout);
 		fputc('\n', stdout);
 	}
+	return;
+}
+
+static void
+__e123ify(ud_handle_t hdl, const char *arg)
+{
+	ud_convo_t cno;	
+	e123_fmtvec_t fv;
+	uint8_t ndigs;
+	int8_t fvi;
+
+	/* query the bugger */
+	cno = e123ify_send(hdl, arg);
+	/* receive */
+	if ((fv = e123ify_recv(hdl, cno)) == NULL) {
+		fprintf(stderr, "No answers\n");
+		return;
+	}
+	/* otherwise care about the output */
+	ndigs = __ndigits(arg);
+	/* find the right template to apply */
+	for (fvi = fv->nfmts - 1; fvi >= 0; fvi--) {
+		if (fv->fmts[fvi].totlen == ndigs) {
+			break;
+		}
+	}
+	/* apply */
+	__e123_apply(&fv->fmts[fvi], ndigs, arg);
 	return;
 }
 

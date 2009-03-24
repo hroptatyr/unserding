@@ -159,14 +159,6 @@ e123ify_recv(ud_handle_t hdl, ud_convo_t cno)
 }
 
 static void
-out_him(void)
-{
-	/* out him */
-	fputs(output, stdout);
-	fputc('\n', stdout);
-}
-
-static void
 __e123ify(ud_handle_t hdl, const char *arg)
 {
 	ud_convo_t cno;	
@@ -174,10 +166,22 @@ __e123ify(ud_handle_t hdl, const char *arg)
 	/* query the bugger */
 	cno = e123ify_send(hdl, arg);
 	/* receive */
-	if (!e123ify_recv(hdl, cno)) {
-		out_him();
-	} else {
+	if (e123ify_recv(hdl, cno)) {
 		fprintf(stderr, "No answers\n");
+		return;
+	}
+	/* otherwise care about the output */
+	if (!sed_mode) {
+		fputs(output, stdout);
+		fputc('\n', stdout);
+	} else {
+		fputc('s', stdout);
+		fputc('/', stdout);
+		fputs(arg, stdout);
+		fputc('/', stdout);
+		fputs(output, stdout);
+		fputc('/', stdout);
+		fputc('\n', stdout);
 	}
 	return;
 }

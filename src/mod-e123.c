@@ -116,20 +116,22 @@ __e123ify(char *restrict resbuf, const char *inbuf, void *match)
 
 #define WILDCARD	'#'
 	/* buffer inbuf temporarily, assume stripped string */
-	memset(tmpin, WILDCARD, 256);
+	memset(tmpin, WILDCARD, sizeof(tmpin));
 	memcpy(tmpin, inbuf, inblen);
 
 	/* go through the format specs */
 	/* copy the initial '+' */
 	resbuf[ri++] = tmpin[ii++];
 
-	while (*mp >= '0' && *mp <= '9') {
+	do {
 		for (int i = 0, n = *mp++ - '0'; i < n; i++) {
 			resbuf[ri++] = tmpin[ii++];
 		}
 		resbuf[ri++] = ' ';
 		++mp;
-	}
+	} while ((*mp >= '0' && *mp <= '9') ||
+		 /* always false */
+		 (resbuf[--ri] = '\0'));
 	/* copy the rest */
 	while (ii < inblen) {
 		resbuf[ri++] = tmpin[ii++];

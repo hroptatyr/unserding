@@ -57,11 +57,101 @@ extern void mod_e123_LTX_deinit(void);
 /* our local trie */
 static cp_trie *loc_trie;
 
+/* our format structs */
+typedef struct e123_fmt_s *e123_fmt_t;
+typedef struct e123_fmtvec_s *e123_fmtvec_t;
+
+struct e123_fmt_s {
+	uint8_t idclen;
+	uint8_t ndclen;
+	uint8_t grplen[6];
+	char idc[8];
+	char ndc[8];
+	bool future;
+	bool ndc_drops_naught;
+};
+
+struct e123_fmtvec_s {
+	size_t nfmts;
+	struct e123_fmt_s fmts[] __attribute__((aligned(16)));
+};
+
 
+static int
+__nfmts(const char *spec, size_t len)
+{
+	uint8_t cnt = 0;
+	for (uint8_t i = 0; i < len; i++) {
+		if (spec[i] == '[') {
+			cnt++;
+		}
+	}
+	return cnt;
+}
+
 static void
+__fill_in_spec(e123_fmt_t fmt, const char *key, const char *spec)
+{
+	/* let all default to 0 */
+	memset(fmt, 0, sizeof(fmt));
+
+	/* check if it's a future thing */
+	if (spec[1] == 'f' && spec[3] == 't') {
+		/* future */
+		fmt->future = true;
+		return;
+	} else if (spec[1] == 'u' && spec[3] == 'k') {
+		/* unknown */
+		return;
+	}
+
+	/* assert(spec[0] == '[') */
+	fmt->idclen = spec[1] - '0';
+	/* assert(spec[2] == ' ') */
+	fmt->ndclen = spec[3] - '0';
+	/* rest */
+	for (int i = 5, j = 0; spec[i - 1] == ' '; i += 2, j++) {
+		fmt->grplen[j] = spec[i] - '0';
+	}
+
+	/* copy the idc and ndc from KEY */
+	memset(fmt->idc, 0, sizeof(fmt->idc));
+	memset(fmt->ndc, 0, sizeof(fmt->ndc));
+	memcpy(fmt->idc, key + 1, fmt->idclen);
+	memcpy(fmt->ndc, key + 1 + fmt->idclen, fmt->ndclen);
+	return;
+}
+
+static e123_fmtvec_t
+make_match(const char *key, const char *spec, size_t len)
+{
+	e123_fmtvec_t res = NULL;
+
+	if (spec[0] == '[') {
+		/* most common case, 1 format spec */
+		res = malloc(aligned_sizeof(struct e123_fmtvec_s) +
+			     aligned_sizeof(struct e123_fmt_s));
+		__fill_in_spec(res->fmts, key, spec);
+
+	} else if (spec[0] == '(') {
+		/* make room for NUM format specs */
+		int num = __nfmts(spec, len);
+		res = malloc(aligned_sizeof(struct e123_fmtvec_s) +
+			     num * aligned_sizeof(struct e123_fmt_s));
+		/* and parse them all */
+		for (uint8_t i = 0, j = 0; i < len && j < num; i++) {
+			if (spec[i] == '[') {
+				__fill_in_spec(&res->fmts[j++], key, &spec[i]);
+			}
+		}
+	}
+	return res;
+}
+
+/*static*/ void
 read_trie_line(cp_trie *t, FILE *f)
 {
-	char key[32], val[32];
+	char key[32], val[64];
 	char c;
 	int i;
 
@@ -76,7 +166,7 @@ read_trie_line(cp_trie *t, FILE *f)
 	val[i] = '\0';
 
 	if (c != EOF) {
-		cp_trie_add(t, key, __builtin_strndup(val, i+1));
+		cp_trie_add(t, key, make_match(key, val, i));
 	}
 	return;
 }
@@ -99,71 +189,134 @@ build_trie(cp_trie *t, const char *file)
 }
 
 
-/* reformat the inbuf */
 static uint8_t
-__e123ify(char *restrict resbuf, const char *inbuf, void *match)
+__e123ify_fmt(char *restrict resbuf, const char *inbuf, e123_fmt_t fmt)
 {
-	size_t inblen = strlen(inbuf);
-	char tmpin[256], *mp = match;
-	uint8_t ii = 0, ri = 0;
+	resbuf[0] = fmt->idclen + fmt->ndclen +
+		fmt->grplen[0] + fmt->grplen[1] +
+		fmt->grplen[2] + fmt->grplen[3] +
+		fmt->grplen[4] + fmt->grplen[5];
+	return 1;
+}
 
-	if (UNLIKELY(match == NULL)) {
+static uint8_t
+__e123ify_idc(char *restrict resbuf, const char *prefix, e123_fmt_t fmt)
+{
+	uint8_t idclen = fmt->idclen;
+
+	/* IDC (international dialling code) */
+	resbuf[0] = UDPC_TYPE_STRING;
+	resbuf[1] = idclen;
+	memcpy(&resbuf[2], fmt->idc, idclen);
+	return idclen + 2;
+}
+
+static uint8_t
+__e123ify_ndc(char *restrict resbuf, const char *prefix, e123_fmt_t fmt)
+{
+	uint8_t ndclen = fmt->ndclen;
+
+	/* IDC (international dialling code) */
+	resbuf[0] = UDPC_TYPE_STRING;
+	resbuf[1] = ndclen;
+	memcpy(&resbuf[2], fmt->ndc, ndclen);
+	return ndclen + 2;
+}
+
+static uint8_t
+__e123ify_grp(char *restrict resbuf, const char *prefix, e123_fmt_t fmt)
+{
+	uint8_t res = 0;
+	for (res = 0; fmt->grplen[res]; res++) {
+		resbuf[res] = fmt->grplen[res];
+	}
+	return res;
+}
+
+static uint8_t
+__e123ify_1(char *restrict resbuf, const char *prefix, e123_fmt_t fmt)
+{
+	uint8_t len = 0, idclen, ndclen;
+	char *rb = resbuf, *idc, *ndc;
+	char inbuf[16];
+
+	/* if format is unknown or future, refuse to do anything */
+	if (fmt->future || fmt->idclen == 0) {
 		return 0;
 	}
-	if (*mp++ != '[') {
-		return 0;
-	}
 
-#define WILDCARD	'#'
-	/* buffer inbuf temporarily, assume stripped string */
-	memset(tmpin, WILDCARD, sizeof(tmpin));
-	memcpy(tmpin, inbuf, inblen);
+	/* back up the prefix */
+	memcpy(inbuf, prefix, sizeof(inbuf));
 
-	/* go through the format specs */
-	/* copy the initial '+' */
-	resbuf[ri++] = tmpin[ii++];
+#define NUMLEN_OFFSET	2
+	/* put in the length of the phone number we're talking */
+	len += __e123ify_fmt(&resbuf[NUMLEN_OFFSET], inbuf, fmt);
 
-	do {
-		for (int i = 0, n = *mp++ - '0'; i < n; i++) {
-			resbuf[ri++] = tmpin[ii++];
-		}
-		resbuf[ri++] = ' ';
-		++mp;
-	} while ((*mp >= '0' && *mp <= '9') ||
-		 /* always false */
-		 (resbuf[--ri] = '\0'));
-	/* copy the rest */
-	while (ii < inblen) {
-		resbuf[ri++] = tmpin[ii++];
-	}
-	return ri;
+#define IDC_OFFSET	NUMLEN_OFFSET + 1
+	/* IDC (international dialling code) */
+	rb = idc = &resbuf[IDC_OFFSET];
+	len += (idclen = __e123ify_idc(rb, inbuf, fmt));
+
+#define NDC_OFFSET	IDC_OFFSET + idclen
+	/* NDC (national dialling code) */
+	rb = ndc = &resbuf[NDC_OFFSET];
+	len += (ndclen = __e123ify_ndc(rb, inbuf, fmt));
+
+#define GRP_OFFSET	NDC_OFFSET + ndclen
+	/* just put in the group lengths */
+	rb = &resbuf[GRP_OFFSET];
+	len += __e123ify_grp(rb, inbuf, fmt);
+
+	/* announce the overall cell */
+	resbuf[0] = UDPC_TYPE_VOID;
+	resbuf[1] = len;
+	return len + NUMLEN_OFFSET;
 }
 
 
 /* public job fun, as announced in unserding-private.h */
-uint8_t
+static uint8_t
 ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
 {
-	void *match;
+	e123_fmtvec_t fmtvec;
+	uint8_t totlen = 0;
 
 	/* query for the number */
-	cp_trie_prefix_match(loc_trie, inbuf, &match);
-	return __e123ify(resbuf, inbuf, match);
+	cp_trie_prefix_match(loc_trie, inbuf, (void*)&fmtvec);
+
+	/* trivial cases first */
+	if (UNLIKELY(fmtvec == NULL)) {
+		return 0;
+	}
+	/* e123ify at least once */
+	totlen = __e123ify_1(resbuf, inbuf, fmtvec->fmts);
+	/* traverse the rest */
+	for (uint8_t i = 1; i < fmtvec->nfmts; i++) {
+		totlen += __e123ify_1(resbuf, inbuf, &fmtvec->fmts[i]);
+	}
+	return totlen;
 }
 
 /* service stuff */
 static void
 f5e_e123ify(job_t j)
 {
+	uint8_t pktlen;
+	char *restrict rb = &j->buf[10];
+
 	/* generate the answer packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 
-	/* we're a string, soon will be a seqof(string) */
-	j->buf[8] = UDPC_TYPE_STRING;
-	/* attach the hostname now */
-	j->buf[9] = ud_5e_e123ify_job(&j->buf[10], &j->buf[10]);
+	if ((pktlen = ud_5e_e123ify_job(rb, rb)) == 0) {
+		return;
+	}
+
+	/* sequence of possible format info */
+	j->buf[8] = UDPC_TYPE_SEQOF;
+	/* the number of info */
+	j->buf[9] = 1;
 	/* compute the overall length */
-	j->blen = 8 + 2 + j->buf[9];
+	j->blen = 8 + 2 + pktlen;
 
 	UD_DEBUG_PROTO("sending 5e/02 RPL\n");
 	/* and send him back */

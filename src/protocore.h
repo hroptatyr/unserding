@@ -84,6 +84,8 @@ enum udpc_type_e {
 	/* expects a uint8_t following designating the length */
 	/* 9 */
 	UDPC_TYPE_STRING,
+	/* 10, like STRING but for arbitrary data */
+	UDPC_TYPE_VOID,
 	/* simplistic date, days since epoch, 16bit */
 	UDPC_TYPE_DATE_DSE,
 	/* simplistic date, seconds since epoch, 32bit */

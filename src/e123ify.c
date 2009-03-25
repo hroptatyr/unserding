@@ -95,6 +95,12 @@ allowed_char_p(char c)
 	return false;
 }
 
+static inline bool __attribute__((always_inline))
+digitp(char c)
+{
+	return c >= '0' && c <= '9';
+}
+
 static int
 strip_number(char *restrict buf, const char *number)
 {
@@ -137,7 +143,7 @@ __ndigits(const char *number)
 	uint8_t res = 0;
 
 	for (const char *np = number; *np; np++) {
-		if (*np >= '0' && *np <= '9') {
+		if (digitp(*np)) {
 			res++;
 		}
 	}
@@ -253,72 +259,112 @@ e123ify_recv(ud_handle_t hdl, ud_convo_t cno)
 	return res;
 }
 
-#if 0
-/* reformat the inbuf */
-static uint8_t
-__e123ify_1(char *restrict resbuf, const char *inbuf, e123_fmt_t fmt)
-{
-	size_t inblen = strlen(inbuf);
-	char tmpin[256], *mp = match;
-	uint8_t ii = 0, ri = 0;
-
-	if (UNLIKELY(match == NULL)) {
-		return 0;
-	}
-	if (*mp++ != '[') {
-		return 0;
-	}
-
-#define WILDCARD	'#'
-	/* buffer inbuf temporarily, assume stripped string */
-	memset(tmpin, WILDCARD, sizeof(tmpin));
-	memcpy(tmpin, inbuf, inblen);
-
-	/* go through the format specs */
-	/* copy the initial '+' */
-	resbuf[ri++] = tmpin[ii++];
-
-	do {
-		for (int i = 0, n = *mp++ - '0'; i < n; i++) {
-			resbuf[ri++] = tmpin[ii++];
-		}
-		resbuf[ri++] = ' ';
-		++mp;
-	} while ((*mp >= '0' && *mp <= '9') ||
-		 /* always false */
-		 (resbuf[--ri] = '\0'));
-	/* copy the rest */
-	while (ii < inblen) {
-		resbuf[ri++] = tmpin[ii++];
-	}
-	return ri;
-}
-#endif
+
+/* output */
 static char missing_char = '#';
 static char excess_char = ' ';
+static char sep_char = ' ';
+
+static const char*
+fput_n_digits(const char *arg, uint8_t n)
+{
+	if (arg == NULL) {
+		return NULL;
+	}
+	while (*arg && n > 0) {
+		const char c = *arg++;
+		if (digitp(c)) {
+			fputc(c, stdout);
+			n--;
+		}
+	}
+	return arg;
+}
+
+static inline const char *
+find_number(e123_fmt_t fmt, const char *arg)
+{
+/* try and find the beginning of the actual telephone number
+ * may contain portions of the ndc */
+	const char *ap = arg;
+	const char *ip = fmt->idc, *np = fmt->ndc;
+
+	/* zap to the end of the idc */
+	while (*ap && *ip) {
+		const char c = *ap++;
+		if (c == *ip) {
+			ip++;
+		}
+	}
+	/* zap to after the ndc */
+	while (*ap && *np) {
+		const char c = *ap++;
+		if (c == *np) {
+			np++;
+		}
+	}
+	/* now skip any non-digits */
+	while (*ap && !digitp(*ap)) {
+		ap++;
+	}
+	return *ap ? ap : NULL;
+}
+
+static inline void
+fput_idc(e123_fmt_t fmt, const char *arg)
+{
+	fputc('+', stdout);
+	fputs(fmt->idc, stdout);
+	return;
+}
+
+static inline const char*
+fput_ndc(e123_fmt_t fmt, const char *num)
+{
+	uint8_t i;
+	for (i = 0; i < fmt->ndclen && fmt->ndc[i]; i++) {
+		fputc(fmt->ndc[i], stdout);
+	}
+	if (i >= fmt->ndclen) {
+		/* likely */
+		return num;
+	}
+	return fput_n_digits(num, fmt->ndclen - i);
+}
+
+static inline const char*
+fput_grp(const char *arg, uint8_t grplen)
+{
+	const char *new = fput_n_digits(arg, grplen);
+	/* fill up with missing chars */
+	for (uint8_t i = new ? new - arg : 0; i < grplen; i++) {
+		fputc(missing_char, stdout);
+	}
+	return new;
+}
 
 static void
 __e123_apply(e123_fmt_t fmt, uint8_t ndigs, const char *arg)
 {
-	fputc('+', stdout);
-	fputs(fmt->idc, stdout);
-	fputc(' ', stdout);
-	fputs(fmt->ndc, stdout);
-	fputc('\n', stdout);
-	return;
-	/* otherwise care about the output */
-	if (!sed_mode) {
-		fputs(output, stdout);
-		fputc('\n', stdout);
-	} else {
-		fputc('s', stdout);
-		fputc('/', stdout);
-		fputs(arg, stdout);
-		fputc('/', stdout);
-		fputs(output, stdout);
-		fputc('/', stdout);
-		fputc('\n', stdout);
+	const char *np = find_number(fmt, arg);
+
+	/* print the idc */
+	fput_idc(fmt, arg);
+	fputc(sep_char, stdout);
+	/* print the ndc */
+	np = fput_ndc(fmt, np);
+	/* print remaining groups */
+	for (uint8_t i = 0; i < sizeof(fmt->grplen) && fmt->grplen[i]; i++) {
+		fputc(sep_char, stdout);
+		np = fput_grp(np, fmt->grplen[i]);
 	}
+
+	if (np != NULL) {
+		/* just output the rest */
+		fputc(excess_char, stdout);
+		fputs(np, stdout);
+	}
+	fputc('\n', stdout);
 	return;
 }
 
@@ -340,7 +386,7 @@ __e123ify(ud_handle_t hdl, const char *arg)
 	/* otherwise care about the output */
 	ndigs = __ndigits(arg);
 	/* find the right template to apply */
-	for (fvi = fv->nfmts - 1; fvi >= 0; fvi--) {
+	for (fvi = fv->nfmts - 1; fvi > 0; fvi--) {
 		if (fv->fmts[fvi].totlen == ndigs) {
 			break;
 		}

@@ -131,6 +131,7 @@ make_match(const char *key, const char *spec, size_t len)
 		/* most common case, 1 format spec */
 		res = malloc(aligned_sizeof(struct e123_fmtvec_s) +
 			     aligned_sizeof(struct e123_fmt_s));
+		res->nfmts = 1;
 		__fill_in_spec(res->fmts, key, spec);
 
 	} else if (spec[0] == '(') {
@@ -138,6 +139,7 @@ make_match(const char *key, const char *spec, size_t len)
 		int num = __nfmts(spec, len);
 		res = malloc(aligned_sizeof(struct e123_fmtvec_s) +
 			     num * aligned_sizeof(struct e123_fmt_s));
+		res->nfmts = num;
 		/* and parse them all */
 		for (uint8_t i = 0, j = 0; i < len && j < num; i++) {
 			if (spec[i] == '[') {
@@ -298,7 +300,7 @@ static uint8_t
 ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
 {
 	e123_fmtvec_t fmtvec;
-	uint8_t totlen = 0;
+	uint16_t totlen = 0;
 
 	/* query for the number */
 	cp_trie_prefix_match(loc_trie, inbuf, (void*)&fmtvec);
@@ -311,35 +313,39 @@ ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
 	if (UNLIKELY(fmtvec == NULL)) {
 		return 0;
 	}
+	/* sequence of possible format info */
+	resbuf[0] = UDPC_TYPE_SEQOF;
+	/* the number of info */
+	resbuf[1] = fmtvec->nfmts;
 	/* e123ify at least once */
-	totlen = __e123ify_1(resbuf, inbuf, fmtvec->fmts);
+	resbuf += (totlen = __e123ify_1(resbuf + 2, inbuf, fmtvec->fmts));
 	/* traverse the rest */
 	for (uint8_t i = 1; i < fmtvec->nfmts; i++) {
-		totlen += __e123ify_1(resbuf, inbuf, &fmtvec->fmts[i]);
+		totlen += __e123ify_1(resbuf + 2, inbuf, &fmtvec->fmts[i]);
+		resbuf += totlen;
 	}
-	return totlen;
+	return totlen + 2;
 }
+
+#define PAYLOAD_OFFSET	8
+#define WS_OFFSET	10
 
 /* service stuff */
 static void
 f5e_e123ify(job_t j)
 {
 	uint8_t pktlen;
-	char *restrict rb = &j->buf[10];
+	char *restrict rb = &j->buf[PAYLOAD_OFFSET];
+	char *ib = &j->buf[WS_OFFSET];
 
 	/* generate the answer packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 
-	if ((pktlen = ud_5e_e123ify_job(rb, rb)) == 0) {
+	if ((pktlen = ud_5e_e123ify_job(rb, ib)) == 0) {
 		return;
 	}
-
-	/* sequence of possible format info */
-	j->buf[8] = UDPC_TYPE_SEQOF;
-	/* the number of info */
-	j->buf[9] = 1;
 	/* compute the overall length */
-	j->blen = 8 + 2 + pktlen;
+	j->blen = PAYLOAD_OFFSET + pktlen;
 
 	UD_DEBUG_PROTO("sending 5e/02 RPL\n");
 	/* and send him back */

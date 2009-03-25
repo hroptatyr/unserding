@@ -148,7 +148,7 @@ make_match(const char *key, const char *spec, size_t len)
 	return res;
 }
 
-/*static*/ void
+static void
 read_trie_line(cp_trie *t, FILE *f)
 {
 	char key[32], val[64];
@@ -273,6 +273,25 @@ __e123ify_1(char *restrict resbuf, const char *prefix, e123_fmt_t fmt)
 	return len + NUMLEN_OFFSET;
 }
 
+static bool __attribute__((noinline)) /* hopefully rarely called */
+unnaughtify(char *inbuf)
+{
+	uint8_t i;
+
+	/* peek 8 digits into it */
+	for (i = 2; i < 8; i++) {
+		if (inbuf[i] == '0') {
+			goto move;
+		}
+	}
+	return false;
+move:
+	for (char *p = &inbuf[i]; *p; p++) {
+		p[0] = p[1];
+	}
+	return true;
+}
+
 
 /* public job fun, as announced in unserding-private.h */
 static uint8_t
@@ -285,6 +304,10 @@ ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
 	cp_trie_prefix_match(loc_trie, inbuf, (void*)&fmtvec);
 
 	/* trivial cases first */
+	if (UNLIKELY(fmtvec == NULL && unnaughtify(inbuf))) {
+		/* query for the number */
+		cp_trie_prefix_match(loc_trie, inbuf, (void*)&fmtvec);
+	}
 	if (UNLIKELY(fmtvec == NULL)) {
 		return 0;
 	}

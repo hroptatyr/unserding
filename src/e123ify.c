@@ -182,7 +182,6 @@ e123ify_send(ud_handle_t hdl, const char *number)
 }
 
 static char buf[UDPC_SIMPLE_PKTLEN];
-static char *output = &buf[WS_OFFSET];
 
 static uint8_t
 __nfmts(const char *pbuf)
@@ -261,9 +260,9 @@ e123ify_recv(ud_handle_t hdl, ud_convo_t cno)
 
 
 /* output */
-static char missing_char = '#';
-static char excess_char = ' ';
-static char sep_char = ' ';
+static char *missing_char = "#";
+static char *excess_char = " ";
+static char *sep_char = " ";
 
 static const char*
 fput_n_digits(const char *arg, uint8_t n)
@@ -338,7 +337,7 @@ fput_grp(const char *arg, uint8_t grplen)
 	const char *new = fput_n_digits(arg, grplen);
 	/* fill up with missing chars */
 	for (uint8_t i = new ? new - arg : 0; i < grplen; i++) {
-		fputc(missing_char, stdout);
+		fputc(missing_char[0], stdout);
 	}
 	return new;
 }
@@ -350,18 +349,18 @@ __e123_apply(e123_fmt_t fmt, uint8_t ndigs, const char *arg)
 
 	/* print the idc */
 	fput_idc(fmt, arg);
-	fputc(sep_char, stdout);
+	fputc(sep_char[0], stdout);
 	/* print the ndc */
 	np = fput_ndc(fmt, np);
 	/* print remaining groups */
 	for (uint8_t i = 0; i < sizeof(fmt->grplen) && fmt->grplen[i]; i++) {
-		fputc(sep_char, stdout);
+		fputc(sep_char[0], stdout);
 		np = fput_grp(np, fmt->grplen[i]);
 	}
 
 	if (np != NULL) {
 		/* just output the rest */
-		fputc(excess_char, stdout);
+		fputc(excess_char[0], stdout);
 		fputs(np, stdout);
 	}
 	fputc('\n', stdout);
@@ -430,10 +429,19 @@ stdio_mode(ud_handle_t hdl)
 
 #if defined HAVE_POPT
 static const struct poptOption const __opts[] = {
-        {"sed-mode", 's', POPT_ARG_NONE,
-	 &sed_mode, 0,
+        {"sed-mode", 0, POPT_ARG_NONE, &sed_mode, 0,
 	 "Print the original and the reformatted string like "
-	 "\"s/original/reformatted/\"", NULL },
+	 "\"s/original/reformatted/\"", NULL},
+        {"missing", 'm', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
+	 &missing_char, 0,
+	 "Placeholder character to use for missing digits", "CHARACTER"},
+        {"excess", 'x', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
+	 &excess_char, 0,
+	 "Placeholder character to use for digits exceeding the length "
+	 "of the telephone number", "CHARACTER"},
+        {"separator", 's', POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
+	 &sep_char, 0,
+	 "Placeholder character to use to separate groups", "CHARACTER"},
         POPT_AUTOHELP
         POPT_TABLEEND
 };

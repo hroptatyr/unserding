@@ -67,9 +67,9 @@ struct e123_fmt_s {
 	uint8_t grplen[6];
 	char idc[8];
 	char ndc[8];
-	bool future;
-	bool defunct;
-	bool ndc_drops_naught;
+	bool future:1;
+	bool defunct:1;
+	bool trunk_prefix_dropped_p:1;
 };
 
 struct e123_fmtvec_s {

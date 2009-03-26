@@ -68,6 +68,7 @@ struct e123_fmt_s {
 	char idc[8];
 	char ndc[8];
 	bool future;
+	bool defunct;
 	bool ndc_drops_naught;
 };
 
@@ -96,9 +97,13 @@ __fill_in_spec(e123_fmt_t fmt, const char *key, const char *spec)
 	memset(fmt, 0, sizeof(fmt));
 
 	/* check if it's a future thing */
-	if (spec[1] == 'f' && spec[3] == 't') {
+	if (spec[1] >= 'f' && spec[3] == 't') {
 		/* future */
 		fmt->future = true;
+		return;
+	} else if (spec[1] == 'd' && spec[3] == 'f') {
+		/* defunct */
+		fmt->defunct = true;
 		return;
 	} else if (spec[1] == 'u' && spec[3] == 'k') {
 		/* unknown */

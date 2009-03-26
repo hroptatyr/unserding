@@ -106,15 +106,17 @@ digitp(char c)
 static int
 strip_number(char *restrict buf, const char *number)
 {
-	int len;
+	int len = 0;
 
 	/* trivial cases first */
 	if (number == NULL) {
 		return 0;
 	}
 
+	/* escrow leading '+' */
+	buf[len++] = '+';
 	/* strip stuff */
-	for (const char *np = number; *np != '\0' && len < 8; np++) {
+	for (const char *np = number; *np != '\0' && len < 9; np++) {
 		/* only copy allowed characters */
 		if (digitp(*np)) {
 			buf[len++] = *np;

@@ -354,6 +354,7 @@ __e123_apply(e123_fmt_t fmt, uint8_t ndigs, const char *arg)
 
 	/* in sed-mode do a bit more */
 	if (sed_mode) {
+		fputc('s', stdout);
 		fputc(sed_char[0], stdout);
 		fputs(arg, stdout);
 		fputc(sed_char[0], stdout);

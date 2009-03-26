@@ -77,6 +77,7 @@ static int sed_mode = 0;
 
 #define TIMEOUT		100 /* milliseconds */
 
+#if 0
 static bool
 allowed_char_p(char c)
 {
@@ -94,6 +95,7 @@ allowed_char_p(char c)
 	}
 	return false;
 }
+#endif	/* 0 */
 
 static inline bool __attribute__((always_inline))
 digitp(char c)
@@ -104,7 +106,7 @@ digitp(char c)
 static int
 strip_number(char *restrict buf, const char *number)
 {
-	int len = 0;
+	int len;
 
 	/* trivial cases first */
 	if (number == NULL) {
@@ -112,12 +114,13 @@ strip_number(char *restrict buf, const char *number)
 	}
 
 	/* strip stuff */
-	for (int i = 0; number[i] != '\0'; i++) {
+	for (const char *np = number; *np != '\0' && len < 8; np++) {
 		/* only copy allowed characters */
-		if (allowed_char_p(number[i])) {
-			buf[len++] = number[i];
+		if (digitp(*np)) {
+			buf[len++] = *np;
 		}
 	}
+	buf[len] = '\0';
 	return len;
 }
 
@@ -155,8 +158,7 @@ __ndigits(const char *number)
 static ud_convo_t
 e123ify_send(ud_handle_t hdl, const char *number)
 {
-	char buf[UDPC_SIMPLE_PKTLEN];
-	char *restrict work_space;
+	char buf[UDPC_SIMPLE_PKTLEN], *bp;
 	ud_packet_t pkt = {sizeof(buf), buf};
 	ud_convo_t cno;
 	uint8_t len;
@@ -170,8 +172,8 @@ e123ify_send(ud_handle_t hdl, const char *number)
 #define WS_OFFSET	QRY_OFFSET + 2
 	/* add their args, the length is taken from the stripper */
 	pkt.pbuf[QRY_OFFSET] = UDPC_TYPE_STRING;
-	work_space = &pkt.pbuf[WS_OFFSET];
-	len = pkt.pbuf[QRY_OFFSET + 1] = strip_number(work_space, number);
+	bp = &pkt.pbuf[WS_OFFSET];
+	len = pkt.pbuf[QRY_OFFSET + 1] = strip_number(bp, number);
 
 	/* set packet size and fill in any remaining args */
 	pkt.plen = QRY_OFFSET + 2 + len;

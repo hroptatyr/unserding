@@ -248,7 +248,7 @@ __e123ify_1(char *restrict resbuf, const char *prefix, e123_fmt_t fmt)
 	char inbuf[16];
 
 	/* if format is unknown or future, refuse to do anything */
-	if (fmt->future || fmt->idclen == 0) {
+	if (fmt->future || fmt->defunct || fmt->idclen == 0) {
 		return 0;
 	}
 

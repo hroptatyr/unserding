@@ -94,7 +94,7 @@ static void
 __fill_in_spec(e123_fmt_t fmt, const char *key, const char *spec)
 {
 	/* let all default to 0 */
-	memset(fmt, 0, sizeof(fmt));
+	memset(fmt, 0, sizeof(*fmt));
 
 	/* check if it's a future thing */
 	if (spec[1] >= 'f' && spec[3] == 't') {
@@ -120,8 +120,6 @@ __fill_in_spec(e123_fmt_t fmt, const char *key, const char *spec)
 	}
 
 	/* copy the idc and ndc from KEY */
-	memset(fmt->idc, 0, sizeof(fmt->idc));
-	memset(fmt->ndc, 0, sizeof(fmt->ndc));
 	memcpy(fmt->idc, key + 1, fmt->idclen);
 	memcpy(fmt->ndc, key + 1 + fmt->idclen, fmt->ndclen);
 	return;
@@ -316,6 +314,7 @@ ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
 		cp_trie_prefix_match(loc_trie, inbuf, (void*)&fmtvec);
 	}
 	if (UNLIKELY(fmtvec == NULL)) {
+		/* return a not-found? */
 		return 0;
 	}
 	/* sequence of possible format info */

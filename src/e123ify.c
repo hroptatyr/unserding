@@ -252,7 +252,7 @@ e123ify_recv(ud_handle_t hdl, ud_convo_t cno)
 	}
 	/* make room for the format specs */
 	res = malloc(aligned_sizeof(struct e123_fmtvec_s) +
-		     aligned_sizeof(struct e123_fmt_s));
+		     nfmts * aligned_sizeof(struct e123_fmt_s));
 	/* deserialise */
 	__deser_e123_fmtvec(res, pkt.pbuf);
 	return res;
@@ -391,7 +391,7 @@ __e123ify(ud_handle_t hdl, const char *arg)
 	cno = e123ify_send(hdl, arg);
 	/* receive */
 	if ((fv = e123ify_recv(hdl, cno)) == NULL) {
-		fprintf(stderr, "No answers\n");
+		fprintf(stderr, "No answers for %s\n", arg);
 		return;
 	}
 	/* otherwise care about the output */
@@ -404,6 +404,8 @@ __e123ify(ud_handle_t hdl, const char *arg)
 	}
 	/* apply */
 	__e123_apply(&fv->fmts[fvi], ndigs, arg);
+	/* free the format specs */
+	free(fv);
 	return;
 }
 
@@ -431,8 +433,11 @@ stdio_mode(ud_handle_t hdl)
 	lbuf = malloc(llen);
 	/* process line by line */
 	while ((nread = getline(&lbuf, &llen, stdin)) > 0) {
+		if (lbuf[nread-2] == '"') {
+			lbuf[nread-2] = '\0';
+		}
 		lbuf[nread-1] = '\0';
-		__e123ify(hdl, lbuf);
+		__e123ify(hdl, lbuf[0] != '"' ? lbuf : lbuf+1);
 	}
 	/* free the line buffer */
 	free(lbuf);

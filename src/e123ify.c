@@ -263,6 +263,7 @@ e123ify_recv(ud_handle_t hdl, ud_convo_t cno)
 static char *missing_char = "#";
 static char *excess_char = " ";
 static char *sep_char = " ";
+static char *sed_char = "@";
 
 static const char*
 fput_n_digits(const char *arg, uint8_t n)
@@ -347,6 +348,13 @@ __e123_apply(e123_fmt_t fmt, uint8_t ndigs, const char *arg)
 {
 	const char *np = find_number(fmt, arg);
 
+	/* in sed-mode do a bit more */
+	if (sed_mode) {
+		fputc(sed_char[0], stdout);
+		fputs(arg, stdout);
+		fputc(sed_char[0], stdout);
+	}
+
 	/* print the idc */
 	fput_idc(fmt, arg);
 	fputc(sep_char[0], stdout);
@@ -358,10 +366,14 @@ __e123_apply(e123_fmt_t fmt, uint8_t ndigs, const char *arg)
 		np = fput_grp(np, fmt->grplen[i]);
 	}
 
-	if (np != NULL) {
+	if (np != NULL && *np != '\0') {
 		/* just output the rest */
 		fputc(excess_char[0], stdout);
 		fputs(np, stdout);
+	}
+	/* and finish him off */
+	if (sed_mode) {
+		fputc(sed_char[0], stdout);
 	}
 	fputc('\n', stdout);
 	return;

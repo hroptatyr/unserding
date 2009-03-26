@@ -431,6 +431,7 @@ stdio_mode(ud_handle_t hdl)
 	lbuf = malloc(llen);
 	/* process line by line */
 	while ((nread = getline(&lbuf, &llen, stdin)) > 0) {
+		lbuf[nread-1] = '\0';
 		__e123ify(hdl, lbuf);
 	}
 	/* free the line buffer */

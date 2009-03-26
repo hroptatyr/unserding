@@ -278,6 +278,7 @@ __e123ify_1(char *restrict resbuf, const char *prefix, e123_fmt_t fmt)
 	return len + NUMLEN_OFFSET;
 }
 
+#if defined UNNAUGHTIFY
 static bool __attribute__((noinline)) /* hopefully rarely called */
 unnaughtify(char *inbuf)
 {
@@ -296,6 +297,7 @@ move:
 	}
 	return true;
 }
+#endif	/* UNNAUGHTIFY */
 
 
 /* public job fun, as announced in unserding-private.h */
@@ -308,11 +310,13 @@ ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
 	/* query for the number */
 	cp_trie_prefix_match(loc_trie, inbuf, (void*)&fmtvec);
 
+#if defined UNNAUGHTIFY
 	/* trivial cases first */
 	if (UNLIKELY(fmtvec == NULL && unnaughtify(inbuf))) {
 		/* query for the number */
 		cp_trie_prefix_match(loc_trie, inbuf, (void*)&fmtvec);
 	}
+#endif	/* UNNAUGHTIFY */
 	if (UNLIKELY(fmtvec == NULL)) {
 		/* return a not-found? */
 		return 0;

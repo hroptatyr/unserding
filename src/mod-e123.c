@@ -405,7 +405,7 @@ mod_e123_LTX_init(void)
 		 * ultimately in a database! */
 		build_trie(loc_trie, "/tmp/all-city-codes");
 	} else {
-		UD_CRITICAL("can\'t create trie\n");
+		UD_CRITICAL("can't create trie\n");
 		loc_trie = NULL;
 		return;
 	}

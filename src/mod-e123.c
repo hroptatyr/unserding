@@ -406,6 +406,8 @@ mod_e123_LTX_init(void)
 		build_trie(loc_trie, "/tmp/all-city-codes");
 	} else {
 		UD_CRITICAL("can\'t create trie\n");
+		loc_trie = NULL;
+		return;
 	}
 	/* put it into fam5e array */
 	ud_fam5e[2] = f5e_e123ify;
@@ -415,7 +417,7 @@ mod_e123_LTX_init(void)
 void
 mod_e123_LTX_deinit(void)
 {
-	if (LIKELY((loc_trie = cp_trie_create(0)) != NULL)) {
+	if (LIKELY(loc_trie != NULL)) {
 		cp_trie_destroy(loc_trie);
 	}
 	return;

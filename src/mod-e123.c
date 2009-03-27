@@ -345,14 +345,16 @@ ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
 		cp_trie_prefix_match(loc_trie, inbuf, (void*)&fmtvec);
 	}
 #endif	/* UNNAUGHTIFY */
-	if (UNLIKELY(fmtvec == NULL)) {
-		/* return a not-found? */
-		return 0;
-	}
 	/* sequence of possible format info */
 	resbuf[0] = UDPC_TYPE_SEQOF;
 	/* the number of info */
-	resbuf[1] = fmtvec->nfmts;
+	if (LIKELY(fmtvec != NULL)) {
+		resbuf[1] = fmtvec->nfmts;
+	} else {
+		/* return a not-found */
+		resbuf[1] = 0;
+		return 2;
+	}
 	/* e123ify at least once */
 	resbuf += (totlen = __e123ify_1(resbuf + 2, inbuf, fmtvec->fmts));
 	/* traverse the rest */
@@ -381,10 +383,8 @@ f5e_e123ify(job_t j)
 
 	/* generate the answer packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));
-
-	if ((pktlen = ud_5e_e123ify_job(rb, ib)) == 0) {
-		return;
-	}
+	/* divert now */
+	pktlen = ud_5e_e123ify_job(rb, ib);
 	/* compute the overall length */
 	j->blen = PAYLOAD_OFFSET + pktlen;
 

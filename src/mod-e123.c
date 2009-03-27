@@ -300,6 +300,34 @@ move:
 #endif	/* UNNAUGHTIFY */
 
 
+/* dump tries */
+typedef cp_trie_node *trie_node_t;
+static void
+__dump_trie_node(char *restrict resbuf, trie_node_t node, const char *pre)
+{
+	mtab_node *map_node;
+
+	/* brag about ourself first */
+	fprintf(stderr, "%s%s\n", pre, node->leaf ? node->leaf : "");
+	for (int i = 0; i < node->others->size; i++) {
+		map_node = node->others->table[i];
+		while (map_node) {
+			__dump_trie_node(resbuf, map_node->value, map_node->attr);
+			map_node = map_node->next;
+		}
+	}
+	return;
+}
+
+static void
+dump_trie(char *restrict resbuf)
+{
+	fprintf(stderr, "dumping\n");
+	__dump_trie_node(resbuf, loc_trie->root, "");
+	return;
+}
+
+
 /* public job fun, as announced in unserding-private.h */
 static uint8_t
 ud_5e_e123ify_job(char *restrict resbuf, /*const*/ char *inbuf)
@@ -345,6 +373,11 @@ f5e_e123ify(job_t j)
 	uint8_t pktlen;
 	char *restrict rb = &j->buf[PAYLOAD_OFFSET];
 	char *ib = &j->buf[WS_OFFSET];
+
+	if (UNLIKELY(rb[0] != UDPC_TYPE_STRING)) {
+		dump_trie(rb);
+		return;
+	}
 
 	/* generate the answer packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));

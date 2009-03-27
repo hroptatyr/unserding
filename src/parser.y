@@ -252,6 +252,13 @@ impo_cmd:
 TOK_IMPORT;
 
 e123_cmd:
+TOK_E123 {
+	/* just dump */
+	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_CHAR;
+	hdl->pktchn[0].pbuf[9] = '\0';
+	/* length is exactly 10 */
+	hdl->pktchn[0].plen = 10;
+} |
 TOK_E123 TOK_STRING {
 	/* init the seqof counter */
 	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_STRING;

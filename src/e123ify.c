@@ -134,9 +134,8 @@ usefulp(ud_packet_t pkt, void *closure)
 	if (udpc_pkt_cno(pkt) != cno) {
 		/* it's not our convo */
 		return false;
-	}
-	if (pkt.pbuf[8] != UDPC_TYPE_SEQOF || pkt.pbuf[9] == 0x00) {
-		/* answer is empty */
+	} else if (udpc_pkt_cmd(pkt) != UDPC_PKT_E123_RPL) {
+		/* it's not a E123 reply */
 		return false;
 	}
 	return true;

@@ -19,21 +19,7 @@ unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c arrqueue.c
 unserdingd_SOURCES += catalogue.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
-unserdingd_LDADD = $(LIBEV_LIBS) $(LIBPFACK_LIBS)
-## additional modules
-unserdingd_SOURCES += mod-pseu-index.c
-if USE_MYSQL
-unserdingd_CPPFLAGS += $(LIBPFACK_CPPFLAGS)
-unserdingd_LDFLAGS += $(LIBPFACK_LDFLAGS)
-unserdingd_LDADD += -lpfack-mysql
-## additional modules
-unserdingd_SOURCES += mod-interests.c
-endif
-## and yet more modules, 4217 (ccys)
-unserdingd_SOURCES += mod-instr-fx.c
-## service modules
-unserdingd_SOURCES += mod-e123.c
-unserdingd_LDADD += -lcprops
+unserdingd_LDADD = $(LIBEV_LIBS)
 
 ## the main server binary
 unsercli_SOURCES = unsercli.c stdin.c
@@ -73,9 +59,8 @@ keywords.c: keywords.perf
 
 ## the lib
 libunserding_la_SOURCES = libstuff.c protocore.c catalogue.c
-libunserding_la_CPPFLAGS = -DUNSERLIB $(LIBPFACK_CPPFLAGS)
-libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(LIBPFACK_LDFLAGS)
-libunserding_la_LIBADD = $(LIBPFACK_LIBS)
+libunserding_la_CPPFLAGS = -DUNSERLIB
+libunserding_la_LDFLAGS = $(AM_LDFLAGS)
 
 ## kick
 libtest_SOURCES = libtest.c

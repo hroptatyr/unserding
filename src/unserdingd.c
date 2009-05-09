@@ -79,8 +79,6 @@
 #include "unserding-private.h"
 /* proto stuff */
 #include "protocore.h"
-/* catalogue stuff */
-#include "catalogue.h"
 
 #define USE_COROUTINES		1
 
@@ -384,8 +382,6 @@ main(int argc, char *argv[])
 	/* initialise the proto core */
 	init_proto();
 
-	/* initialise instruments */
-	instruments = make_catalogue();
 	/* initialise interests module */
 	mod_interests_LTX_init();
 	mod_pseu_index_LTX_init();

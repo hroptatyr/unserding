@@ -16,7 +16,7 @@ noinst_HEADERS = arrqueue.h protocore-private.h
 
 ## the main server binary
 unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c arrqueue.c
-unserdingd_SOURCES += catalogue.c
+unserdingd_SOURCES +=
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
 unserdingd_LDADD = $(LIBEV_LIBS)
@@ -24,7 +24,7 @@ unserdingd_LDADD = $(LIBEV_LIBS)
 ## the main server binary
 unsercli_SOURCES = unsercli.c stdin.c
 unsercli_SOURCES += scanner.l parser.y keywords.c
-unsercli_SOURCES += protocore.c catalogue.c
+unsercli_SOURCES += protocore.c
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_YFLAGS = -d -p "cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
@@ -58,7 +58,7 @@ keywords.c: keywords.perf
 	fi
 
 ## the lib
-libunserding_la_SOURCES = libstuff.c protocore.c catalogue.c
+libunserding_la_SOURCES = libstuff.c protocore.c
 libunserding_la_CPPFLAGS = -DUNSERLIB
 libunserding_la_LDFLAGS = $(AM_LDFLAGS)
 

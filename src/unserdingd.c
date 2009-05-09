@@ -35,12 +35,24 @@
  *
  ***/
 
-#include "config.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <unistd.h>
-#include <stdbool.h>
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif
+#if defined HAVE_STDLIB_H
+# include <stdlib.h>
+#endif
+#if defined HAVE_STDIO_H
+# include <stdio.h>
+#endif
+#if defined HAVE_STDDEF_H
+# include <stddef.h>
+#endif
+#if defined HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+#if defined HAVE_STDBOOL_H
+# include <stdbool.h>
+#endif
 
 #if defined HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
@@ -57,7 +69,9 @@
 #if defined HAVE_ERRNO_H
 # include <errno.h>
 #endif
-#include <fcntl.h>
+#if defined HAVE_FCNTL_H
+# include <fcntl.h>
+#endif
 
 /* our master include file */
 #include "unserding.h"

@@ -59,225 +59,11 @@
 
 #if defined UNSERSRV
 /**
- * Big array with worker functions.
- * 256 families should suffice methinks. */
-extern ud_pktfam_t ud_pktfam[];
-/**
- * Family 00, general adminitrative procedures. */
-extern ud_pktwrk_f ud_fam00[];
-/**
- * Family 01, catalogue procs. */
-extern ud_pktwrk_f ud_fam01[];
-/**
- * Family 7e, test stuff. */
-extern ud_pktwrk_f ud_fam7e[];
-
-/**
- * Family 5e, additional services */
-extern ud_pktwrk_f ud_fam5e[];
-
-
-ud_pktfam_t ud_pktfam[128] = {
-	/* family 0 */
-	ud_fam00,
-	ud_fam01,
-	NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	/* fam 16 */
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	/* fam 32 */
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	/* fam 48 */
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	/* fam 64 */
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	/* fam 80 */
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, ud_fam5e, NULL,
-	/* fam 96 */
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	/* fam 112 */
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL,
-	NULL, NULL, ud_fam7e, NULL,
-};
-
-/* forwarders */
-static void f00_hy(job_t j);
-static void f00_hy_rpl(job_t j);
-
-ud_pktwrk_f ud_fam00[256] = {
-	f00_hy, f00_hy_rpl,
-};
-
-static void f01_ignore_rpl(job_t j);
-
-ud_pktwrk_f ud_fam01[256] = {
-	NULL, f01_ignore_rpl,
-	NULL, f01_ignore_rpl,
-};
-
-static void f7e_54(job_t j);
-
-ud_pktwrk_f ud_fam7e[256] = {
-	/* 0 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 16 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 32 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 48 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 64 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 80 */
-	NULL, NULL, NULL, NULL, f7e_54, NULL /* no rpl */, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-};
-
-ud_pktwrk_f ud_fam5e[256] = {
-	/* 0 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 16 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 32 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 48 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 64 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	/* 80 */
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-};
-
-
-/* family 00 */
-
-/* HY packet */
-static size_t neighbours = 0;
-
-#define MAXHOSTNAMELEN		64
-/* text section */
-unsigned char hnlen;
-static char hn[MAXHOSTNAMELEN] = "";
-
-static void
-f00_hy(job_t j)
-{
-	UD_DEBUG_PROTO("found HY\n");
-	/* generate the answer packet */
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	UD_DEBUG_PROTO("sending HY RPL\n");
-	/* just say that there's more in this packet which is a string */
-	j->buf[8] = UDPC_TYPE_STRING;
-	/* attach the hostname now */
-	j->buf[9] = hnlen;
-	memcpy(j->buf + 10, hn, hnlen);
-	j->blen = 8 + 1 + 1 + hnlen;
-	/* initialise the neighbours counter */
-	neighbours = 0;
-	/* and send him back */
-	send_cl(j);
-	return;
-}
-
-/* handle the HY RPL packet */
-static void
-f00_hy_rpl(job_t j)
-{
-	UD_DEBUG_PROTO("found HY RPL\n");
-	neighbours++;
-	return;
-}
-
-static void
-f7e_54(job_t j)
-{
-	/* just a 2.5 seconds delayed HY */
-	usleep(2500000);
-	/* generate the answer packet */
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	j->buf[8] = UDPC_TYPE_UNK;
-	j->blen = 9;
-	UD_DEBUG_PROTO("sending 54 RPL\n");
-	/* and send him back */
-	send_cl(j);
-	return;
-}
-
-/* generic ignorer */
-static void __attribute__((unused))
-f01_ignore_rpl(job_t j)
-{
-	/* just ignore hime */
-	return;
-}
-
-#if 0
-extern bool ud_cat_ls_job(job_t j);
-
-static void
-f01_ls(job_t j)
-{
-	bool morep;
-	do {
-		morep = ud_cat_ls_job(j);
-		/* and send him back */
-		send_cl(j);
-	} while (morep);
-	return;
-}
-#endif
-
-#if 0
-extern bool ud_cat_cat_job(job_t j);
-
-static void
-f01_cat(job_t j)
-{
-	bool morep;
-	do {
-		morep = ud_cat_cat_job(j);
-		/* and send him back */
-		send_cl(j);
-	} while (morep);
-	return;
-}
-#endif
-
-
-/* family 01 */
+ * Big array with worker functions, aka services.
+ * For now we support 65536 services, of which only the even ones may be
+ * used to raise questions to the service and the next odd one will be
+ * the reply. */
+static ud_pktwrk_f ud_services[65536];
 
 
 void
@@ -421,13 +207,13 @@ __fprint_one(const char *buf, FILE *fp)
 	uint16_t len = 0;
 
 	switch ((udpc_type_t)buf[0]) {
-	case UDPC_TYPE_STRING:
+	case UDPC_TYPE_STR:
 		fputs("(string)", fp);
 		ud_fputs(buf[1], &buf[2], fp);
 		len = buf[1] + 2;
 		break;
 
-	case UDPC_TYPE_VOID:
+	case UDPC_TYPE_VAR:
 		fputs("(data)", fp);
 		for (uint8_t i = 2; i < buf[1] + 2; i++) {
 			fprintf(fp, "(%02x)", buf[i]);
@@ -435,44 +221,20 @@ __fprint_one(const char *buf, FILE *fp)
 		len = buf[1] + 2;
 		break;
 
-	case UDPC_TYPE_SEQOF:
+	case UDPC_TYPE_SEQ:
 		fprintf(fp, "(seqof(#%d))", buf[1]);
 		len = 2;
-		if ((uint8_t)buf[len-1] == 0 ||
-		    (udpc_type_t)buf[len] != UDPC_TYPE_CATOBJ) {
-			break;
-		}
-		/* otherwise use fall-through */
 
-	case UDPC_TYPE_CATOBJ:
-		fputs("\n(catobj)", fp);
-		/* byte at offs 1 is the number of catobjs */
-		len += 2;
-		if ((uint8_t)buf[len-1] == 0 ||
-		    (udpc_type_t)buf[len] != UDPC_TYPE_KEYVAL) {
-			break;
-		}
-		/* otherwise use fall-through */
-
-	case UDPC_TYPE_KEYVAL:
-		fputs("(tlv)", fp);
-		len++;
-		abort();
-		break;
-
-	case UDPC_TYPE_PFINSTR:
-		fputs("\n(pfinstr)", fp);
-		len = 1;
-		break;
-
-	case UDPC_TYPE_DWORD: {
+	case UDPC_TYPE_SI32:
+	case UDPC_TYPE_UI32: {
 		unsigned int dw = *(const unsigned int*const)&buf[1];
 		fprintf(fp, "(dword)%08x", dw);
 		len = 1 + sizeof(dw);
 		break;
 	}
 
-	case UDPC_TYPE_WORD: {
+	case UDPC_TYPE_SI16:
+	case UDPC_TYPE_UI16: {
 		short unsigned int dw = *(const unsigned int*const)&buf[1];
 		fprintf(fp, "(word)%04x", dw);
 		len = 1 + sizeof(dw);

@@ -1,6 +1,6 @@
 /*** protocore.h -- unserding protocol guts
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008, 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
@@ -67,44 +67,26 @@
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
 
 typedef uint8_t udpc_type_t;
-enum udpc_type_e {
-	UDPC_TYPE_UNK,
-	/* fixed size types */
-	UDPC_TYPE_CHAR,
-	UDPC_TYPE_WORD,
-	UDPC_TYPE_DWORD,
-	UDPC_TYPE_QWORD,
-	UDPC_TYPE_SFLOAT,
-	UDPC_TYPE_DFLOAT,
-	/* ffff's monetary32_t */
-	UDPC_TYPE_MON32,
-	/* ffff's monetary64_t */
-	UDPC_TYPE_MON64,
-	/* variadic stuff */
-	/* expects a uint8_t following designating the length */
-	/* 9 */
-	UDPC_TYPE_STRING,
-	/* 10, like STRING but for arbitrary data */
-	UDPC_TYPE_VOID,
-	/* simplistic date, days since epoch, 16bit */
-	UDPC_TYPE_DATE_DSE,
-	/* simplistic date, seconds since epoch, 32bit */
-	UDPC_TYPE_DATE_SSE,
 
-	/* seq types */
-	/* seqof type modifies an upcoming type to be a seq of that type
-	 * syntax goes: <seqof> <length> <obj> <obj> ...
-	 * the type is to be obtained through <obj> type designator. */
-	UDPC_TYPE_SEQOF,
-	/* catobjs are actually sequences of keyval pairs
-	 * syntax goes: <catobj> <number-of(keyval-pairs)> ... */
-	UDPC_TYPE_CATOBJ,
-	/* a keyval pair */
-	UDPC_TYPE_KEYVAL,
-	/* instrument serialisation, 0x0f */
-	UDPC_TYPE_PFINSTR,
-	UDPC_TYPE_MDDLINSTR,
-};
+/* using dbus notation */
+#define UDPC_TYPE_UNK	'\0'
+#define UDPC_TYPE_BYTE	'y'
+#define UDPC_TYPE_BOOL	'b'
+#define UDPC_TYPE_SI16	'n'
+#define UDPC_TYPE_UI16	'q'
+#define UDPC_TYPE_SI32	'i'
+#define UDPC_TYPE_UI32	'u'
+#define UDPC_TYPE_SI64	'x'
+#define UDPC_TYPE_UI64	't'
+#define UDPC_TYPE_FLTS	'f'
+#define UDPC_TYPE_FLTD	'd'
+
+/* variadic ones */
+#define UDPC_TYPE_STR	's'
+#define UDPC_TYPE_SIG	'g'
+#define UDPC_TYPE_SEQ	'a'
+#define UDPC_TYPE_REC	'r'
+#define UDPC_TYPE_VAR	'v'
 
 
 /* commands */

@@ -1,6 +1,6 @@
 /*** protocore.c -- unserding protocol guts
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008, 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
@@ -35,7 +35,9 @@
  *
  ***/
 
-#include "config.h"
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -53,7 +55,6 @@
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"
-#include "catalogue.h"
 #include "protocore-private.h"
 
 #if defined UNSERSRV
@@ -130,12 +131,10 @@ ud_pktwrk_f ud_fam00[256] = {
 };
 
 static void f01_ignore_rpl(job_t j);
-static void f01_ls(job_t j);
-static void f01_cat(job_t j);
 
 ud_pktwrk_f ud_fam01[256] = {
-	f01_ls, f01_ignore_rpl,
-	f01_cat, f01_ignore_rpl,
+	NULL, f01_ignore_rpl,
+	NULL, f01_ignore_rpl,
 };
 
 static void f7e_54(job_t j);
@@ -245,6 +244,7 @@ f01_ignore_rpl(job_t j)
 	return;
 }
 
+#if 0
 extern bool ud_cat_ls_job(job_t j);
 
 static void
@@ -258,7 +258,9 @@ f01_ls(job_t j)
 	} while (morep);
 	return;
 }
+#endif
 
+#if 0
 extern bool ud_cat_cat_job(job_t j);
 
 static void
@@ -272,6 +274,7 @@ f01_cat(job_t j)
 	} while (morep);
 	return;
 }
+#endif
 
 
 /* family 01 */
@@ -454,7 +457,7 @@ __fprint_one(const char *buf, FILE *fp)
 	case UDPC_TYPE_KEYVAL:
 		fputs("(tlv)", fp);
 		len++;
-		len += ud_fprint_tlv(&buf[len], fp);
+		abort();
 		break;
 
 	case UDPC_TYPE_PFINSTR:

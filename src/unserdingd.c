@@ -1,6 +1,6 @@
 /*** unserdingd.c -- unserding network service daemon
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008, 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
@@ -71,6 +71,9 @@
 #endif
 #if defined HAVE_FCNTL_H
 # include <fcntl.h>
+#endif
+#if defined HAVE_POPT_H || 1
+# include <popt.h>
 #endif
 
 /* our master include file */
@@ -382,6 +385,7 @@ main(int argc, char *argv[])
 	/* initialise the proto core */
 	init_proto();
 
+#if 0
 	/* initialise interests module */
 	mod_interests_LTX_init();
 	mod_pseu_index_LTX_init();
@@ -389,6 +393,7 @@ main(int argc, char *argv[])
 	mod_instr_fx_LTX_init();
 	/* initialise module for e.123ification */
 	mod_e123_LTX_init();
+#endif
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);

@@ -63,9 +63,16 @@
 #endif
 /* posix */
 #include <pwd.h>
+#define USE_READLINE	1
+#if USE_READLINE
 /* gnu readline */
-#include <readline/readline.h>
-#include <readline/history.h>
+# include <readline/readline.h>
+# include <readline/history.h>
+#else
+/* bsd's editline */
+# include <editline.h>
+# include <histedit.h>
+#endif	/* USE_READLINE */
 /* our master include */
 #include "unserding.h"
 #include "unserding-private.h"
@@ -83,7 +90,7 @@ static char histfile[256];
 
 /* string goodies */
 static void
-handle_rl(char *line)
+handle_el(char *line)
 {
 	/* print newline */
 	if (UNLIKELY(line == NULL)) {
@@ -153,9 +160,22 @@ stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 }
 
 
+#if !USE_READLINE
+static void *hist;
+static void *el;
+static HistEvent histev;
+
+static char*
+prompt(void *p)
+{
+	return "unserding> ";
+}
+#endif
+
 static int
 stdin_listener_init(void)
 {
+#if USE_READLINE
 	/* initialise the readline */
 	rl_readline_name = "unserding";
 	rl_attempted_completion_function = NULL;
@@ -164,11 +184,25 @@ stdin_listener_init(void)
 	rl_catch_signals = 0;
 
 	/* the callback */
-	rl_callback_handler_install("unserding> ", handle_rl);
+	rl_callback_handler_install("unserding> ", handle_el);
 
 	/* load the history file */
 	(void)read_history(histfile);
 	history_set_pos(history_length);
+#else  /* !USE_READLINE */
+	/* initialise editline */
+	el = el_init("unsercli", stdin, stdout, stderr);
+	/* set the prompt function */
+	el_set(el, EL_PROMPT, prompt);
+	el_set(el, EL_EDITOR, "emacs");
+	el_set(el, EL_SIGNAL, 0);
+
+	/* load the history file */
+	hist = history_init();
+	history(hist, &histev, HIST_LOAD, histfile);
+	/* tell editline to use this history */
+	el_set(el, EL_HIST, history, hist);
+#endif	/* USE_READLINE */
 
 	/* succeeded if == 0 */
 	return STDIN_FILENO;
@@ -178,10 +212,15 @@ static void
 stdin_listener_deinit(EV_P_ int sock)
 {
 	UD_DEBUG_STDIN("deinitialising readline\n");
+#if USE_READLINE
 	rl_callback_handler_remove();
 
 	/* save the history file */
-	(void)write_history(histfile)
+	(void)write_history(histfile);
+#else  /* !USE_READLINE */
+	history(hist, &histev, HIST_SAVE, histfile);
+	history_end(hist);
+#endif	/* USE_READLINE */
 
 	UD_DEBUG_STDIN("closing listening socket %d...\n", sock);
 	shutdown(sock, SHUT_RDWR);

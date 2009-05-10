@@ -169,6 +169,9 @@ dnl fi
 dnl AC_CHECK_PFACK
 dnl AC_DEFINE([WITH_PFACK], [1], [Whether libpfack support library is requested.])
 
+PKG_CHECK_MODULES([LIBEDIT], [libedit])
+
+
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([unserding.pc])

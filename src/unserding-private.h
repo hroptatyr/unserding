@@ -200,7 +200,13 @@ __ud_log(const char *restrict fmt, ...)
 #endif	/* UNSERSRV */
 
 
-#include "arrqueue.h"
+#define USE_ARRPQ	0
+
+#if USE_ARRPQ
+# include "arrqueue.h"
+#else
+# include "dllqueue.h"
+#endif
 
 /* job queue magic */
 /* we use a fairly simplistic approach: one vector with two index pointers */
@@ -250,10 +256,17 @@ struct job_s {
 	SIZEOF_JOB_S - offsetof(struct job_s, buf)
 
 struct job_queue_s {
+#if USE_ARRPQ
 	/* the queue for the workers */
 	arrpq_t wq;
 	/* the queue for free jobs */
 	arrpq_t fq;
+#else  /* !USE_ARRPQ */
+	/* the queue for the workers */
+	dllpq_t wq;
+	/* the queue for free jobs */
+	dllpq_t fq;
+#endif	/* USE_ARRPQ */
 	/* the jobs vector */
 	struct job_s jobs[NJOBS] __attribute__((aligned(16)));
 };
@@ -310,7 +323,11 @@ static inline job_t __attribute__((always_inline, gnu_inline))
 make_job(void)
 {
 	/* dequeue from the free queue */
+#if USE_ARRPQ
 	return arrpq_dequeue(glob_jq->fq);
+#else
+	return dllpq_dequeue(glob_jq->fq);
+#endif
 }
 
 static inline void __attribute__((always_inline, gnu_inline))
@@ -318,7 +335,11 @@ free_job(job_t j)
 {
 	/* enqueue in the free queue */
 	memset(j, 0, SIZEOF_JOB_S);
+#if USE_ARRPQ
 	arrpq_enqueue(glob_jq->fq, j);
+#else
+	dllpq_enqueue(glob_jq->fq, j);
+#endif
 	return;
 }
 
@@ -326,7 +347,11 @@ static inline void __attribute__((always_inline, gnu_inline))
 enqueue_job(job_queue_t jq, job_t j)
 {
 	/* enqueue in the worker queue */
+#if USE_ARRPQ
 	arrpq_enqueue(jq->wq, j);
+#else
+	dllpq_enqueue(jq->wq, j);
+#endif
 	return;
 }
 
@@ -334,7 +359,11 @@ static inline job_t __attribute__((always_inline, gnu_inline))
 dequeue_job(job_queue_t jq)
 {
 	/* dequeue from the worker queue */
+#if USE_ARRPQ
 	return arrpq_dequeue(jq->wq);
+#else
+	return dllpq_dequeue(jq->wq);
+#endif
 }
 
 /* helper macro to use a job as packet */
@@ -342,6 +371,28 @@ dequeue_job(job_queue_t jq)
 /* helper macro to use a char buffer as packet */
 #define BUF_PACKET(b)	((ud_packet_t){.plen = countof(b), .pbuf = b})
 #define PACKET(a, b)	((ud_packet_t){.plen = a, .pbuf = b})
+
+static void __attribute__((unused))
+init_glob_jq(job_queue_t q)
+{
+	glob_jq = q;
+#if USE_ARRPQ
+	glob_jq->wq = make_arrpq(NJOBS);
+	glob_jq->fq = make_arrpq(NJOBS);
+#else
+	glob_jq->wq = make_dllpq(NJOBS);
+	glob_jq->fq = make_dllpq(NJOBS);
+#endif
+	/* enqueue all jobs in the free queue */
+	for (int i = 0; i < NJOBS; i++) {
+#if USE_ARRPQ
+		arrpq_enqueue(glob_jq->fq, &glob_jq->jobs[i]);
+#else
+		dllpq_enqueue(glob_jq->fq, &glob_jq->jobs[i]);
+#endif
+	}
+	return;
+}
 
 /**
  * Job that looks up the parser routine in ud_parsef(). */

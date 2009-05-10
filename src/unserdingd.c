@@ -294,19 +294,6 @@ mod_interests_LTX_init(void)
 	return;
 }
 
-static void
-init_glob_jq(void)
-{
-	glob_jq = &__glob_jq;
-	glob_jq->wq = make_arrpq(NJOBS);
-	glob_jq->fq = make_arrpq(NJOBS);
-	/* enqueue all jobs in the free queue */
-	for (int i = 0; i < NJOBS; i++) {
-		arrpq_enqueue(glob_jq->fq, &glob_jq->jobs[i]);
-	}
-	return;
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -327,7 +314,7 @@ main(int argc, char *argv[])
 	loop = ev_default_loop(0);
 
 	/* initialise global job q */
-	init_glob_jq();
+	init_glob_jq(&__glob_jq);
 
 	/* initialise the proto core */
 	init_proto();

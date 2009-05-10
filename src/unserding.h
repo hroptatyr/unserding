@@ -58,20 +58,6 @@
  * Flags. */
 typedef long unsigned int ud_flags_t;
 
-/**
- * The catalogue data type. */
-typedef struct ud_cat_s *ud_cat_t;
-
-/** Flag to indicate this is merely a `branch holder'. */
-#define UD_CF_JUSTCAT		0x01
-/** Flag to indicate a spot value could be obtained (current quote). */
-#define UD_CF_SPOTTABLE		0x02
-/** Flag to indicate a bid and ask price could be obtained. */
-#define UD_CF_TRADABLE		0x04
-/** Flag to indicate a last trade can be obtained. */
-#define UD_CF_LAST		0x08
-/** Flag to indicate */
-
 
 /**
  * Connexion handle to an unserding network.
@@ -105,6 +91,8 @@ typedef uint32_t ud_pkt_no_t;
  * Predicate function for packets. */
 typedef bool(*ud_pred_f)(const ud_packet_t pkt, void* clo);
 
+/**
+ * Struct to handle conversations. */
 struct ud_handle_s {
 	/** Conversation number. */
 	ud_convo_t convo;
@@ -168,26 +156,5 @@ ud_handle_sock(ud_handle_t hdl)
 {
 	return hdl->sock;
 }	
-
-
-/* catalogue codswallop */
-typedef uint8_t ud_tag_t;
-typedef struct ud_catobj_s *ud_catobj_t;
-
-extern void *instruments;
-
-/* catalogue entries look like this
- * basically a proper tlv cell except sometimes the length is implicit */
-typedef struct ud_tlv_s *ud_tlv_t;
-typedef struct ud_tlvcons_s *ud_tlvcons_t;
-
-
-extern void ud_cat_add_obj(ud_catobj_t co);
-
-/* some convenience funs */
-extern void *ud_cat_ls_by_gaid(ud_handle_t hdl, unsigned int gaid);
-
-/* instruments */
-extern void init_instr(void);
 
 #endif	/* INCLUDED_unserding_h_ */

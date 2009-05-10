@@ -38,11 +38,24 @@
 #if !defined INCLUDED_unserding_private_h_
 #define INCLUDED_unserding_private_h_
 
-#include <pthread.h>
-#include <string.h>
-#include <stdint.h>
-#include <stdarg.h>
-#include <unistd.h>
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif
+#if defined HAVE_PTHREAD_H
+# include <pthread.h>
+#endif
+#if defined HAVE_STRING_H
+# include <string.h>
+#endif
+#if defined HAVE_STDINT_H
+# include <stdint.h>
+#endif
+#if defined HAVE_STDARG_H
+# include <stdarg.h>
+#endif
+#if defined HAVE_UNISTD_H
+# include <unistd.h>
+#endif
 
 #if defined HAVE_EV_H
 # include <ev.h>

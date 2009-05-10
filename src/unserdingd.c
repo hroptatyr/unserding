@@ -83,12 +83,7 @@
 /* proto stuff */
 #include "protocore.h"
 
-#define USE_COROUTINES		1
-
 FILE *logout;
-
-/* the catalogue of instruments */
-void *instruments;
 
 
 typedef struct ud_worker_s *ud_worker_t;
@@ -101,14 +96,6 @@ struct ud_ev_async_s {
 
 struct ud_worker_s {
 	pthread_t ALGN16(thread);
-#if !USE_COROUTINES
-	/* the loop we live on */
-	struct ev_loop *loop;
-	/* a watcher for worker jobs */
-	struct ev_async ALGN16(work_watcher);
-	/* a watcher for harakiri orders */
-	struct ev_async ALGN16(kill_watcher);
-#endif	/* !USE_COROUTINES */
 } __attribute__((aligned(16)));
 
 
@@ -126,42 +113,28 @@ static index_t rr_wrk = 0;
 /* the workers array */
 static struct ud_worker_s __attribute__((aligned(16))) workers[NWORKERS];
 
-#if USE_COROUTINES
 static struct ev_loop *secl;
 /* a watcher for worker jobs */
 struct ev_async ALGN16(work_watcher);
 /* a watcher for harakiri orders */
 struct ev_async ALGN16(kill_watcher);
-#endif	/* USE_COROUTINES */
 
 static inline struct ev_loop __attribute__((always_inline, gnu_inline)) *
 worker_loop(ud_worker_t wk)
 {
-#if USE_COROUTINES
 	return secl;
-#else  /* !USE_COROUTINES */
-	return wk->loop;
-#endif	/* USE_COROUTINES */
 }
 
 static inline struct ev_async __attribute__((always_inline, gnu_inline)) *
 worker_workw(ud_worker_t wk)
 {
-#if USE_COROUTINES
 	return &work_watcher;
-#else  /* !USE_COROUTINES */
-	return &wk->work_watcher;
-#endif	/* USE_COROUTINES */
 }
 
 static inline struct ev_async __attribute__((always_inline, gnu_inline)) *
 worker_killw(ud_worker_t wk)
 {
-#if USE_COROUTINES
 	return &kill_watcher;
-#else  /* !USE_COROUTINES */
-	return &wk->kill_watcher;
-#endif	/* USE_COROUTINES */
 }
 
 /* the global job queue */
@@ -173,15 +146,8 @@ inline void __attribute__((always_inline, gnu_inline))
 trigger_job_queue(void)
 {
 	/* look what we can do */
-#if USE_COROUTINES
 	/* easy */
 	ev_async_send(secl, &work_watcher);
-#else  /* !USE_COROUTINES */
-	/* resort to our round robin */
-	ev_async_send(workers[rr_wrk].loop, &workers[rr_wrk].work_watcher);
-	/* step the round robin */
-	rr_wrk = (rr_wrk + 1) % NWORKERS;
-#endif
 	return;
 }
 
@@ -262,21 +228,6 @@ add_worker(struct ev_loop *loop)
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-	/* use the existing  */
-#if !USE_COROUTINES
-	wk->loop = loop;
-	{
-		ev_async *eva = &wk->work_watcher;
-		ev_async_init(eva, worker_cb);
-		ev_async_start(wk->loop, eva);
-	}
-	{
-		ev_async *eva = &wk->kill_watcher;
-		ev_async_init(eva, kill_cb);
-		ev_async_start(wk->loop, eva);
-	}
-#endif	/* !USE_COROUTINES */
-
 	/* start the thread now */
 	pthread_create(&wk->thread, &attr, worker, wk);
 
@@ -290,10 +241,6 @@ kill_worker(ud_worker_t wk)
 {
 	/* send a lethal signal to the workers and detach */
 	ev_async_send(worker_loop(wk), worker_killw(wk));
-#if !USE_COROUTINES
-	pthread_join(wk->thread, NULL);
-	ev_loop_destroy(worker_loop(wk));
-#endif
 	return;
 }
 
@@ -412,7 +359,6 @@ main(int argc, char *argv[])
 	ev_async_init(glob_notify, triv_cb);
 	ev_async_start(EV_A_ glob_notify);
 
-#if USE_COROUTINES
 	/* create one loop for all threads */
 	secl = ev_loop_new(0);
 	{
@@ -425,13 +371,8 @@ main(int argc, char *argv[])
 		ev_async_init(eva, kill_cb);
 		ev_async_start(secl, eva);
 	}
-#endif	/* USE_COROUTINES */
 	/* set up the worker threads along with their secondary loops */
 	for (index_t i = 0; i < NWORKERS; i++) {
-#if !USE_COROUTINES
-		/* in case of no coroutines create the secondary loop here */
-		struct ev_loop *secl = ev_loop_new(0);
-#endif	/* !USE_COROUTINES */
 		add_worker(secl);
 	}
 
@@ -454,7 +395,6 @@ main(int argc, char *argv[])
 		UD_DEBUG("killing worker %lu\n", (long unsigned int)i - 1);
 		kill_worker(&workers[i-1]);
 	}
-#if USE_COROUTINES
 	for (index_t i = NWORKERS; i > 0; i--) {
 		UD_DEBUG("killing worker %lu\n", (long unsigned int)i - 1);
 		kill_worker(&workers[i-1]);
@@ -466,7 +406,6 @@ main(int argc, char *argv[])
 	}
 	/* destroy the secondary loop */
 	ev_loop_destroy(secl);
-#endif	/* USE_COROUTINES */
 
 	/* destroy the default evloop */
 	ev_default_destroy();

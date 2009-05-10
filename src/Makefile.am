@@ -23,7 +23,7 @@ unserdingd_LDADD = $(LIBEV_LIBS)
 
 ## the main server binary
 unsercli_SOURCES = unsercli.c stdin.c
-unsercli_SOURCES += scanner.l parser.y keywords.c
+unsercli_SOURCES += scanner.l parser.y
 unsercli_SOURCES += protocore.c
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_YFLAGS = -d -p "cli_yy"
@@ -41,21 +41,21 @@ unsercli-scanner.h: scanner.l
 	test -e lex.yy.h && mv lex.yy.h $@
 
 ## gperf baloney
-GPERF = gperf
-GPERFFLAGS = --multiple-iterations=8 --language=ANSI-C
-BUILT_SOURCES += keywords.c
-CLEANFILES += keywords.c keywords.c.tmp
-## gperf target
-keywords.c: keywords.perf
-	if $(GPERF) $(GPERFFLAGS) $< > $@.tmp; then \
-		mv $@.tmp $@; \
-	elif $(GPERF) --version >/dev/null 2>&1; then \
-		rm $@.tmp; \
-		exit 1; \
-	else \
-		rm $@.tmp; \
-		touch $@; \
-	fi
+#GPERF = gperf
+#GPERFFLAGS = --multiple-iterations=8 --language=ANSI-C
+#BUILT_SOURCES += keywords.c
+#CLEANFILES += keywords.c keywords.c.tmp
+### gperf target
+#keywords.c: keywords.perf
+#	if $(GPERF) $(GPERFFLAGS) $< > $@.tmp; then \
+#		mv $@.tmp $@; \
+#	elif $(GPERF) --version >/dev/null 2>&1; then \
+#		rm $@.tmp; \
+#		exit 1; \
+#	else \
+#		rm $@.tmp; \
+#		touch $@; \
+#	fi
 
 ## the lib
 libunserding_la_SOURCES = libstuff.c protocore.c

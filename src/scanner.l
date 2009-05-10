@@ -56,12 +56,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct cli_yystype_s {
-	long int slen;
-	const char *sval;
-};
-#define YYSTYPE			struct cli_yystype_s
-
+#include "cli-common.h"
 #include "unsercli-parser.h"
 
 extern int cli_yyget_column(yyscan_t);

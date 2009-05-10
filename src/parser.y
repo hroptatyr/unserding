@@ -54,7 +54,6 @@
 #include "unserding-private.h"
 #include "protocore.h"
 #include "protocore-private.h"
-#include "catalogue.h"
 
 #if 0
 #if !defined xmalloc
@@ -86,11 +85,7 @@ extern int cli_yyparse(void *scanner, ud_handle_t hdl);
 #define YYENABLE_NLS		0
 #define YYLTYPE_IS_TRIVIAL	1
 
-struct cli_yystype_s {
-	long int slen;
-	const char *sval;
-};
-#define YYSTYPE			struct cli_yystype_s
+#include "cli-common.h"
 
 
 /* these delcarations are provided to suppress compiler warnings */
@@ -277,17 +272,21 @@ key val;
 
 key:
 TOK_KEY {
+#if 0
 	ud_tag_t t = ud_tag_from_s(yylval.sval, yylval.slen);
 	hdl->pktchn[0].pbuf[hdl->pktchn[0].plen++] = t;
+#endif
 };
 
 val:
 TOK_VAL {
+#if 0
 	char *restrict pbuf = &hdl->pktchn[0].pbuf[hdl->pktchn[0].plen];
 	hdl->pktchn[0].plen +=
 		ud_disp_tag(pbuf, *(pbuf-1), yylval.sval, yylval.slen);
 	/* inc the seqof counter */
 	hdl->pktchn[0].pbuf[9]++;
+#endif
 };
 
 %%

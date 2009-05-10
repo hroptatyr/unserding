@@ -124,6 +124,7 @@ rplpkt_cb(EV_P_ ev_io *w, int revents)
 
 
 /* parser madness */
+#include "cli-common.h"
 #include "unsercli-parser.h"
 #include "unsercli-scanner.h"
 #include "protocore.h"

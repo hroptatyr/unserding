@@ -1,6 +1,6 @@
-/*** module.h -- module stuff
+/*** dso-cli.c -- command line interface module
  *
- * Copyright (C) 2005 - 2009 Sebastian Freundt
+ * Copyright (C) 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
@@ -35,22 +35,21 @@
  *
  ***/
 
-#if !defined INCLUDED_module_h_
-#define INCLUDED_module_h_
+#include <stdio.h>
+#include "module.h"
 
-#if defined UNSERSRV
-extern void *open_aux(const char *file, void *clo);
-extern void close_aux(void *handle, void *clo);
-extern void *find_sym(void *handle, const char *sym_name);
+
+void
+init(void *clo)
+{
+	fprintf(stderr, "loaded\n");
+	return;
+}
 
-extern void ud_mod_dump(FILE *whither);
+void
+deinit(void *clo)
+{
+	return;
+}
 
-extern void ud_init_modules(const char *const *rest);
-#endif	/* UNSERSRV */
-
-/**
- * Entry point for repeated work. */
-extern void init(void *clo);
-extern void deinit(void *clo);
-
-#endif	/* INCLUDED_module_h_ */
+/* dso-cli.c ends here */

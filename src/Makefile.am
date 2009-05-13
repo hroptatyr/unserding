@@ -21,7 +21,11 @@ unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt -lltdl
 unserdingd_LDADD = $(LIBEV_LIBS)
 
-## the main server binary
+## server modules
+lib_LTLIBRARIES += dso-cli.la
+dso_cli_la_LDFLAGS = -module
+
+## the main client binary
 unsercli_SOURCES = unsercli.c stdin.c
 unsercli_SOURCES += scanner.l parser.y
 unsercli_SOURCES += protocore.c

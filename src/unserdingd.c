@@ -175,6 +175,7 @@ sighup_cb(EV_P_ ev_signal *w, int revents)
 static void
 sigusr2_cb(EV_P_ ev_signal *w, int revents)
 {
+	open_aux("dso-cli", NULL);
 	ud_mod_dump(logout);
 	return;
 }
@@ -330,23 +331,6 @@ ud_parse_cl(size_t argc, const char *argv[])
                 ;
         }
         return poptGetArgs(opt_ctx);
-}
-
-
-static void
-ud_init_modules(const char *const *rest)
-{
-	if (UNLIKELY(rest == NULL)) {
-		/* no modules at all */
-		return;
-	}
-	/* initialise all modules specified on the command line
-	 * one of which is assumed to initialise the global deposit somehow
-	 * if not, we care fuckall, let the bugger crash relentlessly */
-	for (const char *const *mod = rest; *mod; mod++) {
-		open_aux(*mod, NULL);
-	}
-	return;
 }
 
 

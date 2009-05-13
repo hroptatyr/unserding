@@ -44,6 +44,9 @@
 #if defined HAVE_STDIO_H
 # include <stdio.h>
 #endif
+#if defined HAVE_UNISTD_H
+# include <unistd.h>
+#endif
 #if defined HAVE_STDBOOL_H
 # include <stdbool.h>
 #endif
@@ -77,15 +80,15 @@ open_aux(const char *name, void *clo)
 	struct ud_mod_s tmpmod;
 	ud_mod_t m;
 
-	lt_dlinit();
-
 	tmpmod.handle = lt_dlopenext(name);
 	if (tmpmod.handle == NULL) {
+		perror("unserding: cannot open module");
 		return NULL;
 	}
 
 	if ((tmpmod.initf = lt_dlsym(tmpmod.handle, minit)) == NULL) {
 		lt_dlclose(tmpmod.handle);
+		perror("unserding: cannot open module, init() not found");
 		return NULL;
 	}
 
@@ -107,6 +110,7 @@ open_aux(const char *name, void *clo)
 	 */
 	/* call the init() function */
 	(*tmpmod.initf)(clo);
+	fprintf(stderr, "handle %p\n", m->handle);
 	return ud_mods = m;
 }
 
@@ -157,6 +161,33 @@ ud_mod_dump(FILE *whither)
 	}
 	return;
 }
+
+
+void
+ud_init_modules(const char *const *rest)
+{
+	/* initialise the dl system */
+	lt_dlinit();
+
+	if (lt_dlsetsearchpath("/home/freundt/devel/unserding/=build/src")) {
+		return;
+	}
+
+	printf("%s\n", lt_dlgetsearchpath());
+	/* now load modules */
+	if (rest == NULL) {
+		/* no modules at all */
+		return;
+	}
+	/* initialise all modules specified on the command line
+	 * one of which is assumed to initialise the global deposit somehow
+	 * if not, we care fuckall, let the bugger crash relentlessly */
+	for (const char *const *mod = rest; *mod; mod++) {
+		open_aux(*mod, NULL);
+	}
+	return;
+}
+
 
 /**
  * \} */

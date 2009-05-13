@@ -82,6 +82,8 @@
 #include "unserding-private.h"
 /* proto stuff */
 #include "protocore.h"
+/* module handling */
+#include "module.h"
 
 FILE *logout;
 
@@ -103,6 +105,7 @@ static ev_signal ALGN16(__sigint_watcher);
 static ev_signal ALGN16(__sighup_watcher);
 static ev_signal ALGN16(__sigterm_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
+static ev_signal ALGN16(__sigusr2_watcher);
 static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
 
@@ -166,6 +169,13 @@ sighup_cb(EV_P_ ev_signal *w, int revents)
 {
 	UD_DEBUG("SIGHUP caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
+	return;
+}
+
+static void
+sigusr2_cb(EV_P_ ev_signal *w, int revents)
+{
+	ud_mod_dump(logout);
 	return;
 }
 
@@ -323,6 +333,23 @@ ud_parse_cl(size_t argc, const char *argv[])
 }
 
 
+static void
+ud_init_modules(const char *const *rest)
+{
+	if (UNLIKELY(rest == NULL)) {
+		/* no modules at all */
+		return;
+	}
+	/* initialise all modules specified on the command line
+	 * one of which is assumed to initialise the global deposit somehow
+	 * if not, we care fuckall, let the bugger crash relentlessly */
+	for (const char *const *mod = rest; *mod; mod++) {
+		open_aux(*mod, NULL);
+	}
+	return;
+}
+
+
 int
 main(int argc, const char *argv[])
 {
@@ -332,6 +359,7 @@ main(int argc, const char *argv[])
 	ev_signal *sighup_watcher = &__sighup_watcher;
 	ev_signal *sigterm_watcher = &__sigterm_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+	ev_signal *sigusr2_watcher = &__sigusr2_watcher;
 	const char *const *rest;
 
 	/* parse the command line */
@@ -352,6 +380,9 @@ main(int argc, const char *argv[])
 	/* initialise the proto core */
 	init_proto();
 
+	/* initialise modules */
+	ud_init_modules(rest);
+
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);
@@ -364,6 +395,10 @@ main(int argc, const char *argv[])
 	/* initialise a SIGHUP handler */
 	ev_signal_init(sighup_watcher, sighup_cb, SIGHUP);
 	ev_signal_start(EV_A_ sighup_watcher);
+	/* initialise a SIGUSR2 handler */
+	ev_signal_init(sigusr2_watcher, sigusr2_cb, SIGUSR2);
+	ev_signal_start(EV_A_ sigusr2_watcher);
+
 	/* initialise a wakeup handler */
 	glob_notify = &__wakeup_watcher;
 	ev_async_init(glob_notify, triv_cb);

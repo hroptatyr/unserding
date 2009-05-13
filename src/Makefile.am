@@ -16,9 +16,9 @@ noinst_HEADERS = arrqueue.h protocore-private.h
 
 ## the main server binary
 unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c arrqueue.c dllqueue.c
-unserdingd_SOURCES +=
+unserdingd_SOURCES += module.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
-unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt
+unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt -lltdl
 unserdingd_LDADD = $(LIBEV_LIBS)
 
 ## the main server binary

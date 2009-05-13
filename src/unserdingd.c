@@ -282,18 +282,6 @@ daemonise(void)
 }
 
 
-extern void mod_pseu_index_LTX_init(void);
-extern void mod_instr_fx_LTX_init(void);
-extern void mod_e123_LTX_init(void);
-
-/* interests module husk */
-extern void __attribute__((weak)) mod_interests_LTX_init(void);
-void __attribute__((weak))
-mod_interests_LTX_init(void)
-{
-	return;
-}
-
 int
 main(int argc, char *argv[])
 {

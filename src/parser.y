@@ -173,15 +173,6 @@ ls_cmd {
 
 	YYACCEPT;
 } |
-cat_cmd {
-	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_CAT);
-	ud_send_raw(hdl, hdl->pktchn[0]);
-
-	/* the packet we're gonna send in raw shape */
-	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
-
-	YYACCEPT;
-} |
 impo_cmd {
 	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, 0x7e10);
 	ud_send_raw(hdl, hdl->pktchn[0]);
@@ -190,18 +181,7 @@ impo_cmd {
 	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
 
 	YYACCEPT;
-} |
-/* services are somewhat generic */
-e123_cmd {
-	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_E123);
-	ud_send_raw(hdl, hdl->pktchn[0]);
-
-	/* the packet we're gonna send in raw shape */
-	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
-
-	YYACCEPT;
 }
-
 
 hy_cmd:
 TOK_HY;
@@ -225,18 +205,7 @@ ls_cmd:
 TOK_LS |
 TOK_LS /* in the middle */ {
 	/* init the seqof counter */
-	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_SEQOF;
-	/* set its initial value to naught */
-	hdl->pktchn[0].pbuf[9] = 0;
-	/* set the packet idx */
-	hdl->pktchn[0].plen = 10;
-} keyvals;
-
-cat_cmd:
-TOK_CAT |
-TOK_CAT /* in the middle */ {
-	/* init the seqof counter */
-	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_SEQOF;
+	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_SEQ;
 	/* set its initial value to naught */
 	hdl->pktchn[0].pbuf[9] = 0;
 	/* set the packet idx */
@@ -245,23 +214,6 @@ TOK_CAT /* in the middle */ {
 
 impo_cmd:
 TOK_IMPORT;
-
-e123_cmd:
-TOK_E123 {
-	/* just dump */
-	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_CHAR;
-	hdl->pktchn[0].pbuf[9] = '\0';
-	/* length is exactly 10 */
-	hdl->pktchn[0].plen = 10;
-} |
-TOK_E123 TOK_STRING {
-	/* init the seqof counter */
-	hdl->pktchn[0].pbuf[8] = UDPC_TYPE_STRING;
-	/* set its initial length to naught */
-	hdl->pktchn[0].plen += 2 +
-		(hdl->pktchn[0].pbuf[9] = (uint8_t)yylval.slen);
-	memcpy(&hdl->pktchn[0].pbuf[10], yylval.sval, (uint8_t)yylval.slen);
-};
 
 
 keyvals:

@@ -65,15 +65,15 @@
  * the reply. */
 static ud_pktwrk_f ud_services[65536];
 
+static char hn[64];
+static size_t hnlen;
+
 
 void
 ud_proto_parse(job_t j)
 {
 	ud_pkt_cmd_t cmd = udpc_pkt_cmd((ud_packet_t){0, j->buf});
-	uint8_t fam = udpc_cmd_fam(cmd);
-	uint8_t wrk = udpc_cmd_wrk(cmd);
-	ud_pktfam_t pf = ud_pktfam[fam];
-	ud_pktwrk_f wf = pf ? pf[wrk] : NULL;
+	ud_pktwrk_f wf = ud_services[cmd];
 
 	if (UNLIKELY(wf == NULL)) {
 		UD_LOG("found 0x%04x but cannot cope\n", cmd);

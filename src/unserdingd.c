@@ -319,16 +319,6 @@ main(int argc, char *argv[])
 	/* initialise the proto core */
 	init_proto();
 
-#if 0
-	/* initialise interests module */
-	mod_interests_LTX_init();
-	mod_pseu_index_LTX_init();
-	/* initialise currency module */
-	mod_instr_fx_LTX_init();
-	/* initialise module for e.123ification */
-	mod_e123_LTX_init();
-#endif
-
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);

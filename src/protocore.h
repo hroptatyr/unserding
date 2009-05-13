@@ -91,30 +91,6 @@ typedef uint8_t udpc_type_t;
 
 /* commands */
 #define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
-/**
- * HY packet, used to say `hy' to all attached servers and clients. */
-#define UDPC_PKT_HY		(ud_pkt_cmd_t)(0x0000)
-/**
- * HY reply packet, used to say `hy back' to `hy' saying  clients. */
-#define UDPC_PKT_HY_RPL		UDPC_PKT_RPL(UDPC_PKT_HY)
-/**
- * LS packet, used to say `ls [seqof(keyval)]' */
-#define UDPC_PKT_LS		(ud_pkt_cmd_t)(0x0100)
-#define UDPC_PKT_LS_RPL		UDPC_PKT_RPL(UDPC_PKT_LS)
-/**
- * LC packet, used to say `lc [seqof(keyval)]' */
-#define UDPC_PKT_LC		(ud_pkt_cmd_t)(0x0104)
-#define UDPC_PKT_LC_RPL		UDPC_PKT_RPL(UDPC_PKT_LC)
-/**
- * CAT packet, used to say `cat [seqof(keyval)]' */
-#define UDPC_PKT_CAT		(ud_pkt_cmd_t)(0x0102)
-#define UDPC_PKT_CAT_RPL	UDPC_PKT_RPL(UDPC_PKT_CAT)
-
-/* services */
-/**
- * E123ify packet, used to say `e.123ify [seqof(keyval)]' */
-#define UDPC_PKT_E123		(ud_pkt_cmd_t)(0x5e02)
-#define UDPC_PKT_E123_RPL	UDPC_PKT_RPL(UDPC_PKT_E123)
 
 
 #if !defined TYPEDEFD_job_t

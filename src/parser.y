@@ -138,10 +138,6 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 
 query:
 hy_cmd {
-	char buf[8];
-	ud_packet_t pkt = BUF_PACKET(buf);
-	udpc_make_pkt(pkt, hdl->convo++, 0, UDPC_PKT_HY);
-	ud_send_raw(hdl, pkt);
 	YYACCEPT;
 } |
 cheers_cmd {
@@ -155,31 +151,15 @@ wtf_cmd {
 	YYACCEPT;
 } |
 cya_cmd {
-	char buf[8];
-	ud_packet_t pkt = BUF_PACKET(buf);
-	udpc_make_pkt(pkt, hdl->convo++, 0, 0x7e54);
-	ud_send_raw(hdl, pkt);
 	YYACCEPT;
 } |
 sup_cmd {
 	YYACCEPT;
 } |
 ls_cmd {
-	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, UDPC_PKT_LS);
-	ud_send_raw(hdl, hdl->pktchn[0]);
-
-	/* the packet we're gonna send in raw shape */
-	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
-
 	YYACCEPT;
 } |
 impo_cmd {
-	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, 0x7e10);
-	ud_send_raw(hdl, hdl->pktchn[0]);
-
-	/* the packet we're gonna send in raw shape */
-	ud_fprint_pkt_raw(hdl->pktchn[0], stdout);
-
 	YYACCEPT;
 }
 

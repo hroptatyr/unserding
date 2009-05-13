@@ -86,7 +86,6 @@
 
 static int lsock __attribute__((used));
 static ev_timer ALGN16(__s2s_watcher);
-static uint8_t conv = 0;
 static ev_io ALGN16(__srv_watcher);
 static struct ip_mreq ALGN16(mreq4);
 #if defined AF_INET6
@@ -422,37 +421,10 @@ send_m46(job_t j)
 }
 
 
-static void __attribute__((unused))
-s2s_nego_hy(void)
-{
-	char buf[4 * sizeof(uint16_t)];
-
-	UD_DEBUG("boasting about my balls, god, are they big\n");
-	/* say hy */
-	udpc_make_pkt(BUF_PACKET(buf), conv++, 0, UDPC_PKT_HY);
-	/* ship to m4cast addr */
-	(void)sendto(lsock, buf, countof(buf), 0,
-		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
-	/* ship to m6cast addr */
-	(void)sendto(lsock, buf, countof(buf), 0,
-		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
-	return;
-}
-
-static void __attribute__((unused))
-s2s_hy_cb(EV_P_ ev_timer *w, int revents)
-{
-	/* just say hi */
-	s2s_nego_hy();
-	return;
-}
-
-
 int
 ud_attach_mcast4(EV_P)
 {
 	ev_io *srv_watcher = &__srv_watcher;
-	ev_timer *s2s_watcher = &__s2s_watcher;
 
 	/* get us a global sock */
 	lsock = mcast46_listener_init();
@@ -464,10 +436,6 @@ ud_attach_mcast4(EV_P)
 	/* initialise an io watcher, then start it */
 	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
 	ev_io_start(EV_A_ srv_watcher);
-
-	/* init the s2s timer, this one says `hy' until an id was negotiated */
-	ev_timer_init(s2s_watcher, s2s_hy_cb, 0.0, S2S_BRAG_RATE);
-	ev_timer_start(EV_A_ s2s_watcher);
 	return 0;
 }
 

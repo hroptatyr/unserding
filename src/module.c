@@ -65,10 +65,22 @@ struct ud_mod_s {
 	void *handle;
 	void (*initf)(void*);
 	void (*finif)(void*);
+	void (*relof)(void*);
 	ud_mod_t next;
 };
 
 static ud_mod_t ud_mods = NULL;
+
+static ud_mod_t
+been_there(void *handle)
+{
+	for (ud_mod_t m = ud_mods; m; m = m->next) {
+		if (m->handle == handle) {
+			return m;
+		}
+	}
+	return NULL;
+}
 
 /**
  * Open NAME, call `init(CLO)' there. */
@@ -77,6 +89,7 @@ open_aux(const char *name, void *clo)
 {
 	char minit[] = "init\0\0\0\0\0\0\0";
 	char mdeinit[] = "deinit\0\0\0\0\0";
+	char mreinit[] = "reinit\0\0\0\0\0";
 	struct ud_mod_s tmpmod;
 	ud_mod_t m;
 
@@ -84,6 +97,10 @@ open_aux(const char *name, void *clo)
 	if (tmpmod.handle == NULL) {
 		perror("unserding: cannot open module");
 		return NULL;
+	}
+
+	if ((m = been_there(tmpmod.handle)) != NULL) {
+		goto reinit;
 	}
 
 	if ((tmpmod.initf = lt_dlsym(tmpmod.handle, minit)) == NULL) {
@@ -96,22 +113,27 @@ open_aux(const char *name, void *clo)
 		;
 	}
 
+	if ((tmpmod.relof = lt_dlsym(tmpmod.handle, mreinit)) == NULL) {
+		;
+	}
+
 	/* lock the master list? */
 	tmpmod.next = ud_mods;
 
 	/* reserve a new slot in our big list */
 	m = malloc(sizeof(*m));
-
+	/* fill him in */
 	*m = tmpmod;
-
-	/*
-	 * Now we can get the module to initialize its symbols, and then its
-	 * variables, and lastly the documentation strings.
-	 */
 	/* call the init() function */
-	(*tmpmod.initf)(clo);
-	fprintf(stderr, "handle %p\n", m->handle);
+	(*m->initf)(clo);
 	return ud_mods = m;
+
+reinit:
+	fprintf(stderr, "reloading\n");
+	if (m->relof != NULL) {
+		(*m->relof)(clo);
+	}
+	return m;
 }
 
 void
@@ -127,6 +149,7 @@ close_aux(void *mod, void *clo)
 	m->handle = NULL;
 	m->initf = NULL;
 	m->finif = NULL;
+	m->relof = NULL;
 	return;
 }
 

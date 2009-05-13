@@ -246,6 +246,8 @@ kill_worker(ud_worker_t wk)
 
 
 /* helper for daemon mode */
+static bool daemonisep = 0;
+
 static int
 daemonise(void)
 {
@@ -282,8 +284,47 @@ daemonise(void)
 }
 
 
+/* the popt helper */
+static struct poptOption srv_opts[] = {
+	{ "daemon", 'd', POPT_ARG_NONE | POPT_ARGFLAG_SHOW_DEFAULT,
+	  &daemonisep, 0,
+	  "Detach from tty and run as daemon.", NULL },
+        POPT_TABLEEND
+};
+
+static const struct poptOption const ud_opts[] = {
+#if 1
+        { NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
+          "Server Options", NULL },
+#endif
+        POPT_AUTOHELP
+        POPT_TABLEEND
+};
+
+static const char *const*
+ud_parse_cl(size_t argc, const char *argv[])
+{
+        int rc;
+        poptContext opt_ctx;
+
+        UD_DEBUG("parsing command line options\n");
+        opt_ctx = poptGetContext(NULL, argc, argv, ud_opts, 0);
+        poptSetOtherOptionHelp(
+		opt_ctx,
+		"[server-options] "
+		"module [module [...]]");
+
+        /* auto-do */
+        while ((rc = poptGetNextOpt(opt_ctx)) > 0) {
+                /* Read all the options ... */
+                ;
+        }
+        return poptGetArgs(opt_ctx);
+}
+
+
 int
-main(int argc, char *argv[])
+main(int argc, const char *argv[])
 {
 	/* use the default event loop unless you have special needs */
 	struct ev_loop *loop;
@@ -291,11 +332,15 @@ main(int argc, char *argv[])
 	ev_signal *sighup_watcher = &__sighup_watcher;
 	ev_signal *sigterm_watcher = &__sigterm_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+	const char *const *rest;
+
+	/* parse the command line */
+	rest = ud_parse_cl(argc, argv);
 
 	/* whither to log */
 	logout = stderr;
 	/* run as daemon, do me properly */
-	if (argc > 1) {
+	if (daemonisep) {
 		daemonise();
 	}
 	/* what's loop? */

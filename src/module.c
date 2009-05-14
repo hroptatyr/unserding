@@ -50,6 +50,9 @@
 #if defined HAVE_STDBOOL_H
 # include <stdbool.h>
 #endif
+#if defined HAVE_STRING_H
+# include <string.h>
+#endif
 /* check for me */
 #include <ltdl.h>
 
@@ -189,14 +192,21 @@ ud_mod_dump(FILE *whither)
 void
 ud_init_modules(const char *const *rest)
 {
+	/* linux only */
+	char buffer[BUFSIZ], *s;
+
 	/* initialise the dl system */
 	lt_dlinit();
 
-	if (lt_dlsetsearchpath("/home/freundt/devel/unserding/=build/src")) {
+	readlink("/proc/self/exe", buffer, BUFSIZ);
+	if ((s = strrchr(buffer, '/')) != NULL) {
+		*s = '\0';
+	}
+
+	if (lt_dlsetsearchpath(buffer)) {
 		return;
 	}
 
-	printf("%s\n", lt_dlgetsearchpath());
 	/* now load modules */
 	if (rest == NULL) {
 		/* no modules at all */

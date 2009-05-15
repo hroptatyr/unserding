@@ -57,6 +57,7 @@
 #include <ltdl.h>
 
 #include "module.h"
+#include "unserding-dbg.h"
 
 /**
  * \addtogroup dso
@@ -190,7 +191,7 @@ ud_mod_dump(FILE *whither)
 
 
 void
-ud_init_modules(const char *const *rest)
+ud_init_modules(const char *const *rest, void *clo)
 {
 	/* linux only */
 	char buffer[BUFSIZ], *s;
@@ -216,11 +217,21 @@ ud_init_modules(const char *const *rest)
 	 * one of which is assumed to initialise the global deposit somehow
 	 * if not, we care fuckall, let the bugger crash relentlessly */
 	for (const char *const *mod = rest; *mod; mod++) {
-		open_aux(*mod, NULL);
+		UD_DEBUG("loading module \"%s\"\n", *mod);
+		open_aux(*mod, clo);
 	}
 	return;
 }
 
+void
+ud_deinit_modules(void *clo)
+{
+	for (ud_mod_t m = ud_mods; m; m = m->next) {
+		UD_DEBUG("unloading module %p\n", m);
+		close_aux(m, clo);
+	}
+	return;
+}
 
 /**
  * \} */

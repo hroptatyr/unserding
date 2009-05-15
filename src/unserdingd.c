@@ -80,6 +80,8 @@
 #include "unserding.h"
 /* our private bits */
 #include "unserding-private.h"
+/* context stuff */
+#include "unserding-ctx.h"
 /* proto stuff */
 #include "protocore.h"
 /* module handling */
@@ -214,7 +216,7 @@ worker_cb(EV_P_ ev_async *w, int revents)
 		free_job(j);
 	}
 
-	UD_DEBUG("no more jobs %p/%p\n", self, loop);
+	UD_DEBUG("no more jobs %lx/%p\n", self, loop);
 	return;
 }
 
@@ -345,18 +347,21 @@ main(int argc, const char *argv[])
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 	ev_signal *sigusr2_watcher = &__sigusr2_watcher;
 	const char *const *rest;
+	struct ud_ctx_s __ctx;
+
+	/* whither to log */
+	logout = stderr;
 
 	/* parse the command line */
 	rest = ud_parse_cl(argc, argv);
 
-	/* whither to log */
-	logout = stderr;
 	/* run as daemon, do me properly */
 	if (daemonisep) {
 		daemonise();
 	}
-	/* what's loop? */
+	/* initialise the main loop */
 	loop = ev_default_loop(0);
+	__ctx.mainloop = loop;
 
 	/* initialise global job q */
 	init_glob_jq(&__glob_jq);
@@ -365,7 +370,7 @@ main(int argc, const char *argv[])
 	init_proto();
 
 	/* initialise modules */
-	ud_init_modules(rest);
+	ud_init_modules(rest, &__ctx);
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
@@ -415,6 +420,9 @@ main(int argc, const char *argv[])
 	rr_wrk = 0;
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
+
+	/* deinitialise modules */
+	ud_deinit_modules(&__ctx);
 
 	/* close the socket */
 	ud_detach_mcast4(EV_A);

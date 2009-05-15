@@ -1,11 +1,11 @@
-/*** module.h -- module stuff
+/*** unserding-ctx.h -- context definitions
  *
- * Copyright (C) 2005 - 2009 Sebastian Freundt
+ * Copyright (C) 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
  * This file is part of unserding.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -35,24 +35,14 @@
  *
  ***/
 
-#if !defined INCLUDED_module_h_
-#define INCLUDED_module_h_
+#if !defined INCLUDED_unserding_ctx_h_
+#define INCLUDED_unserding_ctx_h_
 
-#if defined UNSERSRV
-extern void *open_aux(const char *file, void *clo);
-extern void close_aux(void *handle, void *clo);
-extern void *find_sym(void *handle, const char *sym_name);
+typedef struct ud_ctx_s *ud_ctx_t;
 
-extern void ud_mod_dump(FILE *whither);
+struct ud_ctx_s {
+	void *mainloop;
+};
 
-extern void ud_init_modules(const char *const *rest, void *clo);
-extern void ud_deinit_modules(void *clo);
-#endif	/* UNSERSRV */
 
-/**
- * Entry point for repeated work. */
-extern void init(void *clo);
-extern void deinit(void *clo);
-extern void reinit(void *clo);
-
-#endif	/* INCLUDED_module_h_ */
+#endif	/* INCLUDED_unserding_ctx_h_ */

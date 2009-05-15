@@ -47,6 +47,13 @@ init(void *clo)
 }
 
 void
+reinit(void *clo)
+{
+	fprintf(stderr, "reloaded\n");
+	return;
+}
+
+void
 deinit(void *clo)
 {
 	return;

@@ -52,5 +52,6 @@ extern void ud_init_modules(const char *const *rest);
  * Entry point for repeated work. */
 extern void init(void *clo);
 extern void deinit(void *clo);
+extern void reinit(void *clo);
 
 #endif	/* INCLUDED_module_h_ */

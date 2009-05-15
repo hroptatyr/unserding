@@ -22,8 +22,9 @@ unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt -lltdl
 unserdingd_LDADD = $(LIBEV_LIBS)
 
 ## server modules
-lib_LTLIBRARIES += dso-cli.la
+lib_LTLIBRARIES += dso-cli.la dso-scscp.la
 dso_cli_la_LDFLAGS = -module
+dso_scscp_la_LDFLAGS = -module
 
 ## the main client binary
 unsercli_SOURCES = unsercli.c stdin.c

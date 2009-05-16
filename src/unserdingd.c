@@ -167,6 +167,13 @@ sigint_cb(EV_P_ ev_signal *w, int revents)
 }
 
 static void
+sigpipe_cb(EV_P_ ev_signal *w, int revents)
+{
+	UD_DEBUG("SIGPIPE caught, doing nothing\n");
+	return;
+}
+
+static void
 sighup_cb(EV_P_ ev_signal *w, int revents)
 {
 	UD_DEBUG("SIGHUP caught, unrolling everything\n");
@@ -376,7 +383,7 @@ main(int argc, const char *argv[])
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);
 	/* initialise a sig C-c handler */
-	ev_signal_init(sigpipe_watcher, sigint_cb, SIGPIPE);
+	ev_signal_init(sigpipe_watcher, sigpipe_cb, SIGPIPE);
 	ev_signal_start(EV_A_ sigpipe_watcher);
 	/* initialise a SIGTERM handler */
 	ev_signal_init(sigterm_watcher, sighup_cb, SIGTERM);

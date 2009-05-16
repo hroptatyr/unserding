@@ -54,9 +54,15 @@ static int sock;
 static struct sockaddr_storage srv;
 static socklen_t srvlen = sizeof(srv);
 
-static const char scscp_srv[] = "fe80::216:17ff:feb3:5eaa";
+/* issel */
+//static const char scscp_srv[] = "fe80::216:17ff:feb3:5eaa";
+/* muck */
 //static const char scscp_srv[] = "fe80::219:dbff:fed1:4da8";
+/* stirling */
+static const char scscp_srv[] = "fe80::219:dbff:fe63:577a";
 static const char scscp_dev[] = "lan0";
+
+#define BRAG_RATE	0.2
 
 static ev_timer ALGN16(__wtimer);
 static ev_io ALGN16(__wio);
@@ -157,7 +163,7 @@ init_watchers(EV_P_ int s)
         ev_io_start(EV_A_ wio);
 
         /* init the timer which is sending scscp acks all along */
-        ev_timer_init(wtimer, ack_cb, 0.0, 0.5);
+        ev_timer_init(wtimer, ack_cb, 0.0, BRAG_RATE);
 	/* not starting the timer just yet */
 	return;
 }

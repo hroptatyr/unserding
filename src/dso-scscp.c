@@ -119,8 +119,14 @@ inco_cb(EV_P_ ev_io *w, int revents)
 {
 	ev_timer *wtimer = &__wtimer;
 	char buf[4096];
+	ssize_t nread;
 
-	read(sock, buf, sizeof(buf));
+	if ((nread = read(sock, buf, sizeof(buf))) <= 0) {
+		UD_DEBUG("no data, closing socket\n");
+		ev_io_stop(EV_A_ w);
+		close(w->fd);
+		return;
+	}
 	if (negop == 0) {
 		write(sock, negostr, sizeof(negostr));
 		negop++;

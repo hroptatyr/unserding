@@ -54,15 +54,19 @@ static int sock;
 static struct sockaddr_storage srv;
 static socklen_t srvlen = sizeof(srv);
 
+/* link local network */
+//#define V6PFX			"fe80:"
+#define V6PFX			"2001:470:9dd3:ca05"
+
 /* issel */
-//static const char scscp_srv[] = "fe80::216:17ff:feb3:5eaa";
+//static const char scscp_srv[] = V6PFX ":216:17ff:feb3:5eaa";
 /* muck */
-//static const char scscp_srv[] = "fe80::219:dbff:fed1:4da8";
+//static const char scscp_srv[] = V6PFX ":219:dbff:fed1:4da8";
 /* stirling */
-static const char scscp_srv[] = "fe80::219:dbff:fe63:577a";
+static const char scscp_srv[] = V6PFX ":219:dbff:fe63:577a";
 static const char scscp_dev[] = "lan0";
 
-#define BRAG_RATE	0.2
+#define BRAG_RATE	0.8
 
 static ev_timer ALGN16(__wtimer);
 static ev_io ALGN16(__wio);
@@ -119,6 +123,7 @@ static int negop = 0;
 static const char negostr[] = "<?scscp version=\"1.3\" ?>\n";
 static const char bullshit[] = "<?scscp info text=\"debug\" ?>\n";
 static const char ackmsg[] = "<?scscp ack ?>\n";
+static char wsmsg[4096];
 
 static void
 inco_cb(EV_P_ ev_io *w, int revents)
@@ -165,6 +170,8 @@ init_watchers(EV_P_ int s)
         /* init the timer which is sending scscp acks all along */
         ev_timer_init(wtimer, ack_cb, 0.0, BRAG_RATE);
 	/* not starting the timer just yet */
+
+	memset(wsmsg, 32, sizeof(wsmsg));
 	return;
 }
 

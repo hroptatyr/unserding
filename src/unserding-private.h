@@ -72,7 +72,7 @@
 #include "unserding-dbg.h"
 
 
-#define USE_ARRPQ	0
+#define USE_ARRPQ	1
 
 #if USE_ARRPQ
 # include "arrqueue.h"

@@ -38,10 +38,13 @@
 #include <stdio.h>
 #include "module.h"
 #include "unserding.h"
-#include "unserding-ctx.h"
 #define UNSERSRV
 #include "unserding-dbg.h"
+#include "unserding-private.h"
+#include "unserding-ctx.h"
 #include "unserding-nifty.h"
+
+#include "protocore.h"
 
 static char hn[64];
 static size_t hnlen;
@@ -52,6 +55,12 @@ static void
 cli_hy(job_t j)
 {
 	UD_DEBUG("mod/cli: %s<- HY\n", hn);
+	udpc_make_rpl_pkt(JOB_PACKET(j));
+	j->buf[8] = 's';
+	j->buf[9] = hnlen;
+	memcpy(j->buf + 10, hn, hnlen);
+	j->blen = 8 + 1 + 1 + hnlen;
+	send_cl(j);
 	return;
 }
 

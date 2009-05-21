@@ -92,9 +92,14 @@ typedef uint8_t udpc_type_t;
 /* commands */
 #define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
 
+/* helper macro to use a job as packet */
+#define JOB_PACKET(j)	((ud_packet_t){.plen = j->blen, .pbuf = j->buf})
+/* helper macro to use a char buffer as packet */
+#define BUF_PACKET(b)	((ud_packet_t){.plen = countof(b), .pbuf = b})
+#define PACKET(a, b)	((ud_packet_t){.plen = a, .pbuf = b})
+
 
 extern void init_proto(void);
-//extern void ud_proto_parse(job_t j);
 
 /**
  * Return true if PKT is a valid unserding packet. */

@@ -76,7 +76,7 @@ init(void *clo)
 	hnlen = strlen(hn);
 
 	/* lodging our HY service */
-	(void)ud_set_service(1336, cli_hy, cli_hy_rpl);
+	(void)ud_set_service(0x1336, cli_hy, cli_hy_rpl);
 
 	UD_DBGCONT("done\n");
 	return;

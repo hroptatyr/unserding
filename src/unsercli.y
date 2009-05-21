@@ -168,6 +168,13 @@ cya_cmd {
 	ud_detach_stdin(EV_DEFAULT);
 	ev_unloop(EV_DEFAULT_ EVUNLOOP_ALL);
 	YYACCEPT;
+} |
+gen_cmd {
+	ud_pkt_cmd_t cmd = 0x1336;
+	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, cmd);
+} keyvals {
+	ud_send_raw(hdl, hdl->pktchn[0]);
+	YYACCEPT;
 }
 
 wtf_cmd:
@@ -175,6 +182,12 @@ TOK_WTF;
 
 cya_cmd:
 TOK_CYA;
+
+gen_cmd:
+TOK_VAL;
+
+keyvals:
+;
 
 %%
 

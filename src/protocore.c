@@ -65,9 +65,6 @@
  * the reply. */
 static ud_pktwrk_f ud_services[65536];
 
-static char hn[64];
-static size_t hnlen;
-
 
 void
 ud_proto_parse(job_t j)
@@ -84,12 +81,26 @@ ud_proto_parse(job_t j)
 	return;
 }
 
+/* In real life we probably want a list of workers and the module does not
+ * need to know about the previous worker function for CMD.  Ideally we
+ * do not expose the function ptr at all, instead return a pointer into
+ * the services array and provide a fun like next() to allow for defadvice'd
+ * functions. */
+extern void
+ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl);
+void
+ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl)
+{
+	cmd &= ~1;
+	ud_services[cmd | 0] = fun;
+	ud_services[cmd | 1] = rpl;
+	return;
+}
+
+
 void
 init_proto(void)
 {
-	/* obtain the hostname */
-	(void)gethostname(hn, countof(hn));
-	hnlen = strlen(hn);
 	return;
 }
 #endif	/* UNSERSRV */

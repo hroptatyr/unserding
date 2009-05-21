@@ -37,17 +37,47 @@
 
 #include <stdio.h>
 #include "module.h"
+#include "unserding.h"
 #include "unserding-ctx.h"
 #define UNSERSRV
 #include "unserding-dbg.h"
+#include "unserding-nifty.h"
+
+static char hn[64];
+static size_t hnlen;
 
 
+/* the HY service */
+static void
+cli_hy(job_t j)
+{
+	UD_DEBUG("mod/cli: %s<- HY\n", hn);
+	return;
+}
+
+static void
+cli_hy_rpl(job_t j)
+{
+	UD_DEBUG("mod/cli: ->%s HY\n", hn);
+	return;
+}
+
+
+extern void
+ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl);
+
 void
 init(void *clo)
 {
-	//ud_ctx_t ctx = clo;
-
 	UD_DEBUG("mod/cli: loading ...");
+
+	/* obtain the hostname */
+	(void)gethostname(hn, countof(hn));
+	hnlen = strlen(hn);
+
+	/* lodging our HY service */
+	(void)ud_set_service(1336, cli_hy, cli_hy_rpl);
+
 	UD_DBGCONT("done\n");
 	return;
 }

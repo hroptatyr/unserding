@@ -37,25 +37,34 @@
 
 #include <stdio.h>
 #include "module.h"
+#include "unserding-ctx.h"
+#define UNSERSRV
+#include "unserding-dbg.h"
 
 
 void
 init(void *clo)
 {
-	fprintf(stderr, "loaded\n");
+	//ud_ctx_t ctx = clo;
+
+	UD_DEBUG("mod/cli: loading ...");
+	UD_DBGCONT("done\n");
 	return;
 }
 
 void
 reinit(void *clo)
 {
-	fprintf(stderr, "reloaded\n");
+	UD_DEBUG("mod/cli: reloading ...");
+	UD_DBGCONT("done\n");
 	return;
 }
 
 void
 deinit(void *clo)
 {
+	UD_DEBUG("mod/cli: unloading ...");
+	UD_DBGCONT("done\n");
 	return;
 }
 

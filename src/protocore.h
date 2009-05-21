@@ -93,18 +93,8 @@ typedef uint8_t udpc_type_t;
 #define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
 
 
-#if !defined TYPEDEFD_job_t
-typedef void *job_t;
-#endif	/* TYPEDEFD_job_t */
-/**
- * Type for parse functions inside jobs. */
-typedef void(*ud_pktwrk_f)(job_t);
-/**
- * Type for families. */
-typedef ud_pktwrk_f *ud_pktfam_t;
-
 extern void init_proto(void);
-extern void ud_proto_parse(job_t j);
+//extern void ud_proto_parse(job_t j);
 
 /**
  * Return true if PKT is a valid unserding packet. */

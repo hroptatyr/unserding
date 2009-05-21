@@ -44,5 +44,16 @@ struct ud_ctx_s {
 	void *mainloop;
 };
 
+
+#if !defined TYPEDEFD_job_t
+typedef void *job_t;
+# define TYPEDEFD_job_t		1
+#endif	/* TYPEDEFD_job_t */
+/**
+ * Type for parse functions inside jobs. */
+typedef void(*ud_pktwrk_f)(job_t);
+/**
+ * Type for families. */
+typedef ud_pktwrk_f *ud_pktfam_t;
 
 #endif	/* INCLUDED_unserding_ctx_h_ */

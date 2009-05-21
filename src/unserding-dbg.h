@@ -88,7 +88,8 @@ extern FILE *logout;
 #elif defined UNSERCLI && defined DEBUG_FLAG
 # define UD_CRITICAL(args...)				\
 	fprintf(logout, "[unserding] CRITICAL " args)
-# define UD_DEBUG(args...)
+# define UD_DEBUG(args...)				\
+	fprintf(logout, "[unserding] " args)
 # define UD_CRITICAL_MCAST(args...)					\
 	fprintf(logout, "[unserding/input/mcast] CRITICAL " args)
 # define UD_DEBUG_MCAST(args...)				\

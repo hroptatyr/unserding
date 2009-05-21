@@ -58,12 +58,14 @@
 
 #include "cli-common.h"
 #include "unsercli-unsercli.h"
+#include "unserding-dbg.h"
 
 extern int cli_yyget_column(yyscan_t);
 extern void cli_yyset_column(int, yyscan_t);
 
 #define RETURN_TOKEN(_x)			\
 	do {					\
+		UD_DEBUG(#_x "\n");		\
 		return _x;			\
 	} while (0)
 

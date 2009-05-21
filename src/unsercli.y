@@ -205,6 +205,58 @@ rplpkt_cb(EV_P_ ev_io *w, int revents)
 	return;
 }
 
+
+/* completers */
+/* A structure which contains information on the commands this program
+   can understand. */
+
+typedef struct {
+	/* User printable name of the function. */
+	char *name;
+	/* Documentation for this function.  */
+	char *doc;
+} cmd_t;
+
+cmd_t commands[] = {
+	{ "wtf", "Change to directory DIR" },
+	{ "help", "Delete FILE" },
+	{ "kthx", "Display this text" },
+	{ "quit", "Synonym for `help'" },
+	{ "bye", "List files in DIR" },
+	{ "logout", "List files in DIR" },
+	{ NULL, NULL }
+};
+
+extern char *cmd_generator(const char *text, int state);
+char*
+cmd_generator(const char *text, int state)
+{
+	static int list_index, len;
+	char *name;
+
+	/* If this is a new word to complete, initialize now.  This
+	   includes saving the length of TEXT for efficiency, and
+	   initializing the index variable to 0. */
+	if (!state) {
+		list_index = 0;
+		len = strlen(text);
+	}
+
+	/* Return the next name which partially matches from the
+	   command list. */
+	while ((name = commands[list_index].name)) {
+		list_index++;
+
+		if (strncmp(name, text, len) == 0) {
+			return strdup(name);
+		}
+	}
+
+	/* If no names matched, then return NULL. */
+	return NULL;
+}
+
+
 void
 ud_parse(const ud_packet_t pkt)
 {

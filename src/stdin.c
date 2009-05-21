@@ -116,7 +116,7 @@ handle_el(char *line)
 }
 
 /* dirty */
-//extern void _rl_erase_entire_line(void);
+extern void _rl_erase_entire_line(void);
 void
 stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 {
@@ -132,7 +132,7 @@ stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 			buf, sizeof(buf));
 	p = ntohs(sa->sin_port);
 
-	//(void)_rl_erase_entire_line();
+	(void)_rl_erase_entire_line();
 	fprintf(stdout, "packet from [%s]:%d ", buf, p);
 	/* now the header */
 	ud_fprint_pkthdr(pkt, stdout);
@@ -143,6 +143,31 @@ stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
 	/* hm, let's hope they put a newline last */
 	rl_redisplay();
 	return;
+}
+
+/* completers */
+extern char *cmd_generator(const char *text, int state);
+
+/* Attempt to complete on the contents of TEXT.  START and END
+   bound the region of rl_line_buffer that contains the word to
+   complete.  TEXT is the word to complete.  We can use the entire
+   contents of rl_line_buffer in case we want to do some simple
+   parsing.  Return the array of matches, or NULL if there aren't any. */
+static char**
+udcli_comp(const char *text, int start, int end)
+{
+	char **matches;
+
+	matches = (char**)NULL;
+
+	/* If this word is at the start of the line, then it is a command
+	   to complete.  Otherwise it is the name of a file in the current
+	   directory. */
+	if (start == 0) {
+		/* TODO */
+		matches = rl_completion_matches(text, cmd_generator);
+	}
+	return matches;
 }
 
 
@@ -164,7 +189,7 @@ stdin_listener_init(void)
 	/* initialise the readline */
 	rl_initialize();
 	rl_readline_name = "unserding";
-	rl_attempted_completion_function = NULL;
+	rl_attempted_completion_function = udcli_comp;
 
 	rl_basic_word_break_characters = "\t\n@$><=;|&{( ";
 #if USE_READLINE
@@ -238,11 +263,7 @@ init_histfile()
 void
 ud_reset_stdin(EV_P)
 {
-#if 0
-	rl_line_buffer[0] = '\0';
-	rl_point = rl_end = 0;
-#endif	
-	rl_kill_text(0, rl_end);
+	rl_delete_text(0, rl_end);
 	putc('\n', stdout);
 #if USE_READLINE
 	rl_on_new_line();

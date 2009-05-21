@@ -1,11 +1,11 @@
-/*** unserding.c -- unserding network service (client)
+/*** unsercli.y -- unserding CLI parser  -*- C -*-
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2002-2008 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@math.tu-berlin.de>
  *
- * This file is part of unserding.
- *
+ * This file is part of QaoS.
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -35,11 +35,19 @@
  *
  ***/
 
+%defines
+%output="y.tab.c"
+%pure-parser
+%name-prefix="cli_yy"
+%lex-param{void *scanner}
+%parse-param{void *scanner}
+%parse-param{ud_handle_t hdl}
+
+%{
 #include "config.h"
+#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stddef.h>
-#include <unistd.h>
 #include <stdbool.h>
 
 #if defined HAVE_SYS_SOCKET_H
@@ -58,27 +66,54 @@
 # include <errno.h>
 #endif
 
-/* our master include file */
 #include "unserding.h"
-/* our private bits */
 #include "unserding-private.h"
+#include "protocore.h"
+#include "protocore-private.h"
+#include "cli-common.h"
+#include "unsercli-scanner.h"
 
-FILE *logout;
+#if 0
+#if !defined xmalloc
+# define xmalloc        GC_MALLOC
+#endif	/* !xmalloc */
+#if !defined !xmalloc_atomic
+# define xmalloc_atomic GC_MALLOC_ATOMIC
+#endif	/* !xmalloc_atomic */
+#if !defined !xrealloc
+# define xrealloc       GC_REALLOC
+#endif	/* !xrealloc */
+
+#else  /* !0 */
+
+#if !defined xmalloc
+# define xmalloc        malloc
+#endif	/* !xmalloc */
+#if !defined xmalloc_atomic
+# define xmalloc_atomic malloc
+#endif	/* !xmalloc_atomic */
+#if !defined xrealloc
+# define xrealloc       realloc
+#endif	/* !xrealloc */
+#endif	/* 0 */
+
+/* declarations */
+extern int cli_yyparse(void *scanner, ud_handle_t hdl);
 
 
 typedef struct ud_worker_s *ud_worker_t;
 typedef struct ud_ev_async_s ud_ev_async;
 
-/* should that be properly public? */
-extern void
-stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal);
-
 
-static index_t __attribute__((unused)) glob_idx = 0;
+FILE *logout;
+
+static const char help_rpl[] =
+	"help   this help screen\n"
+	"quit   leave the command line interface\n"
+	;
 
 static ev_signal ALGN16(__sigint_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
-//static ev_async ALGN16(__wakeup_watcher);
 static ev_io ALGN16(__srv_watcher);
 ev_async *glob_notify;
 
@@ -87,15 +122,63 @@ static struct ud_handle_s __hdl;
 static char __pktbuf[UDPC_SIMPLE_PKTLEN];
 static ud_packet_t __pkt = {.plen = countof(__pktbuf), .pbuf = __pktbuf};
 
+/* these delcarations are provided to suppress compiler warnings */
+extern int cli_yylex();
+extern int cli_yyget_lineno();
+extern char *cli_yyget_text();
+extern void cli_yyerror(void *scanner, ud_handle_t hdl, char const *errmsg);
+
+/* should that be properly public? */
+extern void
+stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal);
+
+
 void
-trigger_job_queue(void)
+cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 {
+	fputs("syntax error\n", logout);
 	return;
 }
 
-
-static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
+#define YYENABLE_NLS		0
+#define YYLTYPE_IS_TRIVIAL	1
 
+%}
+
+%expect 0
+
+%token <noval>
+	TOK_WTF
+	TOK_CYA
+
+%token <sval>
+	TOK_KEY
+	TOK_VAL
+	TOK_STRING
+
+%%
+
+
+query:
+wtf_cmd {
+	puts(help_rpl);
+	YYACCEPT;
+} |
+cya_cmd {
+	ud_detach_stdin(EV_DEFAULT);
+	ev_unloop(EV_DEFAULT_ EVUNLOOP_ALL);
+	YYACCEPT;
+}
+
+wtf_cmd:
+TOK_WTF;
+
+cya_cmd:
+TOK_CYA;
+
+%%
+
+
 static void
 sigint_cb(EV_P_ ev_signal *w, int revents)
 {
@@ -121,15 +204,6 @@ rplpkt_cb(EV_P_ ev_io *w, int revents)
 	stdin_print_async(PACKET(nread, res), (void*)&sa, lsa);
 	return;
 }
-
-
-/* parser madness */
-#include "cli-common.h"
-#include "unsercli-parser.h"
-#include "unsercli-scanner.h"
-#include "protocore.h"
-
-extern int cli_yyparse(void *scanner, ud_handle_t);
 
 void
 ud_parse(const ud_packet_t pkt)
@@ -198,4 +272,4 @@ main (void)
 	return 0;
 }
 
-/* unserding.c ends here */
+/* parser.y ends here */

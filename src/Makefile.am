@@ -27,17 +27,15 @@ dso_cli_la_LDFLAGS = -module
 dso_scscp_la_LDFLAGS = -module
 
 ## the main client binary
-unsercli_SOURCES = unsercli.c stdin.c
-unsercli_SOURCES += scanner.l parser.y
-unsercli_SOURCES += protocore.c
+unsercli_SOURCES = unsercli.y scanner.l stdin.c protocore.c cli-common.h
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_YFLAGS = -d -p "cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS) $(LIBEDIT_CPPFLAGS)
 unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsercli_LDADD = $(LIBEV_LIBS) -lreadline libunserding.la
-BUILT_SOURCES += unsercli-parser.h unsercli-scanner.h
+BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
 ## weird, must be an automake bug
-CLEANFILES += unsercli-parser.c unsercli-scanner.c
+CLEANFILES += unsercli-unsercli.c unsercli-scanner.c
 
 ## fucking automake refuses to replay my flex patch
 unsercli-scanner.h: scanner.l

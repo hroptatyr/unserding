@@ -57,14 +57,13 @@
 #include <string.h>
 
 #include "cli-common.h"
-#include "unsercli-parser.h"
+#include "unsercli-unsercli.h"
 
 extern int cli_yyget_column(yyscan_t);
 extern void cli_yyset_column(int, yyscan_t);
 
 #define RETURN_TOKEN(_x)			\
 	do {					\
-		fprintf(stderr, #_x "\n");	\
 		return _x;			\
 	} while (0)
 
@@ -97,26 +96,14 @@ abs		\|
 	RETURN_TOKEN(TOK_STRING);
 }
 
-hy		{ RETURN_TOKEN(TOK_HY); }
-oi		{ RETURN_TOKEN(TOK_HY); }
-hey		{ RETURN_TOKEN(TOK_HY); }
-lo		{ RETURN_TOKEN(TOK_HY); }
-ls		{ RETURN_TOKEN(TOK_LS); }
-cheers		{ RETURN_TOKEN(TOK_CHEERS); }
-ta		{ RETURN_TOKEN(TOK_CHEERS); }
-thx		{ RETURN_TOKEN(TOK_CHEERS); }
-help		{ RETURN_TOKEN(TOK_WTF); }
+h?elp		{ RETURN_TOKEN(TOK_WTF); }
 wtf		{ RETURN_TOKEN(TOK_WTF); }
 cya		{ RETURN_TOKEN(TOK_CYA); }
 bye		{ RETURN_TOKEN(TOK_CYA); }
 kthx		{ RETURN_TOKEN(TOK_CYA); }
-sup		{ RETURN_TOKEN(TOK_SUP); }
-alright		{ RETURN_TOKEN(TOK_SUP); }
-nvm		{ RETURN_TOKEN(TOK_NVM); }
-bugger		{ RETURN_TOKEN(TOK_NVM); }
-impo(rt)?	{ RETURN_TOKEN(TOK_IMPORT); }
-cat		{ RETURN_TOKEN(TOK_CAT); }
-e123ify		{ RETURN_TOKEN(TOK_E123); }
+kthxbye		{ RETURN_TOKEN(TOK_CYA); }
+quit		{ RETURN_TOKEN(TOK_CYA); }
+logout		{ RETURN_TOKEN(TOK_CYA); }
 
  /* don't do that at the moment, we can parse the string based on the context
   * ourselves, and much more efficiently */

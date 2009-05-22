@@ -64,6 +64,7 @@
 #endif	/* HAVE_EV_H */
 
 #include "unserding.h"
+#include "protocore.h"
 
 
 #include "unserding-nifty.h"
@@ -87,8 +88,6 @@
 #define NO_JOB		((job_t)0)
 
 typedef struct job_queue_s *job_queue_t;
-typedef struct job_s *job_t;
-#define TYPEDEFD_job_t
 /**
  * Type for work functions inside jobs. */
 typedef void(*ud_work_f)(job_t);
@@ -98,34 +97,6 @@ typedef ud_work_f ud_free_f;
 /**
  * Type for print functions inside jobs. */
 typedef ud_work_f ud_prnt_f;
-
-#define SIZEOF_JOB_S	4096
-struct job_s {
-	/** for udp based transports,
-	 * use a union here to allow clients to use whatever struct they want */
-	union {
-		/* this is the size we want at least */
-		char anon[32];
-#if defined SA_STRUCT
-		/* will be typically struct sockaddr_in6 */
-		SA_STRUCT sa;
-#endif
-	};
-	/**
-	 * bits 0-1 is job state:
-	 * set to 0 if job is free,
-	 * set to 1 if job is being loaded
-	 * set to 2 if job is ready to be processed
-	 * bits 2-3 is transmission state:
-	 *
-	 * */
-	long unsigned int flags;
-
-	size_t blen;
-	char ALGN16(buf)[];
-} __attribute__((aligned(SIZEOF_JOB_S)));
-#define JOB_BUF_SIZE						\
-	SIZEOF_JOB_S - offsetof(struct job_s, buf)
 
 struct job_queue_s {
 #if USE_ARRPQ
@@ -276,10 +247,6 @@ extern bool cli_waiting_p;
 /* more socket goodness, defined in mcast4.c */
 extern int ud_attach_mcast4(EV_P);
 extern int ud_detach_mcast4(EV_P);
-extern void send_m4(job_t);
-extern void send_m46(job_t);
-extern void send_m6(job_t);
-extern void send_cl(job_t);
 
 /* readline goodness, defined in stdin.c */
 extern int ud_attach_stdin(EV_P);

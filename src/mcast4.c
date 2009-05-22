@@ -323,14 +323,14 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 		return;
 	}
 
-	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa, &lsa);
+	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, (void*)&j->sa, &lsa);
 	/* obtain the address in human readable form */
-	a = inet_ntop(j->sa.sin6_family,
-		      j->sa.sin6_family == PF_INET6
-		      ? (void*)&j->sa.sin6_addr
+	a = inet_ntop(((struct sockaddr_in6*)&j->sa)->sin6_family,
+		      ((struct sockaddr_in6*)&j->sa)->sin6_family == PF_INET6
+		      ? (void*)&((struct sockaddr_in6*)&j->sa)->sin6_addr
 		      : (void*)&((struct sockaddr_in*)&j->sa)->sin_addr,
 		      buf, sizeof(buf));
-	p = ntohs(j->sa.sin6_port);
+	p = ntohs(((struct sockaddr_in6*)&j->sa)->sin6_port);
 	UD_DEBUG_MCAST("sock %d connect from host %s port %d\n", w->fd, a, p);
 	UD_LOG_MCAST(":sock %d connect :from [%s]:%d\n"
 		     "                                         "
@@ -365,6 +365,8 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 void
 send_cl(job_t j)
 {
+	struct sockaddr_in6 *sa = (void*)&j->sa;
+
 	if (UNLIKELY(j->blen == 0)) {
 		return;
 	}
@@ -372,7 +374,7 @@ send_cl(job_t j)
 	/* write back to whoever sent the packet */
 	(void)sendto(lsock, j->buf, j->blen, 0,
 		     (struct sockaddr*)&j->sa,
-		     j->sa.sin6_family == PF_INET6
+		     sa->sin6_family == PF_INET6
 		     ? sizeof(struct sockaddr_in6)
 		     : sizeof(struct sockaddr_in));
 	return;

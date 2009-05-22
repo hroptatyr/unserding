@@ -40,9 +40,6 @@
 #include "unserding.h"
 #define UNSERSRV
 #include "unserding-dbg.h"
-#include "unserding-private.h"
-#include "unserding-ctx.h"
-#include "unserding-nifty.h"
 
 #include "protocore.h"
 
@@ -81,7 +78,7 @@ init(void *clo)
 	UD_DEBUG("mod/cli: loading ...");
 
 	/* obtain the hostname */
-	(void)gethostname(hn, countof(hn));
+	(void)gethostname(hn, sizeof(hn));
 	hnlen = strlen(hn);
 
 	/* lodging our HY service */

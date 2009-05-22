@@ -40,7 +40,6 @@
 
 #include <stdio.h>
 #include "protocore.h"
-#include "unserding-ctx.h"
 
 /**
  * Call the worker after finding out what job J is. */

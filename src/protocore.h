@@ -43,6 +43,9 @@
 #if defined HAVE_NETINET_IN_H
 # include <netinet/in.h>
 #endif	/* HAVE_NETINET_IN_H */
+#if defined HAVE_SYS_SOCKET_H || 1
+# include <sys/socket.h>
+#endif
 
 /***
  * The unserding protocol in detail:
@@ -92,14 +95,54 @@ typedef uint8_t udpc_type_t;
 /* commands */
 #define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
 
-/* helper macro to use a job as packet */
-#define JOB_PACKET(j)	((ud_packet_t){.plen = j->blen, .pbuf = j->buf})
 /* helper macro to use a char buffer as packet */
 #define BUF_PACKET(b)	((ud_packet_t){.plen = countof(b), .pbuf = b})
 #define PACKET(a, b)	((ud_packet_t){.plen = a, .pbuf = b})
 
 
+/* jobs */
+typedef struct job_s *job_t;
+#define TYPEDEFD_job_t
+
+/* helper macro to use a job as packet */
+#define JOB_PACKET(j)	((ud_packet_t){.plen = j->blen, .pbuf = j->buf})
+
+#define SIZEOF_JOB_S	4096
+struct job_s {
+	/** for udp based transports,
+	 * use a union here to allow clients to use whatever struct they want */
+	/* will be typically struct sockaddr_in6 */
+	struct sockaddr_storage sa;
+	/**
+	 * bits 0-1 is job state:
+	 * set to 0 if job is free,
+	 * set to 1 if job is being loaded
+	 * set to 2 if job is ready to be processed
+	 * bits 2-3 is transmission state:
+	 *
+	 * */
+	long unsigned int flags;
+
+	size_t blen;
+	char buf[] __attribute__((aligned(16)));
+} __attribute__((aligned(SIZEOF_JOB_S)));
+#define JOB_BUF_SIZE						\
+	SIZEOF_JOB_S - offsetof(struct job_s, buf)
+
+/**
+ * Type for parse functions inside jobs. */
+typedef void(*ud_pktwrk_f)(job_t);
+/**
+ * Type for families. */
+typedef ud_pktwrk_f *ud_pktfam_t;
+
+
 extern void init_proto(void);
+
+extern void send_m4(job_t);
+extern void send_m46(job_t);
+extern void send_m6(job_t);
+extern void send_cl(job_t);
 
 /**
  * Return true if PKT is a valid unserding packet. */

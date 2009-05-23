@@ -175,6 +175,31 @@ add_cmd(const char *name, size_t nlen, ud_pkt_cmd_t cmd)
 	return;
 }
 
+static void
+rem_cmd(const char *name, size_t nlen)
+{
+	if (nlen == 0) {
+		nlen = strlen(name);
+	}
+	if (nlen > 15) {
+		nlen = 15;
+	}
+
+	for (cli_cmd_t c = cmd_list, o = NULL; c; o = c, c = c->next) {
+		if (strncmp(c->name, name, nlen) == 0) {
+			/* found him */
+			if (o == NULL) {
+				cmd_list = c->next;
+			} else {
+				o->next = c->next;
+			}
+			free(c);
+			return;
+		}
+	}
+	return;
+}
+
 static inline uint8_t
 hexdig_to_nibble(char c)
 {
@@ -277,8 +302,8 @@ TOK_CYA;
 
 ali_cmd:
 TOK_ALI TOK_VAL {
-	fputs("unaliasing commands not yet supported\n", logout);
-	YYERROR;
+	rem_cmd($<sval>2, $<slen>2);
+	YYACCEPT;
 } |
 TOK_ALI TOK_VAL TOK_VAL {
 	ud_pkt_cmd_t cmd = resolve_tok($<sval>3, $<slen>3);

@@ -106,6 +106,7 @@ kthx		{ RETURN_TOKEN(TOK_CYA); }
 kthxbye		{ RETURN_TOKEN(TOK_CYA); }
 quit		{ RETURN_TOKEN(TOK_CYA); }
 logout		{ RETURN_TOKEN(TOK_CYA); }
+alias		{ RETURN_TOKEN(TOK_ALI); }
 
  /* don't do that at the moment, we can parse the string based on the context
   * ourselves, and much more efficiently */

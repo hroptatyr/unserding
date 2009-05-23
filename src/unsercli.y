@@ -142,6 +142,99 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 
 #define YYENABLE_NLS		0
 #define YYLTYPE_IS_TRIVIAL	1
+#define YYSTACK_USE_ALLOCA	1
+
+
+/* command handling */
+typedef struct cli_cmd_s *cli_cmd_t;
+struct cli_cmd_s {
+	char name[16];
+	ud_pkt_cmd_t cmd;
+	cli_cmd_t next;
+};
+
+static cli_cmd_t cmd_list = NULL;
+
+static void
+add_cmd(const char *name, size_t nlen, ud_pkt_cmd_t cmd)
+{
+	cli_cmd_t c = malloc(sizeof(struct cli_cmd_s));
+
+	if (nlen == 0) {
+		nlen = strlen(name);
+	}
+	if (nlen > 15) {
+		nlen = 15;
+	}
+	strncpy(c->name, name, nlen);
+	c->name[nlen] = '\0';
+	c->cmd = cmd;
+	/* cons with global list */
+	c->next = cmd_list;
+	cmd_list = c;
+	return;
+}
+
+static inline uint8_t
+hexdig_to_nibble(char c)
+{
+	switch (c) {
+	case '0' ... '9':
+		return (uint8_t)(c - '0');
+	case 'A' ... 'F':
+		return (uint8_t)(c - '0' - 7);
+	case 'a' ... 'f':
+		return (uint8_t)(c - '0' - 39);
+	default:
+		return (uint8_t)(0xff);
+	}
+}
+
+static ud_pkt_cmd_t
+resolve_tok(const char *tok, size_t len)
+{
+	ud_pkt_cmd_t res = 0;
+	uint8_t tmp;
+
+	if (len == 0) {
+		len = strlen(tok);
+	}
+	if (len > 16) {
+		len = 16;
+	}
+	for (cli_cmd_t c = cmd_list; c; c = c->next) {
+		if (strncmp(c->name, tok, len) == 0) {
+			return c->cmd;
+		}
+	}
+	if (len != 4) {
+		goto out;
+	}
+	/* try the hex reader */
+	if ((tmp = hexdig_to_nibble(tok[0])) < 16) {
+		res |= tmp << 12;
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[1])) < 16) {
+		res |= tmp << 8;
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[2])) < 16) {
+		res |= tmp << 4;
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[3])) < 16) {
+		res |= tmp << 0;
+	} else {
+		goto out;
+	}
+	return res;
+out:
+	return 0xffff;
+}
 
 %}
 
@@ -150,6 +243,7 @@ cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
 %token <noval>
 	TOK_WTF
 	TOK_CYA
+	TOK_ALI
 
 %token <sval>
 	TOK_KEY
@@ -169,13 +263,11 @@ cya_cmd {
 	ev_unloop(EV_DEFAULT_ EVUNLOOP_ALL);
 	YYACCEPT;
 } |
-gen_cmd {
-	ud_pkt_cmd_t cmd = 0x1336;
-	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, cmd);
-} keyvals {
+gen_cmd keyvals {
 	ud_send_raw(hdl, hdl->pktchn[0]);
 	YYACCEPT;
-}
+} |
+ali_cmd;
 
 wtf_cmd:
 TOK_WTF;
@@ -183,8 +275,27 @@ TOK_WTF;
 cya_cmd:
 TOK_CYA;
 
+ali_cmd:
+TOK_ALI TOK_VAL {
+	fputs("unaliasing commands not yet supported\n", logout);
+	YYERROR;
+} |
+TOK_ALI TOK_VAL TOK_VAL {
+	ud_pkt_cmd_t cmd = resolve_tok($<sval>3, $<slen>3);
+
+	add_cmd($<sval>2, $<slen>2, cmd);
+	YYACCEPT;
+};
+
 gen_cmd:
-TOK_VAL;
+TOK_VAL {
+	ud_pkt_cmd_t cmd = resolve_tok(yylval.sval, yylval.slen);
+	if (cmd == 0xffff) {
+		fprintf(logout, "no such command: \"%s\"\n", yylval.sval);
+		YYABORT;
+	}
+	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, cmd);
+};
 
 keyvals:
 ;
@@ -230,43 +341,47 @@ typedef struct {
 	char *doc;
 } cmd_t;
 
-cmd_t commands[] = {
-	{ "wtf", "Change to directory DIR" },
-	{ "help", "Delete FILE" },
-	{ "kthx", "Display this text" },
-	{ "quit", "Synonym for `help'" },
-	{ "bye", "List files in DIR" },
-	{ "logout", "List files in DIR" },
-	{ NULL, NULL }
-};
-
 extern char *cmd_generator(const char *text, int state);
 char*
 cmd_generator(const char *text, int state)
 {
-	static int list_index, len;
-	char *name;
+	static size_t len;
+	static cli_cmd_t last = NULL;
 
-	/* If this is a new word to complete, initialize now.  This
+	/* if this is a new word to complete, initialize now.  This
 	   includes saving the length of TEXT for efficiency, and
 	   initializing the index variable to 0. */
 	if (!state) {
-		list_index = 0;
+		last = cmd_list;
 		len = strlen(text);
 	}
 
-	/* Return the next name which partially matches from the
+	/* return the next name which partially matches from the
 	   command list. */
-	while ((name = commands[list_index].name)) {
-		list_index++;
+	while (last) {
+		char *name = last->name;
 
+		last = last->next;
 		if (strncmp(name, text, len) == 0) {
 			return strdup(name);
 		}
 	}
 
-	/* If no names matched, then return NULL. */
+	/* if no names matched, then return NULL. */
 	return NULL;
+}
+
+static void
+init_cmd_list(void)
+{
+	add_cmd("wtf", 0, 0xffff);
+	add_cmd("quit", 0, 0xffff);
+	add_cmd("logout", 0, 0xffff);
+	add_cmd("help", 0, 0xffff);
+	add_cmd("kthx", 0, 0xffff);
+	add_cmd("kthxbye", 0, 0xffff);
+	add_cmd("bye", 0, 0xffff);
+	add_cmd("alias", 0, 0xffff);
 }
 
 
@@ -318,6 +433,9 @@ main (void)
 	/* initialise an io watcher, then start it */
 	ev_io_init(srv_watcher, rplpkt_cb, ud_handle_sock(&__hdl), EV_READ);
 	ev_io_start(EV_A_ srv_watcher);
+
+	/* initialise command system */
+	init_cmd_list();
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);

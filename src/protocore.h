@@ -71,25 +71,8 @@
 
 typedef uint8_t udpc_type_t;
 
-/* using dbus notation */
-#define UDPC_TYPE_UNK	'\0'
-#define UDPC_TYPE_BYTE	'y'
-#define UDPC_TYPE_BOOL	'b'
-#define UDPC_TYPE_SI16	'n'
-#define UDPC_TYPE_UI16	'q'
-#define UDPC_TYPE_SI32	'i'
-#define UDPC_TYPE_UI32	'u'
-#define UDPC_TYPE_SI64	'x'
-#define UDPC_TYPE_UI64	't'
-#define UDPC_TYPE_FLTS	'f'
-#define UDPC_TYPE_FLTD	'd'
-
-/* variadic ones */
-#define UDPC_TYPE_STR	's'
-#define UDPC_TYPE_SIG	'g'
-#define UDPC_TYPE_SEQ	'a'
-#define UDPC_TYPE_REC	'r'
-#define UDPC_TYPE_VAR	'v'
+/* our types and some serialisation protos */
+#include "seria.h"
 
 
 /* commands */
@@ -321,5 +304,10 @@ udpc_cmd_wrk(const ud_pkt_cmd_t cmd)
 {
 	return cmd & 0xff;
 }
+
+
+/* service handlers */
+extern void
+ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl);
 
 #endif	/* INCLUDED_protocore_h_ */

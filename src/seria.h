@@ -1,11 +1,11 @@
-/*** dso-cli.c -- command line interface module
+/*** seria.h -- unserding serialisation
  *
- * Copyright (C) 2009 Sebastian Freundt
+ * Copyright (C) 2008, 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
  * This file is part of unserding.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -35,93 +35,44 @@
  *
  ***/
 
-#include <stdio.h>
-#include "module.h"
-#include "unserding.h"
-#define UNSERSRV
-#include "unserding-dbg.h"
+#if !defined INCLUDED_seria_h_
+#define INCLUDED_seria_h_
 
-#include "protocore.h"
+#define UDPC_TYPE_SEQ	'a'
+#define UDPC_TYPE_VAR	'v'
 
-static char hn[64];
-static size_t hnlen;
 
-
-/* the HY service */
-static void
-cli_hy(job_t j)
-{
-	UD_DEBUG("mod/cli: %s<- HY\n", hn);
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	j->buf[8] = 's';
-	j->buf[9] = hnlen;
-	memcpy(j->buf + 10, hn, hnlen);
-	j->blen = 8 + 1 + 1 + hnlen;
-	send_cl(j);
-	return;
-}
+/* one byte sequences */
+#define UDPC_TYPE_UNK	0x00
+#define UDPC_TYPE_BYTE	0x01
+#define UDPC_TYPE_UI16	0x02
+#define UDPC_TYPE_SI16	(UDPC_TYPE_UI16 | UDPC_SGN_MASK)
+#define UDPC_TYPE_UI32	0x04
+#define UDPC_TYPE_SI32	(UDPC_TYPE_UI32 | UDPC_SGN_MASK)
+#define UDPC_TYPE_UI64	0x08
+#define UDPC_TYPE_SI64	(UDPC_TYPE_UI64 | UDPC_SGN_MASK)
 
-static void
-cli_hy_rpl(job_t j)
-{
-	UD_DEBUG("mod/cli: ->%s HY\n", hn);
-	return;
-}
+#define UDPC_TYPE_FLTH	(UDPC_TYPE_UI16 | UDPC_FLT_MASK)
+#define UDPC_TYPE_FLTS	(UDPC_TYPE_UI32 | UDPC_FLT_MASK)
+#define UDPC_TYPE_FLTD	(UDPC_TYPE_UI64 | UDPC_FLT_MASK)
 
-/* the LS service */
-static void
-cli_ls(job_t j)
-{
-	UD_DEBUG("mod/cli: %s<- LS\n", hn);
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	j->buf[8] = UDPC_TYPE_STR;
-	j->buf[9] = hnlen;
-	memcpy(j->buf + 10, hn, hnlen);
-	j->blen = 8 + 1 + 1 + hnlen;
-	send_cl(j);
-	return;
-}
+#define UDPC_TYPE_STR	(UDPC_TYPE_BYTE | UDPC_SEQ_MASK)
 
-static void
-cli_ls_rpl(job_t j)
-{
-	UD_DEBUG("mod/cli: ->%s HY\n", hn);
-	return;
-}
+/* multi byte sigs */
+#define UDPC_TYPE_REC	0x0f	/* + number of slots + slot sigs */
+
+/* masks */
+#define UDPC_SGN_MASK	0x10
+#define UDPC_FLT_MASK	0x20
+#define UDPC_SEQ_MASK	0x80	/* + number of array elements */
 
 
-void
-init(void *clo)
+/* inlines */
+static inline uint16_t
+udpc_msg_size(const char *sig)
 {
-	UD_DEBUG("mod/cli: loading ...");
-
-	/* obtain the hostname */
-	(void)gethostname(hn, sizeof(hn));
-	hnlen = strlen(hn);
-
-	/* lodging our HY service */
-	ud_set_service(0x1336, cli_hy, cli_hy_rpl);
-	/* lodging the LS service */
-	ud_set_service(0x1330, cli_ls, cli_ls_rpl);
-
-	UD_DBGCONT("done\n");
-	return;
+	uint16_t res = 0;
+	return res;
 }
 
-void
-reinit(void *clo)
-{
-	UD_DEBUG("mod/cli: reloading ...");
-	UD_DBGCONT("done\n");
-	return;
-}
-
-void
-deinit(void *clo)
-{
-	UD_DEBUG("mod/cli: unloading ...");
-	UD_DBGCONT("done\n");
-	return;
-}
-
-/* dso-cli.c ends here */
+#endif	/* INCLUDED_seria_h_ */

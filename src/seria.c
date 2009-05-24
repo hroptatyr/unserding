@@ -1,11 +1,11 @@
-/*** dso-cli.c -- command line interface module
+/*** seria.c -- unserding serialisation
  *
- * Copyright (C) 2009 Sebastian Freundt
+ * Copyright (C) 2008, 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
  * This file is part of unserding.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -35,93 +35,5 @@
  *
  ***/
 
-#include <stdio.h>
-#include "module.h"
-#include "unserding.h"
-#define UNSERSRV
-#include "unserding-dbg.h"
 
-#include "protocore.h"
-
-static char hn[64];
-static size_t hnlen;
-
-
-/* the HY service */
-static void
-cli_hy(job_t j)
-{
-	UD_DEBUG("mod/cli: %s<- HY\n", hn);
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	j->buf[8] = 's';
-	j->buf[9] = hnlen;
-	memcpy(j->buf + 10, hn, hnlen);
-	j->blen = 8 + 1 + 1 + hnlen;
-	send_cl(j);
-	return;
-}
-
-static void
-cli_hy_rpl(job_t j)
-{
-	UD_DEBUG("mod/cli: ->%s HY\n", hn);
-	return;
-}
-
-/* the LS service */
-static void
-cli_ls(job_t j)
-{
-	UD_DEBUG("mod/cli: %s<- LS\n", hn);
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	j->buf[8] = UDPC_TYPE_STR;
-	j->buf[9] = hnlen;
-	memcpy(j->buf + 10, hn, hnlen);
-	j->blen = 8 + 1 + 1 + hnlen;
-	send_cl(j);
-	return;
-}
-
-static void
-cli_ls_rpl(job_t j)
-{
-	UD_DEBUG("mod/cli: ->%s HY\n", hn);
-	return;
-}
-
-
-void
-init(void *clo)
-{
-	UD_DEBUG("mod/cli: loading ...");
-
-	/* obtain the hostname */
-	(void)gethostname(hn, sizeof(hn));
-	hnlen = strlen(hn);
-
-	/* lodging our HY service */
-	ud_set_service(0x1336, cli_hy, cli_hy_rpl);
-	/* lodging the LS service */
-	ud_set_service(0x1330, cli_ls, cli_ls_rpl);
-
-	UD_DBGCONT("done\n");
-	return;
-}
-
-void
-reinit(void *clo)
-{
-	UD_DEBUG("mod/cli: reloading ...");
-	UD_DBGCONT("done\n");
-	return;
-}
-
-void
-deinit(void *clo)
-{
-	UD_DEBUG("mod/cli: unloading ...");
-	UD_DBGCONT("done\n");
-	return;
-}
-
-/* dso-cli.c ends here */
+/* seria.c ends here */

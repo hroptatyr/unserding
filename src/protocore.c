@@ -86,8 +86,6 @@ ud_proto_parse(job_t j)
  * do not expose the function ptr at all, instead return a pointer into
  * the services array and provide a fun like next() to allow for defadvice'd
  * functions. */
-extern void
-ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl);
 void
 ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl)
 {
@@ -224,6 +222,7 @@ __fprint_one(const char *buf, FILE *fp)
 		len = buf[1] + 2;
 		break;
 
+#if 0
 	case UDPC_TYPE_VAR:
 		fputs("(data)", fp);
 		for (uint8_t i = 2; i < buf[1] + 2; i++) {
@@ -231,6 +230,7 @@ __fprint_one(const char *buf, FILE *fp)
 		}
 		len = buf[1] + 2;
 		break;
+#endif
 
 	case UDPC_TYPE_SEQ:
 		fprintf(fp, "(seqof(#%d))", buf[1]);

@@ -35,5 +35,51 @@
  *
  ***/
 
+#include <stdint.h>
+#include "seria.h"
+
+#define SERIA_MAX_DEPTH		8
+
+
+uint16_t
+udpc_msg_size(const char *sig)
+{
+	uint16_t res[SERIA_MAX_DEPTH];
+	uint8_t cnt[SERIA_MAX_DEPTH];
+	uint8_t idx = 0;
+
+	res[0] = 0;
+	cnt[0] = 1;
+	for (const uint8_t *c = (const void*)sig; *c; c++) {
+		if (!(UDPC_SEQ_MASK & *c) &&
+		    ((*c & UDPC_SIZ_MASK) != UDPC_TYPE_REC)) {
+			res[idx] += (uint16_t)(*c & UDPC_SIZ_MASK);
+		} else if ((UDPC_SEQ_MASK & *c) &&
+			   ((*c & UDPC_SIZ_MASK) != UDPC_TYPE_REC)) {
+			res[idx] += (uint16_t)(*c & UDPC_SIZ_MASK) * c[1];
+			c++;
+		} else if ((UDPC_SEQ_MASK & *c)) {
+			/* seqof(struct ...) */
+			idx++;
+			res[idx] = 0;
+			cnt[idx] = c[1];
+			c++;
+		} else if (!(*c & UDPC_SGN_MASK)) {
+			/* must be a struct */
+			idx++;
+			res[idx] = 0;
+			cnt[idx] = 1;
+		} else {
+			/* must be the end of a structs */
+			uint16_t sz = cnt[idx] * res[idx];
+			if (idx-- == 0) {
+				return 0;
+			}
+			res[idx] += sz;
+		}
+	}
+	return res[0];
+}
+
 
 /* seria.c ends here */

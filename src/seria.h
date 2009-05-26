@@ -59,7 +59,8 @@
 #define UDPC_TYPE_STR	(UDPC_TYPE_BYTE | UDPC_SEQ_MASK)
 
 /* multi byte sigs */
-#define UDPC_TYPE_REC	0x0f	/* + number of slots + slot sigs */
+#define UDPC_TYPE_REC	0x0f	/* + slot sigs */
+#define UDPC_TYPE_EOR	(UDPC_TYPE_REC | UDPC_SGN_MASK)	/* end of struct */
 
 /* masks */
 #define UDPC_SGN_MASK	0x10
@@ -70,27 +71,7 @@
 #define UDPC_SEQOF(_x)	((_x) | UDPC_SEQ_MASK)
 #define UDPC_NSEQOF(_x, _n)	((_x) | UDPC_SEQ_MASK), _n
 
-
-/* inlines */
-static inline uint16_t
-udpc_msg_size(const char *sig)
-{
-	uint16_t res = 0;
-	uint8_t cnt = 0;
+extern uint16_t udpc_msg_size(const char *sig);
 
-	for (const uint8_t *c = (const void*)sig; *c; c++) {
-		if (!(UDPC_SEQ_MASK & *c) && *c != UDPC_TYPE_REC) {
-			res += (uint16_t)(*c & UDPC_SIZ_MASK);
-		} else if (UDPC_SEQ_MASK & *c) {
-			res += (uint16_t)(*c & UDPC_SIZ_MASK) * c[1];
-			c++;
-		} else {
-			/* must be a struct */
-			cnt = c[1];
-			c++;
-		}
-	}
-	return res;
-}
 
 #endif	/* INCLUDED_seria_h_ */

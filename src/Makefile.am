@@ -15,7 +15,8 @@ header_HEADERS = unserding.h catalogue.h protocore.h
 noinst_HEADERS = arrqueue.h protocore-private.h
 
 ## the main server binary
-unserdingd_SOURCES = unserdingd.c mcast4.c protocore.c arrqueue.c dllqueue.c
+unserdingd_SOURCES = unserdingd.c mcast4.c
+unserdingd_SOURCES += protocore.c arrqueue.c dllqueue.c seria.c
 unserdingd_SOURCES += module.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt -lltdl

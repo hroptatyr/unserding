@@ -63,6 +63,8 @@
  *
  ***/
 
+#define UDPC_SIG_OFFSET		0x08
+
 #if !defined htons || !defined ntohs
 # error "Cannot find htons()/ntohs()"
 #endif	/* !htons || !ntohs */

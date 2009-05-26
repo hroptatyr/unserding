@@ -53,10 +53,11 @@ cli_hy(job_t j)
 {
 	UD_DEBUG("mod/cli: %s<- HY\n", hn);
 	udpc_make_rpl_pkt(JOB_PACKET(j));
-	j->buf[8] = 's';
-	j->buf[9] = hnlen;
-	memcpy(j->buf + 10, hn, hnlen);
-	j->blen = 8 + 1 + 1 + hnlen;
+	j->buf[UDPC_SIG_OFFSET] = UDPC_TYPE_STR;
+	j->buf[UDPC_SIG_OFFSET + 1] = hnlen;
+	j->buf[UDPC_SIG_OFFSET + 2] = '\0';
+	memcpy(j->buf + UDPC_SIG_OFFSET + 3, hn, hnlen);
+	j->blen = UDPC_SIG_OFFSET + 3 + hnlen;
 	send_cl(j);
 	return;
 }

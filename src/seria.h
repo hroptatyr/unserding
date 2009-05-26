@@ -38,6 +38,9 @@
 #if !defined INCLUDED_seria_h_
 #define INCLUDED_seria_h_
 
+#include <stdio.h>
+
+
 #define UDPC_TYPE_SEQ	'a'
 #define UDPC_TYPE_VAR	'v'
 
@@ -57,6 +60,7 @@
 #define UDPC_TYPE_FLTD	(UDPC_TYPE_UI64 | UDPC_FLT_MASK)
 
 #define UDPC_TYPE_STR	(UDPC_TYPE_BYTE | UDPC_SEQ_MASK)
+#define UDPC_TYPE_NSTR(_n)	(UDPC_TYPE_BYTE | UDPC_SEQ_MASK), _n
 
 /* multi byte sigs */
 #define UDPC_TYPE_REC	0x0f	/* + slot sigs */
@@ -72,6 +76,7 @@
 #define UDPC_NSEQOF(_x, _n)	((_x) | UDPC_SEQ_MASK), _n
 
 extern uint16_t udpc_msg_size(const char *sig);
-
+extern void udpc_sig_string(char *restrict out, const char *sig);
+extern void udpc_fprint_msg(FILE *out, const char *msg);
 
 #endif	/* INCLUDED_seria_h_ */

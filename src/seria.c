@@ -53,9 +53,11 @@ udpc_msg_size(const char *sig)
 	for (const uint8_t *c = (const void*)sig; *c; c++) {
 		if (!(UDPC_SEQ_MASK & *c) &&
 		    ((*c & UDPC_SIZ_MASK) != UDPC_TYPE_REC)) {
+			/* simple type */
 			res[idx] += (uint16_t)(*c & UDPC_SIZ_MASK);
 		} else if ((UDPC_SEQ_MASK & *c) &&
 			   ((*c & UDPC_SIZ_MASK) != UDPC_TYPE_REC)) {
+			/* seqof simple type */
 			res[idx] += (uint16_t)(*c & UDPC_SIZ_MASK) * c[1];
 			c++;
 		} else if ((UDPC_SEQ_MASK & *c)) {
@@ -81,5 +83,41 @@ udpc_msg_size(const char *sig)
 	return res[0];
 }
 
+void
+udpc_sig_string(char *restrict out, const char *sig)
+{
+	for (const uint8_t *c = (const void*)sig; *c; c++) {
+		if (!(UDPC_SEQ_MASK & *c) &&
+		    ((*c & UDPC_SIZ_MASK) != UDPC_TYPE_REC)) {
+			/* simple type */
+			*out++ = (*c & UDPC_SIZ_MASK) + 'a';
+		} else if ((UDPC_SEQ_MASK & *c) &&
+			   ((*c & UDPC_SIZ_MASK) != UDPC_TYPE_REC)) {
+			/* seqof simple type */
+			*out++ = (c[1] & 0x0f) + '0';
+			*out++ = (*c & UDPC_SIZ_MASK) + 'a';
+			c++;
+		} else if ((UDPC_SEQ_MASK & *c)) {
+			/* seqof(struct ...) */
+			*out++ = (c[1] & 0x0f) + '0';
+			*out++ = '(';
+			c++;
+		} else if (!(*c & UDPC_SGN_MASK)) {
+			/* must be a struct */
+			*out++ = '(';
+		} else {
+			/* must be the end of a structs */
+			*out++ = ')';
+		}
+	}
+	*out = '\0';
+	return;
+}
+
+void
+udpc_fprint_msg(FILE *out, const char *msg)
+{
+	return;
+}
 
 /* seria.c ends here */

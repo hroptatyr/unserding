@@ -64,7 +64,11 @@
 /* masks */
 #define UDPC_SGN_MASK	0x10
 #define UDPC_FLT_MASK	0x20
-#define UDPC_SEQ_MASK	0x80	/* + number of array elements */
+#define UDPC_SEQ_MASK	0x80	/* must be \nul terminated */
+#define UDPC_SIZ_MASK	0x0f
+
+#define UDPC_SEQOF(_x)	((_x) | UDPC_SEQ_MASK)
+#define UDPC_NSEQOF(_x, _n)	((_x) | UDPC_SEQ_MASK), _n
 
 
 /* inlines */
@@ -72,6 +76,20 @@ static inline uint16_t
 udpc_msg_size(const char *sig)
 {
 	uint16_t res = 0;
+	uint8_t cnt = 0;
+
+	for (const uint8_t *c = (const void*)sig; *c; c++) {
+		if (!(UDPC_SEQ_MASK & *c) && *c != UDPC_TYPE_REC) {
+			res += (uint16_t)(*c & UDPC_SIZ_MASK);
+		} else if (UDPC_SEQ_MASK & *c) {
+			res += (uint16_t)(*c & UDPC_SIZ_MASK) * c[1];
+			c++;
+		} else {
+			/* must be a struct */
+			cnt = c[1];
+			c++;
+		}
+	}
 	return res;
 }
 

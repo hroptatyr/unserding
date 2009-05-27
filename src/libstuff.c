@@ -150,8 +150,12 @@ ud_send_raw(ud_handle_t hdl, ud_packet_t pkt)
 {
 	int s = ud_handle_sock(hdl);
 
+	if (sizeof(hdl->sa) != sizeof(hdl->sa.sas)) {
+		abort();
+	}
+
 	/* always send to the mcast addresses */
-	(void)sendto(s, pkt.pbuf, pkt.plen, 0, &hdl->sa, sizeof(hdl->sas));
+	(void)sendto(s, pkt.pbuf, pkt.plen, 0, &hdl->sa.sa, sizeof(hdl->sa));
 	return;
 }
 

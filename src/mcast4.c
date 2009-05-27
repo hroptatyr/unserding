@@ -84,14 +84,6 @@
 # error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
 #endif
 
-/* our convenience union */
-typedef union {
-	struct sockaddr_storage sas;
-	struct sockaddr sa;
-	struct sockaddr_in sa4;
-	struct sockaddr_in6 sa6;
-} __attribute__((__transparent_union__)) ud_sockaddr_u;
-
 static int lsock4 __attribute__((used));
 static int lsock6 __attribute__((used));
 
@@ -101,7 +93,7 @@ static ev_timer ALGN16(__s2s_watcher);
 static ev_io ALGN16(__srv4_watcher);
 static struct ip_mreq ALGN16(mreq4);
 /* server to client goodness */
-static ud_sockaddr_u __sa4 = {
+static ud_sockaddr_t __sa4 = {
 	.sa4.sin_addr = {0}
 };
 
@@ -110,7 +102,7 @@ static ud_sockaddr_u __sa4 = {
 static ev_io ALGN16(__srv6_watcher);
 static struct ipv6_mreq ALGN16(mreq6);
 /* server to client goodness */
-static ud_sockaddr_u __sa6 = {
+static ud_sockaddr_t __sa6 = {
 	.sa6.sin6_addr = IN6ADDR_ANY_INIT
 };
 #endif	/* AF_INET */
@@ -370,14 +362,12 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 		return;
 	}
 
-	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, (void*)&j->sa, &lsa);
+	j->sock = w->fd;
+	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa.sa, &lsa);
 	/* obtain the address in human readable form */
-	a = inet_ntop(((struct sockaddr_in6*)&j->sa)->sin6_family,
-		      ((struct sockaddr_in6*)&j->sa)->sin6_family == PF_INET6
-		      ? (void*)&((struct sockaddr_in6*)&j->sa)->sin6_addr
-		      : (void*)&((struct sockaddr_in*)&j->sa)->sin_addr,
-		      buf, sizeof(buf));
-	p = ntohs(((struct sockaddr_in6*)&j->sa)->sin6_port);
+	a = inet_ntop(ud_sockaddr_fam(&j->sa),
+		      ud_sockaddr_addr(&j->sa), buf, sizeof(buf));
+	p = ud_sockaddr_port(&j->sa);
 	UD_DEBUG_MCAST("sock %d connect from host %s port %d\n", w->fd, a, p);
 	UD_LOG_MCAST(":sock %d connect :from [%s]:%d\n"
 		     "                                         "
@@ -412,18 +402,12 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 void
 send_cl(job_t j)
 {
-	struct sockaddr_in6 *sa = (void*)&j->sa;
-
 	if (UNLIKELY(j->blen == 0)) {
 		return;
 	}
 
 	/* write back to whoever sent the packet */
-	(void)sendto(lsock6, j->buf, j->blen, 0,
-		     (struct sockaddr*)&j->sa,
-		     sa->sin6_family == PF_INET6
-		     ? sizeof(struct sockaddr_in6)
-		     : sizeof(struct sockaddr_in));
+	(void)sendto(j->sock, j->buf, j->blen, 0, &j->sa.sa, sizeof(j->sa));
 	return;
 }
 
@@ -435,8 +419,7 @@ send_m4(job_t j)
 	}
 
 	/* send to the m4cast address */
-	(void)sendto(lsock6, j->buf, j->blen, 0,
-		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
+	(void)sendto(lsock4, j->buf, j->blen, 0, &__sa4.sa, sizeof(__sa4.sa4));
 	return;
 }
 
@@ -448,8 +431,7 @@ send_m6(job_t j)
 	}
 
 	/* send to the m6cast address */
-	(void)sendto(lsock6, j->buf, j->blen, 0,
-		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
+	(void)sendto(lsock6, j->buf, j->blen, 0, &__sa6.sa, sizeof(__sa6.sa6));
 	return;
 }
 
@@ -461,11 +443,9 @@ send_m46(job_t j)
 	}
 
 	/* always send to the mcast addresses */
-	(void)sendto(lsock6, j->buf, j->blen, 0,
-		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
+	(void)sendto(lsock4, j->buf, j->blen, 0, &__sa4.sa, sizeof(__sa4.sa4));
 	/* ship to m6cast addr */
-	(void)sendto(lsock6, j->buf, j->blen, 0,
-		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
+	(void)sendto(lsock6, j->buf, j->blen, 0, &__sa6.sa, sizeof(__sa6.sa6));
 	return;
 }
 

@@ -57,6 +57,16 @@
 /* should be computed somehow using the mtu of the nic */
 #define UDPC_SIMPLE_PKTLEN	4096
 
+/* our grand unified sockaddr thingie */
+typedef union ud_sockaddr_u ud_sockaddr_t;
+
+union ud_sockaddr_u {
+		struct sockaddr_storage sas;
+		struct sockaddr sa;
+		struct sockaddr_in sa4;
+		struct sockaddr_in6 sa6;
+} __attribute__((transparent_union));
+
 /**
  * Flags. */
 typedef long unsigned int ud_flags_t;
@@ -112,14 +122,59 @@ struct ud_handle_s {
 	int epfd;
 	ud_pktchn_t pktchn;
 	/* our connexion later on */
-	union {
-		struct sockaddr_storage sas;
-		struct sockaddr sa;
-		struct sockaddr_in sa4;
-		struct sockaddr_in6 sa6;
-	};
+	ud_sockaddr_t sa;
 };
 
+
+/* sockaddr stuff */
+static inline short unsigned int __attribute__((always_inline))
+ud_sockaddr_fam(const ud_sockaddr_t *sa)
+{
+	return sa->sa.sa_family;
+}
+
+static inline short unsigned int __attribute__((always_inline))
+ud_sockaddr_4port(const ud_sockaddr_t *sa)
+{
+	return ntohs(sa->sa4.sin_port);
+}
+
+static inline short unsigned int __attribute__((always_inline))
+ud_sockaddr_6port(const ud_sockaddr_t *sa)
+{
+	return ntohs(sa->sa6.sin6_port);
+}
+
+static inline short unsigned int __attribute__((always_inline))
+ud_sockaddr_port(const ud_sockaddr_t *sa)
+{
+	/* should be properly switched? */
+	return ntohs(sa->sa6.sin6_port);
+}
+
+static inline void __attribute__((always_inline))
+ud_sockaddr_set_6port(ud_sockaddr_t *sa, uint16_t port)
+{
+	sa->sa6.sin6_port = htons(port);
+	return;
+}
+
+static inline void __attribute__((always_inline))
+ud_sockaddr_set_4port(ud_sockaddr_t *sa, uint16_t port)
+{
+	sa->sa4.sin_port = htons(port);
+	return;
+}
+
+static inline void __attribute__((always_inline))
+ud_sockaddr_set_port(ud_sockaddr_t *sa, uint16_t port)
+{
+	/* should be properly switched? */
+	sa->sa6.sin6_port = htons(port);
+	return;
+}
+
+
 /* connexion stuff */
 /**
  * Initialise a handle into what's behind HDL. */
@@ -175,35 +230,51 @@ ud_handle_sock(ud_handle_t hdl)
 	return hdl->sock;
 }	
 
+static inline const void __attribute__((always_inline))*
+ud_sockaddr_4addr(const ud_sockaddr_t *sa)
+{
+	return &sa->sa4.sin_addr;
+}
+
+static inline const void __attribute__((always_inline))*
+ud_sockaddr_6addr(const ud_sockaddr_t *sa)
+{
+	return &sa->sa6.sin6_addr;
+}
+
+static inline const void __attribute__((always_inline))*
+ud_sockaddr_addr(const ud_sockaddr_t *sa)
+{
+	switch (ud_sockaddr_fam(sa)) {
+	case AF_INET6:
+		return ud_sockaddr_6addr(sa);
+	case AF_INET:
+		return ud_sockaddr_4addr(sa);
+	default:
+		return NULL;
+	}
+}
+
 static inline void
 ud_handle_set_port(ud_handle_t hdl, uint16_t port)
 {
-	switch (hdl->sa.sa_family) {
-	case AF_INET6:
-		hdl->sa6.sin6_port = htons(port);
-		break;
-	case AF_INET:
-		hdl->sa4.sin_port = htons(port);
-		break;
-	default:
-		break;
-	}
+	ud_sockaddr_set_port(&hdl->sa, port);
 	return;
 }
 
 static inline void
 ud_handle_set_6svc(ud_handle_t hdl)
 {
-	hdl->sa6.sin6_family = AF_INET6;
-	inet_pton(AF_INET6, UD_MCAST6_ADDR, &hdl->sa6.sin6_addr);
+	hdl->sa.sa6.sin6_family = AF_INET6;
+	inet_pton(AF_INET6, UD_MCAST6_ADDR, &hdl->sa.sa6.sin6_addr);
 	return;
 }
 
 static inline void
 ud_handle_set_4svc(ud_handle_t hdl)
 {
-	hdl->sa4.sin_family = AF_INET;
-	inet_pton(AF_INET, UD_MCAST4_ADDR, &hdl->sa4.sin_addr);
+	hdl->sa.sa4.sin_family = AF_INET;
+	inet_pton(AF_INET, UD_MCAST4_ADDR, &hdl->sa.sa4.sin_addr);
 	return;
 }
 

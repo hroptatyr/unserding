@@ -97,7 +97,8 @@ struct job_s {
 	/** for udp based transports,
 	 * use a union here to allow clients to use whatever struct they want */
 	/* will be typically struct sockaddr_in6 */
-	struct sockaddr_storage sa;
+	ud_sockaddr_t sa;
+	unsigned int sock;
 	/**
 	 * bits 0-1 is job state:
 	 * set to 0 if job is free,
@@ -106,7 +107,7 @@ struct job_s {
 	 * bits 2-3 is transmission state:
 	 *
 	 * */
-	long unsigned int flags;
+	unsigned int flags;
 
 	size_t blen;
 	char buf[] __attribute__((aligned(16)));

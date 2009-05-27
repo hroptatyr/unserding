@@ -343,37 +343,35 @@ sigpipe_cb(EV_P_ ev_signal *w, int revents)
 }
 
 static size_t
-rplpkt_pr_src(char *restrict outbuf, const void *sa)
+rplpkt_pr_src(char *restrict outbuf, const ud_sockaddr_t *sa)
 {
 	static const char srcstr[] = "packet from ";
+	static const char unkstr[] = "unknown";
 	size_t res = sizeof(srcstr) - 1;
 	/* the port (in host-byte order) */
 	uint16_t p;
-	int fam = ((const struct sockaddr_in*)sa)->sin_family;
+	int fam = ud_sockaddr_fam(sa);
 
 	/* copy the introductory text */
 	memcpy(outbuf, srcstr, res);
 	/* obtain the address in human readable form */
-	if (fam == PF_INET6) {
-		const struct sockaddr_in6 *sa6 = sa;
-
+	switch (fam) {
+	case PF_INET6:
 		outbuf[res++] = '[';
-		inet_ntop(fam, &sa6->sin6_addr, &outbuf[res], 256);
+		inet_ntop(fam, &sa->sa6.sin6_addr, &outbuf[res], 256);
 		res += strlen(&outbuf[res]);
 		outbuf[res++] = ']';
-		p = ntohs(sa6->sin6_port);
-	} else if (fam == PF_INET) {
-		const struct sockaddr_in *sa4 = sa;
-
-		inet_ntop(fam, &sa4->sin_addr, &outbuf[res], 256);
+		break;
+	case PF_INET:
+		inet_ntop(fam, &sa->sa4.sin_addr, &outbuf[res], 256);
 		res += strlen(&outbuf[res]);
-		p = ntohs(sa4->sin_port);
-	} else {
-		static const char unkstr[] = "unknown";
-		memcpy(&outbuf[res], "unknown", sizeof(unkstr));
+		break;
+	default:
+		memcpy(&outbuf[res], unkstr, sizeof(unkstr));
 		return res + sizeof(unkstr) - 1;
 	}
 	outbuf[res++] = ':';
+	p = ud_sockaddr_port(sa);
 	res += sprintf(&outbuf[res], "%d", p);
 	return res;
 }
@@ -382,7 +380,7 @@ static void
 rplpkt_cb(EV_P_ ev_io *w, int revents)
 {
 	ssize_t nread;
-	struct sockaddr_storage sa;
+	ud_sockaddr_t sa;
 	socklen_t lsa = sizeof(sa);
 	char res[UDPC_SIMPLE_PKTLEN];
 	/* the print buffer */

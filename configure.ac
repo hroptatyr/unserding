@@ -169,6 +169,15 @@ dnl fi
 dnl AC_CHECK_PFACK
 dnl AC_DEFINE([WITH_PFACK], [1], [Whether libpfack support library is requested.])
 
+## readline and friends
+VL_LIB_READLINE
+if test "${vl_cv_lib_readline}" != "no"; then
+	LIBREADLINE_LIBS=${vl_cv_lib_readline}
+fi
+AC_SUBST([LIBREADLINE_LIBS])
+AC_SUBST([LIBREADLINE_LDFLAGS])
+AC_SUBST([LIBREADLINE_CPPFLAGS])
+
 PKG_CHECK_MODULES([LIBEDIT], [libedit])
 
 

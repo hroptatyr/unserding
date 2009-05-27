@@ -51,13 +51,15 @@ static size_t hnlen;
 static void
 cli_hy(job_t j)
 {
+	struct udpc_seria_s sctx;
+
 	UD_DEBUG("mod/cli: %s<- HY\n", hn);
 	udpc_make_rpl_pkt(JOB_PACKET(j));
-	j->buf[UDPC_SIG_OFFSET] = UDPC_TYPE_STR;
-	j->buf[UDPC_SIG_OFFSET + 1] = hnlen;
-	j->buf[UDPC_SIG_OFFSET + 2] = '\0';
-	memcpy(j->buf + UDPC_SIG_OFFSET + 3, hn, hnlen);
-	j->blen = UDPC_SIG_OFFSET + 3 + hnlen;
+
+	udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], j->blen);
+	udpc_seria_add_str(&sctx, hn, hnlen);
+	j->blen = UDPC_SIG_OFFSET + udpc_seria_msglen(&sctx);
+
 	send_cl(j);
 	return;
 }
@@ -73,12 +75,26 @@ cli_hy_rpl(job_t j)
 static void
 cli_ls(job_t j)
 {
+	struct udpc_seria_s sctx;
+
 	UD_DEBUG("mod/cli: %s<- LS\n", hn);
 	udpc_make_rpl_pkt(JOB_PACKET(j));
-	j->buf[8] = UDPC_TYPE_STR;
-	j->buf[9] = hnlen;
-	memcpy(j->buf + 10, hn, hnlen);
-	j->blen = 8 + 1 + 1 + hnlen;
+
+	udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], j->blen);
+	udpc_seria_add_ui16(&sctx, 0x1337);
+	udpc_seria_add_si16(&sctx, 0x1337);
+	udpc_seria_add_ui32(&sctx, 0xdeadbeef);
+	udpc_seria_add_si32(&sctx, 0xdeadbeef);
+
+	udpc_seria_add_str(&sctx, "hey", 3);
+	udpc_seria_add_flts(&sctx, 0.4);
+	udpc_seria_add_fltd(&sctx, 0.4);
+
+	uint16_t tst[] = {0,1,2,3,4,5,6,7,8,9,10,11,12};
+	udpc_seria_add_sequi16(&sctx, tst, sizeof(tst)/sizeof(*tst));
+
+	j->blen = UDPC_SIG_OFFSET + udpc_seria_msglen(&sctx);
+
 	send_cl(j);
 	return;
 }

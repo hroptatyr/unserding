@@ -41,6 +41,8 @@
 #define SERIA_MAX_DEPTH		8
 
 
+#if defined SIG_UPFRONT
+/* this can be used if we use the sig-upfront approach */
 uint16_t
 udpc_msg_size(const char *sig)
 {
@@ -113,11 +115,42 @@ udpc_sig_string(char *restrict out, const char *sig)
 	*out = '\0';
 	return;
 }
+#endif
 
 void
 udpc_fprint_msg(FILE *out, const char *msg)
 {
 	return;
+}
+
+
+struct udpc_tlo_s
+udpc_seria_des_one(udpc_seria_t sctx)
+{
+	uint16_t off = sctx->msgoff;
+	const char tag = sctx->msg[off];
+	struct udpc_tlo_s res = {.tag = tag, .length = 0, .offset = off};
+
+	if (!(tag & UDPC_SEQ_MASK) &&
+	    ((tag & UDPC_SIZ_MASK) != UDPC_TYPE_REC)) {
+		/* simple type */
+		res.length = (tag & UDPC_SIZ_MASK);
+		sctx->msgoff += 1 + res.length;
+	} else if ((tag & UDPC_SEQ_MASK) &&
+		   ((tag & UDPC_SIZ_MASK) != UDPC_TYPE_REC)) {
+		/* seqof simple type */
+
+	} else if ((tag & UDPC_SEQ_MASK)) {
+		/* seqof(struct ...) */
+
+	} else if (!(tag & UDPC_SGN_MASK)) {
+		/* must be a struct */
+
+	} else {
+		/* must be the end of a structs */
+
+	}
+	return res;
 }
 
 /* seria.c ends here */

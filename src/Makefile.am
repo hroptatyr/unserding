@@ -19,8 +19,8 @@ unserdingd_SOURCES = unserdingd.c mcast4.c
 unserdingd_SOURCES += protocore.c arrqueue.c dllqueue.c seria.c
 unserdingd_SOURCES += module.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
-unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt -lltdl
-unserdingd_LDADD = $(LIBEV_LIBS)
+unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt
+unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL)
 
 ## server modules
 lib_LTLIBRARIES += dso-cli.la dso-scscp.la

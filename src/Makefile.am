@@ -11,8 +11,8 @@ lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
-header_HEADERS = unserding.h catalogue.h protocore.h
-noinst_HEADERS = arrqueue.h protocore-private.h
+header_HEADERS = unserding.h catalogue.h protocore.h seria.h
+noinst_HEADERS = arrqueue.h dllqueue.h protocore-private.h
 
 ## the main server binary
 unserdingd_SOURCES = unserdingd.c mcast4.c

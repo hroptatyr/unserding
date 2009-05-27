@@ -56,18 +56,18 @@ static struct sockaddr_storage srv;
 static socklen_t srvlen = sizeof(srv);
 
 /* link local network */
-//#define V6PFX			"fe80:"
-#define V6PFX			"2001:470:9dd3:ca05"
+#define V6PFX			"fe80:"
+//#define V6PFX			"2001:470:9dd3:ca05"
 
 /* issel */
-//static const char scscp_srv[] = V6PFX ":216:17ff:feb3:5eaa";
+static const char scscp_srv[] = V6PFX ":216:17ff:feb3:5eaa";
 /* muck */
 //static const char scscp_srv[] = V6PFX ":219:dbff:fed1:4da8";
 /* stirling */
-static const char scscp_srv[] = V6PFX ":219:dbff:fe63:577a";
+//static const char scscp_srv[] = V6PFX ":219:dbff:fe63:577a";
 static const char scscp_dev[] = "lan0";
 
-#define BRAG_RATE	0.8
+#define BRAG_RATE	0.2
 
 static ev_timer ALGN16(__wtimer);
 static ev_io ALGN16(__wio);
@@ -123,8 +123,9 @@ scscp_connect(void)
 static int negop = 0;
 static const char negostr[] = "<?scscp version=\"1.3\" ?>\n";
 static const char bullshit[] = "<?scscp info text=\"debug\" ?>\n";
-static const char ackmsg[] = "<?scscp ack ?>\n";
-static char wsmsg[4096];
+//static const char ackmsg[] = "                                                                                                                                                                                                                                                                                                                                \n<?scscp ack ?>\n";
+//static char ackmsg[496];
+static const char ackmsg[] = "                   \n<?scscp ack ?>\n<?scscp start ?><OMOBJ/><?scscp end ?>\n\n                                                                                                                                                                                                                                                                                                                                                                                                       \n";
 
 static void
 inco_cb(EV_P_ ev_io *w, int revents)
@@ -133,6 +134,7 @@ inco_cb(EV_P_ ev_io *w, int revents)
 	char buf[4096];
 	ssize_t nread;
 
+	UD_DEBUG("they got back to us\n");
 	if ((nread = read(sock, buf, sizeof(buf))) <= 0) {
 		UD_DEBUG("no data, closing socket\n");
 		ev_io_stop(EV_A_ w);
@@ -154,6 +156,7 @@ inco_cb(EV_P_ ev_io *w, int revents)
 static void
 ack_cb(EV_P_ ev_timer *w, int revents)
 {
+	UD_DEBUG("writing\n");
 	write(sock, ackmsg, sizeof(ackmsg));
 	return;
 }
@@ -172,7 +175,8 @@ init_watchers(EV_P_ int s)
         ev_timer_init(wtimer, ack_cb, 0.0, BRAG_RATE);
 	/* not starting the timer just yet */
 
-	memset(wsmsg, 32, sizeof(wsmsg));
+	//memset(ackmsg, 32, sizeof(ackmsg));
+	//memcpy(ackmsg, init_watchers, 402);
 	return;
 }
 

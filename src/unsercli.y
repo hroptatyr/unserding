@@ -72,6 +72,7 @@
 #include "protocore-private.h"
 #include "cli-common.h"
 #include "unsercli-scanner.h"
+#include "stdin.h"
 
 #if 0
 #if !defined xmalloc

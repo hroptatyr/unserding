@@ -248,11 +248,6 @@ extern bool cli_waiting_p;
 extern int ud_attach_mcast4(EV_P);
 extern int ud_detach_mcast4(EV_P);
 
-/* readline goodness, defined in stdin.c */
-extern int ud_attach_stdin(EV_P);
-extern int ud_detach_stdin(EV_P);
-extern void ud_reset_stdin(EV_P);
-
 
 /* worker magic */
 /* think we keep this private */

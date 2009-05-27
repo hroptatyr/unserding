@@ -73,11 +73,11 @@
 # include <editline/readline.h>
 # include <histedit.h>
 #endif	/* USE_READLINE */
-/* our master include */
-#include "unserding.h"
-#include "unserding-private.h"
-#include "protocore.h"
-#include "protocore-private.h"
+/* our master file, includes the libev event loop */
+#include "stdin.h"
+/* for LIKELY et al. */
+#include "unserding-nifty.h"
+#include "unserding-dbg.h"
 
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));

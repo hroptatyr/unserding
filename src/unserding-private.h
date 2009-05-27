@@ -237,8 +237,6 @@ extern void ud_proto_parse(job_t);
 
 /* jobs */
 extern void ud_hyrpl_job(job_t);
-/* the old ascii parser */
-extern void ud_parse(ud_packet_t);
 
 #if defined UNSERCLI
 extern bool cli_waiting_p;

@@ -115,6 +115,46 @@ ud_fprint_pkthdr(ud_packet_t pkt, FILE *fp)
 	return;
 }
 
+size_t
+ud_sprint_pkthdr(char *restrict buf, ud_packet_t pkt)
+{
+	return sprintf(buf,
+		       ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+		       (unsigned int)pkt.plen,
+		       udpc_pkt_cno(pkt),
+		       udpc_pkt_pno(pkt),
+		       udpc_pkt_cmd(pkt),
+		       ntohs(((const uint16_t*)pkt.pbuf)[3]));
+}
+
+static inline void __attribute__((always_inline, gnu_inline))
+b2a(char *restrict outbuf, char a)
+{
+	char b = a & 0xf, c = (a >> 4) & 0xf;
+	switch (c) {
+	case 0 ... 9:
+		outbuf[0] = c + '0';
+		break;
+	case 10 ... 15:
+		outbuf[0] = c + 0x57;
+		break;
+	default:
+		break;
+	}
+	switch (b) {
+	case 0 ... 9:
+		outbuf[1] = b + '0';
+		break;
+	case 10 ... 15:
+		outbuf[1] = b + 0x57;
+		break;
+	default:
+		break;
+	}
+	outbuf[2] = ' ';
+	return;
+}
+
 static inline void __attribute__((always_inline, gnu_inline))
 putb(char a, FILE *fp)
 {
@@ -208,6 +248,84 @@ ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp)
 	}
 	putc('\n', fp);
 	return;
+}
+
+size_t
+ud_sprint_pkt_raw(char *restrict buf, ud_packet_t pkt)
+{
+	size_t res = 0;
+	uint16_t i = 0;
+
+	for (; i < (pkt.plen & ~0xf); i += 16) {
+		res += sprintf(&buf[res], "%04x  ", i);
+		b2a(&buf[res + 0], pkt.pbuf[i+0]);
+		b2a(&buf[res + 3], pkt.pbuf[i+1]);
+		b2a(&buf[res + 6], pkt.pbuf[i+2]);
+		b2a(&buf[res + 9], pkt.pbuf[i+3]);
+		b2a(&buf[res + 12], pkt.pbuf[i+4]);
+		b2a(&buf[res + 15], pkt.pbuf[i+5]);
+		b2a(&buf[res + 18], pkt.pbuf[i+6]);
+		b2a(&buf[res + 21], pkt.pbuf[i+7]);
+		buf[res + 24] = ' ';
+		b2a(&buf[res + 25], pkt.pbuf[i+8]);
+		b2a(&buf[res + 28], pkt.pbuf[i+9]);
+		b2a(&buf[res + 31], pkt.pbuf[i+10]);
+		b2a(&buf[res + 34], pkt.pbuf[i+11]);
+		b2a(&buf[res + 37], pkt.pbuf[i+12]);
+		b2a(&buf[res + 40], pkt.pbuf[i+13]);
+		b2a(&buf[res + 43], pkt.pbuf[i+14]);
+		b2a(&buf[res + 46], pkt.pbuf[i+15]);
+		buf[res + 49] = '\n';
+		res += 50;
+	}
+	if (i == pkt.plen) {
+		return res;
+	}
+
+	res += sprintf(&buf[res], "%04x  ", i);
+	if ((pkt.plen & 0xf) >= 8) {
+		b2a(&buf[res + 0], pkt.pbuf[i+0]);
+		b2a(&buf[res + 3], pkt.pbuf[i+1]);
+		b2a(&buf[res + 6], pkt.pbuf[i+2]);
+		b2a(&buf[res + 9], pkt.pbuf[i+3]);
+		b2a(&buf[res + 12], pkt.pbuf[i+4]);
+		b2a(&buf[res + 15], pkt.pbuf[i+5]);
+		b2a(&buf[res + 18], pkt.pbuf[i+6]);
+		b2a(&buf[res + 21], pkt.pbuf[i+7]);
+		buf[res + 24] = ' ';
+		i += 8;
+		res += 25;
+	}
+	/* and the rest, duff's */
+	switch (pkt.plen & 0x7) {
+	case 7:
+		b2a(&buf[res], pkt.pbuf[i++]);
+		res += 3;
+	case 6:
+		b2a(&buf[res], pkt.pbuf[i++]);
+		res += 3;
+	case 5:
+		b2a(&buf[res], pkt.pbuf[i++]);
+		res += 3;
+	case 4:
+		b2a(&buf[res], pkt.pbuf[i++]);
+		res += 3;
+
+	case 3:
+		b2a(&buf[res], pkt.pbuf[i++]);
+		res += 3;
+	case 2:
+		b2a(&buf[res], pkt.pbuf[i++]);
+		res += 3;
+	case 1:
+		b2a(&buf[res], pkt.pbuf[i++]);
+		res += 3;
+	case 0:
+	default:
+		break;
+	}
+	buf[res++] = '\n';
+	return res;
 }
 
 static uint16_t /* better not inline */

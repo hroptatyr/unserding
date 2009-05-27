@@ -81,11 +81,16 @@
 
 static int lsock __attribute__((used));
 static ev_io __srv_watcher __attribute__((aligned(16)));
-extern void
-stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal);
 
 #define HISTFILE	".unsercli_history"
 static char histfile[256];
+
+static void
+__handle_cb(const char *UNUSED(line), size_t UNUSED(len))
+{
+	return;
+}
+static void (*handle_cb)(const char *line, size_t len) = &__handle_cb;
 
 
 /* string goodies */
@@ -111,35 +116,22 @@ handle_el(char *line)
 	add_history(line);
 
 	/* parse him, blocks until a reply is nigh */
-	ud_parse(PACKET(rl_end, line));
+	handle_cb(line, rl_end);
+
+	/* and free him */
+	free(line);
 	return;
 }
 
 /* dirty */
 extern void _rl_erase_entire_line(void);
 void
-stdin_print_async(ud_packet_t pkt, struct sockaddr_in *sa, socklen_t sal)
+stdin_print_async(const char *buf, size_t UNUSED(len))
 {
-	char buf[INET6_ADDRSTRLEN];
-	/* the port (in host-byte order) */
-	uint16_t p;
-
-	/* obtain the address in human readable form */
-	(void)inet_ntop(sa->sin_family,
-			sa->sin_family == PF_INET6
-			? (void*)&((struct sockaddr_in6*)sa)->sin6_addr
-			: (void*)&((struct sockaddr_in*)sa)->sin_addr,
-			buf, sizeof(buf));
-	p = ntohs(sa->sin_port);
-
+	/* clear the current bugger */
 	(void)_rl_erase_entire_line();
-	fprintf(stdout, "packet from [%s]:%d ", buf, p);
-	/* now the header */
-	ud_fprint_pkthdr(pkt, stdout);
-	/* the raw packet */
-	ud_fprint_pkt_raw(pkt, stdout);
-	/* the packet in pretty */
-	ud_fprint_pkt_pretty(pkt, stdout);
+	/* plug ourselves */
+	fputs(buf, stdout);
 	/* hm, let's hope they put a newline last */
 	rl_redisplay();
 	return;
@@ -273,7 +265,7 @@ ud_reset_stdin(EV_P)
 }
 
 int
-ud_attach_stdin(EV_P)
+ud_attach_stdin(EV_P_ void(*hcb)(const char*, size_t))
 {
 	ev_io *srv_watcher = &__srv_watcher;
 
@@ -285,6 +277,9 @@ ud_attach_stdin(EV_P)
 	/* initialise an io watcher, then start it */
 	ev_io_init(srv_watcher, stdin_traf_rcb, lsock, EV_READ);
 	ev_io_start(EV_A_ srv_watcher);
+
+	/* set the handler callback */
+	handle_cb = hcb;
 	return 0;
 }
 
@@ -292,6 +287,9 @@ int
 ud_detach_stdin(EV_P)
 {
 	ev_io *srv_watcher = &__srv_watcher;
+
+	/* reset the handler callback */
+	handle_cb = &__handle_cb;
 
 	/* close the socket et al */
 	stdin_listener_deinit(EV_A_ lsock);

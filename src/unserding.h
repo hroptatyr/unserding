@@ -51,8 +51,8 @@
 #define UD_MCAST4_ADDR		"239.86.53.1"
 #define UD_MCAST4S2S_ADDR	"239.86.53.3"
 /* ff3x::8000:0-ff3x::ffff:ffff - dynamically allocated by hosts when needed */
-#define UD_MCAST6_ADDR		"ff38:8653::1"
-#define UD_MCAST6S2S_ADDR	"ff38:8653::3"
+#define UD_MCAST6_ADDR		"ff38::8653:1"
+#define UD_MCAST6S2S_ADDR	"ff38::8653:3"
 
 /* should be computed somehow using the mtu of the nic */
 #define UDPC_SIMPLE_PKTLEN	4096

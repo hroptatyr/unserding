@@ -178,7 +178,7 @@ ud_sockaddr_set_port(ud_sockaddr_t *sa, uint16_t port)
 /* connexion stuff */
 /**
  * Initialise a handle into what's behind HDL. */
-extern void init_unserding_handle(ud_handle_t hdl);
+extern void init_unserding_handle(ud_handle_t hdl, int pref_fam);
 /**
  * Free a handle and all resources. */
 extern void free_unserding_handle(ud_handle_t);
@@ -273,7 +273,7 @@ ud_handle_set_6svc(ud_handle_t hdl)
 static inline void
 ud_handle_set_4svc(ud_handle_t hdl)
 {
-	hdl->sa.sa4.sin_family = AF_INET;
+	hdl->sa.sa.sa_family = AF_INET;
 	inet_pton(AF_INET, UD_MCAST4_ADDR, &hdl->sa.sa4.sin_addr);
 	return;
 }

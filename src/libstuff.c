@@ -112,15 +112,44 @@ __set_nonblck(int sock)
 }
 
 static int
-mcast_init(ud_handle_t hdl)
+mcast6_init(ud_handle_t hdl)
 {
+#if defined IPPROTO_IPV6
 	volatile int s;
 
+	/* try v6 first */
 	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
 		return SOCK_INVALID;
 	}
 
+#if defined IPV6_V6ONLY
+	{
+		int one = 1;
+		setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &one, sizeof(one));
+	}
+#endif	/* IPV6_V6ONLY */
+
 	ud_handle_set_6svc(hdl);
+	ud_handle_set_port(hdl, UD_NETWORK_SERVICE);
+	return s;
+
+#else  /* !IPPROTO_IPV6 */
+
+	return SOCK_INVALID;
+#endif	/* IPPROTO_IPV6 */
+}
+
+static int
+mcast4_init(ud_handle_t hdl)
+{
+	volatile int s;
+
+	/* try v6 first */
+	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0) {
+		return SOCK_INVALID;
+	}
+
+	ud_handle_set_4svc(hdl);
 	ud_handle_set_port(hdl, UD_NETWORK_SERVICE);
 	return s;
 }
@@ -283,11 +312,24 @@ ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd)
 
 
 void
-init_unserding_handle(ud_handle_t hdl)
+init_unserding_handle(ud_handle_t hdl, int pref_fam)
 {
 	hdl->convo = 0;
-	hdl->sock = mcast_init(hdl);
 	hdl->epfd = -1;
+
+	switch (pref_fam) {
+	default:
+	case PF_UNSPEC:
+		if ((hdl->sock = mcast6_init(hdl)) != SOCK_INVALID) {
+			break;
+		}
+	case PF_INET:
+		hdl->sock = mcast4_init(hdl);
+		break;
+	case PF_INET6:
+		hdl->sock = mcast6_init(hdl);
+		break;
+	}
 	/* operate in non-blocking mode */
 	__set_nonblck(hdl->sock);
 	return;

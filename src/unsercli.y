@@ -358,12 +358,12 @@ rplpkt_pr_src(char *restrict outbuf, const ud_sockaddr_t *sa)
 	switch (fam) {
 	case PF_INET6:
 		outbuf[res++] = '[';
-		inet_ntop(fam, &sa->sa6.sin6_addr, &outbuf[res], 256);
+		inet_ntop(fam, ud_sockaddr_addr(sa), &outbuf[res], 256);
 		res += strlen(&outbuf[res]);
 		outbuf[res++] = ']';
 		break;
 	case PF_INET:
-		inet_ntop(fam, &sa->sa4.sin_addr, &outbuf[res], 256);
+		inet_ntop(fam, ud_sockaddr_addr(sa), &outbuf[res], 256);
 		res += strlen(&outbuf[res]);
 		break;
 	default:
@@ -539,9 +539,10 @@ main(int argc, const char *argv[])
 	rest = ud_parse_cl(argc, argv);
 
 	/* get us some nice handle */
-	init_unserding_handle(&__hdl);
-	if (prefer4) {
-		ud_handle_set_4svc(&__hdl);
+	if (!prefer4) {
+		init_unserding_handle(&__hdl, PF_UNSPEC);
+	} else {
+		init_unserding_handle(&__hdl, PF_INET);
 	}
 	if (port != UD_NETWORK_SERVICE) {
 		ud_handle_set_port(&__hdl, port);

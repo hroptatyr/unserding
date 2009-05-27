@@ -125,7 +125,7 @@ udpc_seria_add_##_na(udpc_seria_t sctx, _ty v)				\
 }									\
 									\
 static inline _ty							\
-updc_seria_des_##_na(udpc_seria_t sctx)					\
+udpc_seria_des_##_na(udpc_seria_t sctx)					\
 {									\
 	uint16_t off = ROUND(sctx->msgoff + 1, __alignof__(_ty));	\
 	_ty *p = (_ty*)&sctx->msg[off];					\
@@ -202,13 +202,20 @@ udpc_seria_des_str(udpc_seria_t sctx, const char **s)
 	return len;
 }
 
+static inline uint8_t
+udpc_seria_tag(udpc_seria_t sctx)
+{
+	if (sctx->msgoff < sctx->len) {
+		return sctx->msg[sctx->msgoff];
+	}
+	return UDPC_TYPE_UNK;
+}
+
 
 /* public funs */
 #if defined SIG_UPFRONT
 extern uint16_t udpc_msg_size(const char *sig);
 extern void udpc_sig_string(char *restrict out, const char *sig);
 #endif
-extern void udpc_fprint_msg(FILE *out, const char *msg);
-extern struct udpc_tlo_s udpc_seria_des_one(udpc_seria_t sctx);
 
 #endif	/* INCLUDED_seria_h_ */

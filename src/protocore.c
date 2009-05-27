@@ -328,52 +328,181 @@ ud_sprint_pkt_raw(char *restrict buf, ud_packet_t pkt)
 	return res;
 }
 
-static uint16_t /* better not inline */
-__fprint_one(const char *buf, FILE *fp)
+static size_t
+__pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 {
-	uint16_t len = 0;
+	size_t res = 0;
 
-	switch ((udpc_type_t)buf[0]) {
-	case UDPC_TYPE_STR:
-		fputs("(string)", fp);
-		ud_fputs(buf[1], &buf[2], fp);
-		len = buf[1] + 2;
-		break;
-
-	case UDPC_TYPE_SEQ:
-		fprintf(fp, "(seqof(#%d))", buf[1]);
-		len = 2;
-
-	case UDPC_TYPE_SI32:
-	case UDPC_TYPE_UI32: {
-		unsigned int dw = *(const unsigned int*const)&buf[1];
-		fprintf(fp, "(dword)%08x", dw);
-		len = 1 + sizeof(dw);
+	switch (tag) {
+	case UDPC_TYPE_UI16:
+	case UDPC_TYPE_SI16: {
+		const uint16_t *v;
+		size_t len = udpc_seria_des_sequi16(sctx, &v);
+		res = sprintf(buf, "seqof(xi16) * %d:\n", len);
+		for (index_t i = 0; i < len; i++) {
+			res += sprintf(&buf[res], "  %04x (%d)\n", v[i], v[i]);
+		}
 		break;
 	}
 
-	case UDPC_TYPE_SI16:
-	case UDPC_TYPE_UI16: {
-		short unsigned int dw = *(const unsigned int*const)&buf[1];
-		fprintf(fp, "(word)%04x", dw);
-		len = 1 + sizeof(dw);
+	case UDPC_TYPE_UI32:
+	case UDPC_TYPE_SI32: {
+		const uint32_t *v;
+		size_t len = udpc_seria_des_sequi32(sctx, &v);
+		res = sprintf(buf, "seqof(xi32) * %d:\n", len);
+		for (index_t i = 0; i < len; i++) {
+			res += sprintf(&buf[res], "  %08x (%d)\n", v[i], v[i]);
+		}
 		break;
 	}
-	case UDPC_TYPE_UNK:
+
+	case UDPC_TYPE_UI64:
+	case UDPC_TYPE_SI64: {
+		const uint64_t *v;
+		size_t len = udpc_seria_des_sequi64(sctx, &v);
+		res = sprintf(buf, "seqof(xi64) * %d:\n", len);
+		for (index_t i = 0; i < len; i++) {
+			res += sprintf(&buf[res], "  %016llx (%lld)\n",
+				       v[i], v[i]);
+		}
+		break;
+	}
+
+	case UDPC_TYPE_FLTS: {
+		const float *v;
+		size_t len = udpc_seria_des_seqflts(sctx, &v);
+		res = sprintf(buf, "seqof(flts) * %d:\n", len);
+		for (index_t i = 0; i < len; i++) {
+			res += sprintf(&buf[res], "  %f\n", v[i]);
+		}
+		break;
+	}
+
+	case UDPC_TYPE_FLTD: {
+		const double *v;
+		size_t len = udpc_seria_des_seqfltd(sctx, &v);
+		res = sprintf(buf, "seqof(fltd) * %d:\n", len);
+		for (index_t i = 0; i < len; i++) {
+			res += sprintf(&buf[res], "  %f\n", v[i]);
+		}
+		break;
+	}
+
+	case UDPC_TYPE_FLTH:
 	default:
-		fprintf(fp, "(%02x)", buf[0]);
-		len = 1;
-		break;
+		memcpy(buf, "(unknown)\n", 10);
+		return 10;
 	}
-	return len;
+	return res;
 }
 
-void
-ud_fprint_pkt_pretty(ud_packet_t pkt, FILE *fp)
+static size_t
+__pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 {
-	for (uint16_t i = 8; i < pkt.plen; i += __fprint_one(&pkt.pbuf[i], fp));
-	putc('\n', fp);
-	return;
+	if ((tag & UDPC_SEQ_MASK) && tag != UDPC_TYPE_STR) {
+		return __pretty_oneseq(buf, sctx, tag & ~UDPC_SEQ_MASK);
+	}
+
+	switch (tag) {
+	case UDPC_TYPE_BYTE:
+	case (UDPC_TYPE_BYTE | UDPC_SGN_MASK):
+		memcpy(buf, "(byte)", 6);
+		b2a(buf + 6, udpc_seria_des_byte(sctx));
+		buf[8] = '\n';
+		return 9;
+
+	case UDPC_TYPE_STR: {
+		const char *s;
+		size_t len;
+
+		memcpy(buf, "(string)", 8);
+		buf[8] = '"';
+		len = udpc_seria_des_str(sctx, &s);
+		memcpy(buf + 9, s, len);
+		buf[len + 9] = '"';
+		buf[len + 10] = '\n';
+		return len + 11;
+	}
+
+	case UDPC_TYPE_UI16:
+	case UDPC_TYPE_SI16: {
+		static char fmt[] = "(xi16)0x%04x (%x)\n";
+		uint16_t v = udpc_seria_des_ui16(sctx);
+
+		if ((UDPC_SGN_MASK & tag)) {
+			fmt[1] = 's';
+			fmt[15] = 'd';
+		} else {
+			fmt[1] = 'u';
+			fmt[15] = 'u';
+		}
+		return sprintf(buf, fmt, v, v);
+	}
+
+	case UDPC_TYPE_UI32:
+	case UDPC_TYPE_SI32: {
+		static char fmt[] = "(xi32)0x%08x (%x)\n";
+		uint32_t v = udpc_seria_des_ui32(sctx);
+
+		if ((UDPC_SGN_MASK & tag)) {
+			fmt[1] = 's';
+			fmt[15] = 'd';
+		} else {
+			fmt[1] = 'u';
+			fmt[15] = 'u';
+		}
+		return sprintf(buf, fmt, v, v);
+	}
+
+
+	case UDPC_TYPE_UI64:
+	case UDPC_TYPE_SI64: {
+		static char fmt[] = "(xi64)0x%016llx (%llx)\n";
+		uint64_t v = udpc_seria_des_ui64(sctx);
+
+		if ((UDPC_SGN_MASK & tag)) {
+			fmt[1] = 's';
+			fmt[20] = 'd';
+		} else {
+			fmt[1] = 'u';
+			fmt[20] = 'u';
+		}
+		return sprintf(buf, "(xi32)0x%016llx (%lld)\n", v, v);
+	}
+
+		
+	case UDPC_TYPE_FLTS: {
+		float v = udpc_seria_des_flts(sctx);
+		return sprintf(buf, "(flts)%f\n", v);
+	}
+
+	case UDPC_TYPE_FLTD: {
+		double v = udpc_seria_des_fltd(sctx);
+		return sprintf(buf, "(fltd)%f\n", v);
+	}
+
+	case UDPC_TYPE_FLTH:
+	default:
+		memcpy(buf, "(unknown)\n", 10);
+		return 10;
+	}
+}
+
+size_t
+ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt)
+{
+	size_t res = 0;
+	struct udpc_seria_s __sctx;
+	udpc_seria_t sctx = &__sctx;
+	uint8_t tag;
+
+	udpc_seria_init(
+		sctx, &pkt.pbuf[UDPC_SIG_OFFSET], pkt.plen - UDPC_SIG_OFFSET);
+
+	while ((tag = udpc_seria_tag(sctx))) {
+		res += __pretty_one(&buf[res], sctx, tag);
+	}
+	return res;
 }
 
 /* protocore.c ends here */

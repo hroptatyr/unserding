@@ -395,10 +395,8 @@ rplpkt_cb(EV_P_ ev_io *w, int revents)
 	len += ud_sprint_pkthdr(&prbuf[len], PACKET(nread, res));
 	/* the raw packet */
 	len += ud_sprint_pkt_raw(&prbuf[len], PACKET(nread, res));
-#if 0
 	/* the packet in pretty */
-	ud_fprint_pkt_pretty(pkt, stdout);
-#endif
+	len += ud_sprint_pkt_pretty(&prbuf[len], PACKET(nread, res));
 	prbuf[len] = '\0';
 
 	/* print him */

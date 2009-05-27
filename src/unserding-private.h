@@ -243,8 +243,8 @@ extern bool cli_waiting_p;
 #endif	/* UNSERCLI */
 
 /* more socket goodness, defined in mcast4.c */
-extern int ud_attach_mcast4(EV_P);
-extern int ud_detach_mcast4(EV_P);
+extern int ud_attach_mcast(EV_P);
+extern int ud_detach_mcast(EV_P);
 
 
 /* worker magic */

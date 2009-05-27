@@ -419,7 +419,7 @@ main(int argc, const char *argv[])
 	 * we add this quite late so that it's unlikely that a plethora of
 	 * events has already been injected into our precious queue
 	 * causing the libev main loop to crash. */
-	ud_attach_mcast4(EV_A);
+	ud_attach_mcast(EV_A);
 
 	/* reset the round robin var */
 	rr_wrk = 0;
@@ -430,7 +430,7 @@ main(int argc, const char *argv[])
 	ud_deinit_modules(&__ctx);
 
 	/* close the socket */
-	ud_detach_mcast4(EV_A);
+	ud_detach_mcast(EV_A);
 
 	/* kill the workers along with their secondary loops */
 	for (index_t i = NWORKERS; i > 0; i--) {

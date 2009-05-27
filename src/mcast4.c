@@ -84,20 +84,36 @@
 # error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
 #endif
 
-static int lsock __attribute__((used));
+/* our convenience union */
+typedef union {
+	struct sockaddr_storage sas;
+	struct sockaddr sa;
+	struct sockaddr_in sa4;
+	struct sockaddr_in6 sa6;
+} __attribute__((__transparent_union__)) ud_sockaddr_u;
+
+static int lsock4 __attribute__((used));
+static int lsock6 __attribute__((used));
+
 static ev_timer ALGN16(__s2s_watcher);
-static ev_io ALGN16(__srv_watcher);
+
+/* v4 stuff */
+static ev_io ALGN16(__srv4_watcher);
 static struct ip_mreq ALGN16(mreq4);
-#if defined AF_INET6
+/* server to client goodness */
+static ud_sockaddr_u __sa4 = {
+	.sa4.sin_addr = {0}
+};
+
+/* dual-stack v6 stuff */
+#if defined IPPROTO_IPV6
+static ev_io ALGN16(__srv6_watcher);
 static struct ipv6_mreq ALGN16(mreq6);
 /* server to client goodness */
-static struct sockaddr_in6 __sa6 = {
-	.sin6_addr = IN6ADDR_ANY_INIT
+static ud_sockaddr_u __sa6 = {
+	.sa6.sin6_addr = IN6ADDR_ANY_INIT
 };
-#endif	/* AF_INET6 */
-static struct sockaddr_in __sa4 = {
-	.sin_addr = {0}
-};
+#endif	/* AF_INET */
 
 
 /* socket goodies */
@@ -175,20 +191,22 @@ __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 static void
 __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *mreq)
 {
-	int UNUSED(one) = 1, UNUSED(zero) = 0;
+	int opt = 0;
 	unsigned char ttl = UDP_MULTICAST_TTL;
 
 #if defined IPV6_PKTINFO && 0
 	/* turn on packet info, very linux-ish!!! */
-	setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &one, sizeof(one));
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &opt, sizeof(opt));
 #endif
 #if defined IPV6_RECVPKTINFO && 0
 	/* turn on destination addr */
-	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &one, sizeof(one));
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &opt, sizeof(opt));
 #endif
 	/* turn into a mcast sock and set a TTL */
-	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &zero, sizeof(zero));
-	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &one, sizeof(one));
+	opt = 0;
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &opt, sizeof(opt));
 	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
 
 	/* set up the multicast group and join it */
@@ -226,24 +244,15 @@ __mcast6_leave_group(int s, struct ipv6_mreq *mreq)
 #endif	/* IPPROTO_IPV6 */
 
 static int
-mcast46_listener_init(void)
+mcast4_listener_init(void)
 {
 	int retval;
 	volatile int s;
 
-#if defined AF_INET6
-	__sa6.sin6_family = AF_INET6;
-	__sa6.sin6_port = htons(UD_NETWORK_SERVICE);
-#endif	/* AF_INET6 */
+	__sa4.sa4.sin_family = AF_INET;
+	__sa4.sa4.sin_port = htons(UD_NETWORK_SERVICE);
 
-	__sa4.sin_family = AF_INET;
-	__sa4.sin_port = htons(UD_NETWORK_SERVICE);
-
-	if (LIKELY(
-#if defined PF_INET6
-		(s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) >= 0 ||
-#endif	/* PF_INET6 */
-		(s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) >= 0)) {
+	if (LIKELY((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) >= 0)) {
 		/* likely case upfront */
 		;
 	} else {
@@ -254,31 +263,69 @@ mcast46_listener_init(void)
 	__reuse_sock(s);
 
 	/* we used to retry upon failure, but who cares */
-#if defined PF_INET6
-	retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6));
-#else
 	retval = bind(s, (struct sockaddr*)&__sa4, sizeof(__sa4));
-#endif
 	if (retval == -1) {
 		UD_DEBUG_MCAST("bind() failed %d %d\n", errno, EINVAL);
 		close(s);
 		return -1;
 	}
 
-#if defined IPPROTO_IPV6
-	/* join the mcast group */
-	__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6);
-	/* endow our s2c and s2s structs */
-	__sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
-#endif	/* IPPROTO_IPV6 */
 	/* join the mcast group */
 	__mcast4_join_group(s, UD_MCAST4_ADDR, &mreq4);
 	/* endow our s2c and s2s structs */
-	__sa4.sin_addr = mreq4.imr_multiaddr;
+	__sa4.sa4.sin_addr = mreq4.imr_multiaddr;
 
 	/* return the socket we've got */
 	/* succeeded if > 0 */
 	return s;
+}
+
+static int
+mcast6_listener_init(void)
+{
+#if defined IPPROTO_IPV6
+	int retval;
+	volatile int s;
+
+	__sa6.sa6.sin6_family = AF_INET6;
+	__sa6.sa6.sin6_port = htons(UD_NETWORK_SERVICE);
+
+	if (LIKELY((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) >= 0)) {
+		/* likely case upfront */
+		;
+	} else {
+		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
+		return s;
+	}
+	/* allow many many many servers on that port */
+	__reuse_sock(s);
+
+#if defined IPV6_V6ONLY
+	retval = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &retval, sizeof(retval));
+#endif	/* IPV6_V6ONLY */
+
+	/* we used to retry upon failure, but who cares */
+	retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6));
+
+	if (retval == -1) {
+		UD_DEBUG_MCAST("bind() failed %d %d\n", errno, EINVAL);
+		close(s);
+		return -1;
+	}
+
+	/* join the mcast group */
+	__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6);
+	/* endow our s2c and s2s structs */
+	__sa6.sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+
+	/* return the socket we've got */
+	/* succeeded if > 0 */
+	return s;
+
+#else  /* !IPPROTO_IPV6 */
+	return -1;
+#endif	/* IPPROTO_IPV6 */
 }
 
 static void
@@ -372,7 +419,7 @@ send_cl(job_t j)
 	}
 
 	/* write back to whoever sent the packet */
-	(void)sendto(lsock, j->buf, j->blen, 0,
+	(void)sendto(lsock6, j->buf, j->blen, 0,
 		     (struct sockaddr*)&j->sa,
 		     sa->sin6_family == PF_INET6
 		     ? sizeof(struct sockaddr_in6)
@@ -388,7 +435,7 @@ send_m4(job_t j)
 	}
 
 	/* send to the m4cast address */
-	(void)sendto(lsock, j->buf, j->blen, 0,
+	(void)sendto(lsock6, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
 	return;
 }
@@ -401,7 +448,7 @@ send_m6(job_t j)
 	}
 
 	/* send to the m6cast address */
-	(void)sendto(lsock, j->buf, j->blen, 0,
+	(void)sendto(lsock6, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
 	return;
 }
@@ -414,49 +461,64 @@ send_m46(job_t j)
 	}
 
 	/* always send to the mcast addresses */
-	(void)sendto(lsock, j->buf, j->blen, 0,
+	(void)sendto(lsock6, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
 	/* ship to m6cast addr */
-	(void)sendto(lsock, j->buf, j->blen, 0,
+	(void)sendto(lsock6, j->buf, j->blen, 0,
 		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
 	return;
 }
 
 
 int
-ud_attach_mcast4(EV_P)
+ud_attach_mcast(EV_P)
 {
-	ev_io *srv_watcher = &__srv_watcher;
-
 	/* get us a global sock */
-	lsock = mcast46_listener_init();
+	lsock4 = mcast4_listener_init();
+	lsock6 = mcast6_listener_init();
 
-	if (UNLIKELY(lsock < 0)) {
+	if (UNLIKELY(lsock4 < 0 && lsock6 < 0)) {
 		return -1;
 	}
-
-	/* initialise an io watcher, then start it */
-	ev_io_init(srv_watcher, mcast_inco_cb, lsock, EV_READ);
-	ev_io_start(EV_A_ srv_watcher);
+	if (LIKELY(lsock4 >= 0)) {
+		ev_io *srv_watcher = &__srv4_watcher;
+		/* initialise an io watcher, then start it */
+		ev_io_init(srv_watcher, mcast_inco_cb, lsock4, EV_READ);
+		ev_io_start(EV_A_ srv_watcher);
+	}
+	if (LIKELY(lsock6 >= 0)) {
+		ev_io *srv_watcher = &__srv6_watcher;
+		/* initialise an io watcher, then start it */
+		ev_io_init(srv_watcher, mcast_inco_cb, lsock6, EV_READ);
+		ev_io_start(EV_A_ srv_watcher);
+	}
 	return 0;
 }
 
 int
-ud_detach_mcast4(EV_P)
+ud_detach_mcast(EV_P)
 {
-	ev_io *srv_watcher = &__srv_watcher;
+	ev_io *srv_watcher;
 	ev_timer *s2s_watcher = &__s2s_watcher;
 
+	/* close the sockets before we stop the watchers */
+	if (LIKELY(lsock4 >= 0)) {
+		/* and kick the socket */
+		mcast_listener_deinit(lsock4);
+	}
+	if (LIKELY(lsock6 >= 0)) {
+		/* and kick the socket */
+		mcast_listener_deinit(lsock6);
+	}
+
 	/* stop the guy that watches the socket */
+	srv_watcher = &__srv4_watcher;
+	ev_io_stop(EV_A_ srv_watcher);
+	srv_watcher = &__srv6_watcher;
 	ev_io_stop(EV_A_ srv_watcher);
 
 	/* stop the timer */
 	ev_timer_stop(EV_A_ s2s_watcher);
-
-	if (LIKELY(lsock >= 0)) {
-		/* and kick the socket */
-		mcast_listener_deinit(lsock);
-	}
 	return 0;
 }
 

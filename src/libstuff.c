@@ -95,10 +95,6 @@
 #define UDP_MULTICAST_TTL	16
 #define SOCK_INVALID		(int)0xffffff
 
-/* server to client goodness */
-static struct sockaddr_in6 __sa6;
-static struct sockaddr_in __sa4;
-
 
 static void
 __set_nonblck(int sock)
@@ -116,21 +112,16 @@ __set_nonblck(int sock)
 }
 
 static int
-mcast_init(void)
+mcast_init(ud_handle_t hdl)
 {
 	volatile int s;
 
-	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0) {
+	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
 		return SOCK_INVALID;
 	}
-	/* prepare the __sa6 structure, but do not join */
-	__sa6.sin6_family = PF_INET6;
-	inet_pton(AF_INET6, UD_MCAST6_ADDR, &__sa6.sin6_addr);
-	__sa6.sin6_port = htons(UD_NETWORK_SERVICE);
-	/* prepare the __sa4 structure, but do not join */
-	__sa4.sin_family = PF_INET;
-	inet_pton(AF_INET, UD_MCAST4_ADDR, &__sa4.sin_addr);
-	__sa4.sin_port = htons(UD_NETWORK_SERVICE);
+
+	ud_handle_set_6svc(hdl);
+	ud_handle_set_port(hdl, UD_NETWORK_SERVICE);
 	return s;
 }
 
@@ -160,11 +151,7 @@ ud_send_raw(ud_handle_t hdl, ud_packet_t pkt)
 	int s = ud_handle_sock(hdl);
 
 	/* always send to the mcast addresses */
-	(void)sendto(s, pkt.pbuf, pkt.plen, 0,
-		     (struct sockaddr*)&__sa4, sizeof(struct sockaddr_in));
-	/* ship to m6cast addr */
-	(void)sendto(s, pkt.pbuf, pkt.plen, 0,
-		     (struct sockaddr*)&__sa6, sizeof(struct sockaddr_in6));
+	(void)sendto(s, pkt.pbuf, pkt.plen, 0, &hdl->sa, sizeof(hdl->sas));
 	return;
 }
 
@@ -295,7 +282,7 @@ void
 init_unserding_handle(ud_handle_t hdl)
 {
 	hdl->convo = 0;
-	hdl->sock = mcast_init();
+	hdl->sock = mcast_init(hdl);
 	hdl->epfd = -1;
 	/* operate in non-blocking mode */
 	__set_nonblck(hdl->sock);

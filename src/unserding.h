@@ -41,6 +41,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define UD_NETWORK_SERVICE	8653
 #define UD_NETWORK_SERVSTR	"8653"
@@ -108,6 +111,13 @@ struct ud_handle_s {
 	int sock:24;
 	int epfd;
 	ud_pktchn_t pktchn;
+	/* our connexion later on */
+	union {
+		struct sockaddr_storage sas;
+		struct sockaddr sa;
+		struct sockaddr_in sa4;
+		struct sockaddr_in6 sa6;
+	};
 };
 
 /* connexion stuff */
@@ -164,5 +174,37 @@ ud_handle_sock(ud_handle_t hdl)
 {
 	return hdl->sock;
 }	
+
+static inline void
+ud_handle_set_port(ud_handle_t hdl, uint16_t port)
+{
+	switch (hdl->sa.sa_family) {
+	case AF_INET6:
+		hdl->sa6.sin6_port = htons(port);
+		break;
+	case AF_INET:
+		hdl->sa4.sin_port = htons(port);
+		break;
+	default:
+		break;
+	}
+	return;
+}
+
+static inline void
+ud_handle_set_6svc(ud_handle_t hdl)
+{
+	hdl->sa6.sin6_family = AF_INET6;
+	inet_pton(AF_INET6, UD_MCAST6_ADDR, &hdl->sa6.sin6_addr);
+	return;
+}
+
+static inline void
+ud_handle_set_4svc(ud_handle_t hdl)
+{
+	hdl->sa4.sin_family = AF_INET;
+	inet_pton(AF_INET, UD_MCAST4_ADDR, &hdl->sa4.sin_addr);
+	return;
+}
 
 #endif	/* INCLUDED_unserding_h_ */

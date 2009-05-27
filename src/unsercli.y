@@ -66,6 +66,10 @@
 # include <errno.h>
 #endif
 
+#if defined HAVE_POPT_H || 1
+# include <popt.h>
+#endif
+
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"
@@ -478,20 +482,72 @@ ud_parse(const char *line, size_t len)
 }
 
 
+/* popt helper */
+static bool prefer4 = 0;
+static uint16_t port = UD_NETWORK_SERVICE;
+
+static struct poptOption srv_opts[] = {
+	{ NULL, '4', POPT_ARG_NONE | POPT_ARGFLAG_SHOW_DEFAULT,
+	  &prefer4, 0,
+	  "Prefer IPv4 multicasting to IPv6.", NULL },
+	{ "port", 'p', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT,
+	  &port, 0,
+	  "Multicast port.", NULL },
+        POPT_TABLEEND
+};
+
+static const struct poptOption const uc_opts[] = {
+#if 1
+        { NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
+          "Server Options", NULL },
+#endif
+        POPT_AUTOHELP
+        POPT_TABLEEND
+};
+
+static const char *const*
+ud_parse_cl(size_t argc, const char *argv[])
+{
+        int rc;
+        poptContext opt_ctx;
+
+        UD_DEBUG("parsing command line options\n");
+        opt_ctx = poptGetContext(NULL, argc, argv, uc_opts, 0);
+        poptSetOtherOptionHelp(opt_ctx, "[server-options] ");
+
+        /* auto-do */
+        while ((rc = poptGetNextOpt(opt_ctx)) > 0) {
+                /* Read all the options ... */
+                ;
+        }
+        return poptGetArgs(opt_ctx);
+}
+
+
 int
-main (void)
+main(int argc, const char *argv[])
 {
 	/* use the default event loop unless you have special needs */
 	struct ev_loop *loop = ev_default_loop(0);
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 	ev_io *srv_watcher = &__srv_watcher;
+	const char *const *rest;
 
 	/* where to log */
 	logout = stderr;
 
+	/* parse the command line */
+	rest = ud_parse_cl(argc, argv);
+
 	/* get us some nice handle */
 	init_unserding_handle(&__hdl);
+	if (prefer4) {
+		ud_handle_set_4svc(&__hdl);
+	}
+	if (port != UD_NETWORK_SERVICE) {
+		ud_handle_set_port(&__hdl, port);
+	}
 	/* store our global packet */
 	__hdl.pktchn = &__pkt;
 	/* attach the stdinlistener, inits readline too */

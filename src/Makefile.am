@@ -33,7 +33,7 @@ unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_YFLAGS = -d -p "cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS) $(LIBEDIT_CPPFLAGS)
-unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lpopt
 unsercli_LDADD = $(LIBEV_LIBS) $(LIBREADLINE_LIBS) libunserding.la
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
 ## weird, must be an automake bug

@@ -95,6 +95,12 @@ ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl)
 	return;
 }
 
+ud_pktwrk_f
+ud_get_service(ud_pkt_cmd_t cmd)
+{
+	return ud_services[cmd];
+}
+
 
 void
 init_proto(void)

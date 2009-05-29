@@ -80,18 +80,13 @@ cli_ls(job_t j)
 	UD_DEBUG("mod/cli: %s<- LS\n", hn);
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 
+	/* initialise that serialiser */
 	udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], j->blen);
-	udpc_seria_add_ui16(&sctx, 0x1337);
-	udpc_seria_add_si16(&sctx, 0x1337);
-	udpc_seria_add_ui32(&sctx, 0xdeadbeef);
-	udpc_seria_add_si32(&sctx, 0xdeadbeef);
-
-	udpc_seria_add_str(&sctx, "hey", 3);
-	udpc_seria_add_flts(&sctx, 0.4);
-	udpc_seria_add_fltd(&sctx, 0.4);
-
-	uint16_t tst[] = {0,1,2,3,4,5,6,7,8,9,10,11,12};
-	udpc_seria_add_sequi16(&sctx, tst, sizeof(tst)/sizeof(*tst));
+	for (ud_pkt_cmd_t i = 0; i < 0xffff; i++) {
+		if (ud_get_service(i) != NULL) {
+			udpc_seria_add_ui16(&sctx, i);
+		}
+	}
 
 	j->blen = UDPC_SIG_OFFSET + udpc_seria_msglen(&sctx);
 

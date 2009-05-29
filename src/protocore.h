@@ -313,4 +313,7 @@ udpc_cmd_wrk(const ud_pkt_cmd_t cmd)
 extern void
 ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl);
 
+extern ud_pktwrk_f
+ud_get_service(ud_pkt_cmd_t cmd);
+
 #endif	/* INCLUDED_protocore_h_ */

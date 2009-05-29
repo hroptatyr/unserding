@@ -178,7 +178,8 @@ AC_SUBST([LIBREADLINE_LIBS])
 AC_SUBST([LIBREADLINE_LDFLAGS])
 AC_SUBST([LIBREADLINE_CPPFLAGS])
 
-PKG_CHECK_MODULES([LIBEDIT], [libedit])
+## check if we've got libedit, we don't use it though at the moment
+PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
 
 
 AC_CONFIG_FILES([Makefile])

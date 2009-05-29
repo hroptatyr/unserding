@@ -92,7 +92,9 @@ typedef struct job_s *job_t;
 /* helper macro to use a job as packet */
 #define JOB_PACKET(j)	((ud_packet_t){.plen = j->blen, .pbuf = j->buf})
 
-#define SIZEOF_JOB_S	4096
+/* we use the minimum pmtu of ipv6 as buf size */
+#define JOB_BUF_SIZE	1280
+#define SIZEOF_JOB_S	sizeof(struct job_s)
 struct job_s {
 	/** for udp based transports,
 	 * use a union here to allow clients to use whatever struct they want */
@@ -110,10 +112,8 @@ struct job_s {
 	unsigned int flags;
 
 	size_t blen;
-	char buf[] __attribute__((aligned(16)));
-} __attribute__((aligned(SIZEOF_JOB_S)));
-#define JOB_BUF_SIZE						\
-	SIZEOF_JOB_S - offsetof(struct job_s, buf)
+	char buf[JOB_BUF_SIZE] __attribute__((aligned(16)));
+} __attribute__((aligned(16)));
 
 /**
  * Type for parse functions inside jobs. */

@@ -151,7 +151,7 @@ static inline size_t							\
 udpc_seria_des_seq##_na(udpc_seria_t sctx, const _ty **s)		\
 {									\
 	uint16_t off = ROUND(sctx->msgoff + 2, __alignof__(*s));	\
-	size_t len = (size_t)sctx->msg[sctx->msgoff+1];			\
+	size_t len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];	\
 									\
 	*s = (_ty*)&sctx->msg[off];					\
 	sctx->msgoff = off + sizeof(_ty) * len;				\
@@ -162,7 +162,7 @@ static inline size_t							\
 udpc_seria_des_seq##_na##_copy(_ty **out, udpc_seria_t sctx)		\
 {									\
 	uint16_t off = ROUND(sctx->msgoff + 2, __alignof__(*out));	\
-	size_t len = (size_t)sctx->msg[sctx->msgoff+1];			\
+	size_t len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];	\
 									\
 	*out = malloc(sizeof(_ty) * len);				\
 	memcpy(*out, (_ty*)&sctx->msg[off], sizeof(_ty) * len);		\
@@ -196,7 +196,7 @@ udpc_seria_add_str(udpc_seria_t sctx, const char *s, size_t len)
 static inline size_t
 udpc_seria_des_str(udpc_seria_t sctx, const char **s)
 {
-	size_t len = (size_t)sctx->msg[sctx->msgoff+1];
+	size_t len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];
 	*s = &sctx->msg[sctx->msgoff+2];
 	sctx->msgoff += 2 + len;
 	return len;

@@ -344,7 +344,7 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 	case UDPC_TYPE_SI16: {
 		const uint16_t *v;
 		size_t len = udpc_seria_des_sequi16(sctx, &v);
-		res = sprintf(buf, "seqof(xi16) * %d:\n", len);
+		res = sprintf(buf, "seqof(xi16) * %d:\n", (int)len);
 		for (index_t i = 0; i < len; i++) {
 			res += sprintf(&buf[res], "  %04x (%d)\n", v[i], v[i]);
 		}
@@ -355,7 +355,7 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 	case UDPC_TYPE_SI32: {
 		const uint32_t *v;
 		size_t len = udpc_seria_des_sequi32(sctx, &v);
-		res = sprintf(buf, "seqof(xi32) * %d:\n", len);
+		res = sprintf(buf, "seqof(xi32) * %d:\n", (int)len);
 		for (index_t i = 0; i < len; i++) {
 			res += sprintf(&buf[res], "  %08x (%d)\n", v[i], v[i]);
 		}
@@ -366,9 +366,9 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 	case UDPC_TYPE_SI64: {
 		const uint64_t *v;
 		size_t len = udpc_seria_des_sequi64(sctx, &v);
-		res = sprintf(buf, "seqof(xi64) * %d:\n", len);
+		res = sprintf(buf, "seqof(xi64) * %d:\n", (int)len);
 		for (index_t i = 0; i < len; i++) {
-			res += sprintf(&buf[res], "  %016llx (%lld)\n",
+			res += sprintf(&buf[res], "  %016lx (%ld)\n",
 				       v[i], v[i]);
 		}
 		break;
@@ -377,7 +377,7 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 	case UDPC_TYPE_FLTS: {
 		const float *v;
 		size_t len = udpc_seria_des_seqflts(sctx, &v);
-		res = sprintf(buf, "seqof(flts) * %d:\n", len);
+		res = sprintf(buf, "seqof(flts) * %d:\n", (int)len);
 		for (index_t i = 0; i < len; i++) {
 			res += sprintf(&buf[res], "  %f\n", v[i]);
 		}
@@ -387,7 +387,7 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 	case UDPC_TYPE_FLTD: {
 		const double *v;
 		size_t len = udpc_seria_des_seqfltd(sctx, &v);
-		res = sprintf(buf, "seqof(fltd) * %d:\n", len);
+		res = sprintf(buf, "seqof(fltd) * %d:\n", (int)len);
 		for (index_t i = 0; i < len; i++) {
 			res += sprintf(&buf[res], "  %f\n", v[i]);
 		}
@@ -473,7 +473,7 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 			fmt[1] = 'u';
 			fmt[20] = 'u';
 		}
-		return sprintf(buf, "(xi32)0x%016llx (%lld)\n", v, v);
+		return sprintf(buf, fmt, v, v);
 	}
 
 		

@@ -101,6 +101,8 @@ extern FILE *logout;
 # define UD_DEBUG_PROTO(args...)
 # define UD_CRITICAL_CAT(args...)
 # define UD_DEBUG_CAT(args...)
+# define UD_DBGCONT(args...)			\
+	fprintf(logout, args)
 
 #elif defined UNSERMON && defined DEBUG_FLAG
 # define UD_CRITICAL(args...)				\
@@ -115,6 +117,7 @@ extern FILE *logout;
 # define UD_DEBUG_PROTO(args...)
 # define UD_CRITICAL_CAT(args...)
 # define UD_DEBUG_CAT(args...)
+# define UD_DBGCONT(args...)
 
 #else  /* aux stuff */
 # define UD_CRITICAL(args...)			\
@@ -128,6 +131,7 @@ extern FILE *logout;
 # define UD_DEBUG_PROTO(args...)
 # define UD_CRITICAL_CAT(args...)
 # define UD_DEBUG_CAT(args...)
+# define UD_DBGCONT(args...)
 #endif
 
 #if defined UNSERMON

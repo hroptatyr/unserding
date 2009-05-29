@@ -23,9 +23,10 @@ unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt
 unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL)
 
 ## server modules
-lib_LTLIBRARIES += dso-cli.la dso-scscp.la
+lib_LTLIBRARIES += dso-cli.la dso-scscp.la dso-bbdb.la
 dso_cli_la_LDFLAGS = -module
 dso_scscp_la_LDFLAGS = -module
+dso_bbdb_la_LDFLAGS = -module
 
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l

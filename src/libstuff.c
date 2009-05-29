@@ -111,24 +111,58 @@ __set_nonblck(int sock)
 	return;
 }
 
+static void
+fiddle_with_mtu(int s)
+{
+#if defined IPV6_PATHMTU
+	struct ip6_mtuinfo mtui;
+	socklen_t mtuilen = sizeof(mtui);
+#endif	/* IPV6_PATHMTU */
+
+#if defined IPV6_USE_MIN_MTU
+	/* use minimal mtu */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU, &opt, sizeof(opt));
+#endif
+#if defined IPV6_DONTFRAG
+	/* rather drop a packet than to fragment it */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_DONTFRAG, &opt, sizeof(opt));
+#endif
+#if defined IPV6_RECVPATHMTU
+	/* obtain path mtu to send maximum non-fragmented packet */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU, &opt, sizeof(opt));
+#endif
+#if defined IPV6_PATHMTU
+	/* obtain current pmtu */
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_PATHMTU, &mtui, &mtuilen) < 0) {
+		perror("could not obtain pmtu");
+	} else {
+		fprintf(stderr, "pmtu is %d\n", mtui.ip6m_mtu);
+	}
+#endif
+	return;
+}
+
 static int
 mcast6_init(ud_handle_t hdl)
 {
 #if defined IPPROTO_IPV6
 	volatile int s;
+	int opt = 0;
 
 	/* try v6 first */
-	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
+	if ((hdl->sock = s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
 		return SOCK_INVALID;
 	}
 
 #if defined IPV6_V6ONLY
-	{
-		int one = 1;
-		setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &one, sizeof(one));
-	}
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
 #endif	/* IPV6_V6ONLY */
 
+	fiddle_with_mtu(s);
 	ud_handle_set_6svc(hdl);
 	ud_handle_set_port(hdl, UD_NETWORK_SERVICE);
 	return s;
@@ -320,14 +354,14 @@ init_unserding_handle(ud_handle_t hdl, int pref_fam)
 	switch (pref_fam) {
 	default:
 	case PF_UNSPEC:
-		if ((hdl->sock = mcast6_init(hdl)) != SOCK_INVALID) {
+		if (mcast6_init(hdl) != SOCK_INVALID) {
 			break;
 		}
 	case PF_INET:
 		hdl->sock = mcast4_init(hdl);
 		break;
 	case PF_INET6:
-		hdl->sock = mcast6_init(hdl);
+		(void)mcast6_init(hdl);
 		break;
 	}
 	/* operate in non-blocking mode */

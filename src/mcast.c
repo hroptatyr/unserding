@@ -186,16 +186,6 @@ __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *mreq)
 	int opt = 0;
 	unsigned char ttl = UDP_MULTICAST_TTL;
 
-#if defined IPV6_PKTINFO && 0
-	/* turn on packet info, very linux-ish!!! */
-	opt = 1;
-	setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &opt, sizeof(opt));
-#endif
-#if defined IPV6_RECVPKTINFO && 0
-	/* turn on destination addr */
-	opt = 1;
-	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &opt, sizeof(opt));
-#endif
 	/* turn into a mcast sock and set a TTL */
 	opt = 0;
 	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &opt, sizeof(opt));
@@ -296,6 +286,21 @@ mcast6_listener_init(void)
 	retval = 1;
 	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &retval, sizeof(retval));
 #endif	/* IPV6_V6ONLY */
+#if defined IPV6_USE_MIN_MTU
+	/* use minimal mtu */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU, &opt, sizeof(opt));
+#endif
+#if defined IPV6_DONTFRAG
+	/* rather drop a packet than to fragment it */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_DONTFRAG, &opt, sizeof(opt));
+#endif
+#if defined IPV6_RECVPATHMTU
+	/* obtain path mtu to send maximum non-fragmented packet */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU, &opt, sizeof(opt));
+#endif
 
 	/* we used to retry upon failure, but who cares */
 	retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6));
@@ -502,4 +507,4 @@ ud_detach_mcast(EV_P)
 	return 0;
 }
 
-/* mcast4.c ends here */
+/* mcast.c ends here */

@@ -50,6 +50,8 @@
 #if defined HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif
+/* posix? */
+#include <inttypes.h>
 
 /* our master include */
 #include "unserding.h"
@@ -368,7 +370,8 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		size_t len = udpc_seria_des_sequi64(sctx, &v);
 		res = sprintf(buf, "seqof(xi64) * %d:\n", (int)len);
 		for (index_t i = 0; i < len; i++) {
-			res += sprintf(&buf[res], "  %016lx (%ld)\n",
+			res += sprintf(&buf[res],
+				       "  %016" PRIx64 " (%" PRId64 ")\n",
 				       v[i], v[i]);
 		}
 		break;
@@ -463,15 +466,15 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 
 	case UDPC_TYPE_UI64:
 	case UDPC_TYPE_SI64: {
-		static char fmt[] = "(xi64)0x%016llx (%llx)\n";
+		static char fmt[] = "(xi64)0x%016" PRIx64 " (%" PRId64 ")\n";
 		uint64_t v = udpc_seria_des_ui64(sctx);
 
 		if ((UDPC_SGN_MASK & tag)) {
 			fmt[1] = 's';
-			fmt[20] = 'd';
+			fmt[17 + sizeof(PRIx64)] = 'd';
 		} else {
 			fmt[1] = 'u';
-			fmt[20] = 'u';
+			fmt[17 + sizeof(PRIx64)] = 'u';
 		}
 		return sprintf(buf, fmt, v, v);
 	}

@@ -116,6 +116,14 @@ struct job_s {
 } __attribute__((aligned(16)));
 
 /**
+ * Our protocol header. */
+struct udproto_hdr_s {
+	uint32_t cno_pno;
+	ud_pkt_cmd_t cmd;
+	uint16_t magic;
+};
+
+/**
  * Type for parse functions inside jobs. */
 typedef void(*ud_pktwrk_f)(job_t);
 /**

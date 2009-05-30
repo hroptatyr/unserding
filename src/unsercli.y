@@ -117,6 +117,12 @@ static const char help_rpl[] =
 	"quit   leave the command line interface\n"
 	;
 
+/* popt helper */
+static int prefer4 = 0;
+static uint16_t port = UD_NETWORK_SERVICE;
+/* whether to display a hex dump of incoming traffic */
+static int hexp = 0;
+
 static ev_signal ALGN16(__sigint_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
 static ev_io ALGN16(__srv_watcher);
@@ -394,7 +400,9 @@ rplpkt_cb(EV_P_ ev_io *w, int revents)
 	/* now the header */
 	len += ud_sprint_pkthdr(&prbuf[len], PACKET(nread, res));
 	/* the raw packet */
-	len += ud_sprint_pkt_raw(&prbuf[len], PACKET(nread, res));
+	if (hexp) {
+		len += ud_sprint_pkt_raw(&prbuf[len], PACKET(nread, res));
+	}
 	/* the packet in pretty */
 	len += ud_sprint_pkt_pretty(&prbuf[len], PACKET(nread, res));
 	prbuf[len] = '\0';
@@ -478,13 +486,9 @@ ud_parse(const char *line, size_t len)
 }
 
 
-/* popt helper */
-static bool prefer4 = 0;
-static uint16_t port = UD_NETWORK_SERVICE;
-
 static struct poptOption srv_opts[] = {
-	{ NULL, '4', POPT_ARG_NONE | POPT_ARGFLAG_SHOW_DEFAULT,
-	  &prefer4, 0,
+	{ NULL, '4', POPT_ARG_NONE,
+	  &prefer4, 1,
 	  "Prefer IPv4 multicasting to IPv6.", NULL },
 	{ "port", 'p', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT,
 	  &port, 0,
@@ -492,10 +496,19 @@ static struct poptOption srv_opts[] = {
         POPT_TABLEEND
 };
 
+static struct poptOption dpy_opts[] = {
+	{ NULL, 'x', POPT_ARG_NONE,
+	  &hexp, 1,
+	  "Include hex dump of incoming traffic.", NULL },
+        POPT_TABLEEND
+};
+
 static const struct poptOption const uc_opts[] = {
 #if 1
         { NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
           "Server Options", NULL },
+        { NULL, '\0', POPT_ARG_INCLUDE_TABLE, dpy_opts, 0,
+          "Display Options", NULL },
 #endif
         POPT_AUTOHELP
         POPT_TABLEEND
@@ -509,7 +522,7 @@ ud_parse_cl(size_t argc, const char *argv[])
 
         UD_DEBUG("parsing command line options\n");
         opt_ctx = poptGetContext(NULL, argc, argv, uc_opts, 0);
-        poptSetOtherOptionHelp(opt_ctx, "[server-options] ");
+        poptSetOtherOptionHelp(opt_ctx, "-4x -p <port>");
 
         /* auto-do */
         while ((rc = poptGetNextOpt(opt_ctx)) > 0) {
@@ -535,6 +548,9 @@ main(int argc, const char *argv[])
 
 	/* parse the command line */
 	rest = ud_parse_cl(argc, argv);
+	for (const char *const *r = rest; r && *r; r++) {
+		UD_DEBUG("unknown option \"%s\"\n", *r);
+	}
 
 	/* get us some nice handle */
 	if (!prefer4) {

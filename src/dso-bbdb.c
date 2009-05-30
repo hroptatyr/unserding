@@ -100,15 +100,21 @@ static void
 bbdb_search(job_t j)
 {
 	struct udpc_seria_s sctx;
-	size_t frag = 254;
+	size_t frag = JOB_BUF_SIZE;
+	size_t mic = 252;
 
 	UD_DEBUG("mod/bbdb: <- search\n");
 
-	for (size_t i = strlen(recs->entry), k = 0; k < i; k += frag) {
-		size_t tsz = i - k > frag ? frag : i - k;
+	for (size_t i = strlen(recs->entry), k = 0; k < i; k += 5*mic) {
 		udpc_make_rpl_pkt(JOB_PACKET(j));
-		udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], j->blen);
-		udpc_seria_add_str(&sctx, &recs->entry[k], tsz);
+		udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], JOB_BUF_SIZE);
+
+		udpc_seria_add_str(&sctx, &recs->entry[k+0*mic], mic);
+		udpc_seria_add_str(&sctx, &recs->entry[k+1*mic], mic);
+		udpc_seria_add_str(&sctx, &recs->entry[k+2*mic], mic);
+		udpc_seria_add_str(&sctx, &recs->entry[k+3*mic], mic);
+		udpc_seria_add_str(&sctx, &recs->entry[k+4*mic], mic);
+
 		j->blen = UDPC_SIG_OFFSET + udpc_seria_msglen(&sctx);
 		send_cl(j);
 	}

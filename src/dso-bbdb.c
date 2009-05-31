@@ -50,14 +50,11 @@
 typedef struct bbdb_rec_s *bbdb_rec_t;
 struct bbdb_rec_s {
 	bbdb_rec_t next;
-#if 0
-/* too advanced */
-	char *gname;
-	char *sname;
-	char *akas;
-	char *emails;
-#endif
 	char *entry;
+	/* offsets into the entry */
+	size_t gname;
+	size_t sname;
+	size_t emails;
 };
 
 static bbdb_rec_t recs = NULL;
@@ -100,10 +97,13 @@ static void
 bbdb_search(job_t j)
 {
 	struct udpc_seria_s sctx;
-	size_t frag = JOB_BUF_SIZE;
 	size_t mic = 252;
+	size_t ssz;
+	const char *sstr;
 
-	UD_DEBUG("mod/bbdb: <- search\n");
+	udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], JOB_BUF_SIZE);
+	ssz = udpc_seria_des_str(&sctx, &sstr);
+	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstr);
 
 	for (size_t i = strlen(recs->entry), k = 0; k < i; k += 5*mic) {
 		udpc_make_rpl_pkt(JOB_PACKET(j));

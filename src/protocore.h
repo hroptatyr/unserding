@@ -260,6 +260,9 @@ udpc_make_rpl_pkt(ud_packet_t p)
 	uint32_t *restrict tm2 = (void*)p.pbuf;
 	uint32_t all = ntohl(tm2[0]);
 
+	/* wipe out past sins */
+	memset(p.pbuf, 0, JOB_BUF_SIZE);
+	p.plen = JOB_BUF_SIZE;
 	/* increment the pkt number */
 	tm2[0] = htonl(all+1);
 	/* construct the reply packet type */

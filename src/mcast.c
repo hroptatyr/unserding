@@ -404,13 +404,22 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 }
 
 
-void
-send_cl(job_t j)
+static inline void
+prep_send(job_t j)
 {
 	if (UNLIKELY(j->blen == 0)) {
 		return;
 	}
+	/* clamp the job length */
+	j->blen = JOB_BUF_SIZE;
+	return;
+}
 
+void
+send_cl(job_t j)
+{
+	/* prepare */
+	prep_send(j);
 	/* write back to whoever sent the packet */
 	(void)sendto(j->sock, j->buf, j->blen, 0, &j->sa.sa, sizeof(j->sa));
 	return;
@@ -419,10 +428,8 @@ send_cl(job_t j)
 void
 send_m4(job_t j)
 {
-	if (UNLIKELY(j->blen == 0)) {
-		return;
-	}
-
+	/* prepare */
+	prep_send(j);
 	/* send to the m4cast address */
 	(void)sendto(lsock4, j->buf, j->blen, 0, &__sa4.sa, sizeof(__sa4.sa4));
 	return;
@@ -431,10 +438,8 @@ send_m4(job_t j)
 void __attribute__((unused))
 send_m6(job_t j)
 {
-	if (UNLIKELY(j->blen == 0)) {
-		return;
-	}
-
+	/* prepare */
+	prep_send(j);
 	/* send to the m6cast address */
 	(void)sendto(lsock6, j->buf, j->blen, 0, &__sa6.sa, sizeof(__sa6.sa6));
 	return;
@@ -443,10 +448,8 @@ send_m6(job_t j)
 void __attribute__((unused))
 send_m46(job_t j)
 {
-	if (UNLIKELY(j->blen == 0)) {
-		return;
-	}
-
+	/* prepare */
+	prep_send(j);
 	/* always send to the mcast addresses */
 	(void)sendto(lsock4, j->buf, j->blen, 0, &__sa4.sa, sizeof(__sa4.sa4));
 	/* ship to m6cast addr */

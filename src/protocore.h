@@ -71,6 +71,9 @@
 
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
 
+/* should be computed somehow using the (p)mtu of the nic */
+#define UDPC_SIMPLE_PKTLEN	1280
+
 typedef uint8_t udpc_type_t;
 
 /* our types and some serialisation protos */
@@ -93,7 +96,7 @@ typedef struct job_s *job_t;
 #define JOB_PACKET(j)	((ud_packet_t){.plen = j->blen, .pbuf = j->buf})
 
 /* we use the minimum pmtu of ipv6 as buf size */
-#define JOB_BUF_SIZE	1280
+#define JOB_BUF_SIZE	UDPC_SIMPLE_PKTLEN
 #define SIZEOF_JOB_S	sizeof(struct job_s)
 struct job_s {
 	/** for udp based transports,

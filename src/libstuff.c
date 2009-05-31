@@ -67,7 +67,6 @@
 #include <fcntl.h>
 
 /* our master include */
-#define SA_STRUCT		struct sockaddr_in6
 #include "unserding.h"
 #include "protocore.h"
 #include "protocore-private.h"

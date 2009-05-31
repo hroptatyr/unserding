@@ -231,6 +231,8 @@ udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t cmd)
 {
 	uint16_t *restrict tmp = (void*)p.pbuf;
 	uint32_t *restrict tm2 = (void*)p.pbuf;
+
+	memset(p.pbuf, 0, UDPC_SIMPLE_PKTLEN);
 	tm2[0] = htonl(__interleave_cno_pno(cno, pno));
 	tmp[2] = htons(cmd);
 	tmp[3] = UDPC_MAGIC_NUMBER;
@@ -264,8 +266,7 @@ udpc_make_rpl_pkt(ud_packet_t p)
 	uint32_t all = ntohl(tm2[0]);
 
 	/* wipe out past sins */
-	memset(p.pbuf, 0, JOB_BUF_SIZE);
-	p.plen = JOB_BUF_SIZE;
+	memset(p.pbuf, 0, UDPC_SIMPLE_PKTLEN);
 	/* increment the pkt number */
 	tm2[0] = htonl(all+1);
 	/* construct the reply packet type */

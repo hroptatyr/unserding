@@ -93,7 +93,7 @@ abs		\|
 %x ARGS
 
 %%
-\"		{ BEGIN(STRING); }
+<ARGS>\"	{ BEGIN(STRING); }
 <STRING>[^\"]*\"	{
 	BEGIN(INITIAL);
 	yylval->slen = cli_yyget_leng(yyscanner) - /* the final quote */ 1;

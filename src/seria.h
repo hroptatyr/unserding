@@ -214,6 +214,24 @@ udpc_seria_add_str(udpc_seria_t sctx, const char *s, size_t len)
 	return;
 }
 
+/* fragment the string */
+static inline size_t
+udpc_seria_add_fragstr(udpc_seria_t sctx, const char *s, size_t len)
+{
+/* fs being the frag size which is now clamped to 252 */
+	size_t fs = 252, i, pted = 0;
+
+	for (i = 0, pted = 0; i < 5 && pted + fs < len; i++, pted += fs) {
+		udpc_seria_add_str(sctx, &s[i*fs], fs);
+	}
+	if (i == 5) {
+		return pted;
+	} else {
+		udpc_seria_add_str(sctx, &s[i*fs], len - pted);
+		return len;
+	}
+}
+
 static inline size_t
 udpc_seria_des_str(udpc_seria_t sctx, const char **s)
 {

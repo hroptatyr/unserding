@@ -47,10 +47,14 @@
 
 #define xnew(_x)	malloc(sizeof(_x))
 
+typedef size_t index_t;
+
 typedef struct bbdb_rec_s *bbdb_rec_t;
 struct bbdb_rec_s {
 	bbdb_rec_t next;
 	char *entry;
+	/* length of entry */
+	size_t enlen;
 	/* offsets into the entry */
 	size_t gname;
 	size_t sname;
@@ -84,11 +88,80 @@ read_bbdb(void)
 		r->entry = malloc(n);
 		memcpy(r->entry, tmp, n - 1);
 		r->entry[n - 1] = '\0';
+		r->enlen = n-1;
 		recs = r;
 	}
 	free(tmp);
 	fclose(bbdbp);
 	return 0;
+}
+
+static const char*
+boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
+{
+	index_t k;
+	long int next[UCHAR_MAX];
+	long int skip[UCHAR_MAX];
+
+	if (patlen > buflen || patlen >= UCHAR_MAX) {
+		return NULL;
+	}
+
+	/* calc skip table ("bad rule") */
+	for (index_t i = 0; i <= UCHAR_MAX; i++) {
+		skip[i] = patlen;
+	}
+	for (index_t i = 0; i < patlen; i++) {
+		skip[(int)pat[i]] = patlen - i - 1;
+	}
+
+	for (index_t j = 0, i; j <= patlen; j++) {
+		for (i = patlen - 1; i >= 1; i--) {
+			for (k = 1; k <= j; k++) {
+				if (i - k < 0) {
+					goto matched;
+				}
+				if (pat[patlen - k] != pat[i - k]) {
+					goto nexttry;
+				}
+			}
+			goto matched;
+		nexttry: ;
+		}
+	matched:
+		next[j] = patlen - i;
+	}
+
+	patlen--;
+
+	for (index_t i = patlen; i < buflen; ) {
+		for (index_t j = 0 /* matched letter count */; j <= patlen; ) {
+			if (buf[i - j] == pat[patlen - j]) {
+				j++;
+				continue;
+			}
+			i += skip[(int)buf[i - j]] > next[j]
+				? skip[(int)buf[i - j]]
+				: next[j];
+			goto newi;
+		}
+		return buf + i - patlen;
+	newi:
+		;
+	}
+	return NULL;
+}
+
+static bbdb_rec_t
+find_entry(const char *str, size_t len)
+{
+	/* traverse our entries */
+	for (bbdb_rec_t r = recs; r; r = r->next) {
+		if (boyer_moore(r->entry, r->enlen, str, len) != NULL) {
+			return r;
+		}
+	}
+	return NULL;
 }
 
 
@@ -97,23 +170,28 @@ static void
 bbdb_search(job_t j)
 {
 	struct udpc_seria_s sctx;
-	size_t mic = 252;
 	size_t ssz;
 	const char *sstr;
+	bbdb_rec_t rec;
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstr);
 	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstr);
 
-	for (size_t i = strlen(recs->entry), k = 0; k < i; k += 5*mic) {
+	if (ssz == 0) {
+		return;
+	}
+
+	if ((rec = find_entry(sstr, ssz)) == NULL) {
+		return;
+	}
+
+	for (size_t k = 0, done, togo = rec->enlen; togo > 0;
+	     k += done, togo -= done) {
 		udpc_make_rpl_pkt(JOB_PACKET(j));
 		udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 
-		udpc_seria_add_str(&sctx, &recs->entry[k+0*mic], mic);
-		udpc_seria_add_str(&sctx, &recs->entry[k+1*mic], mic);
-		udpc_seria_add_str(&sctx, &recs->entry[k+2*mic], mic);
-		udpc_seria_add_str(&sctx, &recs->entry[k+3*mic], mic);
-		udpc_seria_add_str(&sctx, &recs->entry[k+4*mic], mic);
+		done = udpc_seria_add_fragstr(&sctx, &rec->entry[k], togo);
 
 		j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 		send_cl(j);

@@ -129,7 +129,9 @@ udpc_seria_des_##_na(udpc_seria_t sctx)					\
 {									\
 	uint16_t off = ROUND(sctx->msgoff + 1, __alignof__(_ty));	\
 	_ty *p = (_ty*)&sctx->msg[off];					\
-									\
+	if (udpc_seria_tag(sctx) != UDPC_TYPE_##_NA) {			\
+		return 0;						\
+	}								\
 	sctx->msgoff = off + sizeof(_ty);				\
 	return *p;							\
 }									\
@@ -151,8 +153,13 @@ static inline size_t							\
 udpc_seria_des_seq##_na(udpc_seria_t sctx, const _ty **s)		\
 {									\
 	uint16_t off = ROUND(sctx->msgoff + 2, __alignof__(*s));	\
-	size_t len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];	\
+	size_t len;							\
 									\
+	if (udpc_seria_tag(sctx) != UDPC_SEQOF(_NA)) {			\
+		*s = NULL;						\
+		return 0;						\
+	}								\
+	len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];		\
 	*s = (_ty*)&sctx->msg[off];					\
 	sctx->msgoff = off + sizeof(_ty) * len;				\
 	return len;							\
@@ -162,12 +169,26 @@ static inline size_t							\
 udpc_seria_des_seq##_na##_copy(_ty **out, udpc_seria_t sctx)		\
 {									\
 	uint16_t off = ROUND(sctx->msgoff + 2, __alignof__(*out));	\
-	size_t len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];	\
+	size_t len;							\
 									\
+	if (udpc_seria_tag(sctx) != UDPC_SEQOF(_NA)) {			\
+		*out = NULL;						\
+		return 0;						\
+	}								\
+	len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];		\
 	*out = malloc(sizeof(_ty) * len);				\
 	memcpy(*out, (_ty*)&sctx->msg[off], sizeof(_ty) * len);		\
 	sctx->msgoff = off + sizeof(_ty) * len;				\
 	return len;							\
+}
+
+static inline uint8_t
+udpc_seria_tag(udpc_seria_t sctx)
+{
+	if (sctx->msgoff < sctx->len) {
+		return sctx->msg[sctx->msgoff];
+	}
+	return UDPC_TYPE_UNK;
 }
 
 
@@ -196,19 +217,15 @@ udpc_seria_add_str(udpc_seria_t sctx, const char *s, size_t len)
 static inline size_t
 udpc_seria_des_str(udpc_seria_t sctx, const char **s)
 {
-	size_t len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];
+	size_t len;
+	if (udpc_seria_tag(sctx) != UDPC_TYPE_STR) {
+		*s = NULL;
+		return 0;
+	}
+	len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];
 	*s = &sctx->msg[sctx->msgoff+2];
 	sctx->msgoff += 2 + len;
 	return len;
-}
-
-static inline uint8_t
-udpc_seria_tag(udpc_seria_t sctx)
-{
-	if (sctx->msgoff < sctx->len) {
-		return sctx->msg[sctx->msgoff];
-	}
-	return UDPC_TYPE_UNK;
 }
 
 

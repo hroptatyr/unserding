@@ -84,10 +84,13 @@ key		:[a-z]+
 val		[A-Za-z0-9,.-]+
 
 int		[-+]?[0-9]+
+hexdgt		[0-9a-fA-F]
+intdgt		[0-9]
 
 abs		\|
 
 %x STRING
+%x ARGS
 
 %%
 \"		{ BEGIN(STRING); }
@@ -98,32 +101,50 @@ abs		\|
 	RETURN_TOKEN(TOK_STRING);
 }
 
-h?elp		{ RETURN_TOKEN(TOK_WTF); }
-wtf		{ RETURN_TOKEN(TOK_WTF); }
-cya		{ RETURN_TOKEN(TOK_CYA); }
-bye		{ RETURN_TOKEN(TOK_CYA); }
-kthx		{ RETURN_TOKEN(TOK_CYA); }
-kthxbye		{ RETURN_TOKEN(TOK_CYA); }
-quit		{ RETURN_TOKEN(TOK_CYA); }
-logout		{ RETURN_TOKEN(TOK_CYA); }
-alias		{ RETURN_TOKEN(TOK_ALI); }
+{hexdgt}{4,4}	{
+	yylval->slen = cli_yyget_leng(yyscanner);
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_HEXCMD);
+}	
+
+h?elp		{ BEGIN(ARGS); RETURN_TOKEN(TOK_WTF); }
+wtf		{ BEGIN(ARGS); RETURN_TOKEN(TOK_WTF); }
+cya		{ BEGIN(ARGS); RETURN_TOKEN(TOK_CYA); }
+bye		{ BEGIN(ARGS); RETURN_TOKEN(TOK_CYA); }
+kthx		{ BEGIN(ARGS); RETURN_TOKEN(TOK_CYA); }
+kthxbye		{ BEGIN(ARGS); RETURN_TOKEN(TOK_CYA); }
+quit		{ BEGIN(ARGS); RETURN_TOKEN(TOK_CYA); }
+logout		{ BEGIN(ARGS); RETURN_TOKEN(TOK_CYA); }
+alias		{ BEGIN(ARGS); RETURN_TOKEN(TOK_ALI); }
+
+<ARGS>0x{hexdgt}+	{ 
+	yylval->slen = cli_yyget_leng(yyscanner);
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_HEX);
+}
+
+<ARGS>[-+]?{intdgt}+	{
+	yylval->slen = cli_yyget_leng(yyscanner);
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_INT);
+}
 
  /* don't do that at the moment, we can parse the string based on the context
   * ourselves, and much more efficiently */
  /*{int}		{ RETURN_TOKEN(TOK_INTEGER); }*/
-{key}		{
+<ARGS>{key}	{
 	yylval->slen = cli_yyget_leng(yyscanner);
 	yylval->sval = cli_yyget_text(yyscanner);
 	RETURN_TOKEN(TOK_KEY);
 }
-{val}		{
+<ARGS>{val}	{
 	yylval->slen = cli_yyget_leng(yyscanner);
 	yylval->sval = cli_yyget_text(yyscanner);
 	RETURN_TOKEN(TOK_VAL);
 }
 
  /* more ignored shit, whitespace et al */
-{ws}		{ /* ignore */ }
+<*>{ws}		{ /* ignore */ }
 
 %%
 

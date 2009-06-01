@@ -229,7 +229,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	int nfds;
 	ssize_t nread;
 	struct epoll_event ev, *events = NULL;
-	char buf[UDPC_SIMPLE_PKTLEN];
+	char buf[UDPC_PKTLEN];
 	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
 
 	if (UNLIKELY(pkt.plen == 0)) {
@@ -278,7 +278,7 @@ ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_pred_f pf, void *clo)
 	int nfds;
 	ssize_t nread;
 	struct epoll_event ev, *events = evbuf;
-	char buf[UDPC_SIMPLE_PKTLEN];
+	char buf[UDPC_PKTLEN];
 	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
 
 	/* register for input, oob, error and hangups */
@@ -334,7 +334,7 @@ ud_convo_t
 ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd)
 {
 	ud_convo_t cno = ud_handle_convo(hdl);
-	char buf[UDPC_SIMPLE_PKTLEN];
+	char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = {.plen = countof(buf), .pbuf = buf};
 
 	udpc_make_pkt(pkt, cno, /*pno*/0, cmd);

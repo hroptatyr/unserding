@@ -56,9 +56,9 @@ cli_hy(job_t j)
 	UD_DEBUG("mod/cli: %s<- HY\n", hn);
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 
-	udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], j->blen);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	udpc_seria_add_str(&sctx, hn, hnlen);
-	j->blen = UDPC_SIG_OFFSET + udpc_seria_msglen(&sctx);
+	j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 
 	send_cl(j);
 	return;
@@ -81,14 +81,14 @@ cli_ls(job_t j)
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 
 	/* initialise that serialiser */
-	udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], j->blen);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	for (ud_pkt_cmd_t i = 0; i < 0xffff; i++) {
 		if (ud_get_service(i) != NULL) {
 			udpc_seria_add_ui16(&sctx, i);
 		}
 	}
-
-	j->blen = UDPC_SIG_OFFSET + udpc_seria_msglen(&sctx);
+	/* too much exposure, should be more transparent */
+	j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 
 	send_cl(j);
 	return;

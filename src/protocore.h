@@ -63,8 +63,6 @@
  *
  ***/
 
-#define UDPC_SIG_OFFSET		0x08
-
 #if !defined htons || !defined ntohs
 # error "Cannot find htons()/ntohs()"
 #endif	/* !htons || !ntohs */
@@ -72,7 +70,10 @@
 #define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
 
 /* should be computed somehow using the (p)mtu of the nic */
-#define UDPC_SIMPLE_PKTLEN	1280
+#define UDPC_PKTLEN		1280
+#define UDPC_HDRLEN		0x08
+#define UDPC_PAYLOAD(_x)	(&(_x)[UDPC_HDRLEN])
+#define UDPC_PLLEN		(UDPC_PKTLEN - UDPC_HDRLEN)
 
 typedef uint8_t udpc_type_t;
 
@@ -96,7 +97,7 @@ typedef struct job_s *job_t;
 #define JOB_PACKET(j)	((ud_packet_t){.plen = j->blen, .pbuf = j->buf})
 
 /* we use the minimum pmtu of ipv6 as buf size */
-#define JOB_BUF_SIZE	UDPC_SIMPLE_PKTLEN
+#define JOB_BUF_SIZE	UDPC_PKTLEN
 #define SIZEOF_JOB_S	sizeof(struct job_s)
 struct job_s {
 	/** for udp based transports,
@@ -232,7 +233,7 @@ udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t cmd)
 	uint16_t *restrict tmp = (void*)p.pbuf;
 	uint32_t *restrict tm2 = (void*)p.pbuf;
 
-	memset(p.pbuf, 0, UDPC_SIMPLE_PKTLEN);
+	memset(p.pbuf, 0, UDPC_PKTLEN);
 	tm2[0] = htonl(__interleave_cno_pno(cno, pno));
 	tmp[2] = htons(cmd);
 	tmp[3] = UDPC_MAGIC_NUMBER;
@@ -266,7 +267,7 @@ udpc_make_rpl_pkt(ud_packet_t p)
 	uint32_t all = ntohl(tm2[0]);
 
 	/* wipe out past sins */
-	memset(p.pbuf, 0, UDPC_SIMPLE_PKTLEN);
+	memset(p.pbuf, 0, UDPC_PKTLEN);
 	/* increment the pkt number */
 	tm2[0] = htonl(all+1);
 	/* construct the reply packet type */

@@ -505,8 +505,7 @@ ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt)
 	udpc_seria_t sctx = &__sctx;
 	uint8_t tag;
 
-	udpc_seria_init(
-		sctx, &pkt.pbuf[UDPC_SIG_OFFSET], pkt.plen - UDPC_SIG_OFFSET);
+	udpc_seria_init(sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen - UDPC_HDRLEN);
 
 	while ((tag = udpc_seria_tag(sctx))) {
 		res += __pretty_one(&buf[res], sctx, tag);

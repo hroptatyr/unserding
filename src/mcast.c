@@ -342,7 +342,7 @@ mcast_listener_deinit(int sock)
 }
 
 
-static char scratch_buf[UDPC_SIMPLE_PKTLEN];
+static char scratch_buf[UDPC_PKTLEN];
 
 /* this callback is called when data is readable on the main server socket */
 static void
@@ -362,7 +362,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	if (UNLIKELY((j = make_job()) == NULL)) {
 		UD_CRITICAL("no job slots ... leaping\n");
 		/* just read the packet off of the wire */
-		(void)recv(w->fd, scratch_buf, UDPC_SIMPLE_PKTLEN, 0);
+		(void)recv(w->fd, scratch_buf, UDPC_PKTLEN, 0);
 		trigger_job_queue();
 		return;
 	}
@@ -411,7 +411,7 @@ prep_send(job_t j)
 		return;
 	}
 	/* clamp the job length */
-	j->blen = JOB_BUF_SIZE;
+	j->blen = UDPC_PKTLEN;
 	return;
 }
 

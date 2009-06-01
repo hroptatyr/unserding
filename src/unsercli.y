@@ -130,7 +130,7 @@ ev_async *glob_notify;
 
 /* our global handle space, closured because */
 static struct ud_handle_s __hdl;
-static char __pktbuf[UDPC_SIMPLE_PKTLEN];
+static char __pktbuf[UDPC_PKTLEN];
 static ud_packet_t __pkt = {.plen = countof(__pktbuf), .pbuf = __pktbuf};
 
 /* these delcarations are provided to suppress compiler warnings */
@@ -161,6 +161,7 @@ struct cli_cmd_s {
 };
 
 static cli_cmd_t cmd_list = NULL;
+static struct udpc_seria_s sctx;
 
 static void
 add_cmd(const char *name, size_t nlen, ud_pkt_cmd_t cmd)
@@ -281,7 +282,9 @@ out:
 	TOK_KEY
 	TOK_VAL
 	TOK_STRING
-
+	TOK_HEXCMD
+	TOK_HEX
+	TOK_INT
 %%
 
 
@@ -295,7 +298,8 @@ cya_cmd {
 	ev_unloop(EV_DEFAULT_ EVUNLOOP_ALL);
 	YYACCEPT;
 } |
-gen_cmd keyvals {
+gen_cmd tvs {
+	hdl->pktchn[0].plen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 	ud_send_raw(hdl, hdl->pktchn[0]);
 	YYACCEPT;
 } |
@@ -320,17 +324,20 @@ TOK_ALI TOK_VAL TOK_VAL {
 };
 
 gen_cmd:
-TOK_VAL {
+TOK_HEXCMD {
 	ud_pkt_cmd_t cmd = resolve_tok(yylval.sval, yylval.slen);
 	if (cmd == 0xffff) {
 		fprintf(logout, "no such command: \"%s\"\n", yylval.sval);
 		YYABORT;
 	}
 	udpc_make_pkt(hdl->pktchn[0], hdl->convo++, 0, cmd);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(hdl->pktchn[0].pbuf), UDPC_PLLEN);
 };
 
-keyvals:
-;
+tvs:
+TOK_STRING {
+	udpc_seria_add_str(&sctx, yylval.sval, yylval.slen);
+}
 
 %%
 
@@ -388,9 +395,9 @@ rplpkt_cb(EV_P_ ev_io *w, int revents)
 	ssize_t nread;
 	ud_sockaddr_t sa;
 	socklen_t lsa = sizeof(sa);
-	char res[UDPC_SIMPLE_PKTLEN];
+	char res[UDPC_PKTLEN];
 	/* the print buffer */
-	static char prbuf[4 * UDPC_SIMPLE_PKTLEN];
+	static char prbuf[4 * UDPC_PKTLEN];
 	size_t len = 0;
 
 	nread = recvfrom(w->fd, res, countof(res), 0, (void*)&sa, &lsa);

@@ -101,13 +101,13 @@ bbdb_search(job_t j)
 	size_t ssz;
 	const char *sstr;
 
-	udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], JOB_BUF_SIZE);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstr);
 	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstr);
 
 	for (size_t i = strlen(recs->entry), k = 0; k < i; k += 5*mic) {
 		udpc_make_rpl_pkt(JOB_PACKET(j));
-		udpc_seria_init(&sctx, &j->buf[UDPC_SIG_OFFSET], JOB_BUF_SIZE);
+		udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 
 		udpc_seria_add_str(&sctx, &recs->entry[k+0*mic], mic);
 		udpc_seria_add_str(&sctx, &recs->entry[k+1*mic], mic);
@@ -115,7 +115,7 @@ bbdb_search(job_t j)
 		udpc_seria_add_str(&sctx, &recs->entry[k+3*mic], mic);
 		udpc_seria_add_str(&sctx, &recs->entry[k+4*mic], mic);
 
-		j->blen = UDPC_SIG_OFFSET + udpc_seria_msglen(&sctx);
+		j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 		send_cl(j);
 	}
 	return;

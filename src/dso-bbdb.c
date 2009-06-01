@@ -49,6 +49,12 @@
 
 typedef size_t index_t;
 
+struct bbdb_ol_s {
+	/* offset+length */
+	uint16_t off;
+	uint16_t len;
+};
+
 typedef struct bbdb_rec_s *bbdb_rec_t;
 struct bbdb_rec_s {
 	bbdb_rec_t next;
@@ -56,14 +62,51 @@ struct bbdb_rec_s {
 	/* length of entry */
 	size_t enlen;
 	/* offsets into the entry */
-	size_t gname;
-	size_t sname;
-	size_t emails;
+	struct bbdb_ol_s gname;
+	struct bbdb_ol_s sname;
+	struct bbdb_ol_s emails;
 };
 
 static bbdb_rec_t recs = NULL;
 
 
+static void
+parse_common_fields(bbdb_rec_t r)
+{
+	index_t i;
+
+	if (r->entry[0] != '[' || r->entry[1] != '"') {
+		/* malformed entry */
+		return;
+	}
+
+	/* fetch the given name */
+	r->gname.off = 2;
+	for (i = 2; i < 0xfffe; i++) {
+		if (r->entry[i] == '"' && r->entry[i-1] != '\\') {
+			/* found the end */
+			r->gname.len = (uint16_t)i - r->gname.off;
+			break;
+		}
+	}
+
+	if (r->entry[++i] != ' ' || r->entry[++i] != '"') {
+		/* malformed entry */
+		return;
+	}
+
+	/* fetch the surname */
+	r->sname.off = (uint16_t)++i;
+	for (; i < 0xfffe; i++) {
+		if (r->entry[i] == '"' && r->entry[i-1] != '\\') {
+			/* found the end */
+			r->sname.len = (uint16_t)i - r->sname.off;
+			break;
+		}
+	}
+	return;
+}
+
 static int
 read_bbdb(void)
 {
@@ -89,6 +132,9 @@ read_bbdb(void)
 		memcpy(r->entry, tmp, n - 1);
 		r->entry[n - 1] = '\0';
 		r->enlen = n-1;
+		/* parse the fields */
+		parse_common_fields(r);
+		/* cons him to the front of our recs */
 		recs = r;
 	}
 	free(tmp);
@@ -166,7 +212,7 @@ find_entry(const char *str, size_t len)
 
 
 /* #'bbdb-search */
-static void
+static void __attribute__((unused))
 bbdb_search(job_t j)
 {
 	struct udpc_seria_s sctx;
@@ -199,6 +245,47 @@ bbdb_search(job_t j)
 	return;
 }
 
+static void
+bbdb_search_tagged(job_t j)
+{
+	struct udpc_seria_s sctx;
+	size_t ssz;
+	const char *sstr;
+	bbdb_rec_t rec;
+	static const char gnfld[] = "gname";
+	static const char snfld[] = "sname";
+
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	ssz = udpc_seria_des_str(&sctx, &sstr);
+	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstr);
+
+	if (ssz == 0) {
+		return;
+	}
+
+	if ((rec = find_entry(sstr, ssz)) == NULL) {
+		return;
+	}
+
+	udpc_make_rpl_pkt(JOB_PACKET(j));
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	if (rec->gname.len > 0) {
+		udpc_seria_add_str(&sctx, gnfld, sizeof(gnfld)-1);
+		udpc_seria_add_str(
+			&sctx, &rec->entry[rec->gname.off], rec->gname.len);
+	}
+
+	if (rec->sname.len > 0) {
+		udpc_seria_add_str(&sctx, snfld, sizeof(snfld)-1);
+		udpc_seria_add_str(
+			&sctx, &rec->entry[rec->sname.off], rec->sname.len);
+	}
+
+	j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
+	send_cl(j);
+	return;
+}
+
 
 void
 init(void *clo)
@@ -207,7 +294,7 @@ init(void *clo)
 
 	if (read_bbdb() == 0) {
 		/* lodging our bbdb search service */
-		ud_set_service(0xbbda, bbdb_search, NULL);
+		ud_set_service(0xbbda, bbdb_search_tagged, NULL);
 		UD_DBGCONT("done\n");
 
 	} else {
@@ -220,9 +307,15 @@ void
 reinit(void *clo)
 {
 	UD_DEBUG("mod/bbdb: reloading ...");
-	/* lodging our bbdb search service */
-	ud_set_service(0xbbda, bbdb_search, NULL);
-	UD_DBGCONT("done\n");
+
+	if (read_bbdb() == 0) {
+		/* lodging our bbdb search service */
+		ud_set_service(0xbbda, bbdb_search_tagged, NULL);
+		UD_DBGCONT("done\n");
+
+	} else {
+		UD_DBGCONT("failed\n");
+	}
 	return;
 }
 

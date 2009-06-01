@@ -223,6 +223,163 @@ hexdig_to_nibble(char c)
 	}
 }
 
+static uint8_t
+parse_ui8h(const char *tok, size_t len)
+{
+/* format is 0xnn or 0xn */
+	uint8_t res = 0;
+	uint8_t tmp;
+
+	if ((tmp = hexdig_to_nibble(tok[2])) < 16) {
+		if (len == 4) {
+			res |= tmp << 4;
+		} else {
+			return tmp;
+		}
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[3])) < 16) {
+		res |= tmp;
+	} else {
+		goto out;
+	}
+	return res;
+out:
+	return 0;
+}
+
+static uint16_t
+parse_ui16h(const char *tok, size_t len)
+{
+/* format is 0xnnn or 0xnnnn */
+	uint16_t res = 0;
+	uint8_t tmp;
+
+	/* try the hex reader */
+	if ((tmp = hexdig_to_nibble(tok[2])) < 16) {
+		if (len == 6) {
+			res |= tmp << 12;
+		} else {
+			res |= tmp << 8;
+		}
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[3])) < 16) {
+		if (len == 6) {
+			res |= tmp << 8;
+		} else {
+			res |= tmp << 4;
+		}
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[4])) < 16) {
+		if (len == 6) {
+			res |= tmp << 4;
+		} else {
+			return res | tmp;
+		}
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[5])) < 16) {
+		res |= tmp << 0;
+	} else {
+		goto out;
+	}
+	return res;
+out:
+	return 0;
+}
+
+static uint32_t
+parse_ui32h(const char *tok, size_t len)
+{
+/* format is 0xnnnnn or 0xnnnnnn or 0xnnnnnnn or 0xnnnnnnnn */
+	uint32_t res = 0;
+	uint8_t tmp;
+
+	/* try the hex reader */
+	if ((tmp = hexdig_to_nibble(tok[2])) < 16) {
+		res |= tmp << ((len - 3) * 4);
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[3])) < 16) {
+		res |= tmp << ((len - 4) * 4);
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[4])) < 16) {
+		res |= tmp << ((len - 5) * 4);
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[5])) < 16) {
+		res |= tmp << ((len - 6) * 4);
+	} else {
+		goto out;
+	}
+	for (int i = 6; i < 10; i++) {
+		if ((tmp = hexdig_to_nibble(tok[i])) < 16) {
+			res |= tmp << ((len - i - 1) * 4);
+			if (len - i - 1 == 0) {
+				return res;
+			}
+		} else {
+			goto out;
+		}
+	}
+	return res;
+out:
+	return 0;
+}
+
+static uint64_t
+parse_ui64h(const char *tok, size_t len)
+{
+/* format is ... ya know */
+	uint32_t res = 0;
+	uint8_t tmp;
+
+	/* try the hex reader */
+	if ((tmp = hexdig_to_nibble(tok[2])) < 16) {
+		res |= tmp << ((len - 3) * 4);
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[3])) < 16) {
+		res |= tmp << ((len - 4) * 4);
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[4])) < 16) {
+		res |= tmp << ((len - 5) * 4);
+	} else {
+		goto out;
+	}
+	if ((tmp = hexdig_to_nibble(tok[5])) < 16) {
+		res |= tmp << ((len - 6) * 4);
+	} else {
+		goto out;
+	}
+	for (int i = 6; i < 18; i++) {
+		if ((tmp = hexdig_to_nibble(tok[i])) < 16) {
+			res |= tmp << ((len - i - 1) * 4);
+			if (len - i - 1 == 0) {
+				return res;
+			}
+		} else {
+			goto out;
+		}
+	}
+	return res;
+out:
+	return 0;
+}
+
 static ud_pkt_cmd_t
 resolve_tok(const char *tok, size_t len)
 {
@@ -283,7 +440,10 @@ out:
 	TOK_VAL
 	TOK_STRING
 	TOK_HEXCMD
-	TOK_HEX
+	TOK_UI64H
+	TOK_UI32H
+	TOK_UI16H
+	TOK_UI8H
 	TOK_INT
 %%
 
@@ -337,6 +497,22 @@ TOK_HEXCMD {
 tvs:
 TOK_STRING {
 	udpc_seria_add_str(&sctx, yylval.sval, yylval.slen);
+} |
+TOK_UI8H {
+	uint8_t val = (uint8_t)parse_ui8h(yylval.sval, yylval.slen);
+	udpc_seria_add_byte(&sctx, val);
+} |
+TOK_UI16H {
+	uint16_t val = (uint16_t)parse_ui16h(yylval.sval, yylval.slen);
+	udpc_seria_add_ui16(&sctx, val);
+} |
+TOK_UI32H {
+	uint32_t val = (uint32_t)parse_ui32h(yylval.sval, yylval.slen);
+	udpc_seria_add_ui32(&sctx, val);
+} |
+TOK_UI64H {
+	uint64_t val = (uint64_t)parse_ui64h(yylval.sval, yylval.slen);
+	udpc_seria_add_ui64(&sctx, val);
 }
 
 %%

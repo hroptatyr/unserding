@@ -102,6 +102,7 @@ abs		\|
 }
 
 {hexdgt}{4,4}	{
+	BEGIN(ARGS);
 	yylval->slen = cli_yyget_leng(yyscanner);
 	yylval->sval = cli_yyget_text(yyscanner);
 	RETURN_TOKEN(TOK_HEXCMD);
@@ -117,10 +118,28 @@ quit		{ BEGIN(ARGS); RETURN_TOKEN(TOK_CYA); }
 logout		{ BEGIN(ARGS); RETURN_TOKEN(TOK_CYA); }
 alias		{ BEGIN(ARGS); RETURN_TOKEN(TOK_ALI); }
 
-<ARGS>0x{hexdgt}+	{ 
+<ARGS>0x{hexdgt}{9,16}	{ 
 	yylval->slen = cli_yyget_leng(yyscanner);
 	yylval->sval = cli_yyget_text(yyscanner);
-	RETURN_TOKEN(TOK_HEX);
+	RETURN_TOKEN(TOK_UI64H);
+}
+
+<ARGS>0x{hexdgt}{5,8}	{ 
+	yylval->slen = cli_yyget_leng(yyscanner);
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_UI32H);
+}
+
+<ARGS>0x{hexdgt}{3,4}	{ 
+	yylval->slen = cli_yyget_leng(yyscanner);
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_UI16H);
+}
+
+<ARGS>0x{hexdgt}{1,2}	{ 
+	yylval->slen = cli_yyget_leng(yyscanner);
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_UI8H);
 }
 
 <ARGS>[-+]?{intdgt}+	{

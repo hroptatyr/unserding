@@ -51,7 +51,7 @@
 
 #include <ev.h>
 
-static int sock;
+static int sock_i, sock_s;
 static struct sockaddr_storage srv;
 static socklen_t srvlen = sizeof(srv);
 
@@ -60,14 +60,14 @@ static socklen_t srvlen = sizeof(srv);
 //#define V6PFX			"2001:470:9dd3:ca05"
 
 /* issel */
-static const char scscp_srv[] = V6PFX ":216:17ff:feb3:5eaa";
+static const char scscp_srv_issel[] = V6PFX ":216:17ff:feb3:5eaa";
 /* muck */
 //static const char scscp_srv[] = V6PFX ":219:dbff:fed1:4da8";
 /* stirling */
-//static const char scscp_srv[] = V6PFX ":219:dbff:fe63:577a";
+static const char scscp_srv_stirling[] = V6PFX ":219:dbff:fe63:577a";
 static const char scscp_dev[] = "lan0";
 
-#define BRAG_RATE	0.2
+#define BRAG_RATE	6.0
 
 static ev_timer ALGN16(__wtimer);
 static ev_io ALGN16(__wio);
@@ -82,14 +82,14 @@ if_index(int s, const char *if_name)
 	strncpy(ifr.ifr_name, if_name, IFNAMSIZ);
 
 	if (ioctl(s, SIOCGIFINDEX, &ifr) < 0) {
-		close(sock);
+		close(s);
 		return -1;
 	}
 	return ifr.ifr_ifindex;
 }
 
 static int
-scscp_connect(void)
+scscp_connect(const char *scscp_srv)
 {
 	struct sockaddr_in6 *s6 = (void*)&srv;
 	int s = -1;
@@ -135,20 +135,25 @@ inco_cb(EV_P_ ev_io *w, int revents)
 	ssize_t nread;
 
 	UD_DEBUG("they got back to us\n");
-	if ((nread = read(sock, buf, sizeof(buf))) <= 0) {
+	if ((nread = read(w->fd, buf, sizeof(buf))) <= 0) {
 		UD_DEBUG("no data, closing socket\n");
 		ev_io_stop(EV_A_ w);
+		if (w->fd == sock_i) {
+			sock_i = -1;
+		} else if (w->fd == sock_s) {
+			sock_s = -1;
+		}
 		close(w->fd);
 		return;
 	}
 	if (negop == 0) {
-		write(sock, negostr, sizeof(negostr));
+		write(w->fd, negostr, sizeof(negostr));
 		negop++;
 	} else if (negop == 1) {
 		ev_timer_start(EV_A_ wtimer);
 		negop++;
 	} else {
-		write(sock, bullshit, sizeof(bullshit));
+		write(w->fd, bullshit, sizeof(bullshit));
 	}
 	return;
 }
@@ -157,7 +162,16 @@ static void
 ack_cb(EV_P_ ev_timer *w, int revents)
 {
 	UD_DEBUG("writing\n");
-	write(sock, ackmsg, sizeof(ackmsg));
+	if (sock_i >= 0) {
+		write(sock_i, ackmsg, sizeof(ackmsg));
+	} else {
+		sock_i = scscp_connect(scscp_srv_issel);
+	}
+	if (sock_s >= 0) {
+		write(sock_s, ackmsg, sizeof(ackmsg));
+	} else {
+		sock_s = scscp_connect(scscp_srv_stirling);
+	}
 	return;
 }
 
@@ -165,11 +179,21 @@ static void
 init_watchers(EV_P_ int s)
 {
 	ev_io *wio = &__wio;
-	ev_timer *wtimer = &__wtimer;
+
+	if (s < 0) {
+		return;
+	}
 
         /* initialise an io watcher, then start it */
         ev_io_init(wio, inco_cb, s, EV_READ);
         ev_io_start(EV_A_ wio);
+	return;
+}
+
+static void
+init_timer(EV_P)
+{
+	ev_timer *wtimer = &__wtimer;
 
         /* init the timer which is sending scscp acks all along */
         ev_timer_init(wtimer, ack_cb, 0.0, BRAG_RATE);
@@ -177,7 +201,7 @@ init_watchers(EV_P_ int s)
 
 	//memset(ackmsg, 32, sizeof(ackmsg));
 	//memcpy(ackmsg, init_watchers, 402);
-	for (int i = 0; i < sizeof(ackmsg); i++) {
+	for (size_t i = 0; i < sizeof(ackmsg); i++) {
 		ackmsg[i] = (char)rand();
 	}
 	return;
@@ -191,12 +215,13 @@ init(void *clo)
 
 	UD_DEBUG("mod/scscp: loading ...");
 	/* connect to scscp and say ehlo */
-	if ((sock = scscp_connect()) < 0) {
-		return;
-	}
+	sock_i = scscp_connect(scscp_srv_issel);
+	sock_s = scscp_connect(scscp_srv_stirling);
 	/* set up the IO watcher and timer */
-	init_watchers(ctx->mainloop, sock);
+	init_watchers(ctx->mainloop, sock_i);
+	init_watchers(ctx->mainloop, sock_s);
 
+	init_timer(ctx->mainloop);
 	UD_DBGCONT("loaded\n");
 	return;
 }
@@ -212,8 +237,10 @@ void
 deinit(void *clo)
 {
 	UD_DEBUG("mod/scscp: unloading ...");
-	close(sock);
-	sock = -1;
+	close(sock_i);
+	close(sock_s);
+	sock_i = -1;
+	sock_s = -1;
 	UD_DBGCONT("done\n");
 	return;
 }

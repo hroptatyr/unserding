@@ -53,45 +53,51 @@
 #include <libxml/parser.h>
 #include <libxml/xmlreader.h>
 #include <libxml/xmlwriter.h>
-#include <libxml/xmlschemas.h>
+#include <libxml/xpath.h>
 
 #define xnew(_x)	malloc(sizeof(_x))
 
 typedef size_t index_t;
 
-static xmlDocPtr recs = NULL;
+typedef xmlDocPtr bbdb_t;
+typedef xmlNodePtr entry_t;
+
+static bbdb_t recs = NULL;
 
 
-static xmlDocPtr
+static void
 parse_fd(int fd)
 {
-	xmlTextReaderPtr reader;
-	xmlNodePtr root;
+	xmlTextReaderPtr rd;
+	entry_t root;
 
 #if !defined XML_PARSE_COMPACT
 # define XML_PARSE_COMPACT	0
 #endif	/* !XML_PARSE_COMPACT */
 #if 0
-	reader = xmlReaderForMemory(
-		buf, buflen, NULL, NULL, XML_PARSE_COMPACT);
+	rd = xmlReaderForMemory(buf, buflen, NULL, NULL, XML_PARSE_COMPACT);
 #else
-	reader = xmlReaderForFd(fd, NULL, NULL, XML_PARSE_COMPACT);
+	rd = xmlReaderForFd(fd, NULL, NULL, XML_PARSE_COMPACT);
 #endif
 
-	if (reader == NULL) {
-		return NULL;
+	if (rd == NULL) {
+		return;
 	}
-	if (xmlTextReaderRead(reader) < 1) {
+	if (xmlTextReaderRead(rd) < 1) {
 		//("No nodes in that XML stream\n");
-		return NULL;
+		recs = NULL;
+		return;
 	}
-	if ((root = xmlTextReaderExpand(reader)) == NULL) {
+	if ((root = xmlTextReaderExpand(rd)) == NULL) {
 		//("No root node?! Wtf?\n");
-		return NULL;
+		recs = NULL;
+		goto out;
 	}
 
-	recs = xmlTextReaderCurrentDoc(reader);
-	return recs;
+	recs = xmlTextReaderCurrentDoc(rd);
+out:
+	xmlFreeTextReader(rd);
+	return;
 }
 
 static int
@@ -171,71 +177,39 @@ boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
 	}
 	return NULL;
 }
+#endif
 
-static bbdb_rec_t
+static entry_t
 find_entry(const char *str, size_t len)
 {
+#if 0
 	/* traverse our entries */
 	for (bbdb_rec_t r = recs; r; r = r->next) {
 		if (boyer_moore(r->entry, r->enlen, str, len) != NULL) {
 			return r;
 		}
 	}
-	return NULL;
+#endif
+	return recs->children;
 }
 
 
 /* #'bbdb-search */
-static void __attribute__((unused))
+static void
 bbdb_search(job_t j)
 {
 	struct udpc_seria_s sctx;
 	size_t ssz;
 	const char *sstr;
-	bbdb_rec_t rec;
+	entry_t rec;
+	static const char nmfld[] = "fullname";
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstr);
 	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstr);
 
 	if (ssz == 0) {
-		return;
-	}
-
-	if ((rec = find_entry(sstr, ssz)) == NULL) {
-		return;
-	}
-
-	for (size_t k = 0, done, togo = rec->enlen; togo > 0;
-	     k += done, togo -= done) {
-		udpc_make_rpl_pkt(JOB_PACKET(j));
-		udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-
-		done = udpc_seria_add_fragstr(&sctx, &rec->entry[k], togo);
-
-		j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
-		send_cl(j);
-	}
-	return;
-}
-#endif
-
-static void
-bbdb_search_tagged(job_t j)
-{
-#if 0
-	struct udpc_seria_s sctx;
-	size_t ssz;
-	const char *sstr;
-	bbdb_rec_t rec;
-	static const char gnfld[] = "gname";
-	static const char snfld[] = "sname";
-
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	ssz = udpc_seria_des_str(&sctx, &sstr);
-	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstr);
-
-	if (ssz == 0) {
+		/* actually means dump all of it */
 		return;
 	}
 
@@ -245,21 +219,17 @@ bbdb_search_tagged(job_t j)
 
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	if (rec->gname.len > 0) {
-		udpc_seria_add_str(&sctx, gnfld, sizeof(gnfld)-1);
-		udpc_seria_add_str(
-			&sctx, &rec->entry[rec->gname.off], rec->gname.len);
+	/* serialise the fullname */
+	udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
+	{
+		const char *s = (const char*)xmlNodeGetContent(rec->children);
+		size_t sl = strlen(s);
+		udpc_seria_add_str(&sctx, s, sl);
 	}
 
-	if (rec->sname.len > 0) {
-		udpc_seria_add_str(&sctx, snfld, sizeof(snfld)-1);
-		udpc_seria_add_str(
-			&sctx, &rec->entry[rec->sname.off], rec->sname.len);
-	}
-
+	/* chop chop, off we go */
 	j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 	send_cl(j);
-#endif
 	return;
 }
 
@@ -271,7 +241,7 @@ init(void *clo)
 
 	if (read_bbdb() == 0) {
 		/* lodging our bbdb search service */
-		ud_set_service(0xbbda, bbdb_search_tagged, NULL);
+		ud_set_service(0xbbda, bbdb_search, NULL);
 		UD_DBGCONT("done\n");
 
 	} else {
@@ -287,7 +257,7 @@ reinit(void *clo)
 
 	if (read_bbdb() == 0) {
 		/* lodging our bbdb search service */
-		ud_set_service(0xbbda, bbdb_search_tagged, NULL);
+		ud_set_service(0xbbda, bbdb_search, NULL);
 		UD_DBGCONT("done\n");
 
 	} else {

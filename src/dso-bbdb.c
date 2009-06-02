@@ -35,13 +35,16 @@
  *
  ***/
 
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
 #include <stdio.h>
+#include <string.h>
 #include "module.h"
 #include "unserding.h"
 #define UNSERSRV
 #include "unserding-dbg.h"
 #include <sys/param.h>
-#include <string.h>
 
 #include "protocore.h"
 

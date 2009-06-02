@@ -122,10 +122,10 @@ scscp_connect(void)
 
 static int negop = 0;
 static const char negostr[] = "<?scscp version=\"1.3\" ?>\n";
-static const char bullshit[] = "<?scscp info text=\"debug\" ?>\n";
+static const char bullshit[] = "                   \n<?scscp ack ?>\n<?scscp start ?><OMOBJ/><?scscp end ?>\n\n                                                                                                                                                                                                                                                                                                                                                                                                       \n";
 //static const char ackmsg[] = "                                                                                                                                                                                                                                                                                                                                \n<?scscp ack ?>\n";
-//static char ackmsg[496];
-static const char ackmsg[] = "                   \n<?scscp ack ?>\n<?scscp start ?><OMOBJ/><?scscp end ?>\n\n                                                                                                                                                                                                                                                                                                                                                                                                       \n";
+static char ackmsg[4096];
+//static const char ackmsg[] = "                   \n<?scscp ack ?>\n<?scscp start ?><OMOBJ/><?scscp end ?>\n\n                                                                                                                                                                                                                                                                                                                                                                                                       \n";
 
 static void
 inco_cb(EV_P_ ev_io *w, int revents)
@@ -177,6 +177,9 @@ init_watchers(EV_P_ int s)
 
 	//memset(ackmsg, 32, sizeof(ackmsg));
 	//memcpy(ackmsg, init_watchers, 402);
+	for (int i = 0; i < sizeof(ackmsg); i++) {
+		ackmsg[i] = (char)rand();
+	}
 	return;
 }
 

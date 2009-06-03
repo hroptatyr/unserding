@@ -52,19 +52,40 @@
 
 #include <ev.h>
 
+#define BRAG_RATE	26.0
+
 /* link local network */
 #define V6PFX			"fe80:"
 //#define V6PFX			"2001:470:9dd3:ca05"
 
-/* issel */
-static const char scscp_srv_issel[] = V6PFX ":216:17ff:feb3:5eaa";
-/* muck */
-//static const char scscp_srv[] = V6PFX ":219:dbff:fed1:4da8";
-/* stirling */
-static const char scscp_srv_stirling[] = V6PFX ":219:dbff:fe63:577a";
-static const char scscp_dev[] = "lan0";
+typedef struct hent_s *hent_t;
+struct hent_s {
+	const char *host;
+	const char *addr;
+	const char *dev;
+};
 
-#define BRAG_RATE	26.0
+struct hent_s hent_issel = {
+	.addr = V6PFX ":216:17ff:feb3:5eaa",
+	.host = "issel",
+	.dev = "lan0",
+};
+struct hent_s hent_muck = {
+	.addr = V6PFX ":219:dbff:fed1:4da8",
+	.host = "muck",
+	.dev = "lan0",
+};
+struct hent_s hent_stirling = {
+	.addr =V6PFX ":219:dbff:fe63:577a",
+	.dev = "lan0",
+	.host = "stirling",
+};
+struct hent_s hent_pluto = {
+	.addr = V6PFX ":219:dbff:fed1:2c12",
+	.dev = "lan0",
+	.host = "pluto",
+};
+
 
 static const char negostr[] = "<?scscp version=\"1.3\" ?>\n";
 static const char bullshit[] = "                   \n<?scscp ack ?>\n"
@@ -76,18 +97,23 @@ static const char bullshit[] = "                   \n<?scscp ack ?>\n"
 
 typedef struct sock_ctx_s *sock_ctx_t;
 struct sock_ctx_s {
-	const char *host;
-	const char *addr;
+	hent_t had;
 	int state;
 	int sock;
+	float bragrate;
 	ev_io ALGN16(wio);
 	ev_timer ALGN16(wtimer);
 };
 
-static struct sock_ctx_s issel;
-static struct sock_ctx_s stirling;
+static struct sock_ctx_s issel, stirling, muck, pluto;
 
 static void init_spammer(EV_P_ sock_ctx_t ctx);
+
+static inline const char*
+sock_ctx_host(sock_ctx_t ctx)
+{
+	return ctx->had->host;
+}
 
 static inline sock_ctx_t
 sock_ctx_from_evio(ev_io *io)
@@ -127,7 +153,8 @@ scscp_connect(sock_ctx_t ctx)
 
 	/* wipe sockaddr structure */
 	memset(&srv, 0, sizeof(srv));
-	UD_DEBUG("(re)connecting to %s (%s)...", ctx->host, ctx->addr);
+	UD_DEBUG("(re)connecting to %s (%s)...",
+		 sock_ctx_host(ctx), ctx->had->addr);
 	/* get us a socket */
 	if ((s = socket(PF_INET6, SOCK_STREAM, IPPROTO_IP)) < 0) {
 		UD_DBGCONT("failed, socket() screwed up\n");
@@ -136,11 +163,11 @@ scscp_connect(sock_ctx_t ctx)
 	/* init him */
 	s6->sin6_family = AF_INET6;
 	s6->sin6_port = htons(26133);
-	if (inet_pton(AF_INET6, ctx->addr, &s6->sin6_addr) < 0) {
+	if (inet_pton(AF_INET6, ctx->had->addr, &s6->sin6_addr) < 0) {
 		UD_DBGCONT("failed, inet_pton() screwed up\n");
 		return -1;
 	}
-	if ((s6->sin6_scope_id = if_index(s, scscp_dev)) < 0) {
+	if ((s6->sin6_scope_id = if_index(s, ctx->had->dev)) < 0) {
 		UD_DBGCONT("failed, if_index() screwed up\n");
 		return -1;
 	}
@@ -160,9 +187,9 @@ inco_cb(EV_P_ ev_io *w, int revents)
 	char buf[4096];
 	ssize_t nread;
 
-	UD_DEBUG("%s got back to us\n", ctx->host);
+	UD_DEBUG("%s got back to us\n", sock_ctx_host(ctx));
 	if ((nread = read(w->fd, buf, sizeof(buf))) <= 0) {
-		UD_DEBUG("no data, closing socket %s\n", ctx->host);
+		UD_DEBUG("no data, closing socket %s\n", sock_ctx_host(ctx));
 		ev_io_stop(EV_A_ w);
 		close(w->fd);
 		ctx->sock = -1;
@@ -170,11 +197,11 @@ inco_cb(EV_P_ ev_io *w, int revents)
 		return;
 	}
 	if (ctx->state == 0) {
-		UD_DEBUG("negotiationg %s\n", ctx->host);
+		UD_DEBUG("negotiationg %s\n", sock_ctx_host(ctx));
 		write(w->fd, negostr, sizeof(negostr));
 		ctx->state++;
 	} else if (ctx->state == 1) {
-		UD_DEBUG("nego succeeded for %s\n", ctx->host);
+		UD_DEBUG("nego succeeded for %s\n", sock_ctx_host(ctx));
 		ctx->state++;
 	} else {
 		/* nothing */
@@ -189,7 +216,7 @@ ack_cb(EV_P_ ev_timer *w, int revents)
 	sock_ctx_t ctx = sock_ctx_from_evtimer(w);
 
 	if (ctx->sock >= 0) {
-		UD_DEBUG("writing %s\n", ctx->host);
+		UD_DEBUG("writing %s\n", sock_ctx_host(ctx));
 		write(ctx->sock, bullshit, sizeof(bullshit));
 	} else {
 		init_spammer(EV_A_ ctx);
@@ -217,18 +244,18 @@ init_timer(EV_P_ sock_ctx_t ctx)
 	ev_timer *wtimer = &ctx->wtimer;
 
 	/* init the timer */
-        ev_timer_init(wtimer, ack_cb, BRAG_RATE, BRAG_RATE);
+        ev_timer_init(wtimer, ack_cb, ctx->bragrate, ctx->bragrate);
 	ev_timer_start(EV_A_ wtimer);
 	return;
 }
 
 static void
-spam(EV_P_ sock_ctx_t ctx, const char *addr, const char *host)
+spam(EV_P_ sock_ctx_t ctx, hent_t had)
 {
+	ctx->had = had;
 	ctx->state = 0;
-	ctx->host = host;
-	ctx->addr = addr;
 	ctx->sock = -1;
+	ctx->bragrate = BRAG_RATE;
 	init_spammer(EV_A, ctx);
 	init_timer(EV_A, ctx);
 	return;
@@ -251,11 +278,13 @@ init(void *clo)
 {
 	ud_ctx_t ctx = clo;
 
-	UD_DEBUG("mod/scscp: loading ...");
+	UD_DEBUG("mod/scscp: loading ...\n");
 	/* connect to scscp and say ehlo */
-	spam(ctx->mainloop, &issel, scscp_srv_issel, "issel");
-	spam(ctx->mainloop, &stirling, scscp_srv_stirling, "stirling");
-	UD_DBGCONT("loaded\n");
+	spam(ctx->mainloop, &issel, &hent_issel);
+	spam(ctx->mainloop, &stirling, &hent_stirling);
+	spam(ctx->mainloop, &pluto, &hent_pluto);
+	spam(ctx->mainloop, &muck, &hent_muck);
+	UD_DEBUG("loaded\n");
 	return;
 }
 

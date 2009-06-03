@@ -93,6 +93,7 @@ static const char bullshit[] = "                   \n<?scscp ack ?>\n"
 	"<?xml version=\"1.0\"?>\n"
 	"<OM:OMOBJ xmlns:OM=\"http://www.openmath.org/OpenMath\"><OM:OMA><OMS cd=\"scscp2\" name=\"get_allowed_heads\"/></OM:OMA></OM:OMOBJ>\n"
 	"<?scscp end ?>\n\n                                                                                                                                                                                                                                                                                                                                                                                                       \n";
+static const char ackmsg[] = "                   \n<?scscp ack ?>\n\n";
 
 
 typedef struct sock_ctx_s *sock_ctx_t;
@@ -205,6 +206,7 @@ inco_cb(EV_P_ ev_io *w, int revents)
 		ctx->state++;
 	} else {
 		/* nothing */
+		write(w->fd, ackmsg, sizeof(ackmsg));
 		;
 	}
 	return;

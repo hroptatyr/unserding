@@ -20,13 +20,17 @@ unserdingd_SOURCES += protocore.c arrqueue.c dllqueue.c seria.c
 unserdingd_SOURCES += module.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt
+unserdingd_LDFLAGS += $(shell pkg-config --libs libxml-2.0)
 unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL)
 
 ## server modules
-lib_LTLIBRARIES += dso-cli.la dso-scscp.la dso-bbdb.la
+lib_LTLIBRARIES += dso-cli.la dso-scscp.la dso-bbdb.la dso-xbbdb.la
 dso_cli_la_LDFLAGS = -module
 dso_scscp_la_LDFLAGS = -module
 dso_bbdb_la_LDFLAGS = -module
+## the xml bbdb module
+dso_xbbdb_la_CPPFLAGS = $(shell pkg-config --cflags libxml-2.0)
+dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
 
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l

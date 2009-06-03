@@ -37,7 +37,8 @@
 
 #if defined HAVE_CONFIG_H
 # include "config.h"
-#endif	/* HAVE_CONFIG_H */
+#endif
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include "module.h"
@@ -48,103 +49,79 @@
 
 #include "protocore.h"
 
+#include <libxml/tree.h>
+#include <libxml/parser.h>
+#include <libxml/xmlreader.h>
+#include <libxml/xmlwriter.h>
+#include <libxml/xpath.h>
+
 #define xnew(_x)	malloc(sizeof(_x))
 
 typedef size_t index_t;
 
-struct bbdb_ol_s {
-	/* offset+length */
-	uint16_t off;
-	uint16_t len;
-};
+typedef xmlDocPtr bbdb_t;
+typedef xmlNodePtr entry_t;
 
-typedef struct bbdb_rec_s *bbdb_rec_t;
-struct bbdb_rec_s {
-	bbdb_rec_t next;
-	char *entry;
-	/* length of entry */
-	size_t enlen;
-	/* offsets into the entry */
-	struct bbdb_ol_s gname;
-	struct bbdb_ol_s sname;
-	struct bbdb_ol_s emails;
-};
-
-static bbdb_rec_t recs = NULL;
+static bbdb_t recs = NULL;
 
 
 static void
-parse_common_fields(bbdb_rec_t r)
+parse_fd(int fd)
 {
-	index_t i;
+	xmlTextReaderPtr rd;
+	entry_t root;
 
-	if (r->entry[0] != '[' || r->entry[1] != '"') {
-		/* malformed entry */
+#if !defined XML_PARSE_COMPACT
+# define XML_PARSE_COMPACT	0
+#endif	/* !XML_PARSE_COMPACT */
+#if 0
+	rd = xmlReaderForMemory(buf, buflen, NULL, NULL, XML_PARSE_COMPACT);
+#else
+	rd = xmlReaderForFd(fd, NULL, NULL, XML_PARSE_COMPACT);
+#endif
+
+	if (rd == NULL) {
 		return;
 	}
-
-	/* fetch the given name */
-	r->gname.off = 2;
-	for (i = 2; i < 0xfffe; i++) {
-		if (r->entry[i] == '"' && r->entry[i-1] != '\\') {
-			/* found the end */
-			r->gname.len = (uint16_t)i - r->gname.off;
-			break;
-		}
-	}
-
-	if (r->entry[++i] != ' ' || r->entry[++i] != '"') {
-		/* malformed entry */
+	if (xmlTextReaderRead(rd) < 1) {
+		//("No nodes in that XML stream\n");
+		recs = NULL;
 		return;
 	}
-
-	/* fetch the surname */
-	r->sname.off = (uint16_t)++i;
-	for (; i < 0xfffe; i++) {
-		if (r->entry[i] == '"' && r->entry[i-1] != '\\') {
-			/* found the end */
-			r->sname.len = (uint16_t)i - r->sname.off;
-			break;
-		}
+	if ((root = xmlTextReaderExpand(rd)) == NULL) {
+		//("No root node?! Wtf?\n");
+		recs = NULL;
+		goto out;
 	}
+
+	recs = xmlTextReaderCurrentDoc(rd);
+out:
+	xmlFreeTextReader(rd);
 	return;
 }
 
 static int
 read_bbdb(void)
 {
-	const char bbdbfn[] = "/.bbdb";
+	const char bbdbfn[] = "/.bbdb.xml";
 	char full[MAXPATHLEN], *tmp;
-	FILE *bbdbp;
-	size_t bsz = 4096;
+	int bbdbp;
 
 	/* construct the name */
 	tmp = stpcpy(full, getenv("HOME"));
 	strncpy(tmp, bbdbfn, sizeof(bbdbfn));
 
-	if ((bbdbp = fopen(full, "r")) == NULL) {
+	if ((bbdbp = open(full, 0)) < 0) {
 		return 1;
 	}
 
 	/* read the file, line by line */
-	tmp = malloc(bsz);
-	for (ssize_t n; (n = getline(&tmp, &bsz, bbdbp)) > 0;) {
-		bbdb_rec_t r = xnew(*r);
-		r->next = recs;
-		r->entry = malloc(n);
-		memcpy(r->entry, tmp, n - 1);
-		r->entry[n - 1] = '\0';
-		r->enlen = n-1;
-		/* parse the fields */
-		parse_common_fields(r);
-		/* cons him to the front of our recs */
-		recs = r;
-	}
-	free(tmp);
-	fclose(bbdbp);
+	parse_fd(bbdbp);
+	close(bbdbp);
 	return 0;
 }
 
+#if 0
 static const char*
 boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
 {
@@ -200,69 +177,39 @@ boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
 	}
 	return NULL;
 }
+#endif
 
-static bbdb_rec_t
+static entry_t
 find_entry(const char *str, size_t len)
 {
+#if 0
 	/* traverse our entries */
 	for (bbdb_rec_t r = recs; r; r = r->next) {
 		if (boyer_moore(r->entry, r->enlen, str, len) != NULL) {
 			return r;
 		}
 	}
-	return NULL;
+#endif
+	return recs->children;
 }
 
 
 /* #'bbdb-search */
-static void __attribute__((unused))
+static void
 bbdb_search(job_t j)
 {
 	struct udpc_seria_s sctx;
 	size_t ssz;
 	const char *sstr;
-	bbdb_rec_t rec;
+	entry_t rec;
+	static const char nmfld[] = "fullname";
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstr);
 	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstr);
 
 	if (ssz == 0) {
-		return;
-	}
-
-	if ((rec = find_entry(sstr, ssz)) == NULL) {
-		return;
-	}
-
-	for (size_t k = 0, done, togo = rec->enlen; togo > 0;
-	     k += done, togo -= done) {
-		udpc_make_rpl_pkt(JOB_PACKET(j));
-		udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-
-		done = udpc_seria_add_fragstr(&sctx, &rec->entry[k], togo);
-
-		j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
-		send_cl(j);
-	}
-	return;
-}
-
-static void
-bbdb_search_tagged(job_t j)
-{
-	struct udpc_seria_s sctx;
-	size_t ssz;
-	const char *sstr;
-	bbdb_rec_t rec;
-	static const char gnfld[] = "gname";
-	static const char snfld[] = "sname";
-
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	ssz = udpc_seria_des_str(&sctx, &sstr);
-	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstr);
-
-	if (ssz == 0) {
+		/* actually means dump all of it */
 		return;
 	}
 
@@ -272,18 +219,15 @@ bbdb_search_tagged(job_t j)
 
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	if (rec->gname.len > 0) {
-		udpc_seria_add_str(&sctx, gnfld, sizeof(gnfld)-1);
-		udpc_seria_add_str(
-			&sctx, &rec->entry[rec->gname.off], rec->gname.len);
+	/* serialise the fullname */
+	udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
+	{
+		const char *s = (const char*)xmlNodeGetContent(rec->children);
+		size_t sl = strlen(s);
+		udpc_seria_add_str(&sctx, s, sl);
 	}
 
-	if (rec->sname.len > 0) {
-		udpc_seria_add_str(&sctx, snfld, sizeof(snfld)-1);
-		udpc_seria_add_str(
-			&sctx, &rec->entry[rec->sname.off], rec->sname.len);
-	}
-
+	/* chop chop, off we go */
 	j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 	send_cl(j);
 	return;
@@ -297,7 +241,7 @@ init(void *clo)
 
 	if (read_bbdb() == 0) {
 		/* lodging our bbdb search service */
-		ud_set_service(0xbbda, bbdb_search_tagged, NULL);
+		ud_set_service(0xbbda, bbdb_search, NULL);
 		UD_DBGCONT("done\n");
 
 	} else {
@@ -313,7 +257,7 @@ reinit(void *clo)
 
 	if (read_bbdb() == 0) {
 		/* lodging our bbdb search service */
-		ud_set_service(0xbbda, bbdb_search_tagged, NULL);
+		ud_set_service(0xbbda, bbdb_search, NULL);
 		UD_DBGCONT("done\n");
 
 	} else {

@@ -24,9 +24,10 @@ unserdingd_LDFLAGS += $(shell pkg-config --libs libxml-2.0)
 unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL)
 
 ## server modules
-lib_LTLIBRARIES += dso-cli.la dso-scscp.la dso-bbdb.la dso-xbbdb.la
+lib_LTLIBRARIES += dso-cli.la dso-scscp.la dso-scscp2.la dso-bbdb.la dso-xbbdb.la
 dso_cli_la_LDFLAGS = -module
 dso_scscp_la_LDFLAGS = -module
+dso_scscp2_la_LDFLAGS = -module
 dso_bbdb_la_LDFLAGS = -module
 ## the xml bbdb module
 dso_xbbdb_la_CPPFLAGS = $(shell pkg-config --cflags libxml-2.0)

@@ -41,6 +41,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <stddef.h>
+
 #include "module.h"
 #include "unserding.h"
 #define UNSERSRV
@@ -49,54 +51,100 @@
 
 #include "protocore.h"
 
-#include <libxml/tree.h>
 #include <libxml/parser.h>
-#include <libxml/xmlreader.h>
-#include <libxml/xmlwriter.h>
-#include <libxml/xpath.h>
 
 #define xnew(_x)	malloc(sizeof(_x))
 
 typedef size_t index_t;
 
-typedef xmlDocPtr bbdb_t;
-typedef xmlNodePtr entry_t;
+typedef void *bbdb_t;
+typedef struct entry_s *entry_t;
 
 static bbdb_t recs = NULL;
 
+struct entry_s {
+	entry_t next;
+	const char *fn;
+	size_t fnlen;
+};
+
 
+static void sta(void*, const xmlChar*, const xmlChar**);
+static void end(void*, const xmlChar*);
+
+static xmlSAXHandler bbdb_handler = {
+	.startElement = sta,
+	.endElement = end,
+};
+
+typedef struct bbdb_pctx_s *bbdb_pctx_t;
+struct bbdb_pctx_s {
+	entry_t entry;
+};
+
 static void
-parse_fd(int fd)
+init_new_entry(void *ctx)
 {
-	xmlTextReaderPtr rd;
-	entry_t root;
+	bbdb_pctx_t pctx = ctx;
+	pctx->entry = xnew(*pctx->entry);
+	printf("new entry...");
+	return;
+}
 
-#if !defined XML_PARSE_COMPACT
-# define XML_PARSE_COMPACT	0
-#endif	/* !XML_PARSE_COMPACT */
-#if 0
-	rd = xmlReaderForMemory(buf, buflen, NULL, NULL, XML_PARSE_COMPACT);
-#else
-	rd = xmlReaderForFd(fd, NULL, NULL, XML_PARSE_COMPACT);
-#endif
+static void
+fini_new_entry(void *ctx)
+{
+	bbdb_pctx_t pctx = ctx;
+	printf("done\n");
+	pctx->entry->next = recs;
+	recs = pctx->entry;
+	pctx->entry = NULL;
+	return;
+}
 
-	if (rd == NULL) {
+static void
+parse_fn(void *ctx, const xmlChar *ch, int len)
+{
+	bbdb_pctx_t pctx = ctx;
+	char *restrict *fn =
+		(void*)((char*)pctx->entry + offsetof(struct entry_s, fn));
+
+	pctx->entry->fn = malloc(len+1);
+	strncpy(*fn, (const char*)ch, len);
+	pctx->entry->fnlen = len;
+	fputs((const char*)pctx->entry->fn, stdout);
+	return;
+}
+
+static void
+sta(void *ctx, const xmlChar *name, const xmlChar **attrs)
+{
+	if (strcmp((const char*)name, "entry") == 0) {
+		init_new_entry(ctx);
+	} else if (strcmp((const char*)name, "fullname") == 0) {
+		bbdb_handler.characters = parse_fn;
+	}
+	return;
+}
+
+static void
+end(void *ctx, const xmlChar *name)
+{
+	if (strcmp((const char*)name, "entry") == 0) {
+		fini_new_entry(ctx);
+	} else if (strcmp((const char*)name, "fullname") == 0) {
+		bbdb_handler.characters = NULL;
+	}
+	return;
+}
+
+static void
+parse_file(const char *filename)
+{
+	struct bbdb_pctx_s pctx;
+	if (xmlSAXUserParseFile(&bbdb_handler, &pctx, filename) < 0) {
 		return;
 	}
-	if (xmlTextReaderRead(rd) < 1) {
-		//("No nodes in that XML stream\n");
-		recs = NULL;
-		return;
-	}
-	if ((root = xmlTextReaderExpand(rd)) == NULL) {
-		//("No root node?! Wtf?\n");
-		recs = NULL;
-		goto out;
-	}
-
-	recs = xmlTextReaderCurrentDoc(rd);
-out:
-	xmlFreeTextReader(rd);
 	return;
 }
 
@@ -105,23 +153,15 @@ read_bbdb(void)
 {
 	const char bbdbfn[] = "/.bbdb.xml";
 	char full[MAXPATHLEN], *tmp;
-	int bbdbp;
 
 	/* construct the name */
 	tmp = stpcpy(full, getenv("HOME"));
 	strncpy(tmp, bbdbfn, sizeof(bbdbfn));
 
-	if ((bbdbp = open(full, 0)) < 0) {
-		return 1;
-	}
-
-	/* read the file, line by line */
-	parse_fd(bbdbp);
-	close(bbdbp);
+	parse_file(full);
 	return 0;
 }
 
-#if 0
 static const char*
 boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
 {
@@ -177,20 +217,26 @@ boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
 	}
 	return NULL;
 }
-#endif
 
 static entry_t
 find_entry(const char *str, size_t len)
 {
-#if 0
 	/* traverse our entries */
-	for (bbdb_rec_t r = recs; r; r = r->next) {
-		if (boyer_moore(r->entry, r->enlen, str, len) != NULL) {
+	for (entry_t r = recs; r; r = r->next) {
+		if (boyer_moore(r->fn, r->fnlen, str, len) != NULL) {
 			return r;
 		}
 	}
-#endif
-	return recs->children;
+	return NULL;
+}
+
+static void
+bbdb_seria_fullname(udpc_seria_t sctx, entry_t rec)
+{
+	const char *s = rec->fn;
+	size_t sl = rec->fnlen;
+	udpc_seria_add_str(sctx, s, sl);
+	return;
 }
 
 
@@ -221,11 +267,7 @@ bbdb_search(job_t j)
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* serialise the fullname */
 	udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
-	{
-		const char *s = (const char*)xmlNodeGetContent(rec->children);
-		size_t sl = strlen(s);
-		udpc_seria_add_str(&sctx, s, sl);
-	}
+	bbdb_seria_fullname(&sctx, rec);
 
 	/* chop chop, off we go */
 	j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);

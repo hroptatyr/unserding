@@ -62,10 +62,18 @@ typedef struct entry_s *entry_t;
 
 static bbdb_t recs = NULL;
 
+typedef struct email_s *email_t;
+struct email_t {
+	struct __email_s *next;
+	char email[];
+};
+
 struct entry_s {
 	entry_t next;
 	const char *fn;
 	size_t fnlen;
+	char *em;
+	size_t emlen;
 };
 
 
@@ -87,7 +95,9 @@ init_new_entry(void *ctx)
 {
 	bbdb_pctx_t pctx = ctx;
 	pctx->entry = xnew(*pctx->entry);
+	memset(pctx->entry, 0, sizeof(*pctx->entry));
 	printf("new entry...");
+	fflush(stdout);
 	return;
 }
 
@@ -106,13 +116,26 @@ static void
 parse_fn(void *ctx, const xmlChar *ch, int len)
 {
 	bbdb_pctx_t pctx = ctx;
-	char *restrict *fn =
-		(void*)((char*)pctx->entry + offsetof(struct entry_s, fn));
+	char **fn = (void*)((char*)pctx->entry + offsetof(struct entry_s, fn));
 
 	pctx->entry->fn = malloc(len+1);
 	strncpy(*fn, (const char*)ch, len);
 	pctx->entry->fnlen = len;
+	(*fn)[len] = '\0';
 	fputs((const char*)pctx->entry->fn, stdout);
+	return;
+}
+
+static void
+parse_email(void *ctx, const xmlChar *ch, int len)
+{
+	bbdb_pctx_t pctx = ctx;
+	size_t emlen = pctx->entry->emlen;
+
+	pctx->entry->em = realloc(pctx->entry->em, emlen + len + 1);
+	memcpy(&pctx->entry->em[emlen], (const char*)ch, len);
+	pctx->entry->em[emlen + len] = '\000';
+	pctx->entry->emlen = emlen + len + 1;
 	return;
 }
 
@@ -123,6 +146,8 @@ sta(void *ctx, const xmlChar *name, const xmlChar **attrs)
 		init_new_entry(ctx);
 	} else if (strcmp((const char*)name, "fullname") == 0) {
 		bbdb_handler.characters = parse_fn;
+	} else if (strcmp((const char*)name, "email") == 0) {
+		bbdb_handler.characters = parse_email;
 	}
 	return;
 }
@@ -134,6 +159,8 @@ end(void *ctx, const xmlChar *name)
 		fini_new_entry(ctx);
 	} else if (strcmp((const char*)name, "fullname") == 0) {
 		bbdb_handler.characters = NULL;
+	} else if (strcmp((const char*)name, "email") == 0) {
+		bbdb_handler.characters = NULL;
 	}
 	return;
 }
@@ -142,6 +169,7 @@ static void
 parse_file(const char *filename)
 {
 	struct bbdb_pctx_s pctx;
+
 	if (xmlSAXUserParseFile(&bbdb_handler, &pctx, filename) < 0) {
 		return;
 	}
@@ -160,6 +188,24 @@ read_bbdb(void)
 
 	parse_file(full);
 	return 0;
+}
+
+static inline char
+icase(char c)
+{
+	if (c >= 'A' && c <= 'Z') {
+		return c | 0x60;
+	}
+	return c;
+}
+
+static inline bool
+icase_eqp(char c1, char c2)
+{
+	if (c1 >= 'A' && c1 <= 'Z' && (c1 | 0x60) == c2) {
+		return true;
+	}
+	return c1 == c2;
 }
 
 static const char*
@@ -202,7 +248,7 @@ boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
 
 	for (index_t i = patlen; i < buflen; ) {
 		for (index_t j = 0 /* matched letter count */; j <= patlen; ) {
-			if (buf[i - j] == pat[patlen - j]) {
+			if (icase_eqp(buf[i - j], pat[patlen - j])) {
 				j++;
 				continue;
 			}
@@ -239,6 +285,20 @@ bbdb_seria_fullname(udpc_seria_t sctx, entry_t rec)
 	return;
 }
 
+static size_t
+bbdb_seria_email(udpc_seria_t sctx, entry_t rec, size_t off)
+{
+	const char *em = rec->em;
+	size_t emlen;
+
+	if (em == NULL) {
+		return 0;
+	}
+	emlen = strlen(&em[off]);
+	udpc_seria_add_str(sctx, &em[off], emlen);
+	return emlen + 1;
+}
+
 
 /* #'bbdb-search */
 static void
@@ -249,6 +309,7 @@ bbdb_search(job_t j)
 	const char *sstr;
 	entry_t rec;
 	static const char nmfld[] = "fullname";
+	static const char emfld[] = "email";
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstr);
@@ -268,6 +329,11 @@ bbdb_search(job_t j)
 	/* serialise the fullname */
 	udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
 	bbdb_seria_fullname(&sctx, rec);
+	/* serialise the emails */
+	for (size_t len = 0; len < rec->emlen;) {
+		udpc_seria_add_str(&sctx, emfld, sizeof(emfld)-1);
+		len += bbdb_seria_email(&sctx, rec, len);
+	}
 
 	/* chop chop, off we go */
 	j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);

@@ -68,8 +68,8 @@ struct entry_s {
 	entry_t next;
 	const char *fn;
 	size_t fnlen;
-	struct mulvalbuf_s akas;
-	struct mulvalbuf_s emails;
+	struct mvbuf_s akas;
+	struct mvbuf_s emails;
 };
 
 
@@ -127,7 +127,7 @@ parse_email(void *ctx, const xmlChar *ch, int len)
 {
 	bbdb_pctx_t pctx = ctx;
 
-	mulvalbuf_add(&pctx->entry->emails, (const char*)ch, len);
+	mvbuf_add(&pctx->entry->emails, (const char*)ch, len);
 	return;
 }
 
@@ -264,8 +264,8 @@ find_entry(const char *str, size_t len, bbdb_t recs)
 		if (boyer_moore(r->fn, r->fnlen, str, len) != NULL) {
 			return r;
 		}
-		if (boyer_moore(mulvalbuf_buffer(&r->emails),
-				mulvalbuf_buffer_len(&r->emails),
+		if (boyer_moore(mvbuf_buffer(&r->emails),
+				mvbuf_buffer_len(&r->emails),
 				str, len) != NULL) {
 			return r;
 		}
@@ -280,20 +280,6 @@ bbdb_seria_fullname(udpc_seria_t sctx, entry_t rec)
 	size_t sl = rec->fnlen;
 	udpc_seria_add_str(sctx, s, sl);
 	return;
-}
-
-static size_t
-bbdb_seria_email(udpc_seria_t sctx, entry_t rec, size_t off)
-{
-	const char *em = mulvalbuf_buffer(&rec->emails);
-	size_t emlen;
-
-	if (em == NULL) {
-		return 0;
-	}
-	emlen = strlen(&em[off]);
-	udpc_seria_add_str(sctx, &em[off], emlen);
-	return emlen + 1;
 }
 
 
@@ -325,9 +311,10 @@ bbdb_search(job_t j)
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	for (; (rec = find_entry(sstr, ssz, rec)); rec = rec->next) {
+		mvbuf_t em = &rec->emails;
+
 		if (udpc_seria_msglen(&sctx) +
-		    rec->fnlen +
-		    mulvalbuf_buffer_len(&rec->emails) > UDPC_PLLEN - 100) {
+		    rec->fnlen + mvbuf_buffer_len(em) > UDPC_PLLEN - 100) {
 			/* chop chop, off we go */
 			j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 			send_cl(j);
@@ -340,10 +327,11 @@ bbdb_search(job_t j)
 		udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
 		bbdb_seria_fullname(&sctx, rec);
 		/* serialise the emails */
-		for (size_t len = 0;
-		     len < mulvalbuf_buffer_len(&rec->emails);) {
+		for (mvbsize_t idx = 0; idx < mvbuf_nvals(em); idx++) {
+			const char *s;
+			mvbsize_t len = mvbuf_vals(&s, em, idx);
 			udpc_seria_add_str(&sctx, emfld, sizeof(emfld)-1);
-			len += bbdb_seria_email(&sctx, rec, len);
+			udpc_seria_add_str(&sctx, s, len);
 		}
 	}
 	/* chop chop, off we go */

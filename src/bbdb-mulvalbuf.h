@@ -41,10 +41,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-typedef struct mulvalbuf_s *mulvalbuf_t;
+typedef struct mvbuf_s *mvbuf_t;
 typedef uint32_t mvbsize_t;
 
-struct mulvalbuf_s {
+struct mvbuf_s {
 	char *buf;
 	mvbsize_t nvals;
 	mvbsize_t cursor;
@@ -52,14 +52,14 @@ struct mulvalbuf_s {
 };
 
 static inline void
-init_mulvalbuf(mulvalbuf_t mvb, size_t initial_size)
+init_mvbuf(mvbuf_t mvb, size_t initial_size)
 {
 	memset(mvb, 0, sizeof(*mvb));
 	return;
 }
 
 static inline void
-free_mulvalbuf(mulvalbuf_t mvb)
+free_mvbuf(mvbuf_t mvb)
 {
 	free(mvb->buf);
 	memset(mvb, 0, sizeof(*mvb));
@@ -67,31 +67,31 @@ free_mulvalbuf(mulvalbuf_t mvb)
 }
 
 static inline const char __attribute__((always_inline))*
-mulvalbuf_buffer(mulvalbuf_t mvb)
+mvbuf_buffer(mvbuf_t mvb)
 {
 	return mvb->buf;
 }
 
 static inline mvbsize_t __attribute__((always_inline))
-mulvalbuf_nvals(mulvalbuf_t mvb)
+mvbuf_nvals(mvbuf_t mvb)
 {
 	return mvb->nvals;
 }
 
 static inline mvbsize_t __attribute__((always_inline))
-mulvalbuf_buffer_len(mulvalbuf_t mvb)
+mvbuf_buffer_len(mvbuf_t mvb)
 {
 	return mvb->cursor;
 }
 
 static inline mvbsize_t __attribute__((always_inline))
-mulvalbuf_alloc_len(mulvalbuf_t mvb)
+mvbuf_alloc_len(mvbuf_t mvb)
 {
 	return mvb->alllen;
 }
 
 static inline void __attribute__((always_inline))
-mulvalbuf_add(mulvalbuf_t mvb, const char *s, mvbsize_t len)
+mvbuf_add(mvbuf_t mvb, const char *s, mvbsize_t len)
 {
 	mvbsize_t newlen = mvb->cursor + len + 1;
 
@@ -99,7 +99,23 @@ mulvalbuf_add(mulvalbuf_t mvb, const char *s, mvbsize_t len)
 	memcpy(&mvb->buf[mvb->cursor], s, len);
 	mvb->buf[newlen - 1] = '\000';
 	mvb->alllen = mvb->cursor = newlen;
+	mvb->nvals++;
 	return;
+}
+
+static inline mvbsize_t __attribute__((always_inline))
+mvbuf_vals(const char **buf, mvbuf_t mvb, mvbsize_t idx)
+{
+	for (mvbsize_t len = 0, i = 0; i < mvb->nvals; i++) {
+		mvbsize_t tmp = strlen(&mvb->buf[len]);
+		if (i == idx) {
+			*buf = &mvb->buf[len];
+			return tmp;
+		}
+		len += tmp + 1;
+	}
+	*buf = NULL;
+	return 0;
 }
 
 #endif	/* INCLUDED_bbdb_mulvalbuf_h_ */

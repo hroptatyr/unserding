@@ -132,6 +132,15 @@ parse_email(void *ctx, const xmlChar *ch, int len)
 }
 
 static void
+parse_aka(void *ctx, const xmlChar *ch, int len)
+{
+	bbdb_pctx_t pctx = ctx;
+
+	mvbuf_add(&pctx->entry->akas, (const char*)ch, len);
+	return;
+}
+
+static void
 sta(void *ctx, const xmlChar *name, const xmlChar **attrs)
 {
 	if (strcmp((const char*)name, "entry") == 0) {
@@ -140,6 +149,8 @@ sta(void *ctx, const xmlChar *name, const xmlChar **attrs)
 		bbdb_handler.characters = parse_fn;
 	} else if (strcmp((const char*)name, "email") == 0) {
 		bbdb_handler.characters = parse_email;
+	} else if (strcmp((const char*)name, "aka") == 0) {
+		bbdb_handler.characters = parse_aka;
 	}
 	return;
 }
@@ -152,6 +163,8 @@ end(void *ctx, const xmlChar *name)
 	} else if (strcmp((const char*)name, "fullname") == 0) {
 		bbdb_handler.characters = NULL;
 	} else if (strcmp((const char*)name, "email") == 0) {
+		bbdb_handler.characters = NULL;
+	} else if (strcmp((const char*)name, "aka") == 0) {
 		bbdb_handler.characters = NULL;
 	}
 	return;
@@ -283,6 +296,22 @@ bbdb_seria_fullname(udpc_seria_t sctx, entry_t rec)
 }
 
 
+static inline void
+prep_pkt(udpc_seria_t sctx, job_t j)
+{
+	udpc_make_rpl_pkt(JOB_PACKET(j));
+	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	return;
+}
+
+static inline void
+send_pkt(udpc_seria_t sctx, job_t j)
+{
+	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
+	send_cl(j);
+	return;
+}
+
 /* #'bbdb-search */
 static void
 bbdb_search(job_t j)
@@ -294,6 +323,7 @@ bbdb_search(job_t j)
 	entry_t rec = glob_recs;
 	static const char nmfld[] = "fullname";
 	static const char emfld[] = "email";
+	static const char akfld[] = "aka";
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstrp);
@@ -308,24 +338,28 @@ bbdb_search(job_t j)
 	memcpy(sstr, sstrp, ssz);
 
 	/* prepare the job packet */
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	prep_pkt(&sctx, j);
 	for (; (rec = find_entry(sstr, ssz, rec)); rec = rec->next) {
 		mvbuf_t em = &rec->emails;
+		mvbuf_t ak = &rec->akas;
 
 		if (udpc_seria_msglen(&sctx) +
 		    rec->fnlen + mvbuf_buffer_len(em) > UDPC_PLLEN - 100) {
 			/* chop chop, off we go */
-			j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
-			send_cl(j);
+			send_pkt(&sctx, j);
 			/* prepare another job packet */
-			udpc_make_rpl_pkt(JOB_PACKET(j));
-			udpc_seria_init(
-				&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+			prep_pkt(&sctx, j);
 		}
 		/* serialise the fullname */
 		udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
 		bbdb_seria_fullname(&sctx, rec);
+		/* serialise the emails */
+		for (mvbsize_t idx = 0; idx < mvbuf_nvals(ak); idx++) {
+			const char *s;
+			mvbsize_t len = mvbuf_vals(&s, ak, idx);
+			udpc_seria_add_str(&sctx, akfld, sizeof(akfld)-1);
+			udpc_seria_add_str(&sctx, s, len);
+		}
 		/* serialise the emails */
 		for (mvbsize_t idx = 0; idx < mvbuf_nvals(em); idx++) {
 			const char *s;
@@ -335,8 +369,7 @@ bbdb_search(job_t j)
 		}
 	}
 	/* chop chop, off we go */
-	j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
-	send_cl(j);
+	send_pkt(&sctx, j);
 	return;
 }
 

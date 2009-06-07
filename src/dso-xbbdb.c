@@ -60,7 +60,7 @@ typedef size_t index_t;
 typedef void *bbdb_t;
 typedef struct entry_s *entry_t;
 
-static bbdb_t recs = NULL;
+static bbdb_t glob_recs = NULL;
 
 typedef struct email_s *email_t;
 struct email_t {
@@ -106,8 +106,8 @@ fini_new_entry(void *ctx)
 {
 	bbdb_pctx_t pctx = ctx;
 	printf("done\n");
-	pctx->entry->next = recs;
-	recs = pctx->entry;
+	pctx->entry->next = glob_recs;
+	glob_recs = pctx->entry;
 	pctx->entry = NULL;
 	return;
 }
@@ -265,11 +265,14 @@ boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
 }
 
 static entry_t
-find_entry(const char *str, size_t len)
+find_entry(const char *str, size_t len, bbdb_t recs)
 {
 	/* traverse our entries */
 	for (entry_t r = recs; r; r = r->next) {
 		if (boyer_moore(r->fn, r->fnlen, str, len) != NULL) {
+			return r;
+		}
+		if (boyer_moore(r->em, r->emlen, str, len) != NULL) {
 			return r;
 		}
 	}
@@ -306,35 +309,37 @@ bbdb_search(job_t j)
 {
 	struct udpc_seria_s sctx;
 	size_t ssz;
-	const char *sstr;
-	entry_t rec;
+	const char *sstrp;
+	char sstr[256];
+	entry_t rec = glob_recs;
 	static const char nmfld[] = "fullname";
 	static const char emfld[] = "email";
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	ssz = udpc_seria_des_str(&sctx, &sstr);
-	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstr);
+	ssz = udpc_seria_des_str(&sctx, &sstrp);
+	UD_DEBUG("mod/bbdb: <- search \"%s\"\n", sstrp);
 
 	if (ssz == 0) {
 		/* actually means dump all of it */
 		return;
 	}
 
-	if ((rec = find_entry(sstr, ssz)) == NULL) {
-		return;
-	}
+	/* copy him, so we can start wiping the packet */
+	memcpy(sstr, sstrp, ssz);
 
+	/* prepare the job packet */
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	/* serialise the fullname */
-	udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
-	bbdb_seria_fullname(&sctx, rec);
-	/* serialise the emails */
-	for (size_t len = 0; len < rec->emlen;) {
-		udpc_seria_add_str(&sctx, emfld, sizeof(emfld)-1);
-		len += bbdb_seria_email(&sctx, rec, len);
+	for (; (rec = find_entry(sstr, ssz, rec)); rec = rec->next) {
+		/* serialise the fullname */
+		udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
+		bbdb_seria_fullname(&sctx, rec);
+		/* serialise the emails */
+		for (size_t len = 0; len < rec->emlen;) {
+			udpc_seria_add_str(&sctx, emfld, sizeof(emfld)-1);
+			len += bbdb_seria_email(&sctx, rec, len);
+		}
 	}
-
 	/* chop chop, off we go */
 	j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 	send_cl(j);

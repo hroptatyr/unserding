@@ -331,6 +331,16 @@ bbdb_search(job_t j)
 	udpc_make_rpl_pkt(JOB_PACKET(j));
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	for (; (rec = find_entry(sstr, ssz, rec)); rec = rec->next) {
+		if (udpc_seria_msglen(&sctx) +
+		    rec->fnlen + rec->emlen > UDPC_PLLEN - 100) {
+			/* chop chop, off we go */
+			j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
+			send_cl(j);
+			/* prepare another job packet */
+			udpc_make_rpl_pkt(JOB_PACKET(j));
+			udpc_seria_init(
+				&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+		}
 		/* serialise the fullname */
 		udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
 		bbdb_seria_fullname(&sctx, rec);

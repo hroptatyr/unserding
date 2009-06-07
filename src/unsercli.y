@@ -573,7 +573,7 @@ rplpkt_cb(EV_P_ ev_io *w, int revents)
 	socklen_t lsa = sizeof(sa);
 	char res[UDPC_PKTLEN];
 	/* the print buffer */
-	static char prbuf[4 * UDPC_PKTLEN];
+	static char prbuf[8 * UDPC_PKTLEN];
 	size_t len = 0;
 
 	nread = recvfrom(w->fd, res, countof(res), 0, (void*)&sa, &lsa);

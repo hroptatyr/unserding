@@ -53,6 +53,8 @@
 
 #include <libxml/parser.h>
 
+#include "bbdb-mulvalbuf.h"
+
 #define xnew(_x)	malloc(sizeof(_x))
 
 typedef size_t index_t;
@@ -62,18 +64,12 @@ typedef struct entry_s *entry_t;
 
 static bbdb_t glob_recs = NULL;
 
-typedef struct email_s *email_t;
-struct email_t {
-	struct __email_s *next;
-	char email[];
-};
-
 struct entry_s {
 	entry_t next;
 	const char *fn;
 	size_t fnlen;
-	char *em;
-	size_t emlen;
+	struct mulvalbuf_s akas;
+	struct mulvalbuf_s emails;
 };
 
 
@@ -130,12 +126,8 @@ static void
 parse_email(void *ctx, const xmlChar *ch, int len)
 {
 	bbdb_pctx_t pctx = ctx;
-	size_t emlen = pctx->entry->emlen;
 
-	pctx->entry->em = realloc(pctx->entry->em, emlen + len + 1);
-	memcpy(&pctx->entry->em[emlen], (const char*)ch, len);
-	pctx->entry->em[emlen + len] = '\000';
-	pctx->entry->emlen = emlen + len + 1;
+	mulvalbuf_add(&pctx->entry->emails, (const char*)ch, len);
 	return;
 }
 
@@ -272,7 +264,9 @@ find_entry(const char *str, size_t len, bbdb_t recs)
 		if (boyer_moore(r->fn, r->fnlen, str, len) != NULL) {
 			return r;
 		}
-		if (boyer_moore(r->em, r->emlen, str, len) != NULL) {
+		if (boyer_moore(mulvalbuf_buffer(&r->emails),
+				mulvalbuf_buffer_len(&r->emails),
+				str, len) != NULL) {
 			return r;
 		}
 	}
@@ -291,7 +285,7 @@ bbdb_seria_fullname(udpc_seria_t sctx, entry_t rec)
 static size_t
 bbdb_seria_email(udpc_seria_t sctx, entry_t rec, size_t off)
 {
-	const char *em = rec->em;
+	const char *em = mulvalbuf_buffer(&rec->emails);
 	size_t emlen;
 
 	if (em == NULL) {
@@ -332,7 +326,8 @@ bbdb_search(job_t j)
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	for (; (rec = find_entry(sstr, ssz, rec)); rec = rec->next) {
 		if (udpc_seria_msglen(&sctx) +
-		    rec->fnlen + rec->emlen > UDPC_PLLEN - 100) {
+		    rec->fnlen +
+		    mulvalbuf_buffer_len(&rec->emails) > UDPC_PLLEN - 100) {
 			/* chop chop, off we go */
 			j->blen = UDPC_HDRLEN + udpc_seria_msglen(&sctx);
 			send_cl(j);
@@ -345,7 +340,8 @@ bbdb_search(job_t j)
 		udpc_seria_add_str(&sctx, nmfld, sizeof(nmfld)-1);
 		bbdb_seria_fullname(&sctx, rec);
 		/* serialise the emails */
-		for (size_t len = 0; len < rec->emlen;) {
+		for (size_t len = 0;
+		     len < mulvalbuf_buffer_len(&rec->emails);) {
 			udpc_seria_add_str(&sctx, emfld, sizeof(emfld)-1);
 			len += bbdb_seria_email(&sctx, rec, len);
 		}

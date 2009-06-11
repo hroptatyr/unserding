@@ -109,17 +109,33 @@ fini_new_entry(void *ctx)
 	return;
 }
 
+static char fnbuf[2048];
+
 static void
 parse_fn(void *ctx, const xmlChar *ch, int len)
 {
 	bbdb_pctx_t pctx = ctx;
-	char **fn = (void*)((char*)pctx->entry + offsetof(struct entry_s, fn));
+	size_t fnlen = pctx->entry->fnlen;
 
-	pctx->entry->fn = malloc(len+1);
-	strncpy(*fn, (const char*)ch, len);
-	pctx->entry->fnlen = len;
-	(*fn)[len] = '\0';
-	fputs((const char*)pctx->entry->fn, stdout);
+	strncpy(&fnbuf[fnlen], (const char*)ch, len);
+	pctx->entry->fnlen += len;
+	return;
+}
+
+static void
+copy_fn(void *ctx)
+{
+	bbdb_pctx_t pctx = ctx;
+	char **fn = (void*)((char*)pctx->entry + offsetof(struct entry_s, fn));
+	size_t fnlen = pctx->entry->fnlen;
+
+	pctx->entry->fn = malloc(fnlen+1);
+	strncpy(*fn, fnbuf, fnlen);
+	(*fn)[fnlen] = '\0';
+	fputc('"', stdout);
+	fputs(pctx->entry->fn, stdout);
+	fputc('"', stdout);
+	fputc(' ', stdout);
 	return;
 }
 
@@ -173,6 +189,7 @@ end(void *ctx, const xmlChar *name)
 	if (strcmp((const char*)name, "entry") == 0) {
 		fini_new_entry(ctx);
 	} else if (strcmp((const char*)name, "fullname") == 0) {
+		copy_fn(ctx);
 		bbdb_handler.characters = NULL;
 	} else if (strcmp((const char*)name, "email") == 0) {
 		bbdb_handler.characters = NULL;

@@ -513,7 +513,9 @@ TOK_UI32H {
 TOK_UI64H {
 	uint64_t val = (uint64_t)parse_ui64h(yylval.sval, yylval.slen);
 	udpc_seria_add_ui64(&sctx, val);
-}
+} |
+/* nothing */
+;
 
 %%
 

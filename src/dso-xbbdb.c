@@ -93,6 +93,9 @@ init_new_entry(void *ctx)
 	bbdb_pctx_t pctx = ctx;
 	pctx->entry = xnew(*pctx->entry);
 	memset(pctx->entry, 0, sizeof(*pctx->entry));
+	init_mvbuf(&pctx->entry->akas);
+	init_mvbuf(&pctx->entry->orgas);
+	init_mvbuf(&pctx->entry->emails);
 	printf("new entry...");
 	fflush(stdout);
 	return;

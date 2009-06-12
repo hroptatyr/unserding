@@ -41,6 +41,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#define MVBINC			32
+#define RNDU64(_x)		((((_x) / MVBINC) * MVBINC) + MVBINC)
+#define RNDD64(_x)		((((_x) / MVBINC) * MVBINC))
+
 typedef struct mvbuf_s *mvbuf_t;
 typedef uint32_t mvbsize_t;
 
@@ -52,9 +56,10 @@ struct mvbuf_s {
 };
 
 static inline void
-init_mvbuf(mvbuf_t mvb, size_t initial_size)
+init_mvbuf(mvbuf_t mvb)
 {
-	memset(mvb, 0, sizeof(*mvb));
+	mvb->buf = malloc(RNDU64(0));
+	memset(mvb->buf, 0, RNDU64(0));
 	return;
 }
 
@@ -95,7 +100,9 @@ mvbuf_add(mvbuf_t mvb, const char *s, mvbsize_t len)
 {
 	mvbsize_t newlen = mvb->cursor + len + 1;
 
-	mvb->buf = realloc(mvb->buf, newlen);
+	if (RNDU64(newlen) > RNDU64(mvb->cursor)) {
+		mvb->buf = realloc(mvb->buf, RNDU64(newlen));
+	}
 	memcpy(&mvb->buf[mvb->cursor], s, len);
 	mvb->buf[newlen - 1] = '\000';
 	mvb->alllen = mvb->cursor = newlen;

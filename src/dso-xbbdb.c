@@ -109,16 +109,20 @@ fini_new_entry(void *ctx)
 	return;
 }
 
-static char fnbuf[2048];
+static char stbuf[2048];
+static size_t stblen;
+
+static inline void
+init_stbuf(void)
+{
+	stblen = 0;
+}
 
 static void
-parse_fn(void *ctx, const xmlChar *ch, int len)
+stuff_buf(void *ctx, const xmlChar *ch, int len)
 {
-	bbdb_pctx_t pctx = ctx;
-	size_t fnlen = pctx->entry->fnlen;
-
-	strncpy(&fnbuf[fnlen], (const char*)ch, len);
-	pctx->entry->fnlen += len;
+	strncpy(&stbuf[stblen], (const char*)ch, len);
+	stblen += len;
 	return;
 }
 
@@ -127,42 +131,48 @@ copy_fn(void *ctx)
 {
 	bbdb_pctx_t pctx = ctx;
 	char **fn = (void*)((char*)pctx->entry + offsetof(struct entry_s, fn));
-	size_t fnlen = pctx->entry->fnlen;
 
-	pctx->entry->fn = malloc(fnlen+1);
-	strncpy(*fn, fnbuf, fnlen);
-	(*fn)[fnlen] = '\0';
+	pctx->entry->fn = malloc(stblen+1);
+	strncpy(*fn, stbuf, stblen);
+	(*fn)[stblen] = '\0';
+	pctx->entry->fnlen = stblen;
+
 	fputc('"', stdout);
-	fputs(pctx->entry->fn, stdout);
+	fputs((*fn), stdout);
 	fputc('"', stdout);
 	fputc(' ', stdout);
+
+	init_stbuf();
 	return;
 }
 
 static void
-parse_email(void *ctx, const xmlChar *ch, int len)
+copy_email(void *ctx)
 {
 	bbdb_pctx_t pctx = ctx;
 
-	mvbuf_add(&pctx->entry->emails, (const char*)ch, len);
+	mvbuf_add(&pctx->entry->emails, stbuf, stblen+1);
+	init_stbuf();
 	return;
 }
 
 static void
-parse_aka(void *ctx, const xmlChar *ch, int len)
+copy_aka(void *ctx)
 {
 	bbdb_pctx_t pctx = ctx;
 
-	mvbuf_add(&pctx->entry->akas, (const char*)ch, len);
+	mvbuf_add(&pctx->entry->akas, stbuf, stblen);
+	init_stbuf();
 	return;
 }
 
 static void
-parse_orga(void *ctx, const xmlChar *ch, int len)
+copy_orga(void *ctx)
 {
 	bbdb_pctx_t pctx = ctx;
 
-	mvbuf_add(&pctx->entry->orgas, (const char*)ch, len);
+	mvbuf_add(&pctx->entry->orgas, stbuf, stblen);
+	init_stbuf();
 	return;
 }
 
@@ -171,14 +181,11 @@ sta(void *ctx, const xmlChar *name, const xmlChar **attrs)
 {
 	if (strcmp((const char*)name, "entry") == 0) {
 		init_new_entry(ctx);
-	} else if (strcmp((const char*)name, "fullname") == 0) {
-		bbdb_handler.characters = parse_fn;
-	} else if (strcmp((const char*)name, "email") == 0) {
-		bbdb_handler.characters = parse_email;
-	} else if (strcmp((const char*)name, "aka") == 0) {
-		bbdb_handler.characters = parse_aka;
-	} else if (strcmp((const char*)name, "organisation") == 0) {
-		bbdb_handler.characters = parse_orga;
+	} else if (strcmp((const char*)name, "fullname") == 0 ||
+		   strcmp((const char*)name, "email") == 0 ||
+		   strcmp((const char*)name, "aka") == 0 ||
+		   strcmp((const char*)name, "organisation") == 0) {
+		bbdb_handler.characters = stuff_buf;
 	}
 	return;
 }
@@ -192,10 +199,13 @@ end(void *ctx, const xmlChar *name)
 		copy_fn(ctx);
 		bbdb_handler.characters = NULL;
 	} else if (strcmp((const char*)name, "email") == 0) {
+		copy_email(ctx);
 		bbdb_handler.characters = NULL;
 	} else if (strcmp((const char*)name, "aka") == 0) {
+		copy_aka(ctx);
 		bbdb_handler.characters = NULL;
 	} else if (strcmp((const char*)name, "organisation") == 0) {
+		copy_orga(ctx);
 		bbdb_handler.characters = NULL;
 	}
 	return;

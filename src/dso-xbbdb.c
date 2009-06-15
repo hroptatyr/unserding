@@ -61,6 +61,8 @@ typedef size_t index_t;
 
 typedef void *bbdb_t;
 typedef struct entry_s *entry_t;
+typedef struct addr_s *addr_t;
+typedef struct phone_s *phone_t;
 
 static bbdb_t glob_recs = NULL;
 
@@ -71,6 +73,26 @@ struct entry_s {
 	struct mvbuf_s akas;
 	struct mvbuf_s orgas;
 	struct mvbuf_s emails;
+
+	/* may be more sophisticated one day */
+	addr_t addrs;
+	phone_t phones;
+};
+
+struct addr_s {
+	addr_t next;
+	char *occasion;
+	char *street;
+	char *town;
+	char *state;
+	char *postcode;
+	char country[2];
+};
+
+struct phone_s {
+	phone_t next;
+	char occasion[32];
+	char number[32];
 };
 
 
@@ -180,14 +202,66 @@ copy_orga(void *ctx)
 }
 
 static void
+init_addr(void *ctx)
+{
+	bbdb_pctx_t pctx = ctx;
+	addr_t a = xnew(*a);
+
+	memset(a, 0, sizeof(*a));
+	a->next = pctx->entry->addrs;
+	pctx->entry->addrs = a;
+	return;
+}
+
+static void
+init_phone(void *ctx)
+{
+	bbdb_pctx_t pctx = ctx;
+	phone_t p = xnew(*p);
+
+	memset(p, 0, sizeof(*p));
+	p->next = pctx->entry->phones;
+	pctx->entry->phones = p;
+	return;
+}
+
+static void
+pr_buf(void *ctx, const xmlChar *str, int len)
+{
+	fputs((const char*)str, stdout);
+	return;
+}
+
+static void
+copy_street(void *ctx)
+{
+	bbdb_pctx_t pctx = ctx;
+
+	pctx->entry->addrs->street = malloc(stblen+1);
+	strncpy(pctx->entry->addrs->street, stbuf, stblen);
+	pctx->entry->addrs->street[stblen] = '\0';
+
+	init_stbuf();
+	return;
+}
+
+
+static void
 sta(void *ctx, const xmlChar *name, const xmlChar **attrs)
 {
 	if (strcmp((const char*)name, "entry") == 0) {
 		init_new_entry(ctx);
-	} else if (strcmp((const char*)name, "fullname") == 0 ||
-		   strcmp((const char*)name, "email") == 0 ||
-		   strcmp((const char*)name, "aka") == 0 ||
-		   strcmp((const char*)name, "organisation") == 0) {
+
+	} else if (strcmp((const char*)name, "address") == 0) {
+		init_addr(ctx);
+		//bbdb_handler.characters = pr_buf;
+
+	} else if (strcmp((const char*)name, "phone") == 0) {
+		init_phone(ctx);
+		//bbdb_handler.characters = pr_buf;
+
+	} else {
+		/* we just use the character reader in all other cases */
 		bbdb_handler.characters = stuff_buf;
 	}
 	return;
@@ -196,20 +270,20 @@ sta(void *ctx, const xmlChar *name, const xmlChar **attrs)
 static void
 end(void *ctx, const xmlChar *name)
 {
+	bbdb_handler.characters = NULL;
 	if (strcmp((const char*)name, "entry") == 0) {
 		fini_new_entry(ctx);
 	} else if (strcmp((const char*)name, "fullname") == 0) {
 		copy_fn(ctx);
-		bbdb_handler.characters = NULL;
 	} else if (strcmp((const char*)name, "email") == 0) {
 		copy_email(ctx);
-		bbdb_handler.characters = NULL;
 	} else if (strcmp((const char*)name, "aka") == 0) {
 		copy_aka(ctx);
-		bbdb_handler.characters = NULL;
 	} else if (strcmp((const char*)name, "organisation") == 0) {
 		copy_orga(ctx);
-		bbdb_handler.characters = NULL;
+
+	} else if (strcmp((const char*)name, "street") == 0) {
+		copy_street(ctx);
 	}
 	return;
 }

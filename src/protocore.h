@@ -40,12 +40,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#if defined HAVE_NETINET_IN_H
-# include <netinet/in.h>
-#endif	/* HAVE_NETINET_IN_H */
-#if defined HAVE_SYS_SOCKET_H || 1
-# include <sys/socket.h>
-#endif
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 /***
  * The unserding protocol in detail:

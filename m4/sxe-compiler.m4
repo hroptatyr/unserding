@@ -343,8 +343,7 @@ typedef __gnuc_va_list va_list;]],[[1]])], [dnl
 
 	## check whether CC reacts to `extern inline' gnu89 inline declarations
 	## with a warning
-	## don't need this here, we explicitly mark the inlines
-	dnl SXE_CHECK_CC_EXTERN_INLINE
+	SXE_CHECK_CC_EXTERN_INLINE
 ])dnl SXE_CHECK_CC_CHAR
 
 AC_DEFUN([SXE_CHECK_CC_HACKS], [dnl
@@ -686,10 +685,6 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 
 		SXE_CHECK_COMPILER_FLAGS([-Wnopragma], [
 			warnflags="$warnflags -Wnopragma"])
-
-		## against this appalling aliasing of libev
-		SXE_CHECK_COMPILER_FLAGS([-fno-strict-aliasing], [
-			warnflags="$warnflags -fno-strict-aliasing"])
 
 	elif test "$__ICC" = "yes" -a \
 		"$with_maximum_warning_output" = "yes"; then
@@ -1595,8 +1590,8 @@ dnl recommended interface macros
 ## compiler wrapper
 AC_DEFUN([SXE_CHECK_CC], [dnl
 
-	AC_PROG_CPP
-	AC_HEADER_STDC
+	AC_REQUIRE([AC_PROG_CPP])
+	AC_REQUIRE([AC_HEADER_STDC])
 	AC_PROG_CC([gcc icc cc])
 	dnl AC_PROG_CC_STDC
 	AC_PROG_CC_C99

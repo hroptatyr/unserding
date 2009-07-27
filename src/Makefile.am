@@ -43,6 +43,7 @@ dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
 dso_asn1_instr_la_LDFLAGS = -module
 dso_asn1_instr_la_CPPFLAGS = -Ilibinstr
 dso_asn1_instr_la_DEPENDENCIES = libinstr.a
+dso_asn1_instr_la_LIBADD = libinstr.a
 noinst_LIBRARIES = libinstr.a
 
 ## improve me

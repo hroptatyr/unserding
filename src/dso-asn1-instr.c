@@ -44,6 +44,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <fcntl.h>
 
 /* our master include */
 #include "unserding.h"
@@ -54,7 +55,21 @@
 
 #include "Instrument.h"
 
-static void *instruments;
+#define xnew(_x)	malloc(sizeof(_x))
+
+typedef struct instr_cons_s *instr_cons_t;
+
+struct instr_cons_s {
+	instr_cons_t next;
+	void *instr;
+};
+
+
+static instr_cons_t instruments;
+
+static char xer_buf[4096];
+
+#define XER_PATH	"/tmp/instr.xer"
 
 static void
 instr_add(job_t j)
@@ -66,8 +81,32 @@ instr_add(job_t j)
 static void
 instr_add_xer(job_t j)
 {
-	UD_DEBUG("getting shit from /tmp/instr.xer\n");
+	int fd;
+	ssize_t nrd;
+	asn_codec_ctx_t *opt_codec_ctx = NULL;
+	void *s = NULL;
+	asn_dec_rval_t rval;
+	asn_TYPE_descriptor_t *pdu = &asn_DEF_Instrument;
 
+	UD_DEBUG("getting shit from /tmp/instr.xer ...");
+	if ((fd = open(XER_PATH, O_RDONLY)) < 0) {
+		UD_DBGCONT("failed\n");
+		return;
+	}
+	nrd = read(fd, xer_buf, sizeof(xer_buf));
+	close(fd);
+
+	/* decode */
+	rval = xer_decode(opt_codec_ctx, pdu, &s, xer_buf, nrd);
+	if (rval.code == RC_OK) {
+		instr_cons_t ic = xnew(*ic);
+		ic->instr = s;
+		ic->next = instruments;
+		instruments = ic;
+		UD_DBGCONT("success\n");
+	} else {
+		UD_DBGCONT("failed %d\n", rval.code);
+	}
 	return;
 }
 

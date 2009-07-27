@@ -1,0 +1,109 @@
+Instrument DEFINITIONS AUTOMATIC TAGS ::=
+BEGIN
+
+IMPORTS
+	CCY FROM Iso4217;
+
+	MONETARY ::= REAL
+
+	Ident ::= SEQUENCE {
+		isin PrintableString(SIZE(12)) OPTIONAL, -- ordinary isin
+		cusip PrintableString OPTIONAL, -- for yank securities
+		ric PrintableString(SIZE(5)) OPTIONAL, -- reuters
+		bbg PrintableString(SIZE(4)) OPTIONAL, -- bloomberg
+		gaid INTEGER OPTIONAL -- our own bollocks
+	}
+
+	InstrSpec ::= SEQUENCE {
+		name VisibleString(SIZE(1..32)),
+		ident Ident,
+		cfi PrintableString(SIZE(6)),
+		opol PrintableString(SIZE(4))
+	}
+
+	DeliverySched ::= SEQUENCE {
+		issue GeneralizedTime,
+		expiry GeneralizedTime,
+		settle GeneralizedTime
+	}
+
+	RIGHT ::= ENUMERATED {
+		put,
+		call
+	}
+
+	Referent ::= SEQUENCE {
+		instr Instrument,
+		strike MONETARY,
+		ratio REAL
+	}
+
+	Option ::= SEQUENCE {
+		instr-spec InstrSpec,
+		deliv-sched DeliverySched,
+		ref Referent,
+		funded Instrument,
+		settled Instrument,
+		right RIGHT
+	}
+
+	Cash ::= SEQUENCE {
+		currency CCY
+	}
+
+	FX ::= SEQUENCE {
+		name VisibleString(SIZE(1..32)),
+		base CCY,
+		term CCY
+	}
+
+	-- the union over all instruments
+	Instrument ::= CHOICE {
+		option Option,
+		cash Cash,
+		fx FX
+	}
+
+	-- strange construction
+	OptionChain ::= SEQUENCE {
+		ref-instr Instrument,
+		-- chain of strike prices
+		chain SEQUENCE OF MONETARY,
+		-- we assume the same ratio everywhere
+		ratio REAL
+		-- and both rights
+	}
+
+END
+
+Iso4217 DEFINITIONS ::=
+BEGIN
+	CCY ::= ENUMERATED {
+		eur (48),
+		usd (149),
+		gbp (51),
+		cad (26),
+		aud (7),
+		nzd (110),
+		krw (78),
+		jpy (72),
+		inr (66),
+		hkd (59),
+		cny (33),
+		rub (122),
+		sek (128),
+		nok (108),
+		dkk (41),
+		isk (69),
+		eek (44),
+		huf (63),
+		mxn (101),
+		brl (20),
+		clp (32),
+		chf (29),
+		-- precious metals as defined by 4217
+		xau (154),
+		xag (153),
+		xpt (165)
+	}
+END

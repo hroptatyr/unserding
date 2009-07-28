@@ -64,7 +64,7 @@
 #define UDPC_TYPE_NSTR(_n)	(UDPC_TYPE_BYTE | UDPC_SEQ_MASK), _n
 
 /* for ASN.1 objects */
-#define UDPC_TYPE_ASN1	(0x0e | UDPC_SEQ_MASK)
+#define UDPC_TYPE_ASN1	(0x0e)
 
 /* multi byte sigs */
 #define UDPC_TYPE_REC	0x0f	/* + slot sigs */

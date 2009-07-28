@@ -161,8 +161,9 @@ static void
 instr_dump(job_t j)
 {
 	asn_enc_rval_t rv;
-	struct udpc_seria_s __sctx, *sctx = &__sctx;
+	struct udpc_seria_s sctx;
 	size_t len;
+	static char der_buf[4096];
 
 	UD_DEBUG("dumping instruments\n");
 
@@ -170,23 +171,22 @@ instr_dump(job_t j)
 		return;
 	}
 
-	prep_pkt(sctx, j);
 #if 0
 	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
 	}
 #endif
-	sctx->msg[sctx->msgoff + 0] = UDPC_TYPE_ASN1;
 	rv = der_encode_to_buffer(
 		&asn_DEF_Instrument, instruments->instr,
-		UDPC_PAYLOAD(j->buf) + 3, UDPC_PLLEN - 3);
+		der_buf, sizeof(der_buf));
 	if (rv.encoded < 0) {
 		return;
 	}
 	len = rv.encoded;
-	sctx->msg[sctx->msgoff + 1] = (uint8_t)(len >> 8);
-	sctx->msg[sctx->msgoff + 2] = (uint8_t)(len & 0xff);
+	/* prepare the packet and send it off */
+	prep_pkt(&sctx, j);
+	udpc_seria_add_asn1(&sctx, der_buf, len);
 	/* chop chop, off we go */
-	send_pkt(sctx, j);
+	send_pkt(&sctx, j);
 	return;
 }
 

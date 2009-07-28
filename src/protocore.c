@@ -433,6 +433,16 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		return len + 11;
 	}
 
+	case UDPC_TYPE_ASN1: {
+		const char *s;
+		size_t len;
+
+		memcpy(buf, "(ASN.1)", 7);
+		len = udpc_seria_des_asn1(sctx, (const void**)&s);
+		len = sprintf(buf + 7, "%lu\n", len);
+		return len + 7;
+	}
+
 	case UDPC_TYPE_UI16:
 	case UDPC_TYPE_SI16: {
 		static char fmt[] = "(xi16)0x%04x (%x)\n";
@@ -492,6 +502,7 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 
 	case UDPC_TYPE_FLTH:
 	default:
+		fprintf(stderr, "type %d\n", tag);
 		memcpy(buf, "(unknown)\n", 10);
 		return 10;
 	}

@@ -55,7 +55,10 @@ libinstr.a: instrument.asn1
 			-fnative-types \
 			-fskeletons-copy ../$<)
 	(cd libinstr; rm -f converter-sample.c pdu_collection.c)
-	(cd libinstr; for i in *.c; do gcc -c -I. -o $$(basename $$i .c).o $$i; done)
+	(cd libinstr; \
+	for i in *.c; do \
+		$(CC) -fPIC -c -I. -o $$(basename $$i .c).o $$i; \
+	done)
 	ar cru $@ libinstr/*.o
 # we need the header files!
 #	rm -rf libinstr

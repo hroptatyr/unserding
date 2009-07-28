@@ -263,7 +263,7 @@ udpc_make_rpl_pkt(ud_packet_t p)
 	uint32_t all = ntohl(tm2[0]);
 
 	/* wipe out past sins */
-	memset(p.pbuf, 0, UDPC_PKTLEN);
+	memset(UDPC_PAYLOAD(p.pbuf), 0, UDPC_PLLEN);
 	/* increment the pkt number */
 	tm2[0] = htonl(all+1);
 	/* construct the reply packet type */

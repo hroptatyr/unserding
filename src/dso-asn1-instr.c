@@ -98,23 +98,45 @@ read_file(char *restrict buf, size_t bufsz, const char *fname)
 static void
 instr_add(job_t j)
 {
+	/* ASN.1 stuff */
+	asn_dec_rval_t rv;
+	asn_codec_ctx_t *ctx = NULL;
+	asn_TYPE_descriptor_t *pdu = &asn_DEF_Instrument;
+	/* our stuff */
+	struct udpc_seria_s sctx;
+	size_t len;
+	const void *ber_buf = NULL;
+	instr_t s = NULL;
+
 	UD_DEBUG("adding instrument\n");
+
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	len = udpc_seria_des_asn1(&sctx, &ber_buf);
+
+	rv = ber_decode(ctx, pdu, (void**)&s, ber_buf, len);
+	if (rv.code == RC_OK) {
+		add_instr(s);
+		UD_DBGCONT("success\n");
+	} else {
+		UD_DBGCONT("failed %d\n", rv.code);
+	}
 	return;
 }
 
 static void
 instr_add_xer(job_t j)
 {
-	ssize_t nrd;
-	asn_codec_ctx_t *opt_codec_ctx = NULL;
-	void *s = NULL;
+	/* asn1 stuff */
+	asn_codec_ctx_t *ctx = NULL;
 	asn_dec_rval_t rval;
 	asn_TYPE_descriptor_t *pdu = &asn_DEF_Instrument;
 	/* our serialiser */
+	ssize_t nrd;
+	instr_t s = NULL;
 	struct udpc_seria_s sctx;
 	size_t ssz;
 	const char *sstrp;
-	static char xer_buf[4096];
+	char xer_buf[4096];
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstrp);
@@ -131,7 +153,7 @@ instr_add_xer(job_t j)
 	}
 
 	/* decode */
-	rval = xer_decode(opt_codec_ctx, pdu, &s, xer_buf, nrd);
+	rval = xer_decode(ctx, pdu, (void**)&s, xer_buf, nrd);
 	if (rval.code == RC_OK) {
 		add_instr(s);
 		UD_DBGCONT("success\n");
@@ -160,14 +182,18 @@ send_pkt(udpc_seria_t sctx, job_t j)
 static void
 instr_dump(job_t j)
 {
+	/* asn.1 stuff */
 	asn_enc_rval_t rv;
+	asn_TYPE_descriptor_t *pdu = &asn_DEF_Instrument;
+	/* our stuff */
 	struct udpc_seria_s sctx;
 	size_t len;
-	static char der_buf[4096];
+	char der_buf[4096];
+	instr_cons_t ic = instruments;
 
 	UD_DEBUG("dumping instruments\n");
 
-	if (instruments == NULL) {
+	if (ic == NULL) {
 		return;
 	}
 
@@ -175,9 +201,7 @@ instr_dump(job_t j)
 	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
 	}
 #endif
-	rv = der_encode_to_buffer(
-		&asn_DEF_Instrument, instruments->instr,
-		der_buf, sizeof(der_buf));
+	rv = der_encode_to_buffer(pdu, ic->instr, der_buf, sizeof(der_buf));
 	if (rv.encoded < 0) {
 		return;
 	}
@@ -191,14 +215,43 @@ instr_dump(job_t j)
 }
 
 
+#include <ev.h>
+
+static ev_idle __attribute__((aligned(16))) __widle;
+
+static void
+deferred_dl(EV_P_ ev_idle *w, int revents)
+{
+	struct job_s j;
+	ud_packet_t __pkt = {.pbuf = j.buf};
+
+	UD_DEBUG("downloading instrs ...");
+	udpc_make_pkt(__pkt, 0, 0, 0x4220);
+	j.blen = UDPC_HDRLEN;
+	send_m46(&j);
+	UD_DBGCONT("done\n");
+
+	ud_set_service(0x4221, instr_dump, NULL);
+	ev_idle_stop(EV_A_ w);
+	return;
+}
+
 void
 init(void *clo)
 {
-	UD_DEBUG("mod/asn1-inestr: loading ...");
+	ud_ctx_t ctx = clo;
+	ev_idle *widle = &__widle;
+
+	UD_DEBUG("mod/asn1-instr: loading ...");
 	/* lodging our bbdb search service */
 	ud_set_service(0x4216, instr_add, NULL);
 	ud_set_service(0x4218, instr_add_xer, NULL);
 	ud_set_service(0x4220, instr_dump, NULL);
+	UD_DBGCONT("done\n");
+
+	UD_DEBUG("deploying idle bomb ...");
+	ev_idle_init(widle, deferred_dl);
+	ev_idle_start(ctx->mainloop, widle);
 	UD_DBGCONT("done\n");
 	return;
 }

@@ -182,35 +182,29 @@ send_pkt(udpc_seria_t sctx, job_t j)
 static void
 instr_dump(job_t j)
 {
-	/* asn.1 stuff */
-	asn_enc_rval_t rv;
-	asn_TYPE_descriptor_t *pdu = &asn_DEF_Instrument;
 	/* our stuff */
 	struct udpc_seria_s sctx;
-	size_t len;
-	char der_buf[4096];
-	instr_cons_t ic = instruments;
 
-	UD_DEBUG("dumping instruments\n");
+	UD_DEBUG("dumping instruments ...");
 
-	if (ic == NULL) {
-		return;
-	}
-
-#if 0
-	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
-	}
-#endif
-	rv = der_encode_to_buffer(pdu, ic->instr, der_buf, sizeof(der_buf));
-	if (rv.encoded < 0) {
-		return;
-	}
-	len = rv.encoded;
-	/* prepare the packet and send it off */
+	/* prepare the packet ... */
 	prep_pkt(&sctx, j);
-	udpc_seria_add_asn1(&sctx, der_buf, len);
-	/* chop chop, off we go */
+	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
+		/* asn.1 stuff */
+		asn_TYPE_descriptor_t *pdu = &asn_DEF_Instrument;
+		asn_enc_rval_t rv;
+		char der_buf[UDPC_PLLEN];
+		instr_t i = ic->instr;
+
+		rv = der_encode_to_buffer(pdu, i, der_buf, sizeof(der_buf));
+		UD_DEBUG("encoded %ld\n", rv.encoded);
+		if (rv.encoded >= 0) {
+			udpc_seria_add_asn1(&sctx, der_buf, rv.encoded);
+		}
+	}
+	/* ... and send him off */
 	send_pkt(&sctx, j);
+	UD_DBGCONT("done\n");
 	return;
 }
 

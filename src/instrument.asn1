@@ -1,4 +1,5 @@
-Instrument DEFINITIONS AUTOMATIC TAGS ::=
+Instrument { } DEFINITIONS IMPLICIT TAGS ::=
+
 BEGIN
 
 IMPORTS
@@ -41,9 +42,9 @@ IMPORTS
 	Option ::= SEQUENCE {
 		instr-spec InstrSpec,
 		deliv-sched DeliverySched,
-		ref Referent,
-		funded Instrument,
-		settled Instrument,
+--		ref Referent,
+--		funded Instrument,
+--		settled Instrument,
 		right RIGHT
 	}
 

@@ -108,7 +108,7 @@ instr_add(job_t j)
 	const void *ber_buf = NULL;
 	instr_t s = NULL;
 
-	UD_DEBUG("adding instrument\n");
+	UD_DEBUG("adding instrument ...");
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	len = udpc_seria_des_asn1(&sctx, &ber_buf);
@@ -231,7 +231,6 @@ deferred_dl(EV_P_ ev_idle *w, int revents)
 	send_m46(&j);
 	UD_DBGCONT("done\n");
 
-	ud_set_service(0x4221, instr_dump, NULL);
 	ev_idle_stop(EV_A_ w);
 	return;
 }
@@ -246,7 +245,7 @@ init(void *clo)
 	/* lodging our bbdb search service */
 	ud_set_service(0x4216, instr_add, NULL);
 	ud_set_service(0x4218, instr_add_xer, NULL);
-	ud_set_service(0x4220, instr_dump, NULL);
+	ud_set_service(0x4220, instr_dump, instr_add);
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("deploying idle bomb ...");

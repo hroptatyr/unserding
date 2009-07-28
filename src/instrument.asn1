@@ -1,4 +1,4 @@
-Instrument { } DEFINITIONS IMPLICIT TAGS ::=
+Instrument { } DEFINITIONS AUTOMATIC TAGS ::=
 
 BEGIN
 

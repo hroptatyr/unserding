@@ -63,6 +63,9 @@
 #define UDPC_TYPE_STR	(UDPC_TYPE_BYTE | UDPC_SEQ_MASK)
 #define UDPC_TYPE_NSTR(_n)	(UDPC_TYPE_BYTE | UDPC_SEQ_MASK), _n
 
+/* for ASN.1 objects */
+#define UDPC_TYPE_ASN1	(0x0e | UDPC_SEQ_MASK)
+
 /* multi byte sigs */
 #define UDPC_TYPE_REC	0x0f	/* + slot sigs */
 #define UDPC_TYPE_EOR	(UDPC_TYPE_REC | UDPC_SGN_MASK)	/* end of struct */
@@ -243,6 +246,33 @@ udpc_seria_des_str(udpc_seria_t sctx, const char **s)
 	len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];
 	*s = &sctx->msg[sctx->msgoff+2];
 	sctx->msgoff += 2 + len;
+	return len;
+}
+
+/* ASN.1 handling */
+static inline void
+udpc_seria_add_asn1(udpc_seria_t sctx, const void *s, size_t len)
+{
+	sctx->msg[sctx->msgoff + 0] = UDPC_TYPE_ASN1;
+	sctx->msg[sctx->msgoff + 1] = (uint8_t)(len >> 8);
+	sctx->msg[sctx->msgoff + 2] = (uint8_t)(len & 0xff);
+	memcpy(&sctx->msg[sctx->msgoff + 3], s, len);
+	sctx->msgoff += 3 + len;
+	return;
+}
+
+static inline size_t
+udpc_seria_des_asn1(udpc_seria_t sctx, const void **s)
+{
+	size_t len;
+	if (udpc_seria_tag(sctx) != UDPC_TYPE_ASN1) {
+		*s = NULL;
+		return 0;
+	}
+	len = (size_t)(((uint16_t)((uint8_t)sctx->msg[sctx->msgoff+1]) << 8) | \
+		       ((uint8_t)sctx->msg[sctx->msgoff + 2]));
+	*s = &sctx->msg[sctx->msgoff + 3];
+	sctx->msgoff += 3 + len;
 	return len;
 }
 

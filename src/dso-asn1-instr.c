@@ -141,6 +141,55 @@ instr_add_xer(job_t j)
 	return;
 }
 
+static inline void
+prep_pkt(udpc_seria_t sctx, job_t j)
+{
+	udpc_make_rpl_pkt(JOB_PACKET(j));
+	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	return;
+}
+
+static inline void
+send_pkt(udpc_seria_t sctx, job_t j)
+{
+	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
+	send_cl(j);
+	return;
+}
+
+static void
+instr_dump(job_t j)
+{
+	asn_enc_rval_t rv;
+	struct udpc_seria_s __sctx, *sctx = &__sctx;
+	size_t len;
+
+	UD_DEBUG("dumping instruments\n");
+
+	if (instruments == NULL) {
+		return;
+	}
+
+	prep_pkt(sctx, j);
+#if 0
+	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
+	}
+#endif
+	sctx->msg[sctx->msgoff + 0] = UDPC_TYPE_ASN1;
+	rv = der_encode_to_buffer(
+		&asn_DEF_Instrument, instruments->instr,
+		UDPC_PAYLOAD(j->buf) + 3, UDPC_PLLEN - 3);
+	if (rv.encoded < 0) {
+		return;
+	}
+	len = rv.encoded;
+	sctx->msg[sctx->msgoff + 1] = (uint8_t)(len >> 8);
+	sctx->msg[sctx->msgoff + 2] = (uint8_t)(len & 0xff);
+	/* chop chop, off we go */
+	send_pkt(sctx, j);
+	return;
+}
+
 
 void
 init(void *clo)
@@ -149,6 +198,7 @@ init(void *clo)
 	/* lodging our bbdb search service */
 	ud_set_service(0x4216, instr_add, NULL);
 	ud_set_service(0x4218, instr_add_xer, NULL);
+	ud_set_service(0x4220, instr_dump, NULL);
 	UD_DBGCONT("done\n");
 	return;
 }

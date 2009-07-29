@@ -53,12 +53,11 @@
 #define UNSERSRV
 #include "unserding-dbg.h"
 
-#include "Instrument.h"
+#include "dso-asn1-instr-helpers.h"
 
 #define xnew(_x)	malloc(sizeof(_x))
 
 typedef struct instr_cons_s *instr_cons_t;
-typedef struct Instrument *instr_t;
 
 struct instr_cons_s {
 	instr_cons_t next;
@@ -69,13 +68,83 @@ struct instr_cons_s {
 static instr_cons_t instruments;
 
 /* aux */
+static instr_t
+find_instr_by_gaid(ident_t i)
+{
+	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
+		ident_t this_ident = instr_ident(ic->instr);
+		if (ident_gaid_equal_p(this_ident, i)) {
+			return ic->instr;
+		}
+	}
+	return NULL;
+}
+
+static instr_t
+find_instr_by_isin_cfi_opol(ident_t i)
+{
+	return NULL;
+}
+
+static instr_t
+find_instr_by_name(ident_t i)
+{
+	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
+		ident_t this_ident = instr_ident(ic->instr);
+		if (ident_name_equal_p(this_ident, i)) {
+			return ic->instr;
+		}
+	}
+	return NULL;
+}
+
+/**
+ * Return the instrument in the catalogue that matches I, or NULL
+ * if no such instrument exists. */
+static instr_t
+find_instr(instr_t i)
+{
+	/* strategy is
+	 * 1. find_by_gaid
+	 * 2. find_by_isin_cfi_opol
+	 * 3. find_by_name */
+	instr_t resi;
+	ident_t ii = instr_ident(i);
+
+	if ((resi = find_instr_by_gaid(ii)) != NULL) {
+		return resi;
+	} else if ((resi = find_instr_by_isin_cfi_opol(ii)) != NULL) {
+		return resi;
+	} else if ((resi = find_instr_by_name(ii)) != NULL) {
+		return resi;
+	} else {
+		return NULL;
+	}
+}
+
+/**
+ * Merge SRC into TGT if of the same kind, return TRUE if no
+ * conflicts occurred. */
+static bool
+merge_instr(instr_t tgt, instr_t src)
+{
+	return true;
+}
+
 static void
 add_instr(instr_t i)
 {
-	instr_cons_t ic = xnew(*ic);
-	ic->instr = i;
-	ic->next = instruments;
-	instruments = ic;
+	instr_t resi;
+
+	if ((resi = find_instr(i)) != NULL) {
+		merge_instr(resi, i);
+		ASN_STRUCT_FREE(asn_DEF_Instrument, i);
+	} else {
+		instr_cons_t ic = xnew(*ic);
+		ic->instr = i;
+		ic->next = instruments;
+		instruments = ic;
+	}
 	return;
 }
 
@@ -197,7 +266,6 @@ instr_dump(job_t j)
 		instr_t i = ic->instr;
 
 		rv = der_encode_to_buffer(pdu, i, der_buf, sizeof(der_buf));
-		UD_DEBUG("encoded %ld\n", rv.encoded);
 		if (rv.encoded >= 0) {
 			udpc_seria_add_asn1(&sctx, der_buf, rv.encoded);
 		}

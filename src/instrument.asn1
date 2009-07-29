@@ -3,23 +3,29 @@ Instrument { } DEFINITIONS AUTOMATIC TAGS ::=
 BEGIN
 
 IMPORTS
-	CCY FROM Iso4217;
+	CCY FROM Iso4217
+	Resource FROM Resources;
 
 	MONETARY ::= REAL
 
+	-- everything we need to uniquely identify an instrument
+	-- regard these as references, they can be searched using cmd 42xx
 	Ident ::= SEQUENCE {
-		isin PrintableString(SIZE(12)) OPTIONAL, -- ordinary isin
-		cusip PrintableString OPTIONAL, -- for yank securities
-		ric PrintableString(SIZE(5)) OPTIONAL, -- reuters
-		bbg PrintableString(SIZE(4)) OPTIONAL, -- bloomberg
-		gaid INTEGER OPTIONAL -- our own bollocks
-	}
-
-	InstrSpec ::= SEQUENCE {
 		name VisibleString(SIZE(1..32)),
-		ident Ident,
 		cfi PrintableString(SIZE(6)),
-		opol PrintableString(SIZE(4))
+		opol PrintableString(SIZE(4)) OPTIONAL,
+		-- ordinary isin
+		isin PrintableString(SIZE(12)) OPTIONAL,
+		-- for yank securities
+		cusip PrintableString OPTIONAL,
+		-- for pommie securities
+		sedol PrintableString OPTIONAL,
+		-- reuters
+		ric PrintableString(SIZE(5)) OPTIONAL,
+		-- bloomberg
+		bbg PrintableString(SIZE(4)) OPTIONAL,
+		-- ourselves
+		gaid INTEGER
 	}
 
 	DeliverySched ::= SEQUENCE {
@@ -33,19 +39,19 @@ IMPORTS
 		call
 	}
 
-	Referent ::= SEQUENCE {
-		instr Instrument,
-		strike MONETARY,
-		ratio REAL
+	CashFlow ::= SEQUENCE {
+		from Ident,
+		to Ident
 	}
 
 	Option ::= SEQUENCE {
-		instr-spec InstrSpec,
 		deliv-sched DeliverySched,
---		ref Referent,
---		funded Instrument,
---		settled Instrument,
-		right RIGHT
+		strike MONETARY,
+		ratio REAL,
+		underlyer Ident,
+		right RIGHT,
+		buy-flow CashFlow,
+		exer-flow CashFlow
 	}
 
 	Cash ::= SEQUENCE {
@@ -53,16 +59,20 @@ IMPORTS
 	}
 
 	FX ::= SEQUENCE {
-		name VisibleString(SIZE(1..32)),
-		base CCY,
-		term CCY
+		term-flow CashFlow
 	}
 
 	-- the union over all instruments
-	Instrument ::= CHOICE {
+	InstrInstance ::= CHOICE {
 		option Option,
 		cash Cash,
 		fx FX
+	}
+
+	Instrument ::= SEQUENCE {
+		ident Ident,
+		instance InstrInstance,
+		urns SEQUENCE OF Resource
 	}
 
 	-- strange construction
@@ -77,6 +87,20 @@ IMPORTS
 
 END
 
+
+Resources DEFINITIONS ::=
+BEGIN
+	ResourceType ::= ENUMERATED {
+		tseries,
+		ticker-plant
+	}
+
+	Resource ::= SEQUENCE {
+		type ResourceType
+	}
+END
+
+
 Iso4217 DEFINITIONS ::=
 BEGIN
 	CCY ::= ENUMERATED {

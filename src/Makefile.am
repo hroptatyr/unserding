@@ -40,6 +40,7 @@ dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
 #dso_instr_la_LDFLAGS = -module
 #header_HEADERS += catalogue.h
 ## ASN.1 instruments
+dso_asn1_instr_la_SOURCES = dso-asn1-instr-helpers.h dso-asn1-instr.c
 dso_asn1_instr_la_LDFLAGS = -module
 dso_asn1_instr_la_CPPFLAGS = -Ilibinstr
 dso_asn1_instr_la_DEPENDENCIES = libinstr.a

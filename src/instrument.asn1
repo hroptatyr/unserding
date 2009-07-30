@@ -40,8 +40,8 @@ IMPORTS
 	}
 
 	CashFlow ::= SEQUENCE {
-		from Instrument,
-		to Instrument
+		from InstrumentRef,
+		to InstrumentRef
 	}
 
 	Option ::= SEQUENCE {
@@ -63,7 +63,7 @@ IMPORTS
 	}
 
 	-- the union over all instruments
-	InstrInstance ::= CHOICE {
+	Instance ::= CHOICE {
 		option Option,
 		cash Cash,
 		fx FX
@@ -71,13 +71,19 @@ IMPORTS
 
 	Instrument ::= SEQUENCE {
 		ident Ident,
-		instance InstrInstance,
+		instance Instance,
 		urns SEQUENCE OF Resource
+	}
+
+	-- in awe of a lack of by-ref serialisation
+	InstrumentRef ::= CHOICE {
+		instr Instrument,
+		ident Ident
 	}
 
 	-- strange construction
 	OptionChain ::= SEQUENCE {
-		ref-instr Instrument,
+		ref-instr InstrumentRef,
 		-- chain of strike prices
 		chain SEQUENCE OF MONETARY,
 		-- we assume the same ratio everywhere
@@ -92,7 +98,8 @@ Resources DEFINITIONS ::=
 BEGIN
 	ResourceType ::= ENUMERATED {
 		tseries,
-		ticker-plant
+		ticker-plant,
+		nresource-types
 	}
 
 	Resource ::= SEQUENCE {

@@ -62,6 +62,8 @@ typedef struct instr_cons_s *instr_cons_t;
 struct instr_cons_s {
 	instr_cons_t next;
 	void *instr;
+	/* assumed to be defined in ResourceType.h */
+	void *resources[ResourceType_nresource_types];
 };
 
 

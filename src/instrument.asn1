@@ -40,8 +40,8 @@ IMPORTS
 	}
 
 	CashFlow ::= SEQUENCE {
-		from Ident,
-		to Ident
+		from Instrument,
+		to Instrument
 	}
 
 	Option ::= SEQUENCE {

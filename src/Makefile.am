@@ -28,6 +28,7 @@ unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL)
 mod_LTLIBRARIES =
 mod_LTLIBRARIES += dso-cli.la dso-scscp.la dso-scscp2.la dso-bbdb.la dso-xbbdb.la
 #mod_LTLIBRARIES += dso-instr.la
+mod_LTLIBRARIES += dso-xdr-instr.la
 dso_cli_la_LDFLAGS = -module
 dso_scscp_la_LDFLAGS = -module
 dso_scscp2_la_LDFLAGS = -module
@@ -38,6 +39,8 @@ dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
 ## the catalogue module
 #dso_instr_la_LDFLAGS = -module
 #header_HEADERS += catalogue.h
+dso_xdr_instr_la_LDFLAGS = -module
+dso_xdr_instr_la_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
 
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l

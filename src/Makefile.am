@@ -28,7 +28,6 @@ unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL)
 mod_LTLIBRARIES =
 mod_LTLIBRARIES += dso-cli.la dso-scscp.la dso-scscp2.la dso-bbdb.la dso-xbbdb.la
 #mod_LTLIBRARIES += dso-instr.la
-mod_LTLIBRARIES += dso-asn1-instr.la
 dso_cli_la_LDFLAGS = -module
 dso_scscp_la_LDFLAGS = -module
 dso_scscp2_la_LDFLAGS = -module
@@ -39,30 +38,6 @@ dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
 ## the catalogue module
 #dso_instr_la_LDFLAGS = -module
 #header_HEADERS += catalogue.h
-## ASN.1 instruments
-dso_asn1_instr_la_SOURCES = dso-asn1-instr-helpers.h dso-asn1-instr.c
-dso_asn1_instr_la_LDFLAGS = -module
-dso_asn1_instr_la_CPPFLAGS = -Ilibinstr
-dso_asn1_instr_la_DEPENDENCIES = libinstr.a
-dso_asn1_instr_la_LIBADD = libinstr.a
-noinst_LIBRARIES = libinstr.a
-
-## improve me
-libinstr.a: instrument.asn1
-	mkdir -p libinstr
-	(cd libinstr; \
-		asn1c -gen-PER -pdu=all \
-			-funnamed-unions \
-			-fnative-types \
-			-fskeletons-copy ../$<)
-	(cd libinstr; rm -f converter-sample.c pdu_collection.c)
-	(cd libinstr; \
-	for i in *.c; do \
-		$(CC) -fPIC -c -I. -o $$(basename $$i .c).o $$i; \
-	done)
-	ar cru $@ libinstr/*.o
-# we need the header files!
-#	rm -rf libinstr
 
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l

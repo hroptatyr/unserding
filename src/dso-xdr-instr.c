@@ -80,7 +80,7 @@ ident_gaid_equal_p(const_ident_t i1, const_ident_t i2)
 static inline bool
 ident_name_equal_p(const_ident_t i1, const_ident_t i2)
 {
-	return memcmp(i1->name, i2->name, sizeof(i1->name));
+	return memcmp(i1->name, i2->name, sizeof(i1->name)) == 0;
 }
 
 static instr_t
@@ -152,13 +152,30 @@ add_instr(instr_t i)
 	instr_t resi;
 
 	if ((resi = find_instr(i)) != NULL) {
-#if 0
 		merge_instr(resi, i);
-		ASN_STRUCT_FREE(asn_DEF_Instrument, i);
-#endif
+		free_instr(i);
 	} else {
 		instr_cons_t ic = xnew(*ic);
 		ic->instr = i;
+		ic->next = instruments;
+		instruments = ic;
+	}
+	return;
+}
+
+static void
+copyadd_instr(instr_t i)
+{
+	instr_t resi;
+
+	if ((resi = find_instr(i)) != NULL) {
+		merge_instr(resi, i);
+	} else {
+		instr_cons_t ic = xnew(*ic);
+		instr_t copy = xnew(*i);
+
+		memcpy(copy, i, sizeof(*i));
+		ic->instr = copy;
 		ic->next = instruments;
 		instruments = ic;
 	}
@@ -182,25 +199,23 @@ read_file(char *restrict buf, size_t bufsz, const char *fname)
 
 /* jobs */
 static void
-instr_add(job_t j)
+instr_add_svc(job_t j)
 {
 	/* our stuff */
 	struct udpc_seria_s sctx;
 	size_t len;
 	const void *dec_buf = NULL;
-	instr_t s;
+	struct instr_s s;
 
 	UD_DEBUG("adding instrument ...");
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	len = udpc_seria_des_xdr(&sctx, &dec_buf);
 
-	if ((s = deser_instrument(dec_buf, len)) != NULL) {
-		add_instr(s);
-		UD_DBGCONT("success\n");
-	} else {
-		UD_DBGCONT("failed\n");
-	}
+	memset(&s, 0, sizeof(s));
+	deser_instrument_into(&s, dec_buf, len);
+	copyadd_instr(&s);
+	UD_DBGCONT("success\n");
 	return;
 }
 
@@ -259,7 +274,7 @@ send_pkt(udpc_seria_t sctx, job_t j)
 }
 
 static void
-instr_dump(job_t j)
+instr_dump_svc(job_t j)
 {
 	/* our stuff */
 	struct udpc_seria_s sctx;
@@ -292,8 +307,16 @@ static ev_idle __attribute__((aligned(16))) __widle;
 static void
 add_trivial(void)
 {
-	instr_t i = xnew(struct instr_s);
-	add_instr(i);
+	struct instr_s i;
+
+	make_tcnxxx_into(&i, 73380, PFACK_4217_EUR_IDX);
+	copyadd_instr(&i);
+
+	make_tcnxxx_into(&i, 73381, PFACK_4217_USD_IDX);
+	copyadd_instr(&i);
+
+	make_ffcpnx_into(&i, 73382, PFACK_4217_EUR_IDX, PFACK_4217_USD_IDX);
+	copyadd_instr(&i);
 	return;
 }
 
@@ -323,12 +346,12 @@ init(void *clo)
 
 	UD_DEBUG("mod/asn1-instr: loading ...");
 	/* lodging our bbdb search service */
-	ud_set_service(0x4216, instr_add, NULL);
+	ud_set_service(0x4216, instr_add_svc, NULL);
 #if 0
 /* from file, later */
 	ud_set_service(0x4218, instr_add_xer, NULL);
 #endif
-	ud_set_service(0x4220, instr_dump, instr_add);
+	ud_set_service(0x4220, instr_dump_svc, instr_add_svc);
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("deploying idle bomb ...");

@@ -433,13 +433,23 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		return len + 11;
 	}
 
+	case UDPC_TYPE_XDR: {
+		const char *s;
+		size_t len;
+
+		memcpy(buf, "(XDR)", 5);
+		len = udpc_seria_des_xdr(sctx, (const void**)&s);
+		len = sprintf(buf + 5, "%lu\n", (long unsigned int)len);
+		return len + 5;
+	}
+
 	case UDPC_TYPE_ASN1: {
 		const char *s;
 		size_t len;
 
 		memcpy(buf, "(ASN.1)", 7);
 		len = udpc_seria_des_asn1(sctx, (const void**)&s);
-		len = sprintf(buf + 7, "%lu\n", len);
+		len = sprintf(buf + 7, "%lu\n", (long unsigned int)len);
 		return len + 7;
 	}
 

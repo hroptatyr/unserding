@@ -39,8 +39,9 @@ dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
 ## the catalogue module
 #dso_instr_la_LDFLAGS = -module
 #header_HEADERS += catalogue.h
-dso_xdr_instr_la_LDFLAGS = -module
+dso_xdr_instr_la_LDFLAGS = -module $(LIBPFACK_LDFLAGS)
 dso_xdr_instr_la_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
+dso_xdr_instr_la_LIBADD = -lpfack
 
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l

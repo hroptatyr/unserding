@@ -153,6 +153,7 @@ add_instr(instr_t i)
 
 	if ((resi = find_instr(i)) != NULL) {
 		merge_instr(resi, i);
+		/* not clean yet */
 		free_instr(i);
 	} else {
 		instr_cons_t ic = xnew(*ic);
@@ -196,6 +197,20 @@ read_file(char *restrict buf, size_t bufsz, const char *fname)
 	return nrd;
 }
 
+static ssize_t
+write_file(char *restrict buf, size_t bufsz, const char *fname)
+{
+	int fd;
+	ssize_t nrd;
+
+	if ((fd = open(fname, O_CREAT | O_TRUNC | O_WRONLY, 0644)) < 0) {
+		return -1;
+	}
+	nrd = write(fd, buf, bufsz);
+	close(fd);
+	return nrd;
+}
+
 
 /* jobs */
 static void
@@ -219,17 +234,16 @@ instr_add_svc(job_t j)
 	return;
 }
 
-#if 0
 static void
-instr_add_from_file(job_t j)
+instr_add_from_file_svc(job_t j)
 {
 	/* our serialiser */
 	ssize_t nrd;
-	instr_t s = NULL;
 	struct udpc_seria_s sctx;
 	size_t ssz;
 	const char *sstrp;
-	char xer_buf[4096];
+	char xdr_buf[4096];
+	struct instr_s i;
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstrp);
@@ -240,22 +254,21 @@ instr_add_from_file(job_t j)
 	}
 
 	UD_DEBUG("getting XER encoded instrument from %s ...", sstrp);
-	if ((nrd = read_file(xer_buf, sizeof(xer_buf), sstrp)) < 0) {
+	if ((nrd = read_file(xdr_buf, sizeof(xdr_buf), sstrp)) < 0) {
 		UD_DBGCONT("failed\n");
 		return;
 	}
 
 	/* decode */
-	rval = xer_decode(ctx, pdu, (void**)&s, xer_buf, nrd);
-	if (rval.code == RC_OK) {
-		add_instr(s);
+	deser_instrument_into(&i, xdr_buf, nrd);
+	if (ssz > 0) {
+		copyadd_instr(&i);
 		UD_DBGCONT("success\n");
 	} else {
-		UD_DBGCONT("failed %d\n", rval.code);
+		UD_DBGCONT("failed\n");
 	}
 	return;
 }
-#endif
 
 static inline void
 prep_pkt(udpc_seria_t sctx, job_t j)
@@ -296,6 +309,46 @@ instr_dump_svc(job_t j)
 	/* ... and send him off */
 	send_pkt(&sctx, j);
 	UD_DBGCONT("done\n");
+	return;
+}
+
+static void
+instr_dump_to_file_svc(job_t j)
+{
+	/* our serialiser */
+	ssize_t nrd;
+	struct udpc_seria_s sctx;
+	size_t ssz;
+	const char *sstrp;
+	char xdr_buf[4096];
+	char *buf = xdr_buf;
+	size_t buf_sz = sizeof(xdr_buf);
+
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	ssz = udpc_seria_des_str(&sctx, &sstrp);
+
+	if (ssz == 0) {
+		UD_DEBUG("Usage: 4222 \"/path/to/file.xdr\"\n");
+		return;
+	}
+
+	UD_DEBUG("dumping instruments to %s ...", sstrp);
+	ssz = 0;
+	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
+		instr_t i = ic->instr;
+		size_t el;
+
+		el = seria_instrument(buf, buf_sz, i);
+		buf += el;
+		buf_sz -= el;
+	}
+
+	ssz = sizeof(xdr_buf) - buf_sz;
+	if ((nrd = write_file(xdr_buf, ssz, sstrp)) >= 0) {
+		UD_DBGCONT("success\n");
+	} else {
+		UD_DBGCONT("failed\n");
+	}
 	return;
 }
 
@@ -347,11 +400,9 @@ init(void *clo)
 	UD_DEBUG("mod/asn1-instr: loading ...");
 	/* lodging our bbdb search service */
 	ud_set_service(0x4216, instr_add_svc, NULL);
-#if 0
-/* from file, later */
-	ud_set_service(0x4218, instr_add_xer, NULL);
-#endif
+	ud_set_service(0x4218, instr_add_from_file_svc, NULL);
 	ud_set_service(0x4220, instr_dump_svc, instr_add_svc);
+	ud_set_service(0x4222, instr_dump_to_file_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("deploying idle bomb ...");

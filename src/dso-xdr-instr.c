@@ -216,6 +216,7 @@ write_file(char *restrict buf, size_t bufsz, const char *fname)
 static void
 instr_add_svc(job_t j)
 {
+/* would it be wise to treat this like the from-file case? */
 	/* our stuff */
 	struct udpc_seria_s sctx;
 	size_t len;
@@ -227,10 +228,13 @@ instr_add_svc(job_t j)
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	len = udpc_seria_des_xdr(&sctx, &dec_buf);
 
-	memset(&s, 0, sizeof(s));
-	deser_instrument_into(&s, dec_buf, len);
-	copyadd_instr(&s);
-	UD_DBGCONT("success\n");
+	len = deser_instrument_into(&s, dec_buf, len);
+	if (len > 0) {
+		copyadd_instr(&s);
+		UD_DBGCONT("success\n");
+	} else {
+		UD_DBGCONT("failed\n");
+	}
 	return;
 }
 

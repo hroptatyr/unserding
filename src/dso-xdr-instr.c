@@ -243,30 +243,30 @@ instr_add_from_file_svc(job_t j)
 	size_t ssz;
 	const char *sstrp;
 	char xdr_buf[4096];
+	char *buf = xdr_buf;
 	struct instr_s i;
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstrp);
 
 	if (ssz == 0) {
-		UD_DEBUG("Usage: 4218 \"/path/to/file.xer\"\n");
+		UD_DEBUG("Usage: 4218 \"/path/to/file.xdr\"\n");
 		return;
 	}
 
-	UD_DEBUG("getting XER encoded instrument from %s ...", sstrp);
+	UD_DEBUG("getting XDR encoded instrument from %s ...", sstrp);
 	if ((nrd = read_file(xdr_buf, sizeof(xdr_buf), sstrp)) < 0) {
 		UD_DBGCONT("failed\n");
 		return;
 	}
 
 	/* decode */
-	deser_instrument_into(&i, xdr_buf, nrd);
-	if (ssz > 0) {
+	while ((ssz = deser_instrument_into(&i, buf, nrd)) > 0) {
 		copyadd_instr(&i);
-		UD_DBGCONT("success\n");
-	} else {
-		UD_DBGCONT("failed\n");
+		buf += ssz;
+		nrd -= ssz;
 	}
+	UD_DBGCONT("success\n");
 	return;
 }
 
@@ -301,6 +301,7 @@ instr_dump_svc(job_t j)
 		instr_t i = ic->instr;
 		size_t el;
 
+		UD_DBGCONT("%s...", instr_name(i));
 		el = seria_instrument(enc_buf, sizeof(enc_buf), i);
 		if (el > 0) {
 			udpc_seria_add_xdr(&sctx, enc_buf, el);
@@ -357,6 +358,9 @@ instr_dump_to_file_svc(job_t j)
 
 static ev_idle __attribute__((aligned(16))) __widle;
 
+#if 0
+/* ideally this is a separate snippet that reads the stuff from a
+ * database and bangs it into unserding via network */
 static void
 add_trivial(void)
 {
@@ -368,10 +372,17 @@ add_trivial(void)
 	make_tcnxxx_into(&i, 73381, PFACK_4217_USD_IDX);
 	copyadd_instr(&i);
 
-	make_ffcpnx_into(&i, 73382, PFACK_4217_EUR_IDX, PFACK_4217_USD_IDX);
+	make_ffcpnx_into(&i, 5384697780, PFACK_4217_EUR_IDX, PFACK_4217_USD_IDX);
 	copyadd_instr(&i);
 	return;
 }
+#else
+static void
+add_trivial(void)
+{
+	return;
+}
+#endif
 
 static void
 deferred_dl(EV_P_ ev_idle *w, int revents)

@@ -6,7 +6,7 @@ AM_LDFLAGS = -lpthread
 headerdir = $(includedir)/unserding
 moddir = $(libdir)/unserding
 
-bin_PROGRAMS = unserdingd unsercli
+bin_PROGRAMS = unserdingd unsercli instrumenstruation
 noinst_PROGRAMS = ##e123ify
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
@@ -42,6 +42,10 @@ dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
 dso_xdr_instr_la_LDFLAGS = -module $(LIBPFACK_LDFLAGS)
 dso_xdr_instr_la_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
 dso_xdr_instr_la_LIBADD = $(LIBPFACK_LIBS)
+## to fiddle with option chains and other instruments
+instrumenstruation_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
+instrumenstruation_LDFLAGS = $(LIBPFACK_LDFLAGS)
+instrumenstruation_LDADD = $(LIBPFACK_LIBS) libunserding.la
 
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l

@@ -46,7 +46,10 @@
 # include <popt.h>
 #endif
 #include "unserding.h"
+#include <ffff/monetary.h>
 #include <pfack/instruments.h>
+
+typedef struct ga_spec_s *ga_spec_t;
 
 struct ga_spec_s {
 	long unsigned int gaid;
@@ -55,6 +58,14 @@ struct ga_spec_s {
 	int right;
 	time_t expiry;
 };
+
+#define outfile		stdout
+
+static inline bool
+properp(ga_spec_t sp)
+{
+	return sp->expiry > 0;
+}
 
 static time_t
 parse_tstamp(const char *buf, char **on)
@@ -68,6 +79,28 @@ parse_tstamp(const char *buf, char **on)
 	} else {
 		return 0;
 	}
+}
+
+static const_instr_t
+udl(long unsigned int specid)
+{
+	return NULL;
+}
+
+static void
+dump_option(ga_spec_t sp)
+{
+	struct instr_s i;
+	size_t ssz;
+	static char sbuf[4096];
+
+	make_oxxxxx_into(
+		&i, sp->gaid, udl(sp->specid), sp->right ? 'C' : 'P',
+		/* exer style */ 'E',
+		ffff_monetary32_get_d(sp->strike), 0);
+	ssz = seria_instrument(sbuf, sizeof(sbuf), &i);
+	fwrite(sbuf, 1, ssz, outfile);
+	return;
 }
 
 static void
@@ -96,7 +129,12 @@ instrumentify(const char *buf, size_t bsz)
 	while (*on++ != '\t');
 
 	sp.expiry = parse_tstamp(on, &on);
-	fprintf(stdout, "expiry %lu\n", sp.expiry);
+
+	if (!properp(&sp)) {
+		return;
+	}
+	/* otherwise create and dump the instrument */
+	dump_option(&sp);
 	return;
 }
 
@@ -137,6 +175,8 @@ main(int argc, const char *argv[])
 {
 	if (argc > 0 && argv[1][0] != '-') {
 		process(argv[1]);
+	} else if ((argc > 0 && argv[1][1] == '\0') || (argc == 0)) {
+		process("-");
 	} else {
 		usage();
 	}

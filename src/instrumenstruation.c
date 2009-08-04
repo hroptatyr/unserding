@@ -56,6 +56,20 @@ struct ga_spec_s {
 	time_t expiry;
 };
 
+static time_t
+parse_tstamp(const char *buf, char **on)
+{
+	struct tm tm;
+
+	memset(&tm, 0, sizeof(tm));
+	*on = strptime(buf, "%Y-%m-%d", &tm);
+	if (*on != NULL) {
+		return timegm(&tm);
+	} else {
+		return 0;
+	}
+}
+
 static void
 instrumentify(const char *buf, size_t bsz)
 {
@@ -70,8 +84,19 @@ instrumentify(const char *buf, size_t bsz)
 	while (*on++ != '\t');
 
 	sp.strike = strtod(on, &on);
-	fprintf(stdout, "strike %2.4f\n", sp.strike);
 	while (*on++ != '\t');
+
+	if (on[0] == '-' && on[1] == '1') {
+		sp.right = -1;
+	} else if (on[0] == '1') {
+		sp.right = 1;
+	} else {
+		sp.right = 0;
+	}
+	while (*on++ != '\t');
+
+	sp.expiry = parse_tstamp(on, &on);
+	fprintf(stdout, "expiry %lu\n", sp.expiry);
 	return;
 }
 
@@ -90,14 +115,31 @@ rdlns(FILE *fp)
 	return;
 }
 
+static void
+process(const char *infile)
+{
+	FILE *fp = fopen(infile, "r");
+
+	rdlns(fp);
+	fclose(fp);
+	return;
+}
+
+static void
+usage(void)
+{
+	printf("instrumenstruation ga-contracts-file\n");
+	return;
+}
 
 int
 main(int argc, const char *argv[])
 {
-	const char *infile = argv[1];
-	FILE *fp = fopen(infile, "r");
-	rdlns(fp);
-	fclose(fp);
+	if (argc > 0 && argv[1][0] != '-') {
+		process(argv[1]);
+	} else {
+		usage();
+	}
 	return 0;
 }
 

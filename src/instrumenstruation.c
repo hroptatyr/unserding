@@ -48,6 +48,7 @@
 #include "unserding.h"
 #include <ffff/monetary.h>
 #include <pfack/instruments.h>
+#include "protocore.h"
 
 typedef struct ictx_s *ictx_t;
 typedef struct ga_spec_s *ga_spec_t;
@@ -146,7 +147,15 @@ ordinary_write(ictx_t ctx, const char *buf, size_t bsz)
 static void
 unserding_write(ictx_t ctx, const char *buf, size_t bsz)
 {
-	ud_packet_t pkt = {.pbuf = buf, .plen = bsz};
+	char pbuf[UDPC_PKTLEN];
+	ud_packet_t pkt = {.pbuf = pbuf, .plen = sizeof(pbuf)};
+	struct udpc_seria_s sctx;
+
+	/* init the seria structure and prepare the pkt */
+	udpc_make_pkt(pkt, 0, 0, 0x4216);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pbuf), UDPC_PLLEN);
+	/* send it off */
+	udpc_seria_add_xdr(&sctx, buf, bsz);
 	ud_send_raw(&ctx->hdl, pkt);
 	return;
 }

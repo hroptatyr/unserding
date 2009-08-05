@@ -41,13 +41,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <time.h>
 #include <popt.h>
 #include "unserding.h"
 #include <ffff/monetary.h>
 #include <pfack/instruments.h>
 
+typedef struct ictx_s *ictx_t;
 typedef struct ga_spec_s *ga_spec_t;
+
+struct ictx_s {
+	int outfd;
+	struct ud_handle_s hdl;
+	void (*wrf)(ictx_t ctx, const char *buf, size_t bsz);
+};
 
 struct ga_spec_s {
 	long unsigned int gaid;
@@ -56,8 +65,6 @@ struct ga_spec_s {
 	int right;
 	time_t expiry;
 };
-
-#define outfile		stdout
 
 
 /* underlyers */
@@ -129,6 +136,22 @@ udl(long unsigned int specid)
 }
 
 
+static void
+ordinary_write(ictx_t ctx, const char *buf, size_t bsz)
+{
+	write(ctx->outfd, buf, bsz);
+	return;
+}
+
+static void
+unserding_write(ictx_t ctx, const char *buf, size_t bsz)
+{
+	ud_packet_t pkt = {.pbuf = buf, .plen = bsz};
+	ud_send_raw(&ctx->hdl, pkt);
+	return;
+}
+
+
 static inline bool
 properp(ga_spec_t sp)
 {
@@ -150,7 +173,7 @@ parse_tstamp(const char *buf, char **on)
 }
 
 static void
-dump_option(ga_spec_t sp)
+dump_option(ictx_t ctx, ga_spec_t sp)
 {
 	const_instr_t refi = udl(sp->specid);
 	struct instr_s i;
@@ -163,14 +186,14 @@ dump_option(ga_spec_t sp)
 		ffff_monetary32_get_d(sp->strike), 0);
 
 	ssz = seria_instrument(sbuf, sizeof(sbuf), &i);
-	fwrite(sbuf, 1, ssz, outfile);
+	ctx->wrf(ctx, sbuf, ssz);
 	return;
 }
 
 static char out[16777216];
 
 static void
-prepare_dump(void)
+prepare_dump(ictx_t ctx)
 {
 	/* dump index instruments here */
 	size_t ssz;
@@ -178,7 +201,7 @@ prepare_dump(void)
 
 #define SERIA_IDX(_x)					\
 	ssz = seria_instrument(sbuf, sizeof(sbuf), _x);	\
-	fwrite(sbuf, 1, ssz, outfile)
+	ctx->wrf(ctx, sbuf, ssz)
 
 	SERIA_IDX(pfi_idx_dax);
 	SERIA_IDX(pfi_idx_esx);
@@ -194,13 +217,13 @@ prepare_dump(void)
 }
 
 static void
-finish_dump(void)
+finish_dump(ictx_t unused)
 {
 	return;
 }
 
 static void
-instrumentify(const char *buf, size_t bsz)
+instrumentify(ictx_t ctx, const char *buf, size_t bsz)
 {
 /* format goes cid - specid - strike - right - expiry */
 	struct ga_spec_s sp;
@@ -230,25 +253,25 @@ instrumentify(const char *buf, size_t bsz)
 		return;
 	}
 	/* otherwise create and dump the instrument */
-	dump_option(&sp);
+	dump_option(ctx, &sp);
 	return;
 }
 
 static void
-rdlns(FILE *fp)
+rdlns(ictx_t ctx, FILE *fp)
 {
 	size_t lbuf_sz = 256;
 	char *lbuf = malloc(lbuf_sz);
 	ssize_t sz;
 
 	/* pre-hook */
-	prepare_dump();
+	prepare_dump(ctx);
 	while ((sz = getline(&lbuf, &lbuf_sz, fp)) > 0) {
-		instrumentify(lbuf, sz);
+		instrumentify(ctx, lbuf, sz);
 	}
 
 	/* post-hook */
-	finish_dump();
+	finish_dump(ctx);
 	free(lbuf);
 	return;
 }
@@ -289,7 +312,7 @@ rdxdrs(FILE *fp)
 
 
 static void
-process(const char *infile)
+process(ictx_t ctx, const char *infile)
 {
 	FILE *fp;
 
@@ -298,7 +321,7 @@ process(const char *infile)
 	} else {
 		fp = stdin;
 	}
-	rdlns(fp);
+	rdlns(ctx, fp);
 	fclose(fp);
 	return;
 }
@@ -318,13 +341,52 @@ decipher(const char *infile)
 	return;
 }
 
+static void
+init_udnet(ictx_t ctx)
+{
+	ctx->outfd = -1;
+	init_unserding_handle(&ctx->hdl, PF_INET6);
+	ctx->wrf = unserding_write;
+	return;
+}
+
+static void
+init_outfile(ictx_t ctx, const char *outfile)
+{
+	if (outfile != NULL) {
+		ctx->outfd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	} else {
+		ctx->outfd = STDOUT_FILENO;
+	}
+	ctx->wrf = ordinary_write;
+	return;
+}
+
+static void
+deinit(ictx_t ctx)
+{
+	if (ctx->outfd > 0) {
+		close(ctx->outfd);
+	} else {
+		free_unserding_handle(&ctx->hdl);
+	}
+	return;
+}
+
 
 /* the popt helper */
 static int decipherp = 0;
+static int uploadp = 0;
+static char *outfile = NULL;
 
 static const struct poptOption my_opts[] = {
-	{ "decipher", 'd', POPT_ARG_NONE, &decipherp, 0,
-	  "Read instruments file and show its contents.", NULL },
+	{"decipher", 'd', POPT_ARG_NONE, &decipherp, 0,
+	 "Read instruments file and show its contents.", NULL },
+	{"output", 'o', POPT_ARG_STRING, &outfile, 0,
+	 "Output encoded/decoded data to OUTFILE, default stdout.",
+	 "OUTFILE"},
+	{"upload", 'u', POPT_ARG_NONE, &uploadp, 0,
+	 "Upload instruments to unserding network.", NULL},
         POPT_TABLEEND
 };
 
@@ -350,18 +412,27 @@ main(int argc, const char *argv[])
 {
 	const char *const *rest;
 	const char *infile = NULL;
+	struct ictx_s __ctx, *ctx = &__ctx;
 
 	/* parse the command line */
 	if ((rest = parse_cl(argc, argv)) != NULL) {
 		infile = rest[0];
 	}
 
+	if (uploadp) {
+		init_udnet(ctx);
+	} else {
+		init_outfile(ctx, outfile);
+	}
+
 	if (!decipherp) {
 		init_indices();
-		process(infile);
+		process(ctx, infile);
 	} else {
 		decipher(infile);
 	}
+	/* close n free our resources */
+	deinit(ctx);
 	return 0;
 }
 

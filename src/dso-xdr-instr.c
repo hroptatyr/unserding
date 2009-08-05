@@ -106,7 +106,8 @@ find_instr_by_name(ident_t i)
 {
 	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
 		ident_t this_ident = instr_ident(ic->instr);
-		if (ident_name_equal_p(this_ident, i)) {
+		if (ident_name(this_ident)[0] != '\0' &&
+		    ident_name_equal_p(this_ident, i)) {
 			return ic->instr;
 		}
 	}
@@ -170,6 +171,8 @@ copyadd_instr(instr_t i)
 	instr_t resi;
 
 	if ((resi = find_instr(i)) != NULL) {
+		UD_DBGCONT("found him already ... merging ...");
+		abort();
 		merge_instr(resi, i);
 	} else {
 		instr_cons_t ic = xnew(*ic);
@@ -295,8 +298,10 @@ instr_dump_svc(job_t j)
 {
 	/* our stuff */
 	struct udpc_seria_s sctx;
+	int k = 0;
 
-	UD_DEBUG("dumping instruments ...");
+	for (instr_cons_t ic = instruments; ic; ic = ic->next, k++);
+	UD_DEBUG("dumping %d instruments ...", k);
 
 	/* prepare the packet ... */
 	prep_pkt(&sctx, j);

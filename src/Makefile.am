@@ -45,7 +45,7 @@ dso_xdr_instr_la_LIBADD = $(LIBPFACK_LIBS)
 ## to fiddle with option chains and other instruments
 instrumenstruation_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
 instrumenstruation_LDFLAGS = $(LIBPFACK_LDFLAGS)
-instrumenstruation_LDADD = $(LIBPFACK_LIBS) libunserding.la
+instrumenstruation_LDADD = $(LIBPFACK_LIBS) libunserding.la -lpopt
 
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l

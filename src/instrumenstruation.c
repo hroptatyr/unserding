@@ -170,7 +170,31 @@ dump_option(ga_spec_t sp)
 static char out[16777216];
 
 static void
-dump_everything(void)
+prepare_dump(void)
+{
+	/* dump index instruments here */
+	size_t ssz;
+	static char sbuf[4096];
+
+#define SERIA_IDX(_x)					\
+	ssz = seria_instrument(sbuf, sizeof(sbuf), _x);	\
+	fwrite(sbuf, 1, ssz, outfile)
+
+	SERIA_IDX(pfi_idx_dax);
+	SERIA_IDX(pfi_idx_esx);
+	SERIA_IDX(pfi_idx_cac);
+	SERIA_IDX(pfi_idx_ftse);
+	SERIA_IDX(pfi_idx_djia);
+	SERIA_IDX(pfi_idx_ndx);
+	SERIA_IDX(pfi_idx_rut);
+	SERIA_IDX(pfi_idx_spx);
+	SERIA_IDX(pfi_idx_xeo);
+	SERIA_IDX(pfi_idx_k200);
+	return;
+}
+
+static void
+finish_dump(void)
 {
 	return;
 }
@@ -213,16 +237,18 @@ instrumentify(const char *buf, size_t bsz)
 static void
 rdlns(FILE *fp)
 {
-	size_t lbuf_sz = 256, i = 0;
+	size_t lbuf_sz = 256;
 	char *lbuf = malloc(lbuf_sz);
 	ssize_t sz;
 
-	while ((sz = getline(&lbuf, &lbuf_sz, fp)) > 0 && i++ < 20) {
+	/* pre-hook */
+	prepare_dump();
+	while ((sz = getline(&lbuf, &lbuf_sz, fp)) > 0) {
 		instrumentify(lbuf, sz);
 	}
 
-	/* clean up */
-	dump_everything();
+	/* post-hook */
+	finish_dump();
 	free(lbuf);
 	return;
 }
@@ -235,24 +261,27 @@ rdxdrs(FILE *fp)
 	if ((nrd = fread(out, 1, sizeof(out), fp)) > 0) {
 		char *buf = out;
 		size_t res = 0;
-		struct instr_s this;
 
 		fprintf(stderr, "deco %lu bytes\n", (long unsigned int)nrd);
 		while (nrd > 0) {
 			XDR hdl;
+			struct instr_s this;
 
 			xdrmem_create(&hdl, buf, nrd, XDR_DECODE);
 			if (xdr_instr_s(&hdl, &this)) {
 				res = xdr_getpos(&hdl);
 			}
 			xdr_destroy(&hdl);
-			fprintf(stderr, "read %lu bytes\n", (long unsigned int)res);
+			fprintf(stderr, "read %lu bytes\n",
+				(long unsigned int)res);
 			buf += res;
 			nrd -= res;
 
-			fprintf(stderr, "found instr %u ref %p\n",
+			fprintf(stderr, "found instr %u ref %p %s\n",
 				instr_gaid(&this),
-				this.instance.instance_s_u.option.underlyer);
+				this.instance.instance_s_u.option.underlyer,
+				this.instance.instance_s_u.option.underlyer
+				->ident.name);
 		}
 	}
 	return;

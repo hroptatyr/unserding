@@ -84,15 +84,15 @@ static void
 init_indices(void)
 {
 	make_tixxxx_into(pfi_idx_dax, 1, "DAX");
-	make_tixxxx_into(pfi_idx_esx, 3, "Stoxx50");
-	make_tixxxx_into(pfi_idx_cac, 5, "CAC40");
-	make_tixxxx_into(pfi_idx_ftse, 7, "FTSE");
-	make_tixxxx_into(pfi_idx_djia, 9, "DJIA");
-	make_tixxxx_into(pfi_idx_ndx, 11, "NDX");
-	make_tixxxx_into(pfi_idx_rut, 13, "RUT");
-	make_tixxxx_into(pfi_idx_spx, 15, "SPX");
-	make_tixxxx_into(pfi_idx_xeo, 17, "XEO");
-	make_tixxxx_into(pfi_idx_k200, 19, "K200");
+	make_tixxxx_into(pfi_idx_esx, 2, "Stoxx50");
+	make_tixxxx_into(pfi_idx_cac, 3, "CAC40");
+	make_tixxxx_into(pfi_idx_ftse, 4, "FTSE");
+	make_tixxxx_into(pfi_idx_djia, 5, "DJIA");
+	make_tixxxx_into(pfi_idx_ndx, 6, "NDX");
+	make_tixxxx_into(pfi_idx_rut, 7, "RUT");
+	make_tixxxx_into(pfi_idx_spx, 8, "SPX");
+	make_tixxxx_into(pfi_idx_xeo, 9, "XEO");
+	make_tixxxx_into(pfi_idx_k200, 10, "K200");
 	return;
 }
 

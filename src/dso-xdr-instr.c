@@ -131,8 +131,11 @@ find_instr(instr_t i)
 		return resi;
 	} else if ((resi = find_instr_by_isin_cfi_opol(ii)) != NULL) {
 		return resi;
+#if 0
+/* names are currently not unique */
 	} else if ((resi = find_instr_by_name(ii)) != NULL) {
 		return resi;
+#endif
 	} else {
 		return NULL;
 	}

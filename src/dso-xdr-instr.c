@@ -268,6 +268,7 @@ instr_add_from_file_svc(job_t j)
 	char xdr_buf[4096];
 	char *buf = xdr_buf;
 	struct instr_s i;
+	int fd;
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstrp);
@@ -277,19 +278,35 @@ instr_add_from_file_svc(job_t j)
 		return;
 	}
 
-	UD_DEBUG("getting XDR encoded instrument from %s ...", sstrp);
-	if ((nrd = read_file(xdr_buf, sizeof(xdr_buf), sstrp)) < 0) {
-		UD_DBGCONT("failed\n");
+	UD_DEBUG("getting XDR encoded instrument from %s\n", sstrp);
+
+	if ((fd = open(sstrp, O_RDONLY)) < 0) {
+		UD_DEBUG("no such file or directory\n");
 		return;
 	}
 
-	/* decode */
-	while ((ssz = deser_instrument_into(&i, buf, nrd)) > 0) {
-		copyadd_instr(&i);
-		buf += ssz;
-		nrd -= ssz;
+	/* prepare buffer */
+	buf = xdr_buf;
+	nrd = sizeof(xdr_buf);
+	/* main loop */
+	while ((nrd = read(fd, buf, nrd)) > 0) {
+		/* reset buffer */
+		buf = xdr_buf;
+		nrd = sizeof(xdr_buf);
+		/* decode */
+		while ((ssz = deser_instrument_into(&i, buf, nrd)) > 0) {
+			copyadd_instr(&i);
+			buf += ssz;
+			nrd -= ssz;
+		}
+		/* buf points to the remaining nrd bytes, memmove them */
+		UD_DEBUG("%ld bytes left\n", nrd);
+		memcpy(xdr_buf, buf, nrd);
+		buf = xdr_buf + nrd;
+		nrd = sizeof(xdr_buf) - nrd;
 	}
-	UD_DBGCONT("success\n");
+
+	close(fd);
 	return;
 }
 

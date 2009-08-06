@@ -45,6 +45,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 /* our master include */
 #include "unserding.h"
@@ -69,6 +70,7 @@ struct instr_cons_s {
 
 
 static instr_cons_t instruments;
+static pthread_mutex_t imtx = PTHREAD_MUTEX_INITIALIZER;
 
 /* aux */
 static inline bool
@@ -86,12 +88,15 @@ ident_name_equal_p(const_ident_t i1, const_ident_t i2)
 static instr_t
 find_instr_by_gaid(ident_t i)
 {
+	pthread_mutex_lock(&imtx);
 	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
 		ident_t this_ident = instr_ident(ic->instr);
 		if (ident_gaid_equal_p(this_ident, i)) {
+			pthread_mutex_unlock(&imtx);
 			return ic->instr;
 		}
 	}
+	pthread_mutex_unlock(&imtx);
 	return NULL;
 }
 
@@ -104,13 +109,16 @@ find_instr_by_isin_cfi_opol(ident_t i)
 static instr_t
 find_instr_by_name(ident_t i)
 {
+	pthread_mutex_lock(&imtx);
 	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
 		ident_t this_ident = instr_ident(ic->instr);
 		if (ident_name(this_ident)[0] != '\0' &&
 		    ident_name_equal_p(this_ident, i)) {
+			pthread_mutex_unlock(&imtx);
 			return ic->instr;
 		}
 	}
+	pthread_mutex_unlock(&imtx);
 	return NULL;
 }
 
@@ -162,8 +170,11 @@ add_instr(instr_t i)
 	} else {
 		instr_cons_t ic = xnew(*ic);
 		ic->instr = i;
+		/* obtain the append mutex */
+		pthread_mutex_lock(&imtx);
 		ic->next = instruments;
 		instruments = ic;
+		pthread_mutex_unlock(&imtx);
 	}
 	return;
 }
@@ -175,7 +186,7 @@ copyadd_instr(instr_t i)
 
 	if ((resi = find_instr(i)) != NULL) {
 		UD_DBGCONT("found him already ... merging ...");
-		abort();
+		//abort();
 		merge_instr(resi, i);
 	} else {
 		instr_cons_t ic = xnew(*ic);
@@ -183,8 +194,10 @@ copyadd_instr(instr_t i)
 
 		memcpy(copy, i, sizeof(*i));
 		ic->instr = copy;
+		pthread_mutex_lock(&imtx);
 		ic->next = instruments;
 		instruments = ic;
+		pthread_mutex_unlock(&imtx);
 	}
 	return;
 }
@@ -308,6 +321,7 @@ instr_dump_svc(job_t j)
 
 	/* prepare the packet ... */
 	prep_pkt(&sctx, j);
+	pthread_mutex_lock(&imtx);
 	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
 		char enc_buf[UDPC_PLLEN];
 		instr_t i = ic->instr;
@@ -319,6 +333,7 @@ instr_dump_svc(job_t j)
 			udpc_seria_add_xdr(&sctx, enc_buf, el);
 		}
 	}
+	pthread_mutex_unlock(&imtx);
 	/* ... and send him off */
 	send_pkt(&sctx, j);
 	UD_DBGCONT("done\n");
@@ -347,6 +362,7 @@ instr_dump_to_file_svc(job_t j)
 
 	UD_DEBUG("dumping instruments to %s ...", sstrp);
 	ssz = 0;
+	pthread_mutex_lock(&imtx);
 	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
 		instr_t i = ic->instr;
 		size_t el;
@@ -355,6 +371,7 @@ instr_dump_to_file_svc(job_t j)
 		buf += el;
 		buf_sz -= el;
 	}
+	pthread_mutex_unlock(&imtx);
 
 	ssz = sizeof(xdr_buf) - buf_sz;
 	if ((nrd = write_file(xdr_buf, ssz, sstrp)) >= 0) {

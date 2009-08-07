@@ -42,6 +42,7 @@ dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
 dso_xdr_instr_la_LDFLAGS = -module $(LIBPFACK_LDFLAGS)
 dso_xdr_instr_la_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
 dso_xdr_instr_la_LIBADD = $(LIBPFACK_LIBS)
+dso_xdr_instr_la_SOURCES = catalogue.c dso-xdr-instr.c
 ## to fiddle with option chains and other instruments
 instrumenstruation_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
 instrumenstruation_LDFLAGS = $(LIBPFACK_LDFLAGS)

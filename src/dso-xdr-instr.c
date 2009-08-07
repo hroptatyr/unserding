@@ -45,7 +45,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <fcntl.h>
-#include <pthread.h>
 
 /* our master include */
 #include "unserding.h"
@@ -55,73 +54,15 @@
 #include "unserding-dbg.h"
 
 #include <pfack/instruments.h>
+#include "catalogue.h"
 
 #define xnew(_x)	malloc(sizeof(_x))
 
-/* VEEERY simple catalogue */
-typedef struct instr_cons_s *instr_cons_t;
-
-struct instr_cons_s {
-	instr_cons_t next;
-	void *instr;
-	/* unsure about this one */
-	void *resources[2];
-};
+/* our local catalogue */
+static cat_t instrs;
 
 
-static instr_cons_t instruments;
-static pthread_mutex_t imtx = PTHREAD_MUTEX_INITIALIZER;
-
 /* aux */
-static inline bool
-ident_gaid_equal_p(const_ident_t i1, const_ident_t i2)
-{
-	return i1->gaid == i2->gaid && i1->gaid != 0;
-}
-
-static inline bool
-ident_name_equal_p(const_ident_t i1, const_ident_t i2)
-{
-	return memcmp(i1->name, i2->name, sizeof(i1->name)) == 0;
-}
-
-static instr_t
-find_instr_by_gaid(ident_t i)
-{
-	pthread_mutex_lock(&imtx);
-	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
-		ident_t this_ident = instr_ident(ic->instr);
-		if (ident_gaid_equal_p(this_ident, i)) {
-			pthread_mutex_unlock(&imtx);
-			return ic->instr;
-		}
-	}
-	pthread_mutex_unlock(&imtx);
-	return NULL;
-}
-
-static instr_t
-find_instr_by_isin_cfi_opol(ident_t i)
-{
-	return NULL;
-}
-
-static instr_t
-find_instr_by_name(ident_t i)
-{
-	pthread_mutex_lock(&imtx);
-	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
-		ident_t this_ident = instr_ident(ic->instr);
-		if (ident_name(this_ident)[0] != '\0' &&
-		    ident_name_equal_p(this_ident, i)) {
-			pthread_mutex_unlock(&imtx);
-			return ic->instr;
-		}
-	}
-	pthread_mutex_unlock(&imtx);
-	return NULL;
-}
-
 /**
  * Return the instrument in the catalogue that matches I, or NULL
  * if no such instrument exists. */
@@ -135,10 +76,13 @@ find_instr(instr_t i)
 	instr_t resi;
 	ident_t ii = instr_ident(i);
 
-	if ((resi = find_instr_by_gaid(ii)) != NULL) {
+	if ((resi = find_instr_by_gaid(instrs, ident_gaid(ii))) != NULL) {
 		return resi;
+#if 0
+/* unused atm */
 	} else if ((resi = find_instr_by_isin_cfi_opol(ii)) != NULL) {
 		return resi;
+#endif
 #if 0
 /* names are currently not unique */
 	} else if ((resi = find_instr_by_name(ii)) != NULL) {
@@ -159,27 +103,6 @@ merge_instr(instr_t tgt, instr_t src)
 }
 
 static void
-add_instr(instr_t i)
-{
-	instr_t resi;
-
-	if ((resi = find_instr(i)) != NULL) {
-		merge_instr(resi, i);
-		/* not clean yet */
-		free_instr(i);
-	} else {
-		instr_cons_t ic = xnew(*ic);
-		ic->instr = i;
-		/* obtain the append mutex */
-		pthread_mutex_lock(&imtx);
-		ic->next = instruments;
-		instruments = ic;
-		pthread_mutex_unlock(&imtx);
-	}
-	return;
-}
-
-static void
 copyadd_instr(instr_t i)
 {
 	instr_t resi;
@@ -189,19 +112,12 @@ copyadd_instr(instr_t i)
 		//abort();
 		merge_instr(resi, i);
 	} else {
-		instr_cons_t ic = xnew(*ic);
-		instr_t copy = xnew(*i);
-
-		memcpy(copy, i, sizeof(*i));
-		ic->instr = copy;
-		pthread_mutex_lock(&imtx);
-		ic->next = instruments;
-		instruments = ic;
-		pthread_mutex_unlock(&imtx);
+		cat_bang_instr(instrs, i);
 	}
 	return;
 }
 
+#if 0
 static ssize_t
 read_file(char *restrict buf, size_t bufsz, const char *fname)
 {
@@ -229,6 +145,7 @@ write_file(char *restrict buf, size_t bufsz, const char *fname)
 	close(fd);
 	return nrd;
 }
+#endif
 
 
 /* jobs */
@@ -261,14 +178,19 @@ static void
 instr_add_from_file_svc(job_t j)
 {
 	/* our serialiser */
-	ssize_t nrd;
 	struct udpc_seria_s sctx;
-	size_t ssz;
 	const char *sstrp;
+	size_t ssz;
+#if 0
 	char xdr_buf[4096];
 	char *buf = xdr_buf;
-	struct instr_s i;
+	ssize_t nrd;
 	int fd;
+#else
+	XDR hdl;
+	FILE *f;
+	bool st;
+#endif
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstrp);
@@ -280,6 +202,8 @@ instr_add_from_file_svc(job_t j)
 
 	UD_DEBUG("getting XDR encoded instrument from %s\n", sstrp);
 
+#if 0
+/* our attempt n we failed */
 	if ((fd = open(sstrp, O_RDONLY)) < 0) {
 		UD_DEBUG("no such file or directory\n");
 		return;
@@ -290,23 +214,41 @@ instr_add_from_file_svc(job_t j)
 	nrd = sizeof(xdr_buf);
 	/* main loop */
 	while ((nrd = read(fd, buf, nrd)) > 0) {
+		struct instr_s i;
+
 		/* reset buffer */
 		buf = xdr_buf;
 		nrd = sizeof(xdr_buf);
 		/* decode */
 		while ((ssz = deser_instrument_into(&i, buf, nrd)) > 0) {
+			UD_DEBUG("adding %s  (%lu bytes)\n", instr_name(&i), ssz);
 			copyadd_instr(&i);
 			buf += ssz;
 			nrd -= ssz;
 		}
 		/* buf points to the remaining nrd bytes, memmove them */
-		UD_DEBUG("%ld bytes left\n", nrd);
-		memcpy(xdr_buf, buf, nrd);
+		UD_DEBUG("%ld bytes left\n", (long int)nrd);
+		memmove(xdr_buf, buf, nrd);
 		buf = xdr_buf + nrd;
 		nrd = sizeof(xdr_buf) - nrd;
 	}
 
 	close(fd);
+#else
+	f = fopen(sstrp, "r");
+
+	xdrstdio_create(&hdl, f, XDR_DECODE);
+	do {
+		struct instr_s i;
+
+		init_instr(&i);
+		st = xdr_instr_s(&hdl, &i);
+		cat_bang_instr(instrs, &i);
+	} while (st);
+	xdr_destroy(&hdl);
+
+	fclose(f);
+#endif
 	return;
 }
 
@@ -331,11 +273,11 @@ instr_dump_svc(job_t j)
 {
 	/* our stuff */
 	struct udpc_seria_s sctx;
-	int k = 0;
+	size_t k = cat_size(instrs);
 
-	for (instr_cons_t ic = instruments; ic; ic = ic->next, k++);
 	UD_DEBUG("dumping %d instruments ...", k);
 
+#if 0
 	/* prepare the packet ... */
 	prep_pkt(&sctx, j);
 	pthread_mutex_lock(&imtx);
@@ -353,6 +295,7 @@ instr_dump_svc(job_t j)
 	pthread_mutex_unlock(&imtx);
 	/* ... and send him off */
 	send_pkt(&sctx, j);
+#endif
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -360,6 +303,7 @@ instr_dump_svc(job_t j)
 static void
 instr_dump_to_file_svc(job_t j)
 {
+#if 0
 	/* our serialiser */
 	ssize_t nrd;
 	struct udpc_seria_s sctx;
@@ -396,6 +340,7 @@ instr_dump_to_file_svc(job_t j)
 	} else {
 		UD_DBGCONT("failed\n");
 	}
+#endif
 	return;
 }
 
@@ -455,6 +400,8 @@ init(void *clo)
 	ev_idle *widle = &__widle;
 
 	UD_DEBUG("mod/asn1-instr: loading ...");
+	/* create the catalogue */
+	instrs = make_cat();
 	/* lodging our bbdb search service */
 	ud_set_service(0x4216, instr_add_svc, NULL);
 	ud_set_service(0x4218, instr_add_from_file_svc, NULL);

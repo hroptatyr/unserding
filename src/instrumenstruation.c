@@ -309,11 +309,9 @@ rdxdrs(FILE *fp)
 			buf += res;
 			nrd -= res;
 
-			fprintf(stderr, "found instr %u ref %p %s\n",
+			fprintf(stderr, "found instr %u ref %u\n",
 				instr_gaid(&this),
-				this.instance.instance_s_u.option.underlyer,
-				this.instance.instance_s_u.option.underlyer
-				->ident.name);
+				this.instance.instance_s_u.option.underlyer);
 		}
 	}
 	return;

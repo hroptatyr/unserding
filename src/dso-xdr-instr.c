@@ -45,6 +45,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 /* our master include */
 #include "unserding.h"
@@ -272,30 +273,42 @@ static void
 instr_dump_svc(job_t j)
 {
 	/* our stuff */
-	struct udpc_seria_s sctx;
-	size_t k = cat_size(instrs);
+	size_t i = 0;
+	XDR hdl;
 
-	UD_DEBUG("dumping %d instruments ...", k);
+/* fuck ugly, mutex'd iterators are a pita */
+#define CAT	((struct cat_s*)instrs)
+	pthread_mutex_lock(&CAT->mtx);
+	UD_DEBUG("dumping %d instruments ...", CAT->ninstrs);
 
-#if 0
-	/* prepare the packet ... */
-	prep_pkt(&sctx, j);
-	pthread_mutex_lock(&imtx);
-	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
-		char enc_buf[UDPC_PLLEN];
-		instr_t i = ic->instr;
-		size_t el;
+	do {
+		char *enc = &j->buf[UDPC_HDRLEN];
+		size_t len;
 
-		UD_DBGCONT("%s...", instr_name(i));
-		el = seria_instrument(enc_buf, sizeof(enc_buf), i);
-		if (el > 0) {
-			udpc_seria_add_xdr(&sctx, enc_buf, el);
+		/* prepare the packet ... */
+		udpc_make_rpl_pkt(JOB_PACKET(j));
+		/* we just serialise him ourselves */
+		enc[0] = UDPC_TYPE_XDR;
+		enc[1] = enc[2] = 0;
+
+		xdrmem_create(&hdl, enc + 3, UDPC_PLLEN - 3, XDR_ENCODE);
+		for (; i < CAT->ninstrs; i++) {
+			instr_t instr = &((instr_t)CAT->instrs)[i];
+			if (!xdr_instr_s(&hdl, instr)) {
+				break;
+			}
 		}
-	}
-	pthread_mutex_unlock(&imtx);
-	/* ... and send him off */
-	send_pkt(&sctx, j);
-#endif
+		/* clean up */
+		len = xdr_getpos(&hdl);
+		xdr_destroy(&hdl);
+		/* put in the size */
+		enc[1] = (uint8_t)(len >> 8);
+		enc[2] = (uint8_t)(len & 0xff);
+		/* ... and send him off */
+		j->blen = UDPC_HDRLEN + 3 + len;
+		send_cl(j);
+	} while (i < CAT->ninstrs);
+	pthread_mutex_unlock(&CAT->mtx);
 	UD_DBGCONT("done\n");
 	return;
 }

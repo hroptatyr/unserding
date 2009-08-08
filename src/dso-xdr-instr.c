@@ -182,16 +182,9 @@ instr_add_from_file_svc(job_t j)
 	struct udpc_seria_s sctx;
 	const char *sstrp;
 	size_t ssz;
-#if 0
-	char xdr_buf[4096];
-	char *buf = xdr_buf;
-	ssize_t nrd;
-	int fd;
-#else
 	XDR hdl;
 	FILE *f;
 	bool st;
-#endif
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstrp);
@@ -203,40 +196,10 @@ instr_add_from_file_svc(job_t j)
 
 	UD_DEBUG("getting XDR encoded instrument from %s\n", sstrp);
 
-#if 0
-/* our attempt n we failed */
-	if ((fd = open(sstrp, O_RDONLY)) < 0) {
+	if ((f = fopen(sstrp, "r")) == NULL) {
 		UD_DEBUG("no such file or directory\n");
 		return;
 	}
-
-	/* prepare buffer */
-	buf = xdr_buf;
-	nrd = sizeof(xdr_buf);
-	/* main loop */
-	while ((nrd = read(fd, buf, nrd)) > 0) {
-		struct instr_s i;
-
-		/* reset buffer */
-		buf = xdr_buf;
-		nrd = sizeof(xdr_buf);
-		/* decode */
-		while ((ssz = deser_instrument_into(&i, buf, nrd)) > 0) {
-			UD_DEBUG("adding %s  (%lu bytes)\n", instr_name(&i), ssz);
-			copyadd_instr(&i);
-			buf += ssz;
-			nrd -= ssz;
-		}
-		/* buf points to the remaining nrd bytes, memmove them */
-		UD_DEBUG("%ld bytes left\n", (long int)nrd);
-		memmove(xdr_buf, buf, nrd);
-		buf = xdr_buf + nrd;
-		nrd = sizeof(xdr_buf) - nrd;
-	}
-
-	close(fd);
-#else
-	f = fopen(sstrp, "r");
 
 	xdrstdio_create(&hdl, f, XDR_DECODE);
 	do {
@@ -249,7 +212,6 @@ instr_add_from_file_svc(job_t j)
 	xdr_destroy(&hdl);
 
 	fclose(f);
-#endif
 	return;
 }
 

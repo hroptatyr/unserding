@@ -175,6 +175,15 @@ instr_add_svc(job_t j)
 	return;
 }
 
+static inline void
+hrclock_print(void)
+{
+	struct timespec tsp;
+	clock_gettime(CLOCK_REALTIME, &tsp);
+	fprintf(stderr, "%lu.%09u", tsp.tv_sec, (unsigned int)tsp.tv_nsec);
+	return;
+}
+
 static void
 instr_add_from_file_svc(job_t j)
 {
@@ -201,6 +210,9 @@ instr_add_from_file_svc(job_t j)
 		return;
 	}
 
+	hrclock_print();
+	fprintf(stderr, " start\n");
+
 	xdrstdio_create(&hdl, f, XDR_DECODE);
 	do {
 		struct instr_s i;
@@ -212,6 +224,9 @@ instr_add_from_file_svc(job_t j)
 	xdr_destroy(&hdl);
 
 	fclose(f);
+
+	hrclock_print();
+	fprintf(stderr, " stop\n");
 	return;
 }
 

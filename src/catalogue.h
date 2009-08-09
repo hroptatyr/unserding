@@ -47,13 +47,19 @@
  * The catalogue data type, just a husk. */
 typedef void *cat_t;
 
+struct keyval_s {
+	gaid_t key;
+	uint32_t val;
+};
+
 /**
  * The catalogue data structure.
  * Naive, just an array of instruments. */
 struct cat_s {
 	size_t ninstrs;
 	size_t alloc_sz;
-	void *instrs;
+	struct instr_s *instrs;
+	struct keyval_s *keys;
 	pthread_mutex_t mtx;
 };
 
@@ -64,6 +70,9 @@ extern size_t cat_size(cat_t cat);
 extern void cat_add_instr(cat_t cat, instr_t i);
 
 extern instr_t cat_obtain_instr(cat_t cat);
+/**
+ * Check if I is known, if not add it to the catalogue CAT.
+ * If known replace the existing instrument in CAT by I. */
 extern instr_t cat_bang_instr(cat_t cat, instr_t i);
 
 extern instr_t find_instr_by_gaid(cat_t cat, gaid_t gaid);

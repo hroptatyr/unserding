@@ -139,7 +139,7 @@ get_val(_cat_t c, gaid_t key)
 {
 	uint32_t s = slot(c->keys, c->alloc_sz, key);
 
-	if (c->keys[s].key != 0) {
+	if (s != -1U && c->keys[s].key != 0) {
 		return c->keys[s].val;
 	}
 	return -1;
@@ -192,7 +192,7 @@ free_keys(_cat_t c)
 	return;
 }
 
-static instr_t
+static inline instr_t
 __by_gaid_nolock(_cat_t c, gaid_t gaid)
 {
 	/* obtain the slot into our instrs array */
@@ -205,7 +205,7 @@ __by_gaid_nolock(_cat_t c, gaid_t gaid)
 	return cat_instr(c, s);
 }
 
-static instr_t
+static inline instr_t
 __by_name_nolock(_cat_t c, const char *name)
 {
 	for (index_t i = 0; i < c->ninstrs; i++) {
@@ -312,14 +312,12 @@ cat_bang_instr(cat_t cat, instr_t i)
 	uint32_t ks, is;
 
 	pthread_mutex_lock(&c->mtx);
+	(void)check_resize(c);
 	ks = slot(c->keys, c->alloc_sz, gaid);
-	if (UNLIKELY(ks != -1U && c->keys[ks].key != 0)) {
+	if (UNLIKELY(c->keys[ks].key != 0)) {
 		res = cat_instr(c, c->keys[ks].val);
 		pthread_mutex_unlock(&c->mtx);
 		return res;
-	}
-	if (check_resize(c)) {
-		ks = slot(c->keys, c->alloc_sz, gaid);
 	}
 	is = c->ninstrs++;
 	c->keys[ks].key = gaid;
@@ -335,9 +333,18 @@ find_instr_by_gaid(cat_t cat, gaid_t gaid)
 {
 	instr_t res;
 	_cat_t c = cat;
+	uint32_t ks;
 
 	pthread_mutex_lock(&c->mtx);
-	res = __by_gaid_nolock(c, gaid);
+	ks = slot(c->keys, c->alloc_sz, gaid);
+	if (UNLIKELY(ks == -1U)) {
+		res = NULL;
+	} else if (LIKELY(c->keys[ks].key != 0)) {
+		uint32_t is = c->keys[ks].val;
+		res = cat_instr(c, is);
+	} else {
+		res = NULL;
+	}
 	pthread_mutex_unlock(&c->mtx);
 	return res;
 }

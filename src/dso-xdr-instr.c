@@ -59,6 +59,19 @@
 
 #define xnew(_x)	malloc(sizeof(_x))
 
+#if !defined LIKELY
+# define LIKELY(_x)	__builtin_expect((_x), 1)
+#endif
+#if !defined UNLIKELY
+# define UNLIKELY(_x)	__builtin_expect((_x), 0)
+#endif
+#if !defined UNUSED
+# define UNUSED(_x)	__attribute__((unused)) _x
+#endif	/* !UNUSED */
+#if !defined ALGN16
+# define ALGN16(_x)	__attribute__((aligned(16))) _x
+#endif	/* !ALGN16 */
+
 /* our local catalogue */
 static cat_t instrs;
 
@@ -247,6 +260,34 @@ send_pkt(udpc_seria_t sctx, job_t j)
 	return;
 }
 
+static inline void
+__seria_instr(udpc_seria_t sctx, instr_t in)
+{
+/* IN is guaranteed to be non-NULL */
+	uint16_t len = 0;
+	uint16_t max_len = sctx->len - sctx->msgoff - XDR_HDR_LEN;
+	char *buf = &sctx->msg[sctx->msgoff + XDR_HDR_LEN];
+
+	/* tag him as xdr */
+	sctx->msg[sctx->msgoff + 0] = UDPC_TYPE_XDR;
+	len = (uint16_t)seria_instrument(buf, max_len, in);
+
+	sctx->msg[sctx->msgoff + 1] = (uint8_t)(len >> 8);
+	sctx->msg[sctx->msgoff + 2] = (uint8_t)(len & 0xff);
+	sctx->msgoff += XDR_HDR_LEN + len;
+	return;
+}
+
+static inline void
+udpc_seria_instr(udpc_seria_t sctx, instr_t in)
+{
+	if (UNLIKELY(in == NULL)) {
+		return;
+	}
+	__seria_instr(sctx, in);
+	return;
+}
+
 static void
 instr_dump_all(job_t j)
 {
@@ -292,6 +333,24 @@ instr_dump_all(job_t j)
 }
 
 static void
+instr_dump_gaid(job_t j, gaid_t gaid)
+{
+	instr_t in = find_instr_by_gaid(instrs, gaid);
+	struct udpc_seria_s sctx;
+
+	UD_DEBUG("dumping %p ...", in);
+
+	/* prepare the packet ... */
+	prep_pkt(&sctx, j);
+	/* serialise what we've got */
+	udpc_seria_instr(&sctx, in);
+	/* ... and send him off */
+	send_pkt(&sctx, j);
+	UD_DBGCONT("done\n");
+	return;
+}
+
+static void
 instr_dump_svc(job_t j)
 {
 	struct udpc_seria_s sctx;
@@ -302,9 +361,15 @@ instr_dump_svc(job_t j)
 	case UDPC_TYPE_STR:
 		/* find by name */
 		break;
+	case UDPC_TYPE_SI32: {
+		/* find by gaid */
+		int32_t id = udpc_seria_des_si32(&sctx);
+		instr_dump_gaid(j, id);
+		break;
+	}
 	case UDPC_TYPE_UNK:
-		instr_dump_all(j);
 	default:
+		instr_dump_all(j);
 		break;
 	}
 	return;

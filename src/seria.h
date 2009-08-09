@@ -253,14 +253,15 @@ udpc_seria_des_str(udpc_seria_t sctx, const char **s)
 
 /* XDR handling, could rename to opaque since essentially ASN.1 is
  * handled in the very same way */
+#define XDR_HDR_LEN	(1 + 2)
 static inline void
 udpc_seria_add_xdr(udpc_seria_t sctx, const void *s, size_t len)
 {
 	sctx->msg[sctx->msgoff + 0] = UDPC_TYPE_XDR;
 	sctx->msg[sctx->msgoff + 1] = (uint8_t)(len >> 8);
 	sctx->msg[sctx->msgoff + 2] = (uint8_t)(len & 0xff);
-	memcpy(&sctx->msg[sctx->msgoff + 3], s, len);
-	sctx->msgoff += 3 + len;
+	memcpy(&sctx->msg[sctx->msgoff + XDR_HDR_LEN], s, len);
+	sctx->msgoff += XDR_HDR_LEN + len;
 	return;
 }
 
@@ -274,8 +275,8 @@ udpc_seria_des_xdr(udpc_seria_t sctx, const void **s)
 	}
 	len = (size_t)(((uint16_t)((uint8_t)sctx->msg[sctx->msgoff+1]) << 8) | \
 		       ((uint8_t)sctx->msg[sctx->msgoff + 2]));
-	*s = &sctx->msg[sctx->msgoff + 3];
-	sctx->msgoff += 3 + len;
+	*s = &sctx->msg[sctx->msgoff + XDR_HDR_LEN];
+	sctx->msgoff += XDR_HDR_LEN + len;
 	return len;
 }
 

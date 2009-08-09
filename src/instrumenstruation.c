@@ -80,6 +80,12 @@ static struct instr_s __pfi_idx_spx, *pfi_idx_spx = &__pfi_idx_spx;
 static struct instr_s __pfi_idx_xeo, *pfi_idx_xeo = &__pfi_idx_xeo;
 static struct instr_s __pfi_idx_k200, *pfi_idx_k200 = &__pfi_idx_k200;
 
+static struct instr_s __pfi_ccy_eur, *pfi_ccy_eur = &__pfi_ccy_eur;
+static struct instr_s __pfi_ccy_usd, *pfi_ccy_usd = &__pfi_ccy_usd;
+static struct instr_s __pfi_ccy_gbp, *pfi_ccy_gbp = &__pfi_ccy_gbp;
+static struct instr_s __pfi_ccy_krw, *pfi_ccy_krw = &__pfi_ccy_krw;
+static struct instr_s __pfi_ccy_cad, *pfi_ccy_cad = &__pfi_ccy_cad;
+
 static void
 init_indices(void)
 {
@@ -93,6 +99,17 @@ init_indices(void)
 	make_tixxxx_into(pfi_idx_spx, 8, "SPX");
 	make_tixxxx_into(pfi_idx_xeo, 9, "XEO");
 	make_tixxxx_into(pfi_idx_k200, 10, "K200");
+	return;
+}
+
+static void
+init_currencies(void)
+{
+	make_tcnxxx_into(pfi_ccy_eur, 73380, PFACK_4217_EUR_IDX);
+	make_tcnxxx_into(pfi_ccy_usd, 73381, PFACK_4217_USD_IDX);
+	make_tcnxxx_into(pfi_ccy_gbp, 73382, PFACK_4217_GBP_IDX);
+	make_tcnxxx_into(pfi_ccy_krw, 73383, PFACK_4217_KRW_IDX);
+	make_tcnxxx_into(pfi_ccy_cad, 73384, PFACK_4217_CAD_IDX);
 	return;
 }
 
@@ -222,6 +239,16 @@ prepare_dump(ictx_t ctx)
 	SERIA_IDX(pfi_idx_spx);
 	SERIA_IDX(pfi_idx_xeo);
 	SERIA_IDX(pfi_idx_k200);
+
+#define SERIA_CCY(_x)					\
+	ssz = seria_instrument(sbuf, sizeof(sbuf), _x);	\
+	ctx->wrf(ctx, sbuf, ssz)
+
+	SERIA_CCY(pfi_ccy_eur);
+	SERIA_CCY(pfi_ccy_usd);
+	SERIA_CCY(pfi_ccy_gbp);
+	SERIA_CCY(pfi_ccy_krw);
+	SERIA_CCY(pfi_ccy_cad);
 	return;
 }
 
@@ -434,6 +461,7 @@ main(int argc, const char *argv[])
 
 	if (!decipherp) {
 		init_indices();
+		init_currencies();
 		process(ctx, infile);
 	} else {
 		decipher(infile);

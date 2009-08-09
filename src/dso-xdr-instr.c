@@ -193,7 +193,6 @@ instr_add_from_file_svc(job_t j)
 	size_t ssz;
 	XDR hdl;
 	FILE *f;
-	bool st;
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	ssz = udpc_seria_des_str(&sctx, &sstrp);
@@ -214,13 +213,15 @@ instr_add_from_file_svc(job_t j)
 	fprintf(stderr, " start\n");
 
 	xdrstdio_create(&hdl, f, XDR_DECODE);
-	do {
+	while (true) {
 		struct instr_s i;
 
 		init_instr(&i);
-		st = xdr_instr_s(&hdl, &i);
-		cat_bang_instr(instrs, &i);
-	} while (st);
+		if (!(xdr_instr_s(&hdl, &i))) {
+			break;
+		}
+		(void)cat_bang_instr(instrs, &i);
+	}
 	xdr_destroy(&hdl);
 
 	fclose(f);

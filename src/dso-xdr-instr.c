@@ -248,7 +248,7 @@ send_pkt(udpc_seria_t sctx, job_t j)
 }
 
 static void
-instr_dump_svc(job_t j)
+instr_dump_all(job_t j)
 {
 	/* our stuff */
 	size_t i = 0;
@@ -288,6 +288,25 @@ instr_dump_svc(job_t j)
 	} while (i < CAT->ninstrs);
 	pthread_mutex_unlock(&CAT->mtx);
 	UD_DBGCONT("done\n");
+	return;
+}
+
+static void
+instr_dump_svc(job_t j)
+{
+	struct udpc_seria_s sctx;
+
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+
+	switch (udpc_seria_tag(&sctx)) {
+	case UDPC_TYPE_STR:
+		/* find by name */
+		break;
+	case UDPC_TYPE_UNK:
+		instr_dump_all(j);
+	default:
+		break;
+	}
 	return;
 }
 

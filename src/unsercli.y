@@ -380,6 +380,19 @@ out:
 	return 0;
 }
 
+static int32_t
+parse_int(const char *tok, size_t len)
+{
+	long int res;
+	char *on;
+
+	res = strtol(tok, &on, 10);
+	if (on != 0) {
+		return (int32_t)res;
+	}
+	return 0;
+}
+
 static ud_pkt_cmd_t
 resolve_tok(const char *tok, size_t len)
 {
@@ -513,6 +526,10 @@ TOK_UI32H {
 TOK_UI64H {
 	uint64_t val = (uint64_t)parse_ui64h(yylval.sval, yylval.slen);
 	udpc_seria_add_ui64(&sctx, val);
+} |
+TOK_INT {
+	int32_t val = (int32_t)parse_int(yylval.sval, yylval.slen);
+	udpc_seria_add_si32(&sctx, val);
 } |
 /* nothing */
 ;

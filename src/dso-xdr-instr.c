@@ -244,50 +244,6 @@ instr_add_from_file_svc(job_t j)
 	return;
 }
 
-static inline void
-prep_pkt(udpc_seria_t sctx, job_t j)
-{
-	udpc_make_rpl_pkt(JOB_PACKET(j));
-	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	return;
-}
-
-static inline void
-send_pkt(udpc_seria_t sctx, job_t j)
-{
-	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
-	send_cl(j);
-	return;
-}
-
-static inline void
-__seria_instr(udpc_seria_t sctx, instr_t in)
-{
-/* IN is guaranteed to be non-NULL */
-	uint16_t len = 0;
-	uint16_t max_len = sctx->len - sctx->msgoff - XDR_HDR_LEN;
-	char *buf = &sctx->msg[sctx->msgoff + XDR_HDR_LEN];
-
-	/* tag him as xdr */
-	sctx->msg[sctx->msgoff + 0] = UDPC_TYPE_XDR;
-	len = (uint16_t)seria_instrument(buf, max_len, in);
-
-	sctx->msg[sctx->msgoff + 1] = (uint8_t)(len >> 8);
-	sctx->msg[sctx->msgoff + 2] = (uint8_t)(len & 0xff);
-	sctx->msgoff += XDR_HDR_LEN + len;
-	return;
-}
-
-static inline void
-udpc_seria_instr(udpc_seria_t sctx, instr_t in)
-{
-	if (UNLIKELY(in == NULL)) {
-		return;
-	}
-	__seria_instr(sctx, in);
-	return;
-}
-
 static void
 instr_dump_all(job_t j)
 {
@@ -332,20 +288,53 @@ instr_dump_all(job_t j)
 	return;
 }
 
+/* one-at-a-time dispatchers */
+static inline void
+prep_pkt(udpc_seria_t sctx, job_t rplj, job_t srcj)
+{
+	memcpy(rplj, srcj, sizeof(*rplj));
+	memset(UDPC_PAYLOAD(rplj->buf), 0, UDPC_PLLEN);
+	udpc_make_rpl_pkt(JOB_PACKET(rplj));
+	udpc_seria_init(sctx, UDPC_PAYLOAD(rplj->buf), UDPC_PLLEN);
+	return;
+}
+
+static inline void
+send_pkt(udpc_seria_t sctx, job_t j)
+{
+	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
+	send_cl(j);
+	return;
+}
+
+static inline void
+__seria_instr(udpc_seria_t sctx, instr_t in)
+{
+/* IN is guaranteed to be non-NULL */
+	uint16_t len = 0;
+	uint16_t max_len = sctx->len - sctx->msgoff - XDR_HDR_LEN;
+	char *buf = &sctx->msg[sctx->msgoff + XDR_HDR_LEN];
+
+	/* tag him as xdr */
+	sctx->msg[sctx->msgoff + 0] = UDPC_TYPE_XDR;
+	if (LIKELY(in != NULL)) {
+		len = (uint16_t)seria_instrument(buf, max_len, in);
+	}
+
+	sctx->msg[sctx->msgoff + 1] = (uint8_t)(len >> 8);
+	sctx->msg[sctx->msgoff + 2] = (uint8_t)(len & 0xff);
+	sctx->msgoff += XDR_HDR_LEN + len;
+	return;
+}
+
 static void
-instr_dump_gaid(job_t j, gaid_t gaid)
+instr_dump_gaid(udpc_seria_t sctx, gaid_t gaid)
 {
 	instr_t in = find_instr_by_gaid(instrs, gaid);
-	struct udpc_seria_s sctx;
 
 	UD_DEBUG("dumping %p ...", in);
-
-	/* prepare the packet ... */
-	prep_pkt(&sctx, j);
 	/* serialise what we've got */
-	udpc_seria_instr(&sctx, in);
-	/* ... and send him off */
-	send_pkt(&sctx, j);
+	__seria_instr(sctx, in);
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -354,24 +343,39 @@ static void
 instr_dump_svc(job_t j)
 {
 	struct udpc_seria_s sctx;
+	struct udpc_seria_s rplsctx;
+	struct job_s rplj;
+	size_t cnt = 0;
 
+	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 
-	switch (udpc_seria_tag(&sctx)) {
-	case UDPC_TYPE_STR:
-		/* find by name */
-		break;
-	case UDPC_TYPE_SI32: {
-		/* find by gaid */
-		int32_t id = udpc_seria_des_si32(&sctx);
-		instr_dump_gaid(j, id);
-		break;
-	}
-	case UDPC_TYPE_UNK:
-	default:
-		instr_dump_all(j);
-		break;
-	}
+	/* prepare the reply packet ... */
+	prep_pkt(&rplsctx, &rplj, j);
+
+	do {
+		switch (udpc_seria_tag(&sctx)) {
+		case UDPC_TYPE_STR:
+			/* find by name */
+			break;
+		case UDPC_TYPE_SI32: {
+			/* find by gaid */
+			int32_t id = udpc_seria_des_si32(&sctx);
+			instr_dump_gaid(&rplsctx, id);
+			break;
+		}
+		case UDPC_TYPE_UNK:
+		default:
+			if (!cnt) {
+				instr_dump_all(j);
+				return;
+			}
+			goto out;
+		}
+	} while (++cnt);
+out:
+	/* send what we've got */
+	send_pkt(&rplsctx, &rplj);
 	return;
 }
 

@@ -508,6 +508,11 @@ TOK_HEXCMD {
 };
 
 tvs:
+/* nothing */ |
+tv tvs
+;
+
+tv:
 TOK_STRING {
 	udpc_seria_add_str(&sctx, yylval.sval, yylval.slen);
 } |
@@ -530,9 +535,7 @@ TOK_UI64H {
 TOK_INT {
 	int32_t val = (int32_t)parse_int(yylval.sval, yylval.slen);
 	udpc_seria_add_si32(&sctx, val);
-} |
-/* nothing */
-;
+};
 
 %%
 

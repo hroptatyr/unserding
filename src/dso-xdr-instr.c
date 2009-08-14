@@ -254,7 +254,7 @@ instr_dump_all(job_t j)
 /* fuck ugly, mutex'd iterators are a pita */
 #define CAT	((struct cat_s*)instrs)
 	pthread_mutex_lock(&CAT->mtx);
-	UD_DEBUG("dumping %d instruments ...", CAT->ninstrs);
+	UD_DEBUG("dumping %u instruments ...", (unsigned int)CAT->ninstrs);
 
 	do {
 		char *enc = &j->buf[UDPC_HDRLEN];

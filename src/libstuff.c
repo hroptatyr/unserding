@@ -84,8 +84,10 @@
 #if defined DEBUG_FLAG
 # define UD_DEBUG_SENDRECV(args...)		\
 	fprintf(stderr, "[libunserding/sendrecv] " args)
+/* we could define the PKTTRAF debug flag but it's seriously slow */
 #else  /* !DEBUG_FLAG */
 # define UD_DEBUG_SENDRECV(args...)
+# undef DEBUG_PKTTRAF_FLAG
 #endif	/* DEBUG_FLAG */
 
 /**
@@ -230,7 +232,9 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	ssize_t nread;
 	struct epoll_event ev, *events = NULL;
 	char buf[UDPC_PKTLEN];
+#if defined DEBUG_PKTTRAF_FLAG
 	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
+#endif	/* DEBUG_PKTTRAF_FLAG */
 
 	if (UNLIKELY(pkt.plen == 0)) {
 		return;
@@ -252,7 +256,9 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	}
 	/* otherwise NFDS was 1 and it MUST be our socket */
 	nread = recvfrom(s, buf, countof(buf), 0, NULL, 0);
+#if defined DEBUG_PKTTRAF_FLAG
 	udpc_print_pkt(tmp);
+#endif	/* DEBUG_PKTTRAF_FLAG */
 out:
 	/* remove S from the epoll descriptor EPFD */
 	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, &ev);
@@ -309,9 +315,9 @@ wait:
 		}
 		UD_DEBUG_SENDRECV("read %ld bytes\n", (long int)nread);
 		tmp.plen = nread;
-#if defined DEBUG_FLAG
+#if defined DEBUG_PKTTRAF_FLAG
 		ud_fprint_pkt_raw(tmp, stderr);
-#endif	/* DEBUG_FLAG */
+#endif	/* DEBUG_PKTTRAF_FLAG */
 	} while (!udpc_pkt_valid_p(tmp) || !pf(tmp, clo));
 
 	if (LIKELY(nread > 0)) {

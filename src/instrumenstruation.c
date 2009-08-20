@@ -153,6 +153,45 @@ udl(long unsigned int specid)
 	}
 }
 
+static ratio16_t
+oxxxxx_ratio(const_instr_t udl_instr)
+{
+	switch (instr_gaid(udl_instr)) {
+	case 1:
+		/* dax */
+		return ffff_ratio16(5, 1);
+	case 2:
+		/* estoxx */
+		return ffff_ratio16(10, 1);
+	case 3:
+		/* cac40 */
+		return ffff_ratio16(10, 1);
+	case 4:
+		/* ftse */
+		return ffff_ratio16(10, 1);
+	case 5:
+		/* djia */
+		return ffff_ratio16(100, 1);
+	case 6:
+		/* ndx */
+		return ffff_ratio16(100, 1);
+	case 7:
+		/* rut */
+		return ffff_ratio16(100, 1);
+	case 8:
+		/* s&p */
+		return ffff_ratio16(100, 1);
+	case 9:
+		/* xeo */
+		return ffff_ratio16(100, 1);
+	case 10:
+		/* kospi is actually 100000 */
+		return ffff_ratio16(100, -1);
+	default:
+		return 0;
+	}
+}
+
 
 static void
 ordinary_write(ictx_t ctx, const char *buf, size_t bsz)
@@ -205,11 +244,12 @@ dump_option(ictx_t ctx, ga_spec_t sp)
 	struct instr_s i;
 	size_t ssz;
 	static char sbuf[4096];
+	ratio16_t r = oxxxxx_ratio(refi);
 
 	make_oxxxxx_into(
 		&i, sp->gaid, refi, sp->right ? 'C' : 'P',
 		/* exer style */ 'E',
-		ffff_monetary32_get_d(sp->strike), 0);
+		ffff_monetary32_get_d(sp->strike), r);
 
 	ssz = seria_instrument(sbuf, sizeof(sbuf), &i);
 	ctx->wrf(ctx, sbuf, ssz);

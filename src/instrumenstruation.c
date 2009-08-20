@@ -247,7 +247,9 @@ dump_option(ictx_t ctx, ga_spec_t sp)
 	ratio16_t r = oxxxxx_ratio(refi);
 
 	make_oxxxxx_into(
-		&i, sp->gaid, refi, sp->right ? 'C' : 'P',
+		&i, sp->gaid, refi,
+		/* option right */
+		sp->right == -1 ? 'P' : (sp->right == 1 ? 'C' : 'X'),
 		/* exer style */ 'E',
 		ffff_monetary32_get_d(sp->strike), r);
 

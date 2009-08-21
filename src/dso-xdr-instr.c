@@ -57,6 +57,11 @@
 #include <pfack/instruments.h>
 #include "catalogue.h"
 
+/**
+ * Service 4218:
+ * Service 421a:
+ **/
+
 #define xnew(_x)	malloc(sizeof(_x))
 
 #if !defined LIKELY
@@ -484,8 +489,8 @@ init(void *clo)
 	/* lodging our bbdb search service */
 	ud_set_service(0x4216, instr_add_svc, NULL);
 	ud_set_service(0x4218, instr_add_from_file_svc, NULL);
-	ud_set_service(0x4220, instr_dump_svc, instr_add_svc);
-	ud_set_service(0x4222, instr_dump_to_file_svc, NULL);
+	ud_set_service(0x421a, instr_dump_svc, instr_add_svc);
+	ud_set_service(0x421c, instr_dump_to_file_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("deploying idle bomb ...");

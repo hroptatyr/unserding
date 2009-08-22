@@ -453,50 +453,32 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		return len + 7;
 	}
 
-	case UDPC_TYPE_UI16:
-	case UDPC_TYPE_SI16: {
-		static char fmt[] = "(xi16)0x%04x (%x)\n";
+	case UDPC_TYPE_UI16: {
 		uint16_t v = udpc_seria_des_ui16(sctx);
-
-		if ((UDPC_SGN_MASK & tag)) {
-			fmt[1] = 's';
-			fmt[15] = 'd';
-		} else {
-			fmt[1] = 'u';
-			fmt[15] = 'u';
-		}
-		return sprintf(buf, fmt, v, v);
+		return sprintf(buf, "(ui16)0x%04x (%u)\n", v, v);
+	}
+	case UDPC_TYPE_SI16: {
+		int16_t v = udpc_seria_des_si16(sctx);
+		return sprintf(buf, "(si16)0x%04x (%d)\n", v, v);
 	}
 
-	case UDPC_TYPE_UI32:
-	case UDPC_TYPE_SI32: {
-		static char fmt[] = "(xi32)0x%08x (%x)\n";
+	case UDPC_TYPE_UI32: {
 		uint32_t v = udpc_seria_des_ui32(sctx);
-
-		if ((UDPC_SGN_MASK & tag)) {
-			fmt[1] = 's';
-			fmt[15] = 'd';
-		} else {
-			fmt[1] = 'u';
-			fmt[15] = 'u';
-		}
-		return sprintf(buf, fmt, v, v);
+		return sprintf(buf, "(ui32)0x%08x (%u)\n", v, v);
+	}
+	case UDPC_TYPE_SI32: {
+		int32_t v = udpc_seria_des_si32(sctx);
+		return sprintf(buf, "(si32)0x%08x (%u)\n", v, v);
 	}
 
 
-	case UDPC_TYPE_UI64:
-	case UDPC_TYPE_SI64: {
-		static char fmt[] = "(xi64)0x%016" PRIx64 " (%" PRId64 ")\n";
+	case UDPC_TYPE_UI64: {
 		uint64_t v = udpc_seria_des_ui64(sctx);
-
-		if ((UDPC_SGN_MASK & tag)) {
-			fmt[1] = 's';
-			fmt[17 + sizeof(PRIx64)] = 'd';
-		} else {
-			fmt[1] = 'u';
-			fmt[17 + sizeof(PRIx64)] = 'u';
-		}
-		return sprintf(buf, fmt, v, v);
+		return sprintf(buf, "(ui64)0x%16llx (%llu)\n", v, v);
+	}
+	case UDPC_TYPE_SI64: {
+		uint64_t v = udpc_seria_des_si64(sctx);
+		return sprintf(buf, "(si64)0x%16llx (%lld)\n", v, v);
 	}
 
 		

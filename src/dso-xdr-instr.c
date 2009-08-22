@@ -60,6 +60,12 @@
 /**
  * Service 4218:
  * Service 421a:
+ *
+ * Service 4220 find ticks and shite.
+ * - 4220(si32 instr, si32 ts, si32 fund, si32 exch)
+ *   Return the last events before TS
+ * - 4220(si32 instr, si32 ts, si32 fund)
+ * - 4220(si32 instr, si32 ts)
  **/
 
 #define xnew(_x)	malloc(sizeof(_x))
@@ -76,6 +82,8 @@
 #if !defined ALGN16
 # define ALGN16(_x)	__attribute__((aligned(16))) _x
 #endif	/* !ALGN16 */
+
+#define q32_t	quantity32_t
 
 /* our local catalogue */
 static cat_t instrs;
@@ -387,44 +395,50 @@ out:
 static void
 instr_dump_to_file_svc(job_t j)
 {
-#if 0
-	/* our serialiser */
-	ssize_t nrd;
+	return;
+}
+
+/* tick services */
+static void
+__seria_tick(udpc_seria_t sctx, unsigned int tt, time_t ts, q32_t val)
+{
+	udpc_seria_add_byte(sctx, (uint8_t)tt);
+	udpc_seria_add_ui32(sctx, (uint32_t)ts);
+	udpc_seria_add_ui32(sctx, (uint32_t)val);
+	return;
+}
+
+static void
+instr_tick_svc(job_t j)
+{
 	struct udpc_seria_s sctx;
-	size_t ssz;
-	const char *sstrp;
-	char xdr_buf[4096];
-	char *buf = xdr_buf;
-	size_t buf_sz = sizeof(xdr_buf);
+	struct udpc_seria_s rplsctx;
+	struct job_s rplj;
+	/* in args */
+	int32_t gaid, ts, fund, exch;
 
+	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	ssz = udpc_seria_des_str(&sctx, &sstrp);
+	/* just read si32s */
+	gaid = udpc_seria_des_si32(&sctx);
+	ts = udpc_seria_des_si32(&sctx);
+	fund = udpc_seria_des_si32(&sctx);
+	exch = udpc_seria_des_si32(&sctx);
 
-	if (ssz == 0) {
-		UD_DEBUG("Usage: 4222 \"/path/to/file.xdr\"\n");
-		return;
-	}
-
-	UD_DEBUG("dumping instruments to %s ...", sstrp);
-	ssz = 0;
-	pthread_mutex_lock(&imtx);
-	for (instr_cons_t ic = instruments; ic; ic = ic->next) {
-		instr_t i = ic->instr;
-		size_t el;
-
-		el = seria_instrument(buf, buf_sz, i);
-		buf += el;
-		buf_sz -= el;
-	}
-	pthread_mutex_unlock(&imtx);
-
-	ssz = sizeof(xdr_buf) - buf_sz;
-	if ((nrd = write_file(xdr_buf, ssz, sstrp)) >= 0) {
-		UD_DBGCONT("success\n");
-	} else {
-		UD_DBGCONT("failed\n");
-	}
-#endif
+	UD_DEBUG("0x4220: %d %d %d %d\n", gaid, ts, fund, exch);
+	/* prepare the reply packet ... */
+	prep_pkt(&rplsctx, &rplj, j);
+	/* here's what we'd do:
+	 * in <- find_instr_by_gaid()
+	 * resv[] <- find_tick_resources_by_fund_and_exch()
+	 * for i in resv { tick[i][] <- find_tick_by_timestamp() }
+	 * for i,j in resv,tick { seria(tick[i][j]) }
+	 *
+	 * for now however we just send of a dummy */
+	udpc_seria_add_si32(&rplsctx, gaid);
+	__seria_tick(&rplsctx, 4/*TT_EOD*/, ts, 10000/*1.0000*/);
+	/* send what we've got */
+	send_pkt(&rplsctx, &rplj);
 	return;
 }
 
@@ -491,6 +505,8 @@ init(void *clo)
 	ud_set_service(0x4218, instr_add_from_file_svc, NULL);
 	ud_set_service(0x421a, instr_dump_svc, instr_add_svc);
 	ud_set_service(0x421c, instr_dump_to_file_svc, NULL);
+	/* tick service */
+	ud_set_service(0x4220, instr_tick_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("deploying idle bomb ...");

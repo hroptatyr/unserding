@@ -253,6 +253,14 @@ dump_option(ictx_t ctx, ga_spec_t sp)
 		/* exer style */ 'E',
 		ffff_monetary32_get_d(sp->strike), r);
 
+	/* fiddle with the delivery group ... it's a joke anyway at the mo */
+	{
+		option_t o = instr_option(&i);
+		o->ds.issue = 0;
+		o->ds.expiry = sp->expiry;
+		o->ds.settle = sp->expiry + 3 * 86400;
+	}
+
 	ssz = seria_instrument(sbuf, sizeof(sbuf), &i);
 	ctx->wrf(ctx, sbuf, ssz);
 	return;

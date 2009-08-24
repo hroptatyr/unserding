@@ -474,11 +474,15 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 
 	case UDPC_TYPE_UI64: {
 		uint64_t v = udpc_seria_des_ui64(sctx);
-		return sprintf(buf, "(ui64)0x%16llx (%llu)\n", v, v);
+		return sprintf(buf, "(ui64)0x%16llx (%llu)\n",
+			       (long long unsigned int)v,
+			       (long long unsigned int)v);
 	}
 	case UDPC_TYPE_SI64: {
 		uint64_t v = udpc_seria_des_si64(sctx);
-		return sprintf(buf, "(si64)0x%16llx (%lld)\n", v, v);
+		return sprintf(buf, "(si64)0x%16llx (%lld)\n",
+			       (long long int)v,
+			       (long long int)v);
 	}
 
 		

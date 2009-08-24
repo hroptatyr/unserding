@@ -61,11 +61,18 @@
  * Service 4218:
  * Service 421a:
  *
- * Service 4220 find ticks and shite.
- * - 4220(si32 instr, si32 ts, si32 fund, si32 exch)
- *   Return the last events before TS
- * - 4220(si32 instr, si32 ts, si32 fund)
- * - 4220(si32 instr, si32 ts)
+ * Service 4220 find ticks of one time stamp over instruments (mkt snapshot).
+ * This service can be used to get a succinct set of ticks, usually the
+ * last ticks before a given time stamp, for several instruments.
+ * The ticks to return can be specified in a bitset.
+ * - 4220(bitset types, si32 ts, (si32 secu, si32 fund, si32 exch)+)
+ *   As a wildcard for all funds or all exchanges 0x00000000 can be used.
+ *
+ * Service 4222 find ticks of one instrument over time (time series).
+ * This service can be used if the focus is one particular instrument (or one
+ * instrument at different exchanges) and the ticks to be returned are
+ * numerous.
+ * - 4222
  **/
 
 #define xnew(_x)	malloc(sizeof(_x))

@@ -108,6 +108,87 @@ static ud_sockaddr_t __sa6 = {
 #endif	/* AF_INET */
 
 
+/* a simple packet queue and the re-tx service */
+#define MAX_PKTQ_LEN	65536
+#define UD_SVC_RETX	0x0002
+
+struct pktq_slot_s {
+	size_t len;
+	char buf[UDPC_PKTLEN];
+};
+
+static struct pktq_slot_s pktq[MAX_PKTQ_LEN];
+static size_t pktq_idx = 0;
+
+static inline index_t
+next_slot(void)
+{
+	index_t res;
+
+	if ((res = pktq_idx++) >= MAX_PKTQ_LEN) {
+		res = pktq_idx = 0;
+	}
+	return res;
+}
+
+static inline index_t
+curr_slot(void)
+{
+	index_t res;
+	if ((res = pktq_idx) == 0) {
+		res = MAX_PKTQ_LEN;
+	}
+	return res - 1;
+}
+
+static void
+add_packet(const char *buf, size_t len)
+{
+	index_t slot = next_slot();
+	pktq[slot].len = len;
+	memcpy(&pktq[slot].buf, buf, len);
+	return;
+}
+
+static index_t
+find_packet(ud_convo_t cno, ud_pkt_no_t pno)
+{
+	index_t res;
+	for (res = 0; res < MAX_PKTQ_LEN; res++) {
+		ud_packet_t pkt = {
+			.plen = pktq[res].len,
+			.pbuf = pktq[res].buf
+		};
+		ud_convo_t pcno = udpc_pkt_cno(pkt);
+		ud_pkt_no_t ppno = udpc_pkt_pno(pkt);
+
+		if (cno == pcno && pno == ppno) {
+			return res;
+		}
+	}
+	return 0;
+}
+
+static void
+ud_retx(job_t j)
+{
+	struct udpc_seria_s sctx;
+	/* in args */
+	int32_t cno, pno;
+	index_t slot;
+
+	/* prepare the iterator for the incoming packet */
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	cno = udpc_seria_des_si32(&sctx);
+	pno = udpc_seria_des_si32(&sctx);
+
+	slot = find_packet(cno, pno);
+	memcpy(j->buf, &pktq[slot].buf, j->blen = pktq[slot].len);
+	send_cl(j);
+	return;
+}
+
+
 /* socket goodies */
 static inline void
 __reuse_sock(int sock)
@@ -413,6 +494,8 @@ send_cl(job_t j)
 	}
 	/* write back to whoever sent the packet */
 	(void)sendto(j->sock, j->buf, j->blen, 0, &j->sa.sa, sizeof(j->sa));
+	/* also store a copy of the packet for the re-tx service */
+	add_packet(j->buf, j->blen);
 	return;
 }
 
@@ -477,6 +560,9 @@ ud_attach_mcast(EV_P)
 		ev_io_init(srv_watcher, mcast_inco_cb, lsock6, EV_READ);
 		ev_io_start(EV_A_ srv_watcher);
 	}
+
+	/* announce our service */
+	ud_set_service(UD_SVC_RETX, ud_retx, NULL);
 	return 0;
 }
 

@@ -58,22 +58,31 @@
 #include "catalogue.h"
 
 /**
- * Service 4218:
+ * Service 4218: */
+#define UD_SVC_INSTR_FROM_FILE	0x4218
+
+/**
  * Service 421a:
- *
+ **/
+#define UD_SVC_INSTR_BY_ATTR	0x421a
+
+/**
  * Service 4220 find ticks of one time stamp over instruments (mkt snapshot).
  * This service can be used to get a succinct set of ticks, usually the
  * last ticks before a given time stamp, for several instruments.
  * The ticks to return can be specified in a bitset.
  * - 4220(bitset types, si32 ts, (si32 secu, si32 fund, si32 exch)+)
- *   As a wildcard for all funds or all exchanges 0x00000000 can be used.
- *
+ *   As a wildcard for all funds or all exchanges 0x00000000 can be used. */
+#define UD_SVC_TICK_BY_TS	0x4220
+
+/**
  * Service 4222 find ticks of one instrument over time (time series).
  * This service can be used if the focus is one particular instrument (or one
  * instrument at different exchanges) and the ticks to be returned are
  * numerous.
  * - 4222
  **/
+#define UD_SVC_TICK_BY_INSTR	0x4222
 
 #define xnew(_x)	malloc(sizeof(_x))
 
@@ -487,7 +496,7 @@ deferred_dl(EV_P_ ev_idle *w, int revents)
 	ud_packet_t __pkt = {.pbuf = j.buf};
 
 	UD_DEBUG("downloading instrs ...");
-	udpc_make_pkt(__pkt, 0, 0, 0x4220);
+	udpc_make_pkt(__pkt, 0, 0, UD_SVC_INSTR_BY_ATTR);
 	j.blen = UDPC_HDRLEN;
 	send_m46(&j);
 	UD_DBGCONT("done\n");
@@ -509,11 +518,11 @@ init(void *clo)
 	instrs = make_cat();
 	/* lodging our bbdb search service */
 	ud_set_service(0x4216, instr_add_svc, NULL);
-	ud_set_service(0x4218, instr_add_from_file_svc, NULL);
-	ud_set_service(0x421a, instr_dump_svc, instr_add_svc);
+	ud_set_service(UD_SVC_INSTR_FROM_FILE, instr_add_from_file_svc, NULL);
+	ud_set_service(UD_SVC_INSTR_BY_ATTR, instr_dump_svc, instr_add_svc);
 	ud_set_service(0x421c, instr_dump_to_file_svc, NULL);
 	/* tick service */
-	ud_set_service(0x4220, instr_tick_svc, NULL);
+	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("deploying idle bomb ...");

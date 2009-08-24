@@ -413,7 +413,6 @@ send_cl(job_t j)
 	}
 	/* write back to whoever sent the packet */
 	(void)sendto(j->sock, j->buf, j->blen, 0, &j->sa.sa, sizeof(j->sa));
-	usleep(10);
 	return;
 }
 

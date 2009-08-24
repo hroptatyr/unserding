@@ -56,6 +56,7 @@
 
 #include <pfack/instruments.h>
 #include "catalogue.h"
+#include <pfack/tick.h>
 
 /**
  * Service 4218: */
@@ -71,7 +72,7 @@
  * This service can be used to get a succinct set of ticks, usually the
  * last ticks before a given time stamp, for several instruments.
  * The ticks to return can be specified in a bitset.
- * - 4220(bitset types, si32 ts, (si32 secu, si32 fund, si32 exch)+)
+ * - 4220(si32 ts, bitset32 types, (si32 secu, si32 fund, si32 exch)+)
  *   As a wildcard for all funds or all exchanges 0x00000000 can be used. */
 #define UD_SVC_TICK_BY_TS	0x4220
 
@@ -84,7 +85,12 @@
  **/
 #define UD_SVC_TICK_BY_INSTR	0x4222
 
-#define xnew(_x)	malloc(sizeof(_x))
+#if !defined xnew
+# define xnew(_x)	malloc(sizeof(_x))
+#endif	/* !xnew */
+#if !defined countof
+# define countof(x)	(sizeof(x) / sizeof(*x))
+#endif	/* !countof */
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -414,13 +420,29 @@ instr_dump_to_file_svc(job_t j)
 	return;
 }
 
+
 /* tick services */
+/* tickable instruments, including currency and pot */
+typedef struct sparse_l1tick_s *sparse_l1tick_t;
+
+struct secu_s {
+	gaid_t instr;
+	gaid_t curr;
+	gaid_t pot;
+};
+
+struct sparse_l1tick_s {
+	struct secu_s secu;
+	struct l1tick_s tick;
+};
+
 static void
-__seria_tick(udpc_seria_t sctx, unsigned int tt, time_t ts, q32_t val)
+__seria_sparse_l1tick(udpc_seria_t sctx, sparse_l1tick_t t)
 {
-	udpc_seria_add_byte(sctx, (uint8_t)tt);
-	udpc_seria_add_ui32(sctx, (uint32_t)ts);
-	udpc_seria_add_ui32(sctx, (uint32_t)val);
+	udpc_seria_add_si32(sctx, (int32_t)t->secu.instr);
+	udpc_seria_add_byte(sctx, (uint8_t)t->tick.tt);
+	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.ts);
+	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.value);
 	return;
 }
 
@@ -431,17 +453,25 @@ instr_tick_svc(job_t j)
 	struct udpc_seria_s rplsctx;
 	struct job_s rplj;
 	/* in args */
-	int32_t gaid, ts, fund, exch;
+	int32_t ts, ticks;
+	/* allow to filter for 64 instruments at once */
+	struct secu_s filt[64];
+	size_t nfilt = 0;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* just read si32s */
-	gaid = udpc_seria_des_si32(&sctx);
 	ts = udpc_seria_des_si32(&sctx);
-	fund = udpc_seria_des_si32(&sctx);
-	exch = udpc_seria_des_si32(&sctx);
+	ticks = udpc_seria_des_si32(&sctx);
 
-	UD_DEBUG("0x4220: %d %d %d %d\n", gaid, ts, fund, exch);
+	/* triples of instrument identifiers */
+	do {
+		filt[nfilt].instr = udpc_seria_des_si32(&sctx);
+		filt[nfilt].curr = udpc_seria_des_si32(&sctx);
+		filt[nfilt].pot = udpc_seria_des_si32(&sctx);
+	} while (filt[nfilt].instr != 0 && ++nfilt < countof(filt));
+
+	UD_DEBUG("0x4220: ts:%d filtered for %d instrs\n", ts, nfilt);
 	/* prepare the reply packet ... */
 	prep_pkt(&rplsctx, &rplj, j);
 	/* here's what we'd do:
@@ -451,8 +481,17 @@ instr_tick_svc(job_t j)
 	 * for i,j in resv,tick { seria(tick[i][j]) }
 	 *
 	 * for now however we just send of a dummy */
-	udpc_seria_add_si32(&rplsctx, gaid);
-	__seria_tick(&rplsctx, 4/*TT_EOD*/, ts, 10000/*1.0000*/);
+	while (false) {
+		struct sparse_l1tick_s sl1t = {
+			.secu.instr = 12,
+			.secu.curr = 73380,
+			.secu.pot = 4,
+			.tick.tt = PFTT_EOD,
+			.tick.ts = ts,
+			.tick.value = 10000,
+		};
+		__seria_sparse_l1tick(&rplsctx, &sl1t);
+	}
 	/* send what we've got */
 	send_pkt(&rplsctx, &rplj);
 	return;

@@ -448,9 +448,12 @@ struct sparse_l1tick_s {
 static void
 __seria_sparse_l1tick(udpc_seria_t sctx, sparse_l1tick_t t)
 {
-	udpc_seria_add_si32(sctx, (int32_t)t->secu.instr);
-	udpc_seria_add_byte(sctx, (uint8_t)t->tick.tt);
+	udpc_seria_add_ui32(sctx, (int32_t)t->secu.instr);
+	udpc_seria_add_ui32(sctx, (int32_t)t->secu.curr);
+	udpc_seria_add_ui32(sctx, (int32_t)t->secu.pot);
 	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.ts);
+	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.nsec);
+	udpc_seria_add_byte(sctx, (uint8_t)t->tick.tt);
 	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.value);
 	return;
 }
@@ -490,16 +493,18 @@ instr_tick_svc(job_t j)
 	 * for i,j in resv,tick { seria(tick[i][j]) }
 	 *
 	 * for now however we just send of a dummy */
-	while (false) {
+	for (int more = 1; more; ) {
 		struct sparse_l1tick_s sl1t = {
-			.secu.instr = 12,
+			.secu.instr = filt[0].instr,
 			.secu.curr = 73380,
 			.secu.pot = 4,
 			.tick.tt = PFTT_EOD,
 			.tick.ts = ts,
+			.tick.nsec = 0,
 			.tick.value = 10000,
 		};
 		__seria_sparse_l1tick(&rplsctx, &sl1t);
+		more = 0;
 	}
 	/* send what we've got */
 	send_pkt(&rplsctx, &rplj);

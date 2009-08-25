@@ -552,6 +552,41 @@ deferred_dl(EV_P_ ev_idle *w, int revents)
 	add_trivial();
 
 	ev_idle_stop(EV_A_ w);
+#if 0
+#define SOCK_DCCP 6      
+#define IPPROTO_DCCP 33
+#define SOL_DCCP 269    
+#define MAX_DCCP_CONNECTION_BACK_LOG 5
+	struct sockaddr_in salocal;
+	struct sockaddr_in saremote;
+	socklen_t saremote_len = sizeof(saremote);
+
+	int s = socket(PF_INET, SOCK_DCCP, IPPROTO_DCCP);
+	/* turn off bind address checking, and allow port numbers to be reused -
+	 * otherwise the TIME_WAIT phenomenon will prevent binding to these
+	 * address.port combinations for (2 * MSL) seconds. */
+	int on = 1;
+	int result;
+	result = setsockopt(s, SOL_DCCP, SO_REUSEADDR, (const char *)&on, sizeof(on));
+	result = setsockopt(s, SOL_DCCP, 2, (const char *)&on, sizeof(on));
+
+	memset(&salocal, 0, sizeof(salocal));
+	salocal.sin_family = AF_INET;
+	salocal.sin_addr.s_addr = INADDR_ANY;
+	salocal.sin_port = htons(12121);
+	/* bind the socket to the local address and port. salocal is sockaddr
+	 * of local IP and port */
+	result = bind(s, (struct sockaddr *)&salocal, sizeof(salocal));
+	UD_DEBUG("result %d\n", result);
+	/* listen on that port for incoming connections */
+	result = listen(s, MAX_DCCP_CONNECTION_BACK_LOG);
+	UD_DEBUG("result %d\n", result);
+	/* wait to accept a client connecting. When a client joins,
+	 * mRemoteName and mRemoteLength are filled out by accept() */
+	UD_DEBUG("accepting shite ...");
+	int x = accept(s, (struct sockaddr *)&saremote, &saremote_len);
+	UD_DBGCONT("done\n");
+#endif	/* 0 */
 	return;
 }
 

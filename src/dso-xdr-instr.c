@@ -59,29 +59,38 @@
 #include <pfack/tick.h>
 
 /**
- * Service 4218: */
+ * Service 4218:
+ * Obtain instrument definitions from a file.
+ * sig: 4218(string filename)
+ * Returns nothing. */
 #define UD_SVC_INSTR_FROM_FILE	0x4218
 
 /**
  * Service 421a:
+ * Get instrument definitions.
+ * sig: 421a((si32 gaid)*)
+ *   Returns the instruments whose ids match the given ones.  In the
+ *   special case that no id is given, all instruments are dumped.
  **/
 #define UD_SVC_INSTR_BY_ATTR	0x421a
 
 /**
- * Service 4220 find ticks of one time stamp over instruments (mkt snapshot).
+ * Service 4220:
+ * Find ticks of one time stamp over instruments (market snapshot).
  * This service can be used to get a succinct set of ticks, usually the
  * last ticks before a given time stamp, for several instruments.
  * The ticks to return can be specified in a bitset.
- * - 4220(si32 ts, bitset32 types, (si32 secu, si32 fund, si32 exch)+)
+ * sig: 4220(si32 ts, bitset32 types, (si32 secu, si32 fund, si32 exch)+)
  *   As a wildcard for all funds or all exchanges 0x00000000 can be used. */
 #define UD_SVC_TICK_BY_TS	0x4220
 
 /**
- * Service 4222 find ticks of one instrument over time (time series).
- * This service can be used if the focus is one particular instrument (or one
- * instrument at different exchanges) and the ticks to be returned are
- * numerous.
- * - 4222
+ * Service 4222:
+ * Find ticks of one instrument over time (time series).
+ * This service can be used if the focus is one particular instrument
+ * (or one instrument at different exchanges) and the ticks to be returned
+ * are numerous.
+ * sig: 4222()
  **/
 #define UD_SVC_TICK_BY_INSTR	0x4222
 
@@ -456,7 +465,7 @@ instr_tick_svc(job_t j)
 	int32_t ts, ticks;
 	/* allow to filter for 64 instruments at once */
 	struct secu_s filt[64];
-	size_t nfilt = 0;
+	unsigned int nfilt = 0;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -471,7 +480,7 @@ instr_tick_svc(job_t j)
 		filt[nfilt].pot = udpc_seria_des_si32(&sctx);
 	} while (filt[nfilt].instr != 0 && ++nfilt < countof(filt));
 
-	UD_DEBUG("0x4220: ts:%d filtered for %d instrs\n", ts, nfilt);
+	UD_DEBUG("0x4220: ts:%d filtered for %u instrs\n", ts, nfilt);
 	/* prepare the reply packet ... */
 	prep_pkt(&rplsctx, &rplj, j);
 	/* here's what we'd do:

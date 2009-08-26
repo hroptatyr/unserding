@@ -542,32 +542,6 @@ instr_tick_svc(job_t j)
 
 static ev_idle __attribute__((aligned(16))) __widle;
 
-#if 0
-/* ideally this is a separate snippet that reads the stuff from a
- * database and bangs it into unserding via network */
-static void
-add_trivial(void)
-{
-	struct instr_s i;
-
-	make_tcnxxx_into(&i, 73380, PFACK_4217_EUR_IDX);
-	copyadd_instr(&i);
-
-	make_tcnxxx_into(&i, 73381, PFACK_4217_USD_IDX);
-	copyadd_instr(&i);
-
-	make_ffcpnx_into(&i, 5384697780, PFACK_4217_EUR_IDX, PFACK_4217_USD_IDX);
-	copyadd_instr(&i);
-	return;
-}
-#else
-static void
-add_trivial(void)
-{
-	return;
-}
-#endif
-
 static void
 deferred_dl(EV_P_ ev_idle *w, int revents)
 {
@@ -579,8 +553,6 @@ deferred_dl(EV_P_ ev_idle *w, int revents)
 	j.blen = UDPC_HDRLEN;
 	send_m46(&j);
 	UD_DBGCONT("done\n");
-
-	add_trivial();
 
 	ev_idle_stop(EV_A_ w);
 #if 0

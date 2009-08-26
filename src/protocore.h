@@ -140,65 +140,65 @@ extern void send_cl(job_t);
 
 /**
  * Return true if PKT is a valid unserding packet. */
-extern inline bool __attribute__((always_inline, gnu_inline))
+static inline bool __attribute__((always_inline))
 udpc_pkt_valid_p(const ud_packet_t pkt);
 /**
  * Return true if the packet PKT is meant for us,
  * that is the conversation ids coincide. */
-extern inline bool __attribute__((always_inline, gnu_inline))
+static inline bool __attribute__((always_inline))
 udpc_pkt_for_us_p(const ud_packet_t pkt, ud_convo_t cno);
 /**
  * Generic packet generator.
  * Create a packet into P with conversation number CID and packet
  * number PNO of type T. */
-extern inline void __attribute__((always_inline, gnu_inline))
+static inline void __attribute__((always_inline))
 udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t t);
 /**
  * Generic packet generator.
  * Create a packet from the packet PKT into PKT, the packet command is XOR'd
  * with 0x1 and the packet number is increased by 1. */
-extern inline void __attribute__((always_inline, gnu_inline))
+static inline void __attribute__((always_inline))
 udpc_make_rpl_pkt(ud_packet_t pkt);
 /**
  * Extract the conversation number from PKT. */
-extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
+static inline ud_convo_t __attribute__((always_inline))
 udpc_pkt_cno(const ud_packet_t pkt);
 /**
  * Extract the packet number from PKT. */
-extern inline ud_pkt_no_t __attribute__((always_inline, gnu_inline))
+static inline ud_pkt_no_t __attribute__((always_inline))
 udpc_pkt_pno(const ud_packet_t pkt);
 /**
  * Extract the command portion of PKT. */
-extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+static inline ud_pkt_cmd_t __attribute__((always_inline))
 udpc_pkt_cmd(const ud_packet_t pkt);
 /**
  * Extract the family portion of CMD. */
-extern inline uint8_t __attribute__((always_inline, gnu_inline))
+static inline uint8_t __attribute__((always_inline))
 udpc_cmd_fam(const ud_pkt_cmd_t cmd);
 /**
  * Extract the worker fun portion of CMD. */
-extern inline uint8_t __attribute__((always_inline, gnu_inline))
+static inline uint8_t __attribute__((always_inline))
 udpc_cmd_wrk(const ud_pkt_cmd_t cmd);
 /**
  * Set the command slot of PKT to CMD. */
-extern inline void __attribute__((always_inline, gnu_inline))
+static inline void __attribute__((always_inline))
 udpc_pkt_set_cmd(ud_packet_t pkt, ud_pkt_cmd_t cmd);
 /**
  * Return true if CMD is a reply command. */
-extern inline bool __attribute__((always_inline, gnu_inline))
+static inline bool __attribute__((always_inline))
 udpc_reply_p(ud_pkt_cmd_t cmd);
 /**
  * Given a command CMD, return the corresponding reply command. */
-extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+static inline ud_pkt_cmd_t __attribute__((always_inline))
 udpc_reply_cmd(ud_pkt_cmd_t cmd);
 /**
  * Given a command CMD in network byte order return its reply command. */
-extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+static inline ud_pkt_cmd_t __attribute__((always_inline))
 udpc_reply_cmd_ns(ud_pkt_cmd_t cmd);
 
 
 /* inlines */
-extern inline bool __attribute__((always_inline, gnu_inline))
+static inline bool __attribute__((always_inline))
 udpc_pkt_valid_p(const ud_packet_t pkt)
 {
 	const uint16_t *tmp = (const void*)pkt.pbuf;
@@ -209,21 +209,21 @@ udpc_pkt_valid_p(const ud_packet_t pkt)
 	return false;
 }
 
-extern inline bool __attribute__((always_inline, gnu_inline))
+static inline bool __attribute__((always_inline))
 udpc_pkt_for_us_p(const ud_packet_t pkt, ud_convo_t cno)
 {
 	return udpc_pkt_valid_p(pkt) && udpc_pkt_cno(pkt) == cno;
 }
 
-extern inline uint32_t __attribute__((always_inline, gnu_inline))
+static inline uint32_t __attribute__((always_inline))
 __interleave_cno_pno(ud_convo_t cno, ud_pkt_no_t pno);
-extern inline uint32_t __attribute__((always_inline, gnu_inline))
+static inline uint32_t __attribute__((always_inline))
 __interleave_cno_pno(ud_convo_t cno, ud_pkt_no_t pno)
 {
 	return ((uint32_t)cno << 24) | (pno && 0xffffff);
 }
 
-extern inline void __attribute__((always_inline, gnu_inline))
+static inline void __attribute__((always_inline))
 udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t cmd)
 {
 	uint16_t *restrict tmp = (void*)p.pbuf;
@@ -236,26 +236,26 @@ udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t cmd)
 	return;
 }
 
-extern inline bool __attribute__((always_inline, gnu_inline))
+static inline bool __attribute__((always_inline))
 udpc_reply_p(ud_pkt_cmd_t cmd)
 {
 	return cmd & 0x1;
 }
 
-extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+static inline ud_pkt_cmd_t __attribute__((always_inline))
 udpc_reply_cmd(ud_pkt_cmd_t cmd)
 {
 	return cmd | 0x1;
 }
 
-extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+static inline ud_pkt_cmd_t __attribute__((always_inline))
 udpc_reply_cmd_ns(ud_pkt_cmd_t cmd)
 {
 	ud_pkt_cmd_t res = udpc_reply_cmd(ntohs(cmd));
 	return htons(res);
 }
 
-extern inline void __attribute__((always_inline, gnu_inline))
+static inline void __attribute__((always_inline))
 udpc_make_rpl_pkt(ud_packet_t p)
 {
 	uint16_t *restrict tmp = (void*)p.pbuf;
@@ -273,7 +273,7 @@ udpc_make_rpl_pkt(ud_packet_t p)
 	return;
 }
 
-extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
+static inline ud_convo_t __attribute__((always_inline))
 udpc_pkt_cno(const ud_packet_t pkt)
 {
 	const uint32_t *tmp = (void*)pkt.pbuf;
@@ -282,7 +282,7 @@ udpc_pkt_cno(const ud_packet_t pkt)
 	return (ud_convo_t)(all >> 24);
 }
 
-extern inline ud_pkt_no_t __attribute__((always_inline, gnu_inline))
+static inline ud_pkt_no_t __attribute__((always_inline))
 udpc_pkt_pno(const ud_packet_t pkt)
 {
 	const uint32_t *tmp = (void*)pkt.pbuf;
@@ -291,7 +291,7 @@ udpc_pkt_pno(const ud_packet_t pkt)
 	return (ud_pkt_no_t)(all & (0xffffff));
 }
 
-extern inline void __attribute__((always_inline, gnu_inline))
+static inline void __attribute__((always_inline))
 udpc_pkt_set_cmd(ud_packet_t pkt, ud_pkt_cmd_t cmd)
 {
 	uint16_t *tmp = (void*)pkt.pbuf;
@@ -300,7 +300,7 @@ udpc_pkt_set_cmd(ud_packet_t pkt, ud_pkt_cmd_t cmd)
 	return;
 }
 
-extern inline ud_pkt_cmd_t __attribute__((always_inline, gnu_inline))
+static inline ud_pkt_cmd_t __attribute__((always_inline))
 udpc_pkt_cmd(const ud_packet_t pkt)
 {
 	const uint16_t *tmp = (void*)pkt.pbuf;
@@ -308,13 +308,13 @@ udpc_pkt_cmd(const ud_packet_t pkt)
 	return ntohs(tmp[2]);
 }
 
-extern inline uint8_t __attribute__((always_inline, gnu_inline))
+static inline uint8_t __attribute__((always_inline))
 udpc_cmd_fam(const ud_pkt_cmd_t cmd)
 {
 	return (cmd >> 8) & 0x7f;
 }
 
-extern inline uint8_t __attribute__((always_inline, gnu_inline))
+static inline uint8_t __attribute__((always_inline))
 udpc_cmd_wrk(const ud_pkt_cmd_t cmd)
 {
 	return cmd & 0xff;

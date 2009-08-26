@@ -45,9 +45,7 @@
  * Call the worker after finding out what job J is. */
 extern void ud_proto_parse(job_t j);
 
-extern inline void __attribute__((always_inline, gnu_inline))
-ud_fputs(uint8_t len, const char *s, FILE *f);
-extern inline void __attribute__((always_inline, gnu_inline))
+static inline void __attribute__((always_inline))
 ud_fputs(uint8_t len, const char *s, FILE *f)
 {
 	for (uint8_t i = 0; i < len; i++) {
@@ -64,14 +62,11 @@ extern size_t ud_sprint_pkthdr(char *restrict buf, ud_packet_t pkt);
 extern size_t ud_sprint_pkt_raw(char *restrict buf, ud_packet_t pkt);
 extern size_t ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt);
 
-/**
- * Print the packet header. temporary. */
-extern inline void __attribute__((always_inline, gnu_inline))
-udpc_print_pkt(const ud_packet_t pkt);
-
 
 /* inlines */
-extern inline void __attribute__((always_inline, gnu_inline))
+/**
+ * Print the packet header. temporary. */
+static inline void __attribute__((always_inline))
 udpc_print_pkt(const ud_packet_t pkt)
 {
 	printf(":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",

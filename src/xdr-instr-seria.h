@@ -72,7 +72,7 @@ struct sl1tick_s {
 
 /* (de)serialisers */
 static inline void
-udpc_seria_add_tick_by_ts_header(udpc_seria_t sctx, tick_by_ts_hdr_t t)
+udpc_seria_add_tick_by_ts_hdr(udpc_seria_t sctx, tick_by_ts_hdr_t t)
 {
 	udpc_seria_add_ui32(sctx, t->ts);
 	udpc_seria_add_ui32(sctx, t->types);

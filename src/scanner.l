@@ -142,6 +142,12 @@ alias		{ BEGIN(ARGS); RETURN_TOKEN(TOK_ALI); }
 	RETURN_TOKEN(TOK_UI8H);
 }
 
+<ARGS>[-+]?{intdgt}+[uU]	{
+	yylval->slen = cli_yyget_leng(yyscanner);
+	yylval->sval = cli_yyget_text(yyscanner);
+	RETURN_TOKEN(TOK_UINT);
+}
+
 <ARGS>[-+]?{intdgt}+	{
 	yylval->slen = cli_yyget_leng(yyscanner);
 	yylval->sval = cli_yyget_text(yyscanner);

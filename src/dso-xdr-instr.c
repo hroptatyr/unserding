@@ -532,7 +532,9 @@ instr_tick_svc(job_t j)
 		/* prepare the reply packet ... */
 		clear_pkt(&rplsctx, &rplj);
 		/* serialise some ticks */
-		moar = spitfire(&sfctx, &rplsctx);
+		if ((moar = spitfire(&sfctx, &rplsctx))) {
+			udpc_set_frag_pkt(JOB_PACKET(&rplj));
+		}
 		/* send what we've got */
 		send_pkt(&rplsctx, &rplj);
 	}

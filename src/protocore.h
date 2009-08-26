@@ -90,7 +90,7 @@ typedef struct job_s *job_t;
 #define TYPEDEFD_job_t
 
 /* helper macro to use a job as packet */
-#define JOB_PACKET(j)	((ud_packet_t){.plen = j->blen, .pbuf = j->buf})
+#define JOB_PACKET(j)	((ud_packet_t){.plen = (j)->blen, .pbuf = (j)->buf})
 
 /* we use the minimum pmtu of ipv6 as buf size */
 #define JOB_BUF_SIZE	UDPC_PKTLEN

@@ -198,12 +198,18 @@ udpc_reply_cmd_ns(ud_pkt_cmd_t cmd);
 
 
 /* inlines */
+static inline uint16_t
+udpc_pkt_magic(const ud_packet_t pkt)
+{
+	const uint16_t *tmp = (const void*)pkt.pbuf;
+	return tmp[3];
+}
+
 static inline bool __attribute__((always_inline))
 udpc_pkt_valid_p(const ud_packet_t pkt)
 {
-	const uint16_t *tmp = (const void*)pkt.pbuf;
 	/* check magic number */
-	if ((tmp[3] & ~1) == (UDPC_MAGIC_NUMBER & ~1)) {
+	if ((udpc_pkt_magic(pkt) & ~1) == (UDPC_MAGIC_NUMBER & ~1)) {
 		return true;
 	}
 	return false;

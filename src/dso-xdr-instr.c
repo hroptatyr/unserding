@@ -471,11 +471,12 @@ static spitfire_res_t
 spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
 {
 	struct sl1tick_s t;
+	size_t trick = 1;
 
 	/* start out with one tick per instr */
 	while (sfctx->idx < sfctx->slen &&
 	       sctx->msgoff < sctx->len - /*yuck*/7*8) {
-		secu_t s = &sfctx->secu[sfctx->idx++];
+		secu_t s = &sfctx->secu[sfctx->idx];
 
 		t.secu.instr = s->instr;
 		t.secu.unit = s->unit ? s->unit : 73380;
@@ -486,6 +487,8 @@ spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
 		t.tick.nsec = 0;
 		t.tick.value = 10000;
 		udpc_seria_add_sl1tick(sctx, &t);
+
+		sfctx->idx += (trick ^= 1);
 	}
 	/* return false if this packet is meant to be the last one */
 	return sfctx->idx < sfctx->slen;

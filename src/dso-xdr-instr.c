@@ -56,7 +56,7 @@
 
 #include <pfack/instruments.h>
 #include "catalogue.h"
-#include <pfack/tick.h>
+#include "xdr-instr-seria.h"
 
 /**
  * Service 4218:
@@ -334,12 +334,26 @@ instr_dump_all(job_t j)
 
 /* one-at-a-time dispatchers */
 static inline void
-prep_pkt(udpc_seria_t sctx, job_t rplj, job_t srcj)
+clear_pkt(udpc_seria_t sctx, job_t rplj)
 {
-	memcpy(rplj, srcj, sizeof(*rplj));
 	memset(UDPC_PAYLOAD(rplj->buf), 0, UDPC_PLLEN);
 	udpc_make_rpl_pkt(JOB_PACKET(rplj));
 	udpc_seria_init(sctx, UDPC_PAYLOAD(rplj->buf), UDPC_PLLEN);
+	return;
+}
+
+static inline void
+copy_pkt(job_t tgtj, job_t srcj)
+{
+	memcpy(tgtj, srcj, sizeof(*tgtj));
+	return;
+}
+
+static inline void
+prep_pkt(udpc_seria_t sctx, job_t rplj, job_t srcj)
+{
+	copy_pkt(rplj, srcj);
+	clear_pkt(sctx, rplj);
 	return;
 }
 
@@ -431,30 +445,54 @@ instr_dump_to_file_svc(job_t j)
 
 
 /* tick services */
-/* tickable instruments, including currency and pot */
-typedef struct sparse_l1tick_s *sparse_l1tick_t;
+#define index_t	size_t
+typedef struct spitfire_ctx_s *spitfire_ctx_t;
+typedef enum spitfire_res_e spitfire_res_t;
 
-struct secu_s {
-	gaid_t instr;
-	gaid_t curr;
-	gaid_t pot;
+struct spitfire_ctx_s {
+	secu_t secu;
+	size_t slen;
+	index_t idx;
+	time_t ts;
 };
 
-struct sparse_l1tick_s {
-	struct secu_s secu;
-	struct l1tick_s tick;
+enum spitfire_res_e {
+	NO_TICKS,
+	OUT_OF_SPACE,
+	OUT_OF_TICKS,
 };
+
+static spitfire_res_t
+spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
+{
+	struct sl1tick_s t;
+
+	/* start out with one tick per instr */
+	while (sfctx->idx < sfctx->slen &&
+	       sctx->msgoff < sctx->len - /*yuck*/7*8) {
+		secu_t s = &sfctx->secu[sfctx->idx++];
+
+		t.secu.instr = s->instr;
+		t.secu.unit = s->unit ? s->unit : 73380;
+		t.secu.pot = s->pot ? s->pot : 4;
+
+		t.tick.tt = PFTT_EOD;
+		t.tick.ts = sfctx->ts;
+		t.tick.nsec = 0;
+		t.tick.value = 10000;
+		udpc_seria_sl1tick(sctx, &t);
+	}
+	/* return false if this packet is meant to be the last one */
+	return sfctx->idx < sfctx->slen;
+}
 
 static void
-__seria_sparse_l1tick(udpc_seria_t sctx, sparse_l1tick_t t)
+init_spitfire(spitfire_ctx_t sfctx, secu_t secu, size_t slen, time_t ts)
 {
-	udpc_seria_add_ui32(sctx, (int32_t)t->secu.instr);
-	udpc_seria_add_ui32(sctx, (int32_t)t->secu.curr);
-	udpc_seria_add_ui32(sctx, (int32_t)t->secu.pot);
-	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.ts);
-	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.nsec);
-	udpc_seria_add_byte(sctx, (uint8_t)t->tick.tt);
-	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.value);
+	sfctx->secu = secu;
+	sfctx->slen = slen;
+	sfctx->idx = 0;
+	sfctx->ts = ts;
 	return;
 }
 
@@ -469,6 +507,7 @@ instr_tick_svc(job_t j)
 	/* allow to filter for 64 instruments at once */
 	struct secu_s filt[64];
 	unsigned int nfilt = 0;
+	struct spitfire_ctx_s sfctx;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -479,35 +518,22 @@ instr_tick_svc(job_t j)
 	/* triples of instrument identifiers */
 	do {
 		filt[nfilt].instr = udpc_seria_des_si32(&sctx);
-		filt[nfilt].curr = udpc_seria_des_si32(&sctx);
+		filt[nfilt].unit = udpc_seria_des_si32(&sctx);
 		filt[nfilt].pot = udpc_seria_des_si32(&sctx);
 	} while (filt[nfilt].instr != 0 && ++nfilt < countof(filt));
 
 	UD_DEBUG("0x4220: ts:%d filtered for %u instrs\n", ts, nfilt);
-	/* prepare the reply packet ... */
-	prep_pkt(&rplsctx, &rplj, j);
-	/* here's what we'd do:
-	 * in <- find_instr_by_gaid()
-	 * resv[] <- find_tick_resources_by_fund_and_exch()
-	 * for i in resv { tick[i][] <- find_tick_by_timestamp() }
-	 * for i,j in resv,tick { seria(tick[i][j]) }
-	 *
-	 * for now however we just send of a dummy */
-	for (int more = 1; more; ) {
-		struct sparse_l1tick_s sl1t = {
-			.secu.instr = filt[0].instr,
-			.secu.curr = 73380,
-			.secu.pot = 4,
-			.tick.tt = PFTT_EOD,
-			.tick.ts = ts,
-			.tick.nsec = 0,
-			.tick.value = 10000,
-		};
-		__seria_sparse_l1tick(&rplsctx, &sl1t);
-		more = 0;
+	/* initialise the spit state context */
+	init_spitfire(&sfctx, filt, nfilt, ts);
+	copy_pkt(&rplj, j);
+	for (bool moar = true; moar;) {
+		/* prepare the reply packet ... */
+		clear_pkt(&rplsctx, &rplj);
+		/* serialise some ticks */
+		moar = spitfire(&sfctx, &rplsctx);
+		/* send what we've got */
+		send_pkt(&rplsctx, &rplj);
 	}
-	/* send what we've got */
-	send_pkt(&rplsctx, &rplj);
 	return;
 }
 

@@ -80,8 +80,12 @@
  * This service can be used to get a succinct set of ticks, usually the
  * last ticks before a given time stamp, for several instruments.
  * The ticks to return can be specified in a bitset.
- * sig: 4220(si32 ts, bitset32 types, (si32 secu, si32 fund, si32 exch)+)
- *   As a wildcard for all funds or all exchanges 0x00000000 can be used. */
+ *
+ * sig: 4220(ui32 ts, ui32 types, (ui32 secu, ui32 fund, ui32 exch)+)
+ *   As a wildcard for all funds or all exchanges 0x00000000 can be used.
+ *
+ * The TYPES parameter is a bitset made up of PFTB_* values as specified
+ * in pfack/tick.h */
 #define UD_SVC_TICK_BY_TS	0x4220
 
 /**
@@ -454,6 +458,7 @@ struct spitfire_ctx_s {
 	size_t slen;
 	index_t idx;
 	time_t ts;
+	uint32_t types;
 };
 
 enum spitfire_res_e {
@@ -480,19 +485,20 @@ spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
 		t.tick.ts = sfctx->ts;
 		t.tick.nsec = 0;
 		t.tick.value = 10000;
-		udpc_seria_sl1tick(sctx, &t);
+		udpc_seria_add_sl1tick(sctx, &t);
 	}
 	/* return false if this packet is meant to be the last one */
 	return sfctx->idx < sfctx->slen;
 }
 
 static void
-init_spitfire(spitfire_ctx_t sfctx, secu_t secu, size_t slen, time_t ts)
+init_spitfire(spitfire_ctx_t ctx, secu_t secu, size_t slen, tick_by_ts_hdr_t t)
 {
-	sfctx->secu = secu;
-	sfctx->slen = slen;
-	sfctx->idx = 0;
-	sfctx->ts = ts;
+	ctx->secu = secu;
+	ctx->slen = slen;
+	ctx->idx = 0;
+	ctx->ts = t->ts;
+	ctx->types = t->types;
 	return;
 }
 
@@ -503,7 +509,7 @@ instr_tick_svc(job_t j)
 	struct udpc_seria_s rplsctx;
 	struct job_s rplj;
 	/* in args */
-	int32_t ts, ticks;
+	struct tick_by_ts_hdr_s hdr;
 	/* allow to filter for 64 instruments at once */
 	struct secu_s filt[64];
 	unsigned int nfilt = 0;
@@ -511,20 +517,16 @@ instr_tick_svc(job_t j)
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	/* just read si32s */
-	ts = udpc_seria_des_si32(&sctx);
-	ticks = udpc_seria_des_si32(&sctx);
+	/* read the header off of the wire */
+	udpc_seria_des_tick_by_ts_hdr(&hdr, &sctx);
 
 	/* triples of instrument identifiers */
-	do {
-		filt[nfilt].instr = udpc_seria_des_si32(&sctx);
-		filt[nfilt].unit = udpc_seria_des_si32(&sctx);
-		filt[nfilt].pot = udpc_seria_des_si32(&sctx);
-	} while (filt[nfilt].instr != 0 && ++nfilt < countof(filt));
+	while (udpc_seria_des_secu(&filt[nfilt], &sctx) &&
+	       ++nfilt < countof(filt));
 
-	UD_DEBUG("0x4220: ts:%d filtered for %u instrs\n", ts, nfilt);
+	UD_DEBUG("0x4220: ts:%d filtered for %u instrs\n", (int)hdr.ts, nfilt);
 	/* initialise the spit state context */
-	init_spitfire(&sfctx, filt, nfilt, ts);
+	init_spitfire(&sfctx, filt, nfilt, &hdr);
 	copy_pkt(&rplj, j);
 	for (bool moar = true; moar;) {
 		/* prepare the reply packet ... */

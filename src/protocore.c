@@ -433,6 +433,16 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		return len + 11;
 	}
 
+	case UDPC_TYPE_DATA: {
+		const char *s;
+		uint8_t len;
+
+		memcpy(buf, "(DATA)", 6);
+		len = udpc_seria_des_data(sctx, (const void**)&s);
+		len = sprintf(buf + 6, "%u\n", len);
+		return len + 6;
+	}
+
 	case UDPC_TYPE_XDR: {
 		const char *s;
 		size_t len;

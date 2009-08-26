@@ -113,6 +113,7 @@ udpc_seria_des_secu(secu_t t, udpc_seria_t sctx)
 static inline void
 udpc_seria_add_sl1tick(udpc_seria_t sctx, sl1tick_t t)
 {
+#if 0
 	udpc_seria_add_ui32(sctx, (int32_t)t->secu.instr);
 	udpc_seria_add_ui32(sctx, (int32_t)t->secu.unit);
 	udpc_seria_add_ui32(sctx, (int32_t)t->secu.pot);
@@ -120,12 +121,16 @@ udpc_seria_add_sl1tick(udpc_seria_t sctx, sl1tick_t t)
 	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.nsec);
 	udpc_seria_add_byte(sctx, (uint8_t)t->tick.tt);
 	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.value);
+#else
+	udpc_seria_add_data(sctx, t, sizeof(*t));
+#endif
 	return;
 }
 
 static inline bool
 udpc_seria_des_sl1tick(sl1tick_t t, udpc_seria_t sctx)
 {
+#if 0
 	if (!udpc_seria_des_secu(&t->secu, sctx)) {
 		/* the security deserialisation got cunted, fuck off early */
 		return false;
@@ -136,6 +141,9 @@ udpc_seria_des_sl1tick(sl1tick_t t, udpc_seria_t sctx)
 	t->tick.tt = udpc_seria_des_byte(sctx);
 	t->tick.value = udpc_seria_des_ui32(sctx);
 	return true;
+#else
+	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
+#endif
 }
 
 #endif	/* INCLUDED_seria_h_ */

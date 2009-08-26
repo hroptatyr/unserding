@@ -63,6 +63,8 @@
 #define UDPC_TYPE_STR	(UDPC_TYPE_BYTE | UDPC_SEQ_MASK)
 #define UDPC_TYPE_NSTR(_n)	(UDPC_TYPE_BYTE | UDPC_SEQ_MASK), _n
 
+/* for generic data objects */
+#define UDPC_TYPE_DATA	(0x0c)
 /* for XDR objects */
 #define UDPC_TYPE_XDR	(0x0d)
 /* for ASN.1 objects */
@@ -278,6 +280,52 @@ udpc_seria_des_xdr(udpc_seria_t sctx, const void **s)
 	*s = &sctx->msg[sctx->msgoff + XDR_HDR_LEN];
 	sctx->msgoff += XDR_HDR_LEN + len;
 	return len;
+}
+
+/* generic data handling, this is for very small objects,
+ * preferably sans pointers and shite */
+#define DATA_HDR_LEN	(1 + 1)
+static inline void
+udpc_seria_add_data(udpc_seria_t sctx, const void *s, uint8_t len)
+{
+	sctx->msg[sctx->msgoff + 0] = UDPC_TYPE_DATA;
+	sctx->msg[sctx->msgoff + 1] = len;
+	memcpy(&sctx->msg[sctx->msgoff + DATA_HDR_LEN], s, len);
+	sctx->msgoff += DATA_HDR_LEN + len;
+	return;
+}
+
+static inline uint8_t
+udpc_seria_des_data(udpc_seria_t sctx, const void **s)
+{
+	uint8_t len;
+	if (udpc_seria_tag(sctx) != UDPC_TYPE_DATA) {
+		*s = NULL;
+		return 0;
+	}
+	len = (uint8_t)sctx->msg[sctx->msgoff+1];
+	*s = &sctx->msg[sctx->msgoff + DATA_HDR_LEN];
+	sctx->msgoff += DATA_HDR_LEN + len;
+	return len;
+}
+
+#if !defined MIN
+# define MIN(a, b)	a < b ? a : b;
+#endif	/* !MIN */
+
+static inline uint8_t
+udpc_seria_des_data_into(void *s, size_t slen, udpc_seria_t sctx)
+{
+	uint8_t len, cplen;
+
+	if (udpc_seria_tag(sctx) != UDPC_TYPE_DATA) {
+		return 0;
+	}
+	len = (uint8_t)sctx->msg[sctx->msgoff+1];
+	cplen = MIN(slen, len);
+	memcpy(s, &sctx->msg[sctx->msgoff + DATA_HDR_LEN], cplen);
+	sctx->msgoff += DATA_HDR_LEN + len;
+	return cplen;
 }
 
 /* ASN.1 handling */

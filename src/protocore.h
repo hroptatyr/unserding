@@ -203,11 +203,27 @@ udpc_pkt_valid_p(const ud_packet_t pkt)
 {
 	const uint16_t *tmp = (const void*)pkt.pbuf;
 	/* check magic number */
-	if (tmp[3] == UDPC_MAGIC_NUMBER) {
+	if ((tmp[3] & ~1) == (UDPC_MAGIC_NUMBER & ~1)) {
 		return true;
 	}
 	return false;
 }
+
+static inline void __attribute__((always_inline))
+udpc_set_fina_pkt(ud_packet_t p)
+{
+	uint16_t *restrict tmp = (void*)p.pbuf;
+	tmp[3] = UDPC_MAGIC_NUMBER & ~1;
+	return;
+}	
+
+static inline void __attribute__((always_inline))
+udpc_set_frag_pkt(ud_packet_t p)
+{
+	uint16_t *restrict tmp = (void*)p.pbuf;
+	tmp[3] = UDPC_MAGIC_NUMBER | 1;
+	return;
+}	
 
 static inline bool __attribute__((always_inline))
 udpc_pkt_for_us_p(const ud_packet_t pkt, ud_convo_t cno)
@@ -232,7 +248,7 @@ udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t cmd)
 	memset(p.pbuf, 0, UDPC_PKTLEN);
 	tm2[0] = htonl(__interleave_cno_pno(cno, pno));
 	tmp[2] = htons(cmd);
-	tmp[3] = UDPC_MAGIC_NUMBER;
+	udpc_set_fina_pkt(p);
 	return;
 }
 
@@ -269,7 +285,7 @@ udpc_make_rpl_pkt(ud_packet_t p)
 	/* construct the reply packet type */
 	tmp[2] = udpc_reply_cmd_ns(tmp[2]);
 	/* voodoo */
-	tmp[3] = UDPC_MAGIC_NUMBER;
+	udpc_set_fina_pkt(p);
 	return;
 }
 

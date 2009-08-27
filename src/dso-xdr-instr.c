@@ -536,7 +536,7 @@ instr_tick_svc(job_t j)
 		clear_pkt(&rplsctx, &rplj);
 		/* serialise some ticks */
 		if ((moar = spitfire(&sfctx, &rplsctx))) {
-			udpc_set_frag_pkt(JOB_PACKET(&rplj));
+			udpc_set_immed_frag_pkt(JOB_PACKET(&rplj));
 		}
 		/* send what we've got */
 		send_pkt(&rplsctx, &rplj);

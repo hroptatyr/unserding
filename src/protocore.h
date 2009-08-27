@@ -57,13 +57,18 @@
  * requesting command (c2s) is even, the corresponding reply (if existent)
  * is then odd (LOR'd with 0x0001).
  *
+ * As of more recent versions the magic number is used to transfer some
+ * flags and simple flow control messages:
+ * - 0xbeef denotes the last packet in a packet storm, ETA immediate
+ * - 0xbeee denotes one packet in a packet storm, ETA immediate
+ * - 0xcaff denotes a packet storm with exactly one packet to arrive soon
+ * - 0xcafe denotes a packet storm with possibly many packets soon to arrive
+ *
  ***/
 
 #if !defined htons || !defined ntohs
 # error "Cannot find htons()/ntohs()"
 #endif	/* !htons || !ntohs */
-
-#define UDPC_MAGIC_NUMBER	(uint16_t)(htons(0xbeef))
 
 /* should be computed somehow using the (p)mtu of the nic */
 #define UDPC_PKTLEN		1280
@@ -72,6 +77,64 @@
 #define UDPC_PLLEN		(UDPC_PKTLEN - UDPC_HDRLEN)
 
 typedef uint8_t udpc_type_t;
+
+
+/* packet flags */
+typedef enum udpc_pktstorminess_e udpc_pktstorminess_t;
+
+/** pkt storminess: one pkt, delivery: now */
+#define UDPC_PKTFLO_NOW_ONE	((uint16_t)0xbeef)
+/** pkt storminess: many pkts, delivery: now */
+#define UDPC_PKTFLO_NOW_MANY	((uint16_t)0xbeee)
+/** pkt storminess: one pkt, delivery: soon */
+#define UDPC_PKTFLO_SOON_ONE	((uint16_t)0xcaff)
+/** pkt storminess: many pkts, delivery: soon */
+#define UDPC_PKTFLO_SOON_MANY	((uint16_t)0xcafe)
+
+enum udpc_pktstorminess_e {
+	UDPC_PKTSTORMINESS_UNK,
+	UDPC_PKTSTORMINESS_ONE,
+	UDPC_PKTSTORMINESS_MANY,
+};
+
+static inline uint16_t
+udpc_pkt_flags(const ud_packet_t pkt)
+{
+	const uint16_t *tmp = (const void*)pkt.pbuf;
+	return ntohs(tmp[3]);
+}
+
+static inline void
+udpc_pkt_set_flags(ud_packet_t pkt, uint16_t flags)
+{
+	uint16_t *tmp = (void*)pkt.pbuf;
+	tmp[3] = htons(flags);
+	return;
+}
+
+/**
+ * Return true if PKT seems a valid unserding packet. */
+static inline bool
+udpc_pkt_valid_p(const ud_packet_t pkt)
+{
+	/* be trivial for now */
+	return true;
+}
+
+static inline udpc_pktstorminess_t
+udpc_pktstorminess(ud_packet_t p)
+{
+	switch (udpc_pkt_flags(p)) {
+	case UDPC_PKTFLO_NOW_ONE:
+	case UDPC_PKTFLO_SOON_ONE:
+		return UDPC_PKTSTORMINESS_ONE;
+	case UDPC_PKTFLO_NOW_MANY:
+	case UDPC_PKTFLO_SOON_MANY:
+		return UDPC_PKTSTORMINESS_MANY;
+	default:
+		return UDPC_PKTSTORMINESS_UNK;
+	}
+}
 
 /* our types and some serialisation protos */
 #include "seria.h"
@@ -139,10 +202,6 @@ extern void send_m6(job_t);
 extern void send_cl(job_t);
 
 /**
- * Return true if PKT is a valid unserding packet. */
-static inline bool __attribute__((always_inline))
-udpc_pkt_valid_p(const ud_packet_t pkt);
-/**
  * Return true if the packet PKT is meant for us,
  * that is the conversation ids coincide. */
 static inline bool __attribute__((always_inline))
@@ -198,36 +257,31 @@ udpc_reply_cmd_ns(ud_pkt_cmd_t cmd);
 
 
 /* inlines */
-static inline uint16_t
-udpc_pkt_magic(const ud_packet_t pkt)
-{
-	const uint16_t *tmp = (const void*)pkt.pbuf;
-	return tmp[3];
-}
-
-static inline bool __attribute__((always_inline))
-udpc_pkt_valid_p(const ud_packet_t pkt)
-{
-	/* check magic number */
-	if ((udpc_pkt_magic(pkt) & ~1) == (UDPC_MAGIC_NUMBER & ~1)) {
-		return true;
-	}
-	return false;
-}
-
 static inline void __attribute__((always_inline))
-udpc_set_fina_pkt(ud_packet_t p)
+udpc_set_immed_fina_pkt(ud_packet_t p)
 {
-	uint16_t *restrict tmp = (void*)p.pbuf;
-	tmp[3] = UDPC_MAGIC_NUMBER & ~1;
+	udpc_pkt_set_flags(p, UDPC_PKTFLO_NOW_ONE);
 	return;
 }	
 
 static inline void __attribute__((always_inline))
-udpc_set_frag_pkt(ud_packet_t p)
+udpc_set_immed_frag_pkt(ud_packet_t p)
 {
-	uint16_t *restrict tmp = (void*)p.pbuf;
-	tmp[3] = UDPC_MAGIC_NUMBER | 1;
+	udpc_pkt_set_flags(p, UDPC_PKTFLO_NOW_MANY);
+	return;
+}	
+
+static inline void __attribute__((always_inline))
+udpc_set_defer_fina_pkt(ud_packet_t p)
+{
+	udpc_pkt_set_flags(p, UDPC_PKTFLO_SOON_ONE);
+	return;
+}	
+
+static inline void __attribute__((always_inline))
+udpc_set_defer_frag_pkt(ud_packet_t p)
+{
+	udpc_pkt_set_flags(p, UDPC_PKTFLO_SOON_MANY);
 	return;
 }	
 
@@ -254,7 +308,8 @@ udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t cmd)
 	memset(p.pbuf, 0, UDPC_PKTLEN);
 	tm2[0] = htonl(__interleave_cno_pno(cno, pno));
 	tmp[2] = htons(cmd);
-	udpc_set_fina_pkt(p);
+	/* just to have a default */
+	udpc_set_immed_fina_pkt(p);
 	return;
 }
 
@@ -290,8 +345,8 @@ udpc_make_rpl_pkt(ud_packet_t p)
 	tm2[0] = htonl(all+1);
 	/* construct the reply packet type */
 	tmp[2] = udpc_reply_cmd_ns(tmp[2]);
-	/* voodoo */
-	udpc_set_fina_pkt(p);
+	/* just to have a default */
+	udpc_set_immed_fina_pkt(p);
 	return;
 }
 

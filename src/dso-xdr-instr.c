@@ -478,14 +478,13 @@ spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
 	       sctx->msgoff < sctx->len - /*yuck*/7*8) {
 		secu_t s = &sfctx->secu[sfctx->idx];
 
-		if ((1 << (t.tick.tt = PFTT_EOD)) & sfctx->types) {
-			t.secu.instr = s->instr;
-			t.secu.unit = s->unit ? s->unit : 73380;
-			t.secu.pot = s->pot ? s->pot : 4;
+		if ((1 << (PFTT_EOD))/* bollocks */ & sfctx->types) {
+			gaid_t i = s->instr;
+			gaid_t u = s->unit ? s->unit : 73380;
+			gaid_t p = s->pot ? s->pot : 4;
 
-			t.tick.ts = sfctx->ts;
-			t.tick.nsec = 0;
-			t.tick.value = 10000;
+			fill_sl1tick_shdr(&t, i, u, p);
+			fill_sl1tick_tick(&t, sfctx->ts, 0, PFTT_EOD, 10000);
 			udpc_seria_add_sl1tick(sctx, &t);
 		}
 		sfctx->idx += (trick ^= 1);

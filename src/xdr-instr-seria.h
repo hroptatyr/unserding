@@ -53,10 +53,24 @@
  * -
  **/
 
-typedef struct sl1tick_s *sl1tick_t;
+/* points to the tick-type of the day */
+#define sl1tick_s		sl1tp_s
+#define sl1tick_t		sl1tp_t
+#define fill_sl1tick_shdr	fill_sl1tp_shdr
+#define fill_sl1tick_tick	fill_sl1tp_tick
+#define sl1tick_value		sl1tp_value
+#define sl1tick_tick_type	sl1tp_tt
+#define sl1tick_timestamp	sl1tp_ts
+#define sl1tick_msec		sl1tp_msec
+#define sl1tick_instr		sl1tp_inst
+#define sl1tick_unit		sl1tp_unit
+#define sl1tick_pot		sl1tp_exch
+
 typedef struct secu_s *secu_t;
 typedef struct tick_by_ts_hdr_s *tick_by_ts_hdr_t;
 typedef struct tick_by_instr_hdr_s *tick_by_instr_hdr_t;
+typedef struct sl1tp_s *sl1tp_t;
+typedef struct sl1t_s *sl1t_t;
 
 struct tick_by_ts_hdr_s {
 	time_t ts;
@@ -74,7 +88,7 @@ struct secu_s {
 	gaid_t pot;
 };
 
-struct sl1tick_s {
+struct sl1t_s {
 	struct secu_s secu;
 	struct l1tick_s tick;
 };
@@ -130,7 +144,7 @@ struct dl1tp_s {
 struct sl1tp_s {
 	struct l1t_shdr_s shdr;
 	/* actually a union of l1t_auxinfo_t and this */
-	struct dl1tp_s l1t;
+	struct dl1tp_s tick;
 };
 
 
@@ -163,6 +177,87 @@ static inline uint8_t
 l1t_auxinfo_tt(l1t_auxinfo_t ai)
 {
 	return (ai & 0x3f);
+}
+
+/* the sl1tp packed tick, consumes 12 or 20 bytes */
+static inline void
+fill_sl1tp_shdr(sl1tp_t l1t, gaid_t secu, gaid_t fund, gaid_t exch)
+{
+	l1t->shdr.inst = secu;
+	l1t->shdr.unit = fund;
+	l1t->shdr.exch = exch;
+	return;
+}
+
+static inline void
+fill_sl1tp_tick(sl1tp_t l1t, time_t ts, uint16_t msec, uint8_t tt, uint32_t v)
+{
+	l1t->tick.auxinfo = l1t_auxinfo(msec, tt);
+	l1t->tick.ts = ts;
+	l1t->tick.val = v;
+	return;
+}
+
+static inline uint32_t
+sl1tp_value(sl1tp_t t)
+{
+	return t->tick.val;
+}
+
+static inline uint8_t
+sl1tp_tt(sl1tp_t t)
+{
+	return l1t_auxinfo_tt(t->tick.auxinfo);
+}
+
+static inline uint16_t
+sl1tp_msec(sl1tp_t t)
+{
+	return l1t_auxinfo_msec(t->tick.auxinfo);
+}
+
+static inline uint32_t
+sl1tp_ts(sl1tp_t t)
+{
+	return t->tick.ts;
+}
+
+static inline uint32_t
+sl1tp_inst(sl1tp_t t)
+{
+	return t->shdr.inst;
+}
+
+static inline uint32_t
+sl1tp_unit(sl1tp_t t)
+{
+	return t->shdr.unit;
+}
+
+static inline uint16_t
+sl1tp_exch(sl1tp_t t)
+{
+	return t->shdr.exch;
+}
+
+/* them old sl1t ticks, consumes 28 bytes */
+static inline void
+fill_sl1t_secu(sl1t_t l1t, gaid_t secu, gaid_t fund, gaid_t exch)
+{
+	l1t->secu.instr = secu;
+	l1t->secu.unit = fund;
+	l1t->secu.pot = exch;
+	return;
+}
+
+static inline void
+fill_sl1t_tick(sl1t_t l1t, time_t ts, uint16_t msec, uint8_t tt, uint32_t v)
+{
+	l1t->tick.ts = ts;
+	l1t->tick.nsec = msec * 1000000;
+	l1t->tick.tt = tt;
+	l1t->tick.value = v;
+	return;
 }
 
 
@@ -209,37 +304,14 @@ udpc_seria_des_secu(secu_t t, udpc_seria_t sctx)
 static inline void
 udpc_seria_add_sl1tick(udpc_seria_t sctx, sl1tick_t t)
 {
-#if 0
-	udpc_seria_add_ui32(sctx, (int32_t)t->secu.instr);
-	udpc_seria_add_ui32(sctx, (int32_t)t->secu.unit);
-	udpc_seria_add_ui32(sctx, (int32_t)t->secu.pot);
-	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.ts);
-	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.nsec);
-	udpc_seria_add_byte(sctx, (uint8_t)t->tick.tt);
-	udpc_seria_add_ui32(sctx, (uint32_t)t->tick.value);
-#else
 	udpc_seria_add_data(sctx, t, sizeof(*t));
-#endif
 	return;
 }
 
 static inline bool
 udpc_seria_des_sl1tick(sl1tick_t t, udpc_seria_t sctx)
 {
-#if 0
-	if (!udpc_seria_des_secu(&t->secu, sctx)) {
-		/* the security deserialisation got cunted, fuck off early */
-		return false;
-	}
-	/* now the meaningful fields */
-	t->tick.ts = udpc_seria_des_ui32(sctx);
-	t->tick.nsec = udpc_seria_des_ui32(sctx);
-	t->tick.tt = udpc_seria_des_byte(sctx);
-	t->tick.value = udpc_seria_des_ui32(sctx);
-	return true;
-#else
 	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
-#endif
 }
 
 #endif	/* INCLUDED_seria_h_ */

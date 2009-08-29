@@ -43,6 +43,16 @@
 #include <time.h>
 #include "seria.h"
 
+/**
+ * Time series (per instrument) and market snapshots (per point in time)
+ * need the best of both worlds, low latency on the one hand and small
+ * memory footprint on the other, yet allowing for a rich variety of
+ * gatherable information.
+ * Specifically we want to answer questions like:
+ * -
+ * -
+ **/
+
 typedef struct sl1tick_s *sl1tick_t;
 typedef struct secu_s *secu_t;
 typedef struct tick_by_ts_hdr_s *tick_by_ts_hdr_t;
@@ -68,6 +78,92 @@ struct sl1tick_s {
 	struct secu_s secu;
 	struct l1tick_s tick;
 };
+
+/**
+ * Condensed version of:
+ *   // upper 10 bits
+ *   uint10_t millisec_flags;
+ *   // lower 6 bits
+ *   uint6_t tick_type;
+ * where the millisec_flags slot uses the values 0 to 999 if it
+ * is a valid available tick and denotes the milliseconds part
+ * of the timestamp and special values 1000 to 1023 if it's not,
+ * whereby:
+ * - 1023 TICK_NA denotes a tick that is not available, as in it
+ *   is unknown to the system whether or not it exists
+ * - 1022 TICK_NE denotes a tick that is known not to exist
+ * - 1021 TICK_OLD denotes a tick that is too old and hence
+ *   meaningless in the current context
+ * - 1020 TICK_SOON denotes a tick that is known to exist but
+ *   is out of reach at the moment, a packet retransmission will
+ *   be necessary
+ * In either case the actual timestamp and value slot of the tick
+ * structure has become meaningless, therefore it is possible to
+ * transfer even shorter, denser versions of the packet in such
+ * cases, saving 64 bits, at the price of non-uniformity.
+ **/
+typedef uint16_t l1t_auxinfo_t;
+
+#define TICK_NA		((uint16_t)1023)
+#define TICK_NE		((uint16_t)1022)
+#define TICK_OLD	((uint16_t)1021)
+#define TICK_SOON	((uint16_t)1020)
+
+/**
+ * Level 1 tick security header. */
+struct l1t_shdr_s {
+	uint32_t inst;
+	uint32_t unit;
+	uint16_t exch;
+};	
+
+/**
+ * Dense level 1 ticks, packed. */
+struct dl1tp_s {
+	l1t_auxinfo_t auxinfo;
+	uint32_t ts;
+	uint32_t val;
+};
+
+/**
+ * Sparse level 1 ticks, packed. */
+struct sl1tp_s {
+	struct l1t_shdr_s shdr;
+	/* actually a union of l1t_auxinfo_t and this */
+	struct dl1tp_s l1t;
+};
+
+
+/* type (de)muxers */
+static inline l1t_auxinfo_t
+l1t_auxinfo(uint16_t msec, uint8_t tt)
+{
+	return (msec << 6) | (tt & 0x3f);
+}
+
+static inline l1t_auxinfo_t
+l1t_auxinfo_set_msec(l1t_auxinfo_t src, uint16_t msec)
+{
+	return (src & 0x3f) | (msec << 6);
+}
+
+static inline l1t_auxinfo_t
+l1t_auxinfo_set_tt(l1t_auxinfo_t src, uint8_t tt)
+{
+	return (src & 0xffc0) | (tt & 0x3f);
+}
+
+static inline uint16_t
+l1t_auxinfo_msec(l1t_auxinfo_t ai)
+{
+	return (ai >> 6);
+}
+
+static inline uint8_t
+l1t_auxinfo_tt(l1t_auxinfo_t ai)
+{
+	return (ai & 0x3f);
+}
 
 
 /* (de)serialisers */

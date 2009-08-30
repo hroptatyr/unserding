@@ -106,9 +106,8 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 	if (UNLIKELY((len = pkt.plen) == 0)) {
 		return 0;
 	}
-	len -= UDPC_HDRLEN;
-	memcpy(tgt, buf, len);
-	return len;
+	memcpy(tgt, UDPC_PAYLOAD(pkt.pbuf), len - UDPC_HDRLEN);
+	return len - UDPC_HDRLEN;
 }
 
 /* libhelpers.c ends here */

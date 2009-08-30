@@ -85,7 +85,7 @@ unsercli-scanner.h: scanner.l
 #	fi
 
 ## the lib
-libunserding_la_SOURCES = libstuff.c protocore.c
+libunserding_la_SOURCES = libstuff.c protocore.c libhelpers.c
 libunserding_la_CPPFLAGS = -DUNSERLIB
 libunserding_la_LDFLAGS = $(AM_LDFLAGS)
 

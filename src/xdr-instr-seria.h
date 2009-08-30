@@ -41,7 +41,32 @@
 #include <stdbool.h>
 #include <pfack/tick.h>
 #include <time.h>
+#include "unserding.h"
+#include "protocore.h"
 #include "seria.h"
+
+/**
+ * Service 421a:
+ * Get instrument definitions.
+ * sig: 421a((si32 gaid)*)
+ *   Returns the instruments whose ids match the given ones.  In the
+ *   special case that no id is given, all instruments are dumped.
+ **/
+#define UD_SVC_INSTR_BY_ATTR	0x421a
+
+/**
+ * Service 4220:
+ * Find ticks of one time stamp over instruments (market snapshot).
+ * This service can be used to get a succinct set of ticks, usually the
+ * last ticks before a given time stamp, for several instruments.
+ * The ticks to return can be specified in a bitset.
+ *
+ * sig: 4220(ui32 ts, ui32 types, (ui32 secu, ui32 fund, ui32 exch)+)
+ *   As a wildcard for all funds or all exchanges 0x00000000 can be used.
+ *
+ * The TYPES parameter is a bitset made up of PFTB_* values as specified
+ * in pfack/tick.h */
+#define UD_SVC_TICK_BY_TS	0x4220
 
 /**
  * Time series (per instrument) and market snapshots (per point in time)
@@ -78,14 +103,14 @@ struct tick_by_ts_hdr_s {
 };
 
 struct tick_by_instr_hdr_s {
-	gaid_t instr;
+	uint32_t instr;
 	uint32_t types;
 };
 
 struct secu_s {
-	gaid_t instr;
-	gaid_t unit;
-	gaid_t pot;
+	uint32_t instr;
+	uint32_t unit;
+	uint16_t pot;
 };
 
 struct sl1t_s {
@@ -136,6 +161,34 @@ struct sl1tp_s {
 };
 
 
+/* helper funs, to simplify the unserding access */
+/**
+ * Deliver the guts of the instrument specified by CONT_ID via XDR.
+ * \param hdl the unserding handle to use
+ * \param tgt a buffer that the XDR encoded instrument is banged into,
+ *   reserve at least UDPC_PLLEN bytes
+ * \param inst_id the GA instrument identifier
+ * \return the number of bytes copied into TGT.
+ * The instrument is delivered in encoded form and can be decoded
+ * with libpfack's deser_instrument().
+ **/
+extern size_t
+ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t inst_id);
+
+/**
+ * Deliver a tick packet for S at TS.
+ * \param hdl the unserding handle to use
+ * \param tgt a buffer that holds the tick packet, should be at least
+ *   UDPC_PLLEN bytes long
+ * \param s the security to look up
+ * \param bs a bitset to filter for ticks
+ * \param ts the timestamp at which S shall be valuated
+ * \return the length of the tick packet
+ **/
+extern size_t
+ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
+
+
 /* type (de)muxers */
 static inline l1t_auxinfo_t
 l1t_auxinfo(uint16_t msec, uint8_t tt)
@@ -169,7 +222,7 @@ l1t_auxinfo_tt(l1t_auxinfo_t ai)
 
 /* the sl1tp packed tick, consumes 12 or 20 bytes */
 static inline void
-fill_sl1tp_shdr(sl1tp_t l1t, gaid_t secu, gaid_t fund, gaid_t exch)
+fill_sl1tp_shdr(sl1tp_t l1t, uint32_t secu, uint32_t fund, uint16_t exch)
 {
 	l1t->inst = secu;
 	l1t->unit = fund;
@@ -230,7 +283,7 @@ sl1tp_exch(sl1tp_t t)
 
 /* them old sl1t ticks, consumes 28 bytes */
 static inline void
-fill_sl1t_secu(sl1t_t l1t, gaid_t secu, gaid_t fund, gaid_t exch)
+fill_sl1t_secu(sl1t_t l1t, uint32_t secu, uint32_t fund, uint16_t exch)
 {
 	l1t->secu.instr = secu;
 	l1t->secu.unit = fund;

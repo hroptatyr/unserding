@@ -66,29 +66,6 @@
 #define UD_SVC_INSTR_FROM_FILE	0x4218
 
 /**
- * Service 421a:
- * Get instrument definitions.
- * sig: 421a((si32 gaid)*)
- *   Returns the instruments whose ids match the given ones.  In the
- *   special case that no id is given, all instruments are dumped.
- **/
-#define UD_SVC_INSTR_BY_ATTR	0x421a
-
-/**
- * Service 4220:
- * Find ticks of one time stamp over instruments (market snapshot).
- * This service can be used to get a succinct set of ticks, usually the
- * last ticks before a given time stamp, for several instruments.
- * The ticks to return can be specified in a bitset.
- *
- * sig: 4220(ui32 ts, ui32 types, (ui32 secu, ui32 fund, ui32 exch)+)
- *   As a wildcard for all funds or all exchanges 0x00000000 can be used.
- *
- * The TYPES parameter is a bitset made up of PFTB_* values as specified
- * in pfack/tick.h */
-#define UD_SVC_TICK_BY_TS	0x4220
-
-/**
  * Service 4222:
  * Find ticks of one instrument over time (time series).
  * This service can be used if the focus is one particular instrument

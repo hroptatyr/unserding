@@ -124,27 +124,15 @@ typedef uint16_t l1t_auxinfo_t;
 #define TICK_SOON	((uint16_t)1020)
 
 /**
- * Level 1 tick security header. */
-struct l1t_shdr_s {
+ * Sparse level 1 ticks, packed. */
+struct sl1tp_s {
 	uint32_t inst;
 	uint32_t unit;
 	uint16_t exch;
-};	
-
-/**
- * Dense level 1 ticks, packed. */
-struct dl1tp_s {
 	l1t_auxinfo_t auxinfo;
+	/* these are actually optional */
 	uint32_t ts;
 	uint32_t val;
-};
-
-/**
- * Sparse level 1 ticks, packed. */
-struct sl1tp_s {
-	struct l1t_shdr_s shdr;
-	/* actually a union of l1t_auxinfo_t and this */
-	struct dl1tp_s tick;
 };
 
 
@@ -183,61 +171,61 @@ l1t_auxinfo_tt(l1t_auxinfo_t ai)
 static inline void
 fill_sl1tp_shdr(sl1tp_t l1t, gaid_t secu, gaid_t fund, gaid_t exch)
 {
-	l1t->shdr.inst = secu;
-	l1t->shdr.unit = fund;
-	l1t->shdr.exch = exch;
+	l1t->inst = secu;
+	l1t->unit = fund;
+	l1t->exch = exch;
 	return;
 }
 
 static inline void
 fill_sl1tp_tick(sl1tp_t l1t, time_t ts, uint16_t msec, uint8_t tt, uint32_t v)
 {
-	l1t->tick.auxinfo = l1t_auxinfo(msec, tt);
-	l1t->tick.ts = ts;
-	l1t->tick.val = v;
+	l1t->auxinfo = l1t_auxinfo(msec, tt);
+	l1t->ts = ts;
+	l1t->val = v;
 	return;
 }
 
 static inline uint32_t
 sl1tp_value(sl1tp_t t)
 {
-	return t->tick.val;
+	return t->val;
 }
 
 static inline uint8_t
 sl1tp_tt(sl1tp_t t)
 {
-	return l1t_auxinfo_tt(t->tick.auxinfo);
+	return l1t_auxinfo_tt(t->auxinfo);
 }
 
 static inline uint16_t
 sl1tp_msec(sl1tp_t t)
 {
-	return l1t_auxinfo_msec(t->tick.auxinfo);
+	return l1t_auxinfo_msec(t->auxinfo);
 }
 
 static inline uint32_t
 sl1tp_ts(sl1tp_t t)
 {
-	return t->tick.ts;
+	return t->ts;
 }
 
 static inline uint32_t
 sl1tp_inst(sl1tp_t t)
 {
-	return t->shdr.inst;
+	return t->inst;
 }
 
 static inline uint32_t
 sl1tp_unit(sl1tp_t t)
 {
-	return t->shdr.unit;
+	return t->unit;
 }
 
 static inline uint16_t
 sl1tp_exch(sl1tp_t t)
 {
-	return t->shdr.exch;
+	return t->exch;
 }
 
 /* them old sl1t ticks, consumes 28 bytes */

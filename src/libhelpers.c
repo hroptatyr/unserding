@@ -82,6 +82,39 @@ ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
 }
 
 size_t
+ud_find_many_instrs(
+	ud_handle_t hdl, void(*cb)(char *restrict tgt, void *clo), void *clo,
+	uint32_t cont_id[], size_t len)
+{
+	struct udpc_seria_s sctx;
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
+	ud_convo_t cno = hdl->convo++;
+	size_t res;
+	char *out = NULL;
+
+	memset(buf, 0, sizeof(buf));
+	udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	for (size_t i = 0; i < len; i++) {
+		udpc_seria_add_si32(&sctx, cont_id[i]);
+	}
+	/* prepare packet for sending im off */
+	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+	ud_send_raw(hdl, pkt);
+
+	pkt.plen = sizeof(buf);
+	ud_recv_convo(hdl, &pkt, UD_SVC_TIMEOUT, cno);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
+	if ((res = udpc_seria_des_xdr(&sctx, (void*)&out)) > 0) {
+		cb(out, clo);
+	}
+	return res;
+}
+
+
+/* tick finders */
+size_t
 ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 {
 	struct udpc_seria_s sctx;

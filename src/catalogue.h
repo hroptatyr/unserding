@@ -47,9 +47,30 @@
  * The catalogue data type, just a husk. */
 typedef void *cat_t;
 
+/**
+ * Just a reverse lookup structure. */
 struct keyval_s {
 	gaid_t key;
 	uint32_t val;
+};
+
+/**
+ * Annotation structure for annotated instruments. */
+struct anno_s {
+	const char *tbl_name;
+	time_t from;
+	time_t to;
+};
+
+/**
+ * Use annotated instruments, this is the class to do so.  Actually,
+ * libpfack provides this already in form of URNs, however we are
+ * not overly certain of how the API shall look like.
+ * To get ahead, we just store the one resource we're interested in
+ * directly. */
+struct anno_instr_s {
+	struct instr_s instr;
+	struct anno_s anno;
 };
 
 /**
@@ -58,7 +79,7 @@ struct keyval_s {
 struct cat_s {
 	size_t ninstrs;
 	size_t alloc_sz;
-	struct instr_s *instrs;
+	struct anno_instr_s *instrs;
 	struct keyval_s *keys;
 	pthread_mutex_t mtx;
 };
@@ -67,7 +88,6 @@ extern cat_t make_cat(void);
 extern void free_cat(cat_t cat);
 
 extern size_t cat_size(cat_t cat);
-extern void cat_add_instr(cat_t cat, instr_t i);
 
 extern instr_t cat_obtain_instr(cat_t cat);
 /**

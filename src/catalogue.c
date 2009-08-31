@@ -56,6 +56,7 @@
 #define INITIAL_SIZE	8192
 
 typedef struct cat_s *_cat_t;
+typedef struct anno_instr_s *anno_instr_t;
 
 #define AS_CAT(x)	((_cat_t)(x))
 #define xnew(x)		(malloc(sizeof(x)))
@@ -74,11 +75,11 @@ name_equal_p(const char *n1, const char *n2)
 	return strncmp(n1, n2, sizeof(INSTR_NAME_SZ)) == 0;
 }
 
-static inline instr_t
+static inline anno_instr_t
 cat_instr(cat_t cat, index_t i)
 {
 	_cat_t c = cat;
-	instr_t instrs = c->instrs;
+	anno_instr_t instrs = c->instrs;
 	return &instrs[i];
 }
 
@@ -202,14 +203,14 @@ __by_gaid_nolock(_cat_t c, gaid_t gaid)
 		/* amazing, never seen this instr */
 		return NULL;
 	}
-	return cat_instr(c, s);
+	return (void*)cat_instr(c, s);
 }
 
 static inline instr_t
 __by_name_nolock(_cat_t c, const char *name)
 {
 	for (index_t i = 0; i < c->ninstrs; i++) {
-		instr_t this_instr = cat_instr(c, i);
+		instr_t this_instr = (void*)cat_instr(c, i);
 		ident_t this_ident = instr_ident(this_instr);
 		if (ident_name(this_ident)[0] != '\0' &&
 		    name_equal_p(ident_name(this_ident), name)) {
@@ -251,12 +252,6 @@ free_cat(cat_t cat)
 }
 
 /* modifiers */
-void
-cat_add_instr(cat_t cat, instr_t instr)
-{
-	return;
-}
-
 size_t
 cat_size(cat_t cat)
 {
@@ -296,7 +291,7 @@ cat_obtain_instr(cat_t cat)
 
 	pthread_mutex_lock(&c->mtx);
 	check_resize(c);
-	res = cat_instr(c, c->ninstrs++);
+	res = (void*)cat_instr(c, c->ninstrs++);
 	pthread_mutex_unlock(&c->mtx);
 	return res;
 }
@@ -315,14 +310,14 @@ cat_bang_instr(cat_t cat, instr_t i)
 	(void)check_resize(c);
 	ks = slot(c->keys, c->alloc_sz, gaid);
 	if (UNLIKELY(c->keys[ks].key != 0)) {
-		res = cat_instr(c, c->keys[ks].val);
+		res = (void*)cat_instr(c, c->keys[ks].val);
 		pthread_mutex_unlock(&c->mtx);
 		return res;
 	}
 	is = c->ninstrs++;
 	c->keys[ks].key = gaid;
 	c->keys[ks].val = is;
-	res = cat_instr(c, is);
+	res = (void*)cat_instr(c, is);
 	memcpy(res, i, sizeof(*i));
 	pthread_mutex_unlock(&c->mtx);
 	return res;
@@ -341,7 +336,7 @@ find_instr_by_gaid(cat_t cat, gaid_t gaid)
 		res = NULL;
 	} else if (LIKELY(c->keys[ks].key != 0)) {
 		uint32_t is = c->keys[ks].val;
-		res = cat_instr(c, is);
+		res = (void*)cat_instr(c, is);
 	} else {
 		res = NULL;
 	}

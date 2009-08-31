@@ -57,6 +57,7 @@
 #include <pfack/instruments.h>
 #include "catalogue.h"
 #include "xdr-instr-seria.h"
+#include "xdr-instr-private.h"
 
 /**
  * Service 4218:
@@ -98,7 +99,7 @@
 #define q32_t	quantity32_t
 
 /* our local catalogue */
-static cat_t instrs;
+cat_t instrs;
 
 
 /* aux */
@@ -213,15 +214,6 @@ instr_add_svc(job_t j)
 	return;
 }
 
-static inline void
-hrclock_print(void)
-{
-	struct timespec tsp;
-	clock_gettime(CLOCK_REALTIME, &tsp);
-	fprintf(stderr, "%lu.%09u", tsp.tv_sec, (unsigned int)tsp.tv_nsec);
-	return;
-}
-
 static void
 instr_add_from_file_svc(job_t j)
 {
@@ -315,38 +307,6 @@ instr_dump_all(job_t j)
 
 /* one-at-a-time dispatchers */
 static inline void
-clear_pkt(udpc_seria_t sctx, job_t rplj)
-{
-	memset(UDPC_PAYLOAD(rplj->buf), 0, UDPC_PLLEN);
-	udpc_make_rpl_pkt(JOB_PACKET(rplj));
-	udpc_seria_init(sctx, UDPC_PAYLOAD(rplj->buf), UDPC_PLLEN);
-	return;
-}
-
-static inline void
-copy_pkt(job_t tgtj, job_t srcj)
-{
-	memcpy(tgtj, srcj, sizeof(*tgtj));
-	return;
-}
-
-static inline void
-prep_pkt(udpc_seria_t sctx, job_t rplj, job_t srcj)
-{
-	copy_pkt(rplj, srcj);
-	clear_pkt(sctx, rplj);
-	return;
-}
-
-static inline void
-send_pkt(udpc_seria_t sctx, job_t j)
-{
-	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
-	send_cl(j);
-	return;
-}
-
-static inline void
 __seria_instr(udpc_seria_t sctx, instr_t in)
 {
 /* IN is guaranteed to be non-NULL */
@@ -425,102 +385,6 @@ instr_dump_to_file_svc(job_t j)
 }
 
 
-/* tick services */
-#define index_t	size_t
-typedef struct spitfire_ctx_s *spitfire_ctx_t;
-typedef enum spitfire_res_e spitfire_res_t;
-
-struct spitfire_ctx_s {
-	secu_t secu;
-	size_t slen;
-	index_t idx;
-	time_t ts;
-	uint32_t types;
-};
-
-enum spitfire_res_e {
-	NO_TICKS,
-	OUT_OF_SPACE,
-	OUT_OF_TICKS,
-};
-
-static spitfire_res_t
-spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
-{
-	struct sl1tick_s t;
-	size_t trick = 1;
-
-	/* start out with one tick per instr */
-	while (sfctx->idx < sfctx->slen &&
-	       sctx->msgoff < sctx->len - /*yuck*/7*8) {
-		secu_t s = &sfctx->secu[sfctx->idx];
-
-		if ((1 << (PFTT_EOD))/* bollocks */ & sfctx->types) {
-			gaid_t i = s->instr;
-			gaid_t u = s->unit ? s->unit : 73380;
-			gaid_t p = s->pot ? s->pot : 4;
-
-			fill_sl1tick_shdr(&t, i, u, p);
-			fill_sl1tick_tick(&t, sfctx->ts, 0, PFTT_EOD, 10000);
-			udpc_seria_add_sl1tick(sctx, &t);
-		}
-		sfctx->idx += (trick ^= 1);
-	}
-	/* return false if this packet is meant to be the last one */
-	return sfctx->idx < sfctx->slen;
-}
-
-static void
-init_spitfire(spitfire_ctx_t ctx, secu_t secu, size_t slen, tick_by_ts_hdr_t t)
-{
-	ctx->secu = secu;
-	ctx->slen = slen;
-	ctx->idx = 0;
-	ctx->ts = t->ts;
-	ctx->types = t->types;
-	return;
-}
-
-static void
-instr_tick_svc(job_t j)
-{
-	struct udpc_seria_s sctx;
-	struct udpc_seria_s rplsctx;
-	struct job_s rplj;
-	/* in args */
-	struct tick_by_ts_hdr_s hdr;
-	/* allow to filter for 64 instruments at once */
-	struct secu_s filt[64];
-	unsigned int nfilt = 0;
-	struct spitfire_ctx_s sfctx;
-
-	/* prepare the iterator for the incoming packet */
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	/* read the header off of the wire */
-	udpc_seria_des_tick_by_ts_hdr(&hdr, &sctx);
-
-	/* triples of instrument identifiers */
-	while (udpc_seria_des_secu(&filt[nfilt], &sctx) &&
-	       ++nfilt < countof(filt));
-
-	UD_DEBUG("0x4220: ts:%d filtered for %u instrs\n", (int)hdr.ts, nfilt);
-	/* initialise the spit state context */
-	init_spitfire(&sfctx, filt, nfilt, &hdr);
-	copy_pkt(&rplj, j);
-	for (bool moar = true; moar;) {
-		/* prepare the reply packet ... */
-		clear_pkt(&rplsctx, &rplj);
-		/* serialise some ticks */
-		if ((moar = spitfire(&sfctx, &rplsctx))) {
-			udpc_set_immed_frag_pkt(JOB_PACKET(&rplj));
-		}
-		/* send what we've got */
-		send_pkt(&rplsctx, &rplj);
-	}
-	return;
-}
-
-
 #include <ev.h>
 
 static ev_idle __attribute__((aligned(16))) __widle;
@@ -577,12 +441,12 @@ deferred_dl(EV_P_ ev_idle *w, int revents)
 }
 
 void
-init(void *clo)
+dso_xdr_instr_LTX_init(void *clo)
 {
 	ud_ctx_t ctx = clo;
 	ev_idle *widle = &__widle;
 
-	UD_DEBUG("mod/asn1-instr: loading ...");
+	UD_DEBUG("mod/xdr-instr: loading ...");
 	/* create the catalogue */
 	instrs = make_cat();
 	/* lodging our bbdb search service */
@@ -590,14 +454,15 @@ init(void *clo)
 	ud_set_service(UD_SVC_INSTR_FROM_FILE, instr_add_from_file_svc, NULL);
 	ud_set_service(UD_SVC_INSTR_BY_ATTR, instr_dump_svc, instr_add_svc);
 	ud_set_service(0x421c, instr_dump_to_file_svc, NULL);
-	/* tick service */
-	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("deploying idle bomb ...");
 	ev_idle_init(widle, deferred_dl);
 	ev_idle_start(ctx->mainloop, widle);
 	UD_DBGCONT("done\n");
+
+	/* load the ticks service */
+	dso_xdr_instr_ticks_LTX_init(clo);
 	return;
 }
 

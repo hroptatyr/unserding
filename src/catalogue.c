@@ -56,7 +56,6 @@
 #define INITIAL_SIZE	8192
 
 typedef struct cat_s *_cat_t;
-typedef struct anno_instr_s *anno_instr_t;
 
 #define AS_CAT(x)	((_cat_t)(x))
 #define xnew(x)		(malloc(sizeof(x)))
@@ -279,21 +278,6 @@ check_resize(_cat_t c)
 	}
 	/* not resized, all slots should be intact */
 	return false;
-}
-
-/* doesnt work well with the keys schema we invented */
-instr_t
-cat_obtain_instr(cat_t cat)
-{
-/* returns the next available instrument */
-	_cat_t c = cat;
-	instr_t res;
-
-	pthread_mutex_lock(&c->mtx);
-	check_resize(c);
-	res = (void*)cat_instr(c, c->ninstrs++);
-	pthread_mutex_unlock(&c->mtx);
-	return res;
 }
 
 instr_t

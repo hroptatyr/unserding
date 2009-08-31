@@ -48,6 +48,13 @@
 typedef void *cat_t;
 
 /**
+ * The annotation structure to refer to resources. */
+typedef struct anno_s *anno_t;
+
+/* and the instr version */
+typedef struct anno_instr_s *anno_instr_t;
+
+/**
  * Just a reverse lookup structure. */
 struct keyval_s {
 	gaid_t key;
@@ -89,11 +96,32 @@ extern void free_cat(cat_t cat);
 
 extern size_t cat_size(cat_t cat);
 
-extern instr_t cat_obtain_instr(cat_t cat);
 /**
  * Check if I is known, if not add it to the catalogue CAT.
  * If known replace the existing instrument in CAT by I. */
 extern instr_t cat_bang_instr(cat_t cat, instr_t i);
+
+/**
+ * Annotate I.
+ * I is assumed to stem from within the catalogue structure as data
+ * is appended beyond its natural extent. */
+static inline void
+cat_annotate_instr(cat_t c, instr_t i, const char *tbl, time_t from, time_t to)
+{
+	anno_instr_t ai = (void*)i;
+	ai->anno.tbl_name = tbl;
+	ai->anno.from = from;
+	ai->anno.to = to;
+	return;
+}
+
+/**
+ * Return the annotation of an instrument I from within the catalogue. */
+static inline anno_t
+cat_instr_annotation(instr_t i)
+{
+	return &(((anno_instr_t)(void*)i)->anno);
+}
 
 extern instr_t find_instr_by_gaid(cat_t cat, gaid_t gaid);
 extern instr_t find_instr_by_name(cat_t cat, const char *name);

@@ -265,6 +265,7 @@ kill_worker(ud_worker_t wk)
 
 /* helper for daemon mode */
 static bool daemonisep = 0;
+static bool prefer6p = 0;
 
 static int
 daemonise(void)
@@ -304,7 +305,10 @@ daemonise(void)
 
 /* the popt helper */
 static struct poptOption srv_opts[] = {
-	{ "daemon", 'd', POPT_ARG_NONE | POPT_ARGFLAG_SHOW_DEFAULT,
+	{ "prefer-ipv6", '6', POPT_ARG_NONE,
+	  &prefer6p, 0,
+	  "Prefer ipv6 traffic to ipv4 if applicable..", NULL },
+	{ "daemon", 'd', POPT_ARG_NONE,
 	  &daemonisep, 0,
 	  "Detach from tty and run as daemon.", NULL },
         POPT_TABLEEND
@@ -419,7 +423,7 @@ main(int argc, const char *argv[])
 	 * we add this quite late so that it's unlikely that a plethora of
 	 * events has already been injected into our precious queue
 	 * causing the libev main loop to crash. */
-	ud_attach_mcast(EV_A);
+	ud_attach_mcast(EV_A_ prefer6p);
 
 	/* reset the round robin var */
 	rr_wrk = 0;

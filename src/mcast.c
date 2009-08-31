@@ -539,20 +539,24 @@ send_m46(job_t j)
 
 
 int
-ud_attach_mcast(EV_P)
+ud_attach_mcast(EV_P_ bool prefer_ipv6_p)
 {
 	/* get us a global sock */
-	lsock4 = mcast4_listener_init();
 	lsock6 = mcast6_listener_init();
 
-	if (UNLIKELY(lsock4 < 0 && lsock6 < 0)) {
-		return -1;
-	}
-	if (LIKELY(lsock4 >= 0)) {
-		ev_io *srv_watcher = &__srv4_watcher;
-		/* initialise an io watcher, then start it */
-		ev_io_init(srv_watcher, mcast_inco_cb, lsock4, EV_READ);
-		ev_io_start(EV_A_ srv_watcher);
+	if (!prefer_ipv6_p) {
+		/* if we prefer IPv6 we actually mean it's v6 only */
+		lsock4 = mcast4_listener_init();
+
+		if (UNLIKELY(lsock4 < 0 && lsock6 < 0)) {
+			return -1;
+		}
+		if (LIKELY(lsock4 >= 0)) {
+			ev_io *srv_watcher = &__srv4_watcher;
+			/* initialise an io watcher, then start it */
+			ev_io_init(srv_watcher, mcast_inco_cb, lsock4, EV_READ);
+			ev_io_start(EV_A_ srv_watcher);
+		}
 	}
 	if (LIKELY(lsock6 >= 0)) {
 		ev_io *srv_watcher = &__srv6_watcher;

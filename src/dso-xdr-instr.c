@@ -480,6 +480,8 @@ dso_xdr_instr_LTX_init(void *clo)
 
 	/* load the ticks service */
 	dso_xdr_instr_ticks_LTX_init(clo);
+	/* fetch some instruments by sql */
+	dso_xdr_instr_mysql_LTX_init(clo);
 	return;
 }
 

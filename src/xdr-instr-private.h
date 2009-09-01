@@ -76,6 +76,7 @@ extern cat_t instrs;
 
 extern void dso_xdr_instr_LTX_init(void*);
 extern void dso_xdr_instr_ticks_LTX_init(void*);
+extern void dso_xdr_instr_mysql_LTX_init(void*);
 
 
 /* inlines */

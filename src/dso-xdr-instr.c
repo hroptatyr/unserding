@@ -142,6 +142,23 @@ merge_instr(instr_t tgt, instr_t src)
 	return true;
 }
 
+/* cunting hack, remove me ASAP */
+static void
+auto_annotate(instr_t i)
+{
+	if (instr_type(i) == PFIT_OPTION &&
+	    instr_const_option(i)->underlyer == 5) {
+		/* DJX */
+		static const char eod_name[] = "MDX.DJX_eod_tmp";
+		cat_annotate_instr(instrs, i, eod_name, 0, -1UL);
+	} else if (instr_type(i) == PFIT_IRATE) {
+		/* all kinds of interest rates */
+		static const char eod_name[] = "GAT_static.eod_interest_rates2";
+		cat_annotate_instr(instrs, i, eod_name, 0, -1UL);
+	}
+	return;
+}
+
 static void
 copyadd_instr(instr_t i)
 {
@@ -149,10 +166,10 @@ copyadd_instr(instr_t i)
 
 	if ((resi = find_instr(i)) != NULL) {
 		UD_DBGCONT("found him already ... merging ...");
-		//abort();
 		merge_instr(resi, i);
 	} else {
-		cat_bang_instr(instrs, i);
+		i = cat_bang_instr(instrs, i);
+		auto_annotate(i);
 	}
 	return;
 }

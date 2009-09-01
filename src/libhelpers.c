@@ -81,16 +81,16 @@ ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
 	return len;
 }
 
-size_t
+void
 ud_find_many_instrs(
-	ud_handle_t hdl, void(*cb)(char *restrict tgt, void *clo), void *clo,
+	ud_handle_t hdl,
+	void(*cb)(const char *tgt, size_t len, void *clo), void *clo,
 	uint32_t cont_id[], size_t len)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
 	ud_convo_t cno = hdl->convo++;
-	size_t res;
 	char *out = NULL;
 
 	memset(buf, 0, sizeof(buf));
@@ -106,10 +106,10 @@ ud_find_many_instrs(
 	pkt.plen = sizeof(buf);
 	ud_recv_convo(hdl, &pkt, UD_SVC_TIMEOUT, cno);
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
-	if ((res = udpc_seria_des_xdr(&sctx, (void*)&out)) > 0) {
-		cb(out, clo);
+	while ((len = udpc_seria_des_xdr(&sctx, (void*)&out)) > 0) {
+		cb(out, len, clo);
 	}
-	return res;
+	return;
 }
 
 

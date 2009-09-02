@@ -1,10 +1,12 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <pfack/instruments.h>
 #include "unserding.h"
 #include "protocore.h"
 
 static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
+static bool xmlp;
 
 static void
 fjfj(char *buf, size_t len, void *clo)
@@ -21,12 +23,16 @@ main(int argc, const char *argv[])
 {
 	char buf[UDPC_PLLEN];
 	size_t len;
-	uint32_t cid[64];
+	/* vla */
+	uint32_t cid[argc];
 	int n = 0;
 
 	for (int i = 1; i < argc; i++) {
-		char *p;
-		cid[n++] = strtol(argv[i], &p, 10);
+		if ((cid[n] = strtol(argv[i], NULL, 10))) {
+			n++;
+		} else if (strcmp(argv[i], "--xml") == 0) {
+			xmlp = true;
+		}
 	}
 	if (n == 0) {
 		return 0;

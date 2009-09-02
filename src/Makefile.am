@@ -6,7 +6,7 @@ AM_LDFLAGS = -lpthread
 headerdir = $(includedir)/unserding
 moddir = $(libdir)/unserding
 
-bin_PROGRAMS = unserdingd unsercli instrumenstruation
+bin_PROGRAMS = unserdingd unsercli instrumenstruation ud-instr
 noinst_PROGRAMS = ##e123ify
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
@@ -100,6 +100,9 @@ libunserding_la_LDFLAGS = $(AM_LDFLAGS)
 #e123ify_CPPFLAGS = $(AM_CPPFLAGS)
 #e123ify_LDFLAGS = $(AM_LDFLAGS)
 #e123ify_LDADD = libunserding.la -lpopt
+
+ud_instr_SOURCES = ud-instr.c
+ud_instr_LDADD = libunserding.la -lpfack
 
 # 
 # Help the developers get nice post-processed source files

@@ -89,13 +89,22 @@ spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
 	       sctx->msgoff < sctx->len - /*yuck*/7*8) {
 		secu_t s = &sfctx->secu[sfctx->idx];
 
-		if ((1 << (PFTT_EOD))/* bollocks */ & sfctx->types) {
+		if (trick && (1 << (PFTT_EOD))/* bollocks */ & sfctx->types) {
 			gaid_t i = s->instr;
 			gaid_t u = s->unit ? s->unit : 73380;
 			gaid_t p = s->pot ? s->pot : 4;
 
 			fill_sl1tick_shdr(&t, i, u, p);
 			fill_sl1tick_tick(&t, sfctx->ts, 0, PFTT_EOD, 10000);
+			udpc_seria_add_sl1tick(sctx, &t);
+		}
+		if (!trick && (1 << (PFTT_STL))/* bollocks */ & sfctx->types) {
+			gaid_t i = s->instr;
+			gaid_t u = s->unit ? s->unit : 73380;
+			gaid_t p = s->pot ? s->pot : 4;
+
+			fill_sl1tick_shdr(&t, i, u, p);
+			fill_sl1tick_tick(&t, sfctx->ts, 0, PFTT_STL, 15000);
 			udpc_seria_add_sl1tick(sctx, &t);
 		}
 		sfctx->idx += (trick ^= 1);

@@ -176,6 +176,14 @@ extern size_t
 ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t inst_id);
 
 /**
+ * Query a bunch of instruments at once, calling CB() on each result. */
+extern void
+ud_find_many_instrs(
+	ud_handle_t hdl,
+	void(*cb)(const char *tgt, size_t len, void *clo), void *clo,
+	uint32_t cont_id[], size_t len);
+
+/**
  * Deliver a tick packet for S at TS.
  * \param hdl the unserding handle to use
  * \param tgt a buffer that holds the tick packet, should be at least

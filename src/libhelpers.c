@@ -207,7 +207,8 @@ ud_find_ticks_by_ts(
 		memset(buf, 0, sizeof(buf));
 		udpc_make_pkt(pkt, cno, 0, UD_SVC_TICK_BY_TS);
 		udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-#define FILL	(UDPC_PLLEN / (max_num_ticks(bs) * sizeof(struct sl1tick_s)))
+/* compute me! */
+#define FILL	(48 / max_num_ticks(bs))
 		/* 4220(ts, tick_bitset, triples-of-instrs) */
 		udpc_seria_add_tick_by_ts_hdr(&sctx, &hdr);
 		for (index_t j = 0, i = rcvd; j < FILL && i < slen; i++, j++) {

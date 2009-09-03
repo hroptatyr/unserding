@@ -184,28 +184,6 @@ max_num_ticks(uint32_t bitset)
 #endif	/* !SSE */
 }
 
-#if 0
-static bool
-fetch_slice(sl1tv_t tgt, index_t *k, ud_packet_t pkt, ud_convo_t cno)
-{
-	struct udpc_seria_s sctx;
-
-	ud_recv_convo(hdl, &pkt, /* timeout */20, cno);
-	if (pkt.plen == 0) {
-		/* time out */
-		return false;
-	}
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
-	/* fetch the gaid first */
-	while (*k < tgt->len && udpc_seria_des_sl1tick(&tgt->vec[*k], &sctx)) {
-		/* we're waiting for a TT_EOD (4) */
-		print_tick(&tgt->vec[*k]);
-		(*k)++;
-	}
-	return udpc_pktstorminess(pkt) == UDPC_PKTSTORMINESS_MANY;
-}
-#endif
-
 void
 ud_find_ticks_by_ts(
 	ud_handle_t hdl,

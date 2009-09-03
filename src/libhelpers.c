@@ -247,8 +247,12 @@ ud_find_ticks_by_ts(
 		/* we assume that instrs are sent in the same order as
 		 * requested *inside* the packet */
 		while (udpc_seria_des_sl1tick(&t, &sctx)) {
+			/* marking-less approach, so we could make s[] const */
+			if (sl1tick_instr(&t) == s[rcvd].instr) {
+				rcvd++;
+			}
+			/* callback */
 			cb(&t, clo);
-			rcvd++;
 			retry = 4;
 		}
 	} while (rcvd < slen && retry > 0);

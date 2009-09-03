@@ -159,4 +159,52 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 	return len - UDPC_HDRLEN;
 }
 
+void
+ud_find_many_prices(
+	ud_handle_t hdl,
+	void(*cb)(void *clo), void *clo,
+	secu_t s, size_t slen,
+	uint32_t bs, time_t ts)
+{
+/* fixme, the retry cruft should be a parameter? */
+	index_t rcvd = 0;
+	index_t retry = 4;
+	struct tick_by_ts_hdr_s hdr = {.ts = ts, .types = bs};
+
+	do {
+		struct udpc_seria_s sctx;
+		char buf[UDPC_PKTLEN];
+		ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
+		ud_convo_t cno = hdl->convo++;
+		size_t nrd;
+
+		retry--;
+		memset(buf, 0, sizeof(buf));
+		udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
+		udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+#define FILL	(UDPC_PLLEN / sizeof(struct instr_s))
+		/* 4220(ts, tick_bitset, triples-of-instrs) */
+		udpc_seria_add_tick_by_ts_hdr(&sctx, &hdr);
+		for (index_t j = 0, i = rcvd; j < FILL && i < slen; i++, j++) {
+			udpc_seria_add_secu(&sctx, &s[i]);
+		}
+		/* prepare packet for sending im off */
+		pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+		ud_send_raw(hdl, pkt);
+
+		pkt.plen = sizeof(buf);
+		ud_recv_convo(hdl, &pkt, (5 - retry) * UD_SVC_TIMEOUT, cno);
+		udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
+
+		/* we assume that instrs are sent in the same order as
+		 * requested *inside* the packet */
+		while ((nrd = 0) > 0) {
+			cb(clo);
+			rcvd++;
+			retry = 4;
+		}
+	} while (rcvd < slen && retry > 0);
+	return;
+}
+
 /* libhelpers.c ends here */

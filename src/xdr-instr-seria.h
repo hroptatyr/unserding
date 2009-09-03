@@ -196,6 +196,13 @@ ud_find_many_instrs(
 extern size_t
 ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
 
+extern void
+ud_find_many_prices(
+	ud_handle_t hdl,
+	void(*cb)(void *clo), void *clo,
+	secu_t s, size_t slen,
+	uint32_t bs, time_t ts);
+
 
 /* type (de)muxers */
 static inline l1t_auxinfo_t

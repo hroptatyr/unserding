@@ -136,23 +136,23 @@ AM_CONDITIONAL([WITH_INPUT_MULTICAST],
 	[test "$have_inputs_multicast" = "yes" -a "$with_inputs_multicast" = "yes"])
 
 ## database stuff ... does not belong here
-dnl AC_ARG_WITH([mysql], [
-dnl AS_HELP_STRING([--with-mysql], [Which mysql to use])], [], [])
+AC_ARG_WITH([mysql], [
+AS_HELP_STRING([--with-mysql], [Which mysql to use])], [], [])
 dnl AC_ARG_WITH([pgsql], [
 dnl AS_HELP_STRING([--with-pgsql], [Which postgres to use])], [], [])
 dnl 
-dnl if test "$with_mysql" != "no"; then
-dnl 	AC_PATH_PROG([MYSQL_CONFIG], [mysql_config], [:])
-dnl 	MYSQL_CPPFLAGS=$(${MYSQL_CONFIG} --include)
-dnl 	MYSQL_LDFLAGS=$(${MYSQL_CONFIG} --libs)
-dnl 	AC_SUBST([MYSQL_CPPFLAGS])
-dnl 	AC_SUBST([MYSQL_LDFLAGS])
-dnl 	if test "${MYSQL_CONFIG}" != ":"; then
-dnl 		AC_DEFINE([HAVE_MYSQL], [1], [Defined when mysql could be found])
-dnl 	fi
-dnl 	AC_DEFINE([WITH_MYSQL], [1], [Defined when mysql was desired])
-dnl fi
-dnl AM_CONDITIONAL([USE_MYSQL], [test "$with_mysql" != "no" -a "${MYSQL_CONFIG}" != ":"])
+if test "$with_mysql" != "no"; then
+	AC_PATH_PROG([MYSQL_CONFIG], [mysql_config], [:])
+	MYSQL_CPPFLAGS=$(${MYSQL_CONFIG} --include)
+	MYSQL_LDFLAGS=$(${MYSQL_CONFIG} --libs)
+	AC_SUBST([MYSQL_CPPFLAGS])
+	AC_SUBST([MYSQL_LDFLAGS])
+	if test "${MYSQL_CONFIG}" != ":"; then
+		AC_DEFINE([HAVE_MYSQL], [1], [Defined when mysql could be found])
+	fi
+	AC_DEFINE([WITH_MYSQL], [1], [Defined when mysql was desired])
+fi
+AM_CONDITIONAL([USE_MYSQL], [test "$with_mysql" != "no" -a "${MYSQL_CONFIG}" != ":"])
 
 ## check for libffff
 dnl AC_CHECK_FFFF

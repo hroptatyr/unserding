@@ -176,6 +176,14 @@ extern size_t
 ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t inst_id);
 
 /**
+ * Query a bunch of instruments at once, calling CB() on each result. */
+extern void
+ud_find_many_instrs(
+	ud_handle_t hdl,
+	void(*cb)(const char *tgt, size_t len, void *clo), void *clo,
+	uint32_t cont_id[], size_t len);
+
+/**
  * Deliver a tick packet for S at TS.
  * \param hdl the unserding handle to use
  * \param tgt a buffer that holds the tick packet, should be at least
@@ -187,6 +195,13 @@ ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t inst_id);
  **/
 extern size_t
 ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
+
+extern void
+ud_find_many_prices(
+	ud_handle_t hdl,
+	void(*cb)(void *clo), void *clo,
+	secu_t s, size_t slen,
+	uint32_t bs, time_t ts);
 
 
 /* type (de)muxers */

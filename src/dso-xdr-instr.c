@@ -409,6 +409,7 @@ static ev_idle __attribute__((aligned(16))) __widle;
 static void
 deferred_dl(EV_P_ ev_idle *w, int revents)
 {
+#if 0
 	struct job_s j;
 	ud_packet_t __pkt = {.pbuf = j.buf};
 
@@ -417,7 +418,7 @@ deferred_dl(EV_P_ ev_idle *w, int revents)
 	j.blen = UDPC_HDRLEN;
 	send_m46(&j);
 	UD_DBGCONT("done\n");
-
+#endif
 	ev_idle_stop(EV_A_ w);
 #if 0
 #define SOCK_DCCP 6      

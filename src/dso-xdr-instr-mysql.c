@@ -143,6 +143,21 @@ make_index(instr_t in, uint32_t id, void **rows, size_t nflds)
 	return;
 }
 
+static time_t
+parse_tstamp(const char *buf)
+{
+	struct tm tm;
+	char *on;
+
+	memset(&tm, 0, sizeof(tm));
+	on = strptime(buf, "%Y-%m-%d", &tm);
+	if (on != NULL) {
+		return timegm(&tm);
+	} else {
+		return 0;
+	}
+}
+
 static void
 make_option(instr_t in, uint32_t id, void **rows, size_t nflds)
 {
@@ -156,6 +171,12 @@ make_option(instr_t in, uint32_t id, void **rows, size_t nflds)
 	instr_t undl = find_instr_by_gaid(instrs, undl_id);
 
 	make_oxxxxx_into(in, id, undl, right, exer, strike, multpl);
+
+	/* fiddle with the delivery group ... it's a joke anyway at the mo */
+	option_t o = instr_option(in);
+	o->ds.issue = 0;
+	o->ds.expiry = parse_tstamp(rows[OPT_DELIV]);
+	o->ds.settle = o->ds.expiry + 3 * 86400;
 	return;
 }
 

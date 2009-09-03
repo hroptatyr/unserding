@@ -1277,6 +1277,12 @@ AC_DEFUN([SXE_CHECK_CPU_PC], [dnl
 			sxe_gcc_arch="pentium-m pentium3 pentiumpro"
 			;;
 		dnl (
+		*67a:*:*:*)
+			## intel quad Q9550
+			sxe_gcc_arch="core2 nocona native"
+			icc_flags="-xK"
+			;;
+		dnl (
 		*6[[78b]]?:*:*:*)
 			sxe_gcc_arch="pentium3 pentiumpro"
 			icc_flags="-xK"
@@ -1284,13 +1290,13 @@ AC_DEFUN([SXE_CHECK_CPU_PC], [dnl
 		dnl (
 		*6f?:*:*:*)
 			## intel core 2 duo
-			sxe_gcc_arch="nocona pentium4 pentiumpro"
+			sxe_gcc_arch="core2 nocona pentium4 pentiumpro"
 			## icc flags here
 			## icc_flags="??"
 			;;
 		dnl (
 		*6??:*:*:*)
-			sxe_gcc_arch="pentiumpro"
+			sxe_gcc_arch="native"
 			;;
 		dnl (
 		*f3[[347]]:*:*:*|*f4[1347]:*:*:*)

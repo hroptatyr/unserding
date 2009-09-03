@@ -197,9 +197,9 @@ extern size_t
 ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
 
 extern void
-ud_find_many_prices(
+ud_find_ticks_by_ts(
 	ud_handle_t hdl,
-	void(*cb)(void *clo), void *clo,
+	void(*cb)(sl1tick_t, void *clo), void *clo,
 	secu_t s, size_t slen,
 	uint32_t bs, time_t ts);
 

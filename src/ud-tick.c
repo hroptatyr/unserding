@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
-#include <pfack/instruments.h>
+#include <pfack/tick.h>
 #include "unserding.h"
 #include "protocore.h"
 #include "xdr-instr-seria.h"
@@ -10,14 +10,14 @@ static ud_handle_t hdl = &__hdl;
 static bool xmlp;
 
 static void
-in_cb(const char *buf, size_t len, void *clo)
+t_cb(sl1tick_t t, void *clo)
 {
-	struct instr_s in;
-
-	deser_instrument_into(&in, buf, len);
-	fprintf(stderr, "d/l'd instrument: ");
-	print_instr(stderr, &in);
-	fputc('\n', stderr);
+	fprintf(stdout, "ii:%u  tt:%d ts:%ld.%03d v:%2.4f\n",
+		sl1tick_instr(t),
+		sl1tick_tick_type(t),
+		(long int)sl1tick_timestamp(t),
+		(short int)sl1tick_msec(t),
+		ffff_monetary32_d(sl1tick_value(t)));
 	return;
 }
 
@@ -25,11 +25,15 @@ int
 main(int argc, const char *argv[])
 {
 	/* vla */
-	uint32_t cid[argc];
+	struct secu_s cid[argc];
 	int n = 0;
+	time_t ts = time(NULL);
+	uint32_t bs = PFTB_EOD | PFTB_STL;
 
 	for (int i = 1; i < argc; i++) {
-		if ((cid[n] = strtol(argv[i], NULL, 10))) {
+		if ((cid[n].instr = strtol(argv[i], NULL, 10))) {
+			cid[n].unit = 0;
+			cid[n].pot = 0;
 			n++;
 		} else if (strcmp(argv[i], "--xml") == 0) {
 			xmlp = true;
@@ -38,14 +42,13 @@ main(int argc, const char *argv[])
 	if (n == 0) {
 		return 0;
 	}
-	printf("sizeof %ld\n", sizeof(struct instr_s));
 	/* obtain us a new handle */
 	init_unserding_handle(hdl, PF_INET6);
 	/* now kick off the finder */
-	ud_find_many_instrs(hdl, in_cb, NULL, cid, n);
+	ud_find_ticks_by_ts(hdl, t_cb, NULL, cid, n, bs, ts);
 	/* and lose the handle again */
 	free_unserding_handle(&__hdl);
 	return 0;
 }
 
-/* ud-instr.c ends here */
+/* ud-tick.c ends here */

@@ -109,6 +109,7 @@ ud_find_many_instrs(
 		for (index_t j = 0, i = rcvd; j < FILL && i < len; i++, j++) {
 			udpc_seria_add_si32(&sctx, cont_id[i]);
 		}
+#undef FILL
 		/* prepare packet for sending im off */
 		pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 		ud_send_raw(hdl, pkt);
@@ -159,10 +160,56 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 	return len - UDPC_HDRLEN;
 }
 
+static size_t
+max_num_ticks(uint32_t bitset)
+{
+#if defined __SSE4_2__
+	__asm__("popcnt %0\n"
+		: "=r" (bitset) : "rm" (bitset));
+	return bitset;
+#else
+/* stolen from http://www-graphics.stanford.edu/~seander/bithacks.html */
+	/* Magic Binary Numbers */
+	static const int S[] = {1, 2, 4, 8, 16};
+	static const int B[] = {
+		0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF, 0x0000FFFF};
+	size_t cnt = bitset;
+
+	cnt = cnt - ((cnt >> 1) & B[0]);
+	cnt = ((cnt >> S[1]) & B[1]) + (cnt & B[1]);
+	cnt = ((cnt >> S[2]) + cnt) & B[2];
+	cnt = ((cnt >> S[3]) + cnt) & B[3];
+	cnt = ((cnt >> S[4]) + cnt) & B[4];
+	return cnt;
+#endif	/* !SSE */
+}
+
+#if 0
+static bool
+fetch_slice(sl1tv_t tgt, index_t *k, ud_packet_t pkt, ud_convo_t cno)
+{
+	struct udpc_seria_s sctx;
+
+	ud_recv_convo(hdl, &pkt, /* timeout */20, cno);
+	if (pkt.plen == 0) {
+		/* time out */
+		return false;
+	}
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
+	/* fetch the gaid first */
+	while (*k < tgt->len && udpc_seria_des_sl1tick(&tgt->vec[*k], &sctx)) {
+		/* we're waiting for a TT_EOD (4) */
+		print_tick(&tgt->vec[*k]);
+		(*k)++;
+	}
+	return udpc_pktstorminess(pkt) == UDPC_PKTSTORMINESS_MANY;
+}
+#endif
+
 void
-ud_find_many_prices(
+ud_find_ticks_by_ts(
 	ud_handle_t hdl,
-	void(*cb)(void *clo), void *clo,
+	void(*cb)(sl1tick_t, void *clo), void *clo,
 	secu_t s, size_t slen,
 	uint32_t bs, time_t ts)
 {
@@ -173,21 +220,22 @@ ud_find_many_prices(
 
 	do {
 		struct udpc_seria_s sctx;
+		struct sl1tick_s t;
 		char buf[UDPC_PKTLEN];
 		ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
 		ud_convo_t cno = hdl->convo++;
-		size_t nrd;
 
 		retry--;
 		memset(buf, 0, sizeof(buf));
-		udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
+		udpc_make_pkt(pkt, cno, 0, UD_SVC_TICK_BY_TS);
 		udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-#define FILL	(UDPC_PLLEN / sizeof(struct instr_s))
+#define FILL	(UDPC_PLLEN / (max_num_ticks(bs) * sizeof(struct sl1tick_s)))
 		/* 4220(ts, tick_bitset, triples-of-instrs) */
 		udpc_seria_add_tick_by_ts_hdr(&sctx, &hdr);
 		for (index_t j = 0, i = rcvd; j < FILL && i < slen; i++, j++) {
 			udpc_seria_add_secu(&sctx, &s[i]);
 		}
+#undef FILL
 		/* prepare packet for sending im off */
 		pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 		ud_send_raw(hdl, pkt);
@@ -198,8 +246,8 @@ ud_find_many_prices(
 
 		/* we assume that instrs are sent in the same order as
 		 * requested *inside* the packet */
-		while ((nrd = 0) > 0) {
-			cb(clo);
+		while (udpc_seria_des_sl1tick(&t, &sctx)) {
+			cb(&t, clo);
 			rcvd++;
 			retry = 4;
 		}

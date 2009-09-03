@@ -110,7 +110,7 @@ static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
 
 /* worker magic */
-#define NWORKERS		4
+#define NWORKERS		1
 /* round robin var */
 static index_t rr_wrk = 0;
 /* the workers array */

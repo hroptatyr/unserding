@@ -343,7 +343,8 @@ typedef __gnuc_va_list va_list;]],[[1]])], [dnl
 
 	## check whether CC reacts to `extern inline' gnu89 inline declarations
 	## with a warning
-	SXE_CHECK_CC_EXTERN_INLINE
+	## prefer the explicitly marked variant
+	## SXE_CHECK_CC_EXTERN_INLINE
 ])dnl SXE_CHECK_CC_CHAR
 
 AC_DEFUN([SXE_CHECK_CC_HACKS], [dnl

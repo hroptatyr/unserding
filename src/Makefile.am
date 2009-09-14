@@ -7,7 +7,7 @@ headerdir = $(includedir)/unserding
 moddir = $(libdir)/unserding
 
 bin_PROGRAMS = unserdingd unsercli instrumenstruation
-noinst_PROGRAMS = ud-instr ud-tick ##e123ify
+noinst_PROGRAMS = ud-instr ud-snap ##e123ify
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
@@ -110,8 +110,8 @@ libunserding_la_LDFLAGS = $(AM_LDFLAGS)
 ud_instr_SOURCES = ud-instr.c
 ud_instr_LDADD = libunserding.la -lpfack
 
-ud_tick_SOURCES = ud-tick.c
-ud_tick_LDADD = libunserding.la
+ud_snap_SOURCES = ud-snap.c
+ud_snap_LDADD = libunserding.la
 
 # 
 # Help the developers get nice post-processed source files

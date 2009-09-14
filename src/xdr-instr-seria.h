@@ -77,6 +77,7 @@
  * -
  * -
  **/
+#define UD_SVC_TICK_BY_INSTR	0x4222
 
 /* points to the tick-type of the day */
 #define sl1tick_s		sl1tp_s
@@ -102,15 +103,15 @@ struct tick_by_ts_hdr_s {
 	uint32_t types;
 };
 
-struct tick_by_instr_hdr_s {
-	uint32_t instr;
-	uint32_t types;
-};
-
 struct secu_s {
 	uint32_t instr;
 	uint32_t unit;
 	uint16_t pot;
+};
+
+struct tick_by_instr_hdr_s {
+	struct secu_s secu;
+	uint32_t types;
 };
 
 struct sl1t_s {
@@ -196,12 +197,25 @@ ud_find_many_instrs(
 extern size_t
 ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
 
+/**
+ * Deliver a packet storm of ticks for instruments specified by S at TS.
+ * Call the callback function CB() for every tick in the packet storm. */
 extern void
 ud_find_ticks_by_ts(
 	ud_handle_t hdl,
 	void(*cb)(sl1tick_t, void *clo), void *clo,
 	secu_t s, size_t slen,
 	uint32_t bs, time_t ts);
+
+/**
+ * Deliver a packet storm of ticks for S at specified times TS.
+ * Call the callback function CB() for every tick in the packet storm. */
+extern void
+ud_find_ticks_by_instr(
+	ud_handle_t hdl,
+	void(*cb)(sl1tick_t, void *clo), void *clo,
+	secu_t s, uint32_t bs,
+	time_t *ts, size_t tslen);
 
 
 /* type (de)muxers */
@@ -355,6 +369,22 @@ udpc_seria_des_secu(secu_t t, udpc_seria_t sctx)
 	/* exchange */	
 	t->pot = udpc_seria_des_ui32(sctx);
 	return true;
+}
+
+static inline void
+udpc_seria_add_tick_by_instr_hdr(udpc_seria_t sctx, tick_by_instr_hdr_t h)
+{
+	udpc_seria_add_secu(sctx, &h->secu);
+	udpc_seria_add_ui32(sctx, h->types);
+	return;
+}
+
+static inline void
+udpc_seria_des_tick_by_instr_hdr(tick_by_instr_hdr_t h, udpc_seria_t sctx)
+{
+	udpc_seria_des_secu(&h->secu, sctx);
+	h->types = udpc_seria_des_ui32(sctx);
+	return;
 }
 
 static inline void

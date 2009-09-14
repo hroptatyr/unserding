@@ -238,4 +238,61 @@ ud_find_ticks_by_ts(
 	return;
 }
 
+void
+ud_find_ticks_by_instr(
+	ud_handle_t hdl,
+	void(*cb)(sl1tick_t, void *clo), void *clo,
+	secu_t s, uint32_t bs,
+	time_t *ts, size_t tslen)
+{
+/* fixme, the retry cruft should be a parameter? */
+	index_t rcvd = 0;
+	index_t retry = 4;
+	struct tick_by_instr_hdr_s hdr;
+
+	hdr.secu = *s;
+	hdr.types = bs;
+
+	do {
+		struct udpc_seria_s sctx;
+		struct sl1tick_s t;
+		char buf[UDPC_PKTLEN];
+		ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
+		ud_convo_t cno = hdl->convo++;
+
+		retry--;
+		memset(buf, 0, sizeof(buf));
+		udpc_make_pkt(pkt, cno, 0, UD_SVC_TICK_BY_INSTR);
+		udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+/* compute me! */
+#define FILL	(48 / max_num_ticks(bs))
+		/* 4222(instr-triple, tick_bitset, ts, ts, ts, ...) */
+		udpc_seria_add_tick_by_instr_hdr(&sctx, &hdr);
+		for (index_t j = 0, i = rcvd; j < FILL && i < tslen; i++, j++) {
+			udpc_seria_add_ui32(&sctx, ts[i]);
+		}
+#undef FILL
+		/* prepare packet for sending im off */
+		pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+		ud_send_raw(hdl, pkt);
+
+		pkt.plen = sizeof(buf);
+		ud_recv_convo(hdl, &pkt, (5 - retry) * UD_SVC_TIMEOUT, cno);
+		udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
+
+		/* we assume that instrs are sent in the same order as
+		 * requested *inside* the packet */
+		while (udpc_seria_des_sl1tick(&t, &sctx)) {
+			/* marking-less approach, so we could make s[] const */
+			if (sl1tick_instr(&t) == s[rcvd].instr) {
+				rcvd++;
+			}
+			/* callback */
+			cb(&t, clo);
+			retry = 4;
+		}
+	} while (rcvd < tslen && retry > 0);
+	return;
+}
+
 /* libhelpers.c ends here */

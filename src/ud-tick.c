@@ -63,7 +63,7 @@ main(int argc, const char *argv[])
 	}
 
 	for (int i = 2; i < argc; i++) {
-		if ((ts[0] = parse_time(argv[i])) == 0) {
+		if ((ts[n] = parse_time(argv[i])) == 0) {
 			fprintf(stderr, "invalid date format \"%s\", "
 				"must be YYYY-MM-DDThh:mm:ss\n", argv[i]);
 			exit(1);
@@ -73,7 +73,7 @@ main(int argc, const char *argv[])
 	/* obtain us a new handle */
 	init_unserding_handle(hdl, PF_INET6);
 	/* now kick off the finder */
-	ud_find_ticks_by_ts(hdl, t_cb, NULL, &cid, 1, bs, ts[0]);
+	ud_find_ticks_by_instr(hdl, t_cb, NULL, &cid, bs, ts, n);
 	/* and lose the handle again */
 	free_unserding_handle(&__hdl);
 	return 0;

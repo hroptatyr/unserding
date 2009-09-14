@@ -51,4 +51,4 @@ main(int argc, const char *argv[])
 	return 0;
 }
 
-/* ud-tick.c ends here */
+/* ud-snap.c ends here */

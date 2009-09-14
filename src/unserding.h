@@ -69,14 +69,6 @@ union ud_sockaddr_u {
 typedef long unsigned int ud_flags_t;
 
 
-/* contexts */
-typedef struct ud_ctx_s *ud_ctx_t;
-
-struct ud_ctx_s {
-	void *mainloop;
-};
-
-
 /**
  * Connexion handle to an unserding network.
  * Carries the current conversation id which is incremented upon each query

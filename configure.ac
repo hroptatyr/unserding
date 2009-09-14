@@ -181,6 +181,8 @@ AC_SUBST([LIBREADLINE_CPPFLAGS])
 ## check if we've got libedit, we don't use it though at the moment
 PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
 
+## check if we've got libconfig
+PKG_CHECK_MODULES([LIBCONFIG], [libconfig])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])

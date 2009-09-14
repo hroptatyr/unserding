@@ -49,6 +49,7 @@
 #define UNSERSRV
 #include "unserding-dbg.h"
 #include "unserding-nifty.h"
+#include "unserding-ctx.h"
 
 #include <ev.h>
 

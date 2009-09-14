@@ -78,6 +78,8 @@
 
 /* our master include file */
 #include "unserding.h"
+/* context goodness, passed around internally */
+#include "unserding-ctx.h"
 /* our private bits */
 #include "unserding-private.h"
 /* proto stuff */
@@ -371,6 +373,8 @@ main(int argc, const char *argv[])
 	/* initialise the main loop */
 	loop = ev_default_loop(0);
 	__ctx.mainloop = loop;
+	/* and the context file */
+	config_init(&__ctx.cfgctx);
 
 	/* initialise global job q */
 	init_glob_jq(&__glob_jq);
@@ -381,6 +385,8 @@ main(int argc, const char *argv[])
 	/* initialise modules */
 	ud_init_modules(rest, &__ctx);
 
+	/* just before we start the action, kick the config context */
+	config_destroy(&__ctx.cfgctx);
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);

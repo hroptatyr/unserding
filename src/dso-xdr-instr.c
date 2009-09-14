@@ -53,6 +53,8 @@
 #include "protocore.h"
 #define UNSERSRV
 #include "unserding-dbg.h"
+#include "unserding-nifty.h"
+#include "unserding-ctx.h"
 
 #include <pfack/instruments.h>
 #include "catalogue.h"
@@ -82,19 +84,6 @@
 #if !defined countof
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
-
-#if !defined LIKELY
-# define LIKELY(_x)	__builtin_expect((_x), 1)
-#endif
-#if !defined UNLIKELY
-# define UNLIKELY(_x)	__builtin_expect((_x), 0)
-#endif
-#if !defined UNUSED
-# define UNUSED(_x)	__attribute__((unused)) _x
-#endif	/* !UNUSED */
-#if !defined ALGN16
-# define ALGN16(_x)	__attribute__((aligned(16))) _x
-#endif	/* !ALGN16 */
 
 #define q32_t	quantity32_t
 

@@ -38,7 +38,6 @@ main(int argc, const char *argv[])
 	if (n == 0) {
 		return 0;
 	}
-	printf("sizeof %ld\n", sizeof(struct instr_s));
 	/* obtain us a new handle */
 	init_unserding_handle(hdl, PF_INET6);
 	/* now kick off the finder */

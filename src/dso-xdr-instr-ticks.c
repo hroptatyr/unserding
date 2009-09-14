@@ -125,7 +125,7 @@ init_spitfire(spitfire_ctx_t ctx, secu_t secu, size_t slen, tick_by_ts_hdr_t t)
 }
 
 static void
-instr_tick_svc(job_t j)
+instr_tick_by_ts_svc(job_t j)
 {
 	struct udpc_seria_s sctx;
 	struct udpc_seria_s rplsctx;
@@ -163,13 +163,47 @@ instr_tick_svc(job_t j)
 	return;
 }
 
+static void
+instr_tick_by_instr_svc(job_t j)
+{
+	struct udpc_seria_s sctx;
+	struct udpc_seria_s rplsctx;
+	struct job_s rplj;
+	/* in args */
+	struct tick_by_instr_hdr_s hdr;
+	/* allow to filter for 64 time stamps at once */
+	time_t filt[64];
+	unsigned int nfilt = 0;
+
+	/* prepare the iterator for the incoming packet */
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	/* read the header off of the wire */
+	udpc_seria_des_tick_by_instr_hdr(&hdr, &sctx);
+
+	/* triples of instrument identifiers */
+	while ((filt[nfilt] = udpc_seria_des_ui32(&sctx)) &&
+	       ++nfilt < countof(filt));
+
+	UD_DEBUG("0x4222: %u/%u@%u filtered for %u time stamps\n",
+		 hdr.secu.instr, hdr.secu.unit, hdr.secu.pot, nfilt);
+	/* prepare the reply packet ... */
+	copy_pkt(&rplj, j);
+	clear_pkt(&rplsctx, &rplj);
+	/* let the luser know we deliver our shit later on */
+	udpc_set_defer_fina_pkt(JOB_PACKET(&rplj));
+	/* send what we've got */
+	send_pkt(&rplsctx, &rplj);
+	return;
+}
+
 
 void
 dso_xdr_instr_ticks_LTX_init(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/xdr-instr-ticks: loading ...");
 	/* tick service */
-	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_svc, NULL);
+	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
+	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 	return;
 }

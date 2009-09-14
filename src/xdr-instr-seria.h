@@ -362,6 +362,8 @@ udpc_seria_des_secu(secu_t t, udpc_seria_t sctx)
 {
 	if ((t->instr = udpc_seria_des_ui32(sctx)) == 0) {
 		/* no gaid? fuck off early */
+		t->unit = 0;
+		t->pot = 0;
 		return false;
 	}
 	/* currency */

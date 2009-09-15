@@ -45,11 +45,13 @@ dso_xdr_instr_la_LDFLAGS = -module $(LIBPFACK_LDFLAGS)
 dso_xdr_instr_la_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
 dso_xdr_instr_la_LIBADD = $(LIBPFACK_LIBS)
 if USE_MYSQL
+dso_xdr_instr_la_CPPFLAGS += $(MYSQL_CPPFLAGS)
 dso_xdr_instr_la_LDFLAGS += $(MYSQL_LDFLAGS) -lmysqlclient
 endif
-dso_xdr_instr_la_SOURCES = catalogue.c dso-xdr-instr.c dso-xdr-instr-ticks.c
+dso_xdr_instr_la_SOURCES = catalogue.c dso-xdr-instr.c
 if USE_MYSQL
 dso_xdr_instr_la_SOURCES += dso-xdr-instr-mysql.c
+dso_xdr_instr_la_SOURCES += dso-xdr-instr-ticks.c
 endif
 header_HEADERS += xdr-instr-seria.h
 ## to fiddle with option chains and other instruments

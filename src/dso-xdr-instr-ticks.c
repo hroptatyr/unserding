@@ -63,7 +63,11 @@
 
 /* later to be decoupled from the actual source */
 #if defined HAVE_MYSQL
-# include <mysql/mysql.h>
+# if defined HAVE_MYSQL_MYSQL_H
+#  include <mysql/mysql.h>
+# elif defined HAVE_MYSQL_H
+#  include <mysql.h>
+# endif
 #endif	/* HAVE_MYSQL */
 
 static void obtain_tick_urns(void *UNUSED());

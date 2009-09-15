@@ -60,7 +60,11 @@
 #include "xdr-instr-private.h"
 
 #if defined HAVE_MYSQL
-# include <mysql/mysql.h>
+# if defined HAVE_MYSQL_MYSQL_H
+#  include <mysql/mysql.h>
+# elif defined HAVE_MYSQL_H
+#  include <mysql.h>
+# endif
 #endif	/* HAVE_MYSQL */
 
 #if !defined countof

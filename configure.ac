@@ -151,6 +151,11 @@ if test "$with_mysql" != "no"; then
 		AC_DEFINE([HAVE_MYSQL], [1], [Defined when mysql could be found])
 	fi
 	AC_DEFINE([WITH_MYSQL], [1], [Defined when mysql was desired])
+
+	SXE_DUMP_LIBS
+	CPPFLAGS="${CPPFLAGS} ${MYSQL_CPPFLAGS}"
+	AC_CHECK_HEADERS([mysql/mysql.h mysql.h])
+	SXE_RESTORE_LIBS
 fi
 AM_CONDITIONAL([USE_MYSQL], [test "$with_mysql" != "no" -a "${MYSQL_CONFIG}" != ":"])
 

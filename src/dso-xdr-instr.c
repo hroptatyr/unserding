@@ -566,7 +566,10 @@ dso_xdr_instr_LTX_init(void *clo)
 	UD_DBGCONT("done\n");
 
 	/* take a gaze at what we're supposed to do */
-	settings = frob_relevant_config(&ctx->cfgctx);
+	if ((settings = frob_relevant_config(&ctx->cfgctx)) == NULL) {
+		/* fuck off immediately */
+		return;
+	}
 	/* load the ticks fetcher if need be */
 	if ((tmp = asked_for_ticks_p(settings))) {
 		load_ticks_fetcher(clo, settings, tmp);

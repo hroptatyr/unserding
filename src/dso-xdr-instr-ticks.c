@@ -53,6 +53,7 @@
 #include "protocore.h"
 #define UNSERSRV
 #include "unserding-dbg.h"
+#include "unserding-ctx.h"
 
 #include <pfack/instruments.h>
 #include "catalogue.h"
@@ -197,14 +198,29 @@ instr_tick_by_instr_svc(job_t j)
 }
 
 
+static const char *dbhost, *dbuser, *dbpass, *dbsche;
+
+static void
+frob_db_settings(ud_ctx_t ctx)
+{
+	config_t *cfgctx = &ctx->cfgctx;
+	config_lookup_string(cfgctx, "dso-xdr-instr.dbhost", &dbhost);
+	config_lookup_string(cfgctx, "dso-xdr-instr.dbuser", &dbuser);
+	config_lookup_string(cfgctx, "dso-xdr-instr.dbpass", &dbpass);
+	config_lookup_string(cfgctx, "dso-xdr-instr.dbschema", &dbsche);
+	return;
+}
+
 void
-dso_xdr_instr_ticks_LTX_init(void *UNUSED(clo))
+dso_xdr_instr_ticks_LTX_init(void *clo)
 {
 	UD_DEBUG("mod/xdr-instr-ticks: loading ...");
 	/* tick service */
 	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	UD_DBGCONT("done\n");
+
+	frob_db_settings(clo);
 	return;
 }
 

@@ -262,5 +262,14 @@ trigger_evloop(EV_P)
 	return;
 }
 
+/* more mainloop magic */
+extern void
+schedule_once_idle(void *ctx, void(*cb)(void *clo), void *clo);
+extern void
+schedule_timer_once(void *ctx, void(*cb)(void *clo), void *clo, double in);
+extern void*
+schedule_timer_every(void *ctx, void(*cb)(void *clo), void *clo, double every);
+extern void
+unsched_timer(void *ctx, void *timer);
 
 #endif	/* INCLUDED_unserding_private_h_ */

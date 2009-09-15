@@ -103,6 +103,117 @@ struct ud_worker_s {
 } __attribute__((aligned(16)));
 
 
+/* module services */
+struct ev_cb_clo_s {
+	union {
+		ev_idle idle;
+		ev_timer timer;
+	};
+	void(*cb)(void*);
+	void *clo;
+};
+
+static void
+std_idle_cb(EV_P_ ev_idle *ie, int revents)
+{
+	struct ev_cb_clo_s *clo = (void*)ie;
+
+	/* stop the idle event */
+	ev_idle_stop(EV_A_ ie);
+
+	/* call the call back */
+	clo->cb(clo->clo);
+
+	/* clean up */
+	free(clo);
+	return;
+}
+
+static void
+std_timer_once_cb(EV_P_ ev_timer *te, int revents)
+{
+	struct ev_cb_clo_s *clo = (void*)te;
+
+	/* stop the timer event */
+	ev_timer_stop(EV_A_ te);
+
+	/* call the call back */
+	clo->cb(clo->clo);
+
+	/* clean up */
+	free(clo);
+	return;
+}
+
+static void
+std_timer_every_cb(EV_P_ ev_timer *te, int revents)
+{
+	struct ev_cb_clo_s *clo = (void*)te;
+
+	/* call the call back */
+	clo->cb(clo->clo);
+	return;
+}
+
+void
+schedule_once_idle(void *ctx, void(*cb)(void *clo), void *clo)
+{
+	ud_ctx_t ud_ctx = ctx;
+	struct ev_cb_clo_s *f = xnew(struct ev_cb_clo_s);
+
+	/* make a closure from cb and clo */
+	f->cb = cb;
+	f->clo = clo;
+
+	ev_idle_init((ev_idle*)f, std_idle_cb);
+	ev_idle_start(ud_ctx->mainloop, (void*)f);
+	return;
+}
+
+void
+schedule_timer_once(void *ctx, void(*cb)(void *clo), void *clo, double in)
+{
+	ud_ctx_t ud_ctx = ctx;
+	struct ev_cb_clo_s *f = xnew(struct ev_cb_clo_s);
+
+	/* make a closure from cb and clo */
+	f->cb = cb;
+	f->clo = clo;
+
+	ev_timer_init((ev_timer*)f, std_timer_once_cb, in, 0.0);
+	ev_timer_start(ud_ctx->mainloop, (void*)f);
+	return;
+}
+
+void*
+schedule_timer_every(void *ctx, void(*cb)(void *clo), void *clo, double every)
+{
+	ud_ctx_t ud_ctx = ctx;
+	struct ev_cb_clo_s *f = xnew(struct ev_cb_clo_s);
+
+	/* make a closure from cb and clo */
+	f->cb = cb;
+	f->clo = clo;
+
+	ev_timer_init((ev_timer*)f, std_timer_every_cb, every, every);
+	ev_timer_start(ud_ctx->mainloop, (void*)f);
+	return f;
+}
+
+void
+unsched_timer(void *ctx, void *timer)
+{
+	ud_ctx_t ud_ctx = ctx;
+	struct ev_cb_clo_s *f = timer;
+
+	ev_timer_stop(ud_ctx->mainloop, timer);
+	f->cb = NULL;
+	f->clo = NULL;
+	free(timer);
+	return;
+}
+
+
 static ev_signal ALGN16(__sigint_watcher);
 static ev_signal ALGN16(__sighup_watcher);
 static ev_signal ALGN16(__sigterm_watcher);

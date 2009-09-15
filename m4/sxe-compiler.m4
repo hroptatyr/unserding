@@ -687,6 +687,9 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 		SXE_CHECK_COMPILER_FLAGS([-Wnopragma], [
 			warnflags="$warnflags -Wnopragma"])
 
+		SXE_CHECK_COMPILER_FLAGS([-fdiagnostics-show-option], [
+			warnflags="${warnflags} -fdiagnostics-show-option"])
+
 	elif test "$__ICC" = "yes" -a \
 		"$with_maximum_warning_output" = "yes"; then
 		SXE_CHECK_COMPILER_FLAGS([-Wunused-function], [

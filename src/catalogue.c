@@ -58,7 +58,6 @@
 typedef struct cat_s *_cat_t;
 
 #define AS_CAT(x)	((_cat_t)(x))
-#define xnew(x)		(malloc(sizeof(x)))
 
 static inline bool
 gaid_equal_p(gaid_t id1, gaid_t id2)

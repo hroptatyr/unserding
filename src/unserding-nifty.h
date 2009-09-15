@@ -56,4 +56,8 @@ typedef size_t index_t;
 #define ROUND(s, a)		(a * ((s + a - 1) / a))
 #define aligned_sizeof(t)	ROUND(sizeof(t), __alignof(void*))
 
+#if !defined xnew
+# define xnew(_a)	(malloc(sizeof(_a)))
+#endif	/* !xnew */
+
 #endif	/* INCLUDED_unserding_nifty_h_ */

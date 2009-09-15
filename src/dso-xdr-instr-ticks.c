@@ -54,11 +54,17 @@
 #define UNSERSRV
 #include "unserding-dbg.h"
 #include "unserding-ctx.h"
+#include "unserding-private.h"
 
 #include <pfack/instruments.h>
 #include "catalogue.h"
 #include "xdr-instr-seria.h"
 #include "xdr-instr-private.h"
+
+/* later to be decoupled from the actual source */
+#if defined HAVE_MYSQL
+# include <mysql/mysql.h>
+#endif	/* HAVE_MYSQL */
 
 /* tick services */
 #define index_t	size_t
@@ -198,28 +204,90 @@ instr_tick_by_instr_svc(job_t j)
 }
 
 
-static const char *dbhost, *dbuser, *dbpass, *dbsche;
+/* db connectors */
+static const char *host = NULL;
+static const char *user = NULL;
+static const char *pass = NULL;
+static const char *sche = NULL;
+/* mysql conn, kept open */
+static void *conn;
 
 static void
-frob_db_settings(void *spec)
+db_connect(void *UNUSED(clo))
 {
-	config_setting_lookup_string(spec, "host", &dbhost);
-	config_setting_lookup_string(spec, "user", &dbuser);
-	config_setting_lookup_string(spec, "pass", &dbpass);
-	config_setting_lookup_string(spec, "schema", &dbsche);
+/* we assume that SPEC is a config_setting_t pointing to database mumbojumbo */
+	MYSQL *res;
+	const char dflt_sche[] = "freundt";
+
+	UD_DEBUG("deferred tick loader: loading ...");
+	/* have we got a catalogue? */
+	if (instrs == NULL) {
+		UD_DBGCONT("failed (no catalogue found)\n");
+		return;
+	} else if (conn != NULL) {
+		UD_DBGCONT("failed (already connected)\n");
+		return;
+	}
+	UD_DBGCONT("done\n");
+
+	UD_DEBUG("connecting to database ...");
+
+	if (host == NULL || user == NULL || pass == NULL) {
+		conn = NULL;
+		UD_DBGCONT("failed\n");
+		return;
+	} else if (sche == NULL) {
+		/* just assume the schema exists as we know it */
+		sche = dflt_sche;
+	}
+
+	res = mysql_init(NULL);
+	if (!mysql_real_connect(res, host, user, pass, sche, 0, NULL, 0)) {
+		mysql_close(res);
+		conn = NULL;
+		UD_DBGCONT("failed\n");
+		return;
+	}
+	conn = res;
+	UD_DBGCONT("done\n");
 	return;
 }
+
+static void __attribute__((unused))
+db_disconnect(void)
+{
+	(void)mysql_close(conn);
+	conn = NULL;
+	return;
+}
+
+static void
+frob_db_specs(void *clo)
+{
+	/* try and read the stuff from the config file */
+	config_setting_lookup_string(clo, "host", &host);
+	config_setting_lookup_string(clo, "user", &user);
+	config_setting_lookup_string(clo, "pass", &pass);
+	config_setting_lookup_string(clo, "schema", &sche);
+}
+
+
+#define DEFERRAL_TIME	10.0
 
 void
 dso_xdr_instr_ticks_LTX_init(void *clo)
 {
+	struct {ud_ctx_t ctx; void *spec;} *tmp = clo;
+
 	UD_DEBUG("mod/xdr-instr-ticks: loading ...");
 	/* tick service */
 	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 
-	frob_db_settings(clo);
+	/* store the config file settings for later use */
+	frob_db_specs(tmp->spec);
+	schedule_timer_once(tmp->ctx, db_connect, tmp->spec, DEFERRAL_TIME);
 	return;
 }
 

@@ -392,12 +392,8 @@ instr_dump_to_file_svc(job_t j)
 
 
 #if 0
-#include <ev.h>
-
-static ev_idle __attribute__((aligned(16))) __widle;
-
 static void
-deferred_dl(EV_P_ ev_idle *w, int revents)
+deferred_dl(BLA *w, int revents)
 {
 #if 0
 	struct job_s j;
@@ -409,7 +405,8 @@ deferred_dl(EV_P_ ev_idle *w, int revents)
 	send_m46(&j);
 	UD_DBGCONT("done\n");
 #endif
-	ev_idle_stop(EV_A_ w);
+
+
 #if 0
 #define SOCK_DCCP 6      
 #define IPPROTO_DCCP 33
@@ -506,13 +503,14 @@ static void
 load_ticks_fetcher(void *clo, void *grpcfg, void *spec)
 {
 	void *src = cfgspec_get_source(grpcfg, spec);
+	struct {ud_ctx_t ctx; void *spec;} tmp = {.ctx = clo, .spec = src};
 
 	/* find out about its type */
 	switch (cfgsrc_type(src)) {
 	case CST_MYSQL:
 #if defined HAVE_MYSQL
 		/* fetch some instruments by sql */
-		dso_xdr_instr_ticks_LTX_init(src);
+		dso_xdr_instr_ticks_LTX_init(&tmp);
 #endif	/* HAVE_MYSQL */
 		break;
 
@@ -528,13 +526,14 @@ static void
 load_instr_fetcher(void *clo, void *grpcfg, void *spec)
 {
 	void *src = cfgspec_get_source(grpcfg, spec);
+	struct {ud_ctx_t ctx; void *spec;} tmp = {.ctx = clo, .spec = src};
 
 	/* find out about its type */
 	switch (cfgsrc_type(src)) {
 	case CST_MYSQL:
 #if defined HAVE_MYSQL
 		/* fetch some instruments by sql */
-		dso_xdr_instr_mysql_LTX_init(src);
+		dso_xdr_instr_mysql_LTX_init(&tmp);
 #endif	/* HAVE_MYSQL */
 		break;
 
@@ -550,9 +549,6 @@ void
 dso_xdr_instr_LTX_init(void *clo)
 {
 	ud_ctx_t ctx = clo;
-#if 0
-	ev_idle *widle = &__widle;
-#endif
 	void *settings, *tmp;
 
 	UD_DEBUG("mod/xdr-instr: loading ...");
@@ -578,13 +574,6 @@ dso_xdr_instr_LTX_init(void *clo)
 	if ((tmp = asked_for_instrs_p(settings))) {
 		load_instr_fetcher(clo, settings, tmp);
 	}
-
-#if 0
-	UD_DEBUG("deploying idle bomb ...");
-	ev_idle_init(widle, deferred_dl);
-	ev_idle_start(ctx->mainloop, widle);
-	UD_DBGCONT("done\n");
-#endif
 	return;
 }
 

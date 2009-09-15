@@ -59,7 +59,7 @@
 #include "catalogue.h"
 #include "xdr-instr-private.h"
 
-#if defined HAVE_MYSQL || 1
+#if defined HAVE_MYSQL
 # include <mysql/mysql.h>
 #endif	/* HAVE_MYSQL */
 
@@ -347,6 +347,8 @@ db_disconnect(void)
 void
 dso_xdr_instr_mysql_LTX_init(void *clo)
 {
+	struct {ud_ctx_t ctx; void *spec;} *tmp = clo;
+
 	UD_DEBUG("mod/xdr-instr-mysql: loading ...");
 	/* create the catalogue */
 	if (instrs == NULL) {
@@ -356,7 +358,7 @@ dso_xdr_instr_mysql_LTX_init(void *clo)
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("connecting to database ...");
-	if (db_connect(clo) == NULL) {
+	if (db_connect(tmp->spec) == NULL) {
 		UD_DBGCONT("failed\n");
 		return;
 	}

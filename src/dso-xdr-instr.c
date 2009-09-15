@@ -391,6 +391,7 @@ instr_dump_to_file_svc(job_t j)
 }
 
 
+#if 0
 #include <ev.h>
 
 static ev_idle __attribute__((aligned(16))) __widle;
@@ -446,12 +447,113 @@ deferred_dl(EV_P_ ev_idle *w, int revents)
 #endif	/* 0 */
 	return;
 }
+#endif	/* big-0 */
+
+
+/* config file mumbo jumbo */
+#define CFG_GROUP	"dso-xdr-instr"
+#define CFG_TFETCHER	"ticks_fetcher"
+#define CFG_IFETCHER	"instr_fetcher"
+
+static void*
+frob_relevant_config(config_t *cfg)
+{
+	return config_lookup(cfg, CFG_GROUP);
+}
+
+static void*
+asked_for_ticks_p(config_setting_t *cfgs)
+{
+	return config_setting_get_member(cfgs, CFG_TFETCHER);
+}
+
+static void*
+asked_for_instrs_p(config_setting_t *cfgs)
+{
+	return config_setting_get_member(cfgs, CFG_IFETCHER);
+}
+
+static void*
+cfgspec_get_source(void *grp, void *spec)
+{
+#define CFG_SOURCE	"source"
+	const char *src = NULL;
+	config_setting_lookup_string(spec, CFG_SOURCE, &src);
+	return config_setting_get_member(grp, src);
+}
+
+typedef enum {
+	CST_UNK,
+	CST_MYSQL,
+} cfgsrc_type_t;
+
+static cfgsrc_type_t
+cfgsrc_type(void *spec)
+{
+#define CFG_TYPE	"type"
+	const char *type = NULL;
+	config_setting_lookup_string(spec, CFG_TYPE, &type);
+
+	if (type == NULL) {
+		return CST_UNK;
+	} else if (memcmp(type, "mysql", 5) == 0) {
+		return CST_MYSQL;
+	}
+	return CST_UNK;
+}
+
+static void
+load_ticks_fetcher(void *clo, void *grpcfg, void *spec)
+{
+	void *src = cfgspec_get_source(grpcfg, spec);
+
+	/* find out about its type */
+	switch (cfgsrc_type(src)) {
+	case CST_MYSQL:
+#if defined HAVE_MYSQL
+		/* fetch some instruments by sql */
+		dso_xdr_instr_ticks_LTX_init(src);
+#endif	/* HAVE_MYSQL */
+		break;
+
+	case CST_UNK:
+	default:
+		/* do fuckall */
+		break;
+	}
+	return;
+}
+
+static void
+load_instr_fetcher(void *clo, void *grpcfg, void *spec)
+{
+	void *src = cfgspec_get_source(grpcfg, spec);
+
+	/* find out about its type */
+	switch (cfgsrc_type(src)) {
+	case CST_MYSQL:
+#if defined HAVE_MYSQL
+		/* fetch some instruments by sql */
+		dso_xdr_instr_mysql_LTX_init(src);
+#endif	/* HAVE_MYSQL */
+		break;
+
+	case CST_UNK:
+	default:
+		/* do fuckall */
+		break;
+	}
+	return;
+}
 
 void
 dso_xdr_instr_LTX_init(void *clo)
 {
 	ud_ctx_t ctx = clo;
+#if 0
 	ev_idle *widle = &__widle;
+#endif
+	void *settings, *tmp;
 
 	UD_DEBUG("mod/xdr-instr: loading ...");
 	/* create the catalogue */
@@ -463,17 +565,23 @@ dso_xdr_instr_LTX_init(void *clo)
 	ud_set_service(0x421c, instr_dump_to_file_svc, NULL);
 	UD_DBGCONT("done\n");
 
+	/* take a gaze at what we're supposed to do */
+	settings = frob_relevant_config(&ctx->cfgctx);
+	/* load the ticks fetcher if need be */
+	if ((tmp = asked_for_ticks_p(settings))) {
+		load_ticks_fetcher(clo, settings, tmp);
+	}
+	/* load the instr fetcher if need be */
+	if ((tmp = asked_for_instrs_p(settings))) {
+		load_instr_fetcher(clo, settings, tmp);
+	}
+
+#if 0
 	UD_DEBUG("deploying idle bomb ...");
 	ev_idle_init(widle, deferred_dl);
 	ev_idle_start(ctx->mainloop, widle);
 	UD_DBGCONT("done\n");
-
-	/* load the ticks service */
-	dso_xdr_instr_ticks_LTX_init(clo);
-#if defined HAVE_MYSQL
-	/* fetch some instruments by sql */
-	dso_xdr_instr_mysql_LTX_init(clo);
-#endif	/* HAVE_MYSQL */
+#endif
 	return;
 }
 

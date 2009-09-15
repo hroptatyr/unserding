@@ -68,10 +68,6 @@
 #endif	/* !countof */
 
 static void *conn;
-static const char dflt_host[] = "cobain";
-static const char dflt_user[] = "GAT_user";
-static const char dflt_pass[] = "EFGau5A4A5BLGAme";
-static const char dflt_sche[] = "freundt";
 
 
 static const char iqry[] =
@@ -307,27 +303,24 @@ fetch_instrs(void)
 
 /* db connectors */
 static void*
-db_connect(ud_ctx_t ctx)
+db_connect(void *spec)
 {
+/* we assume that SPEC is a config_setting_t pointing to database mumbojumbo */
 	MYSQL *res;
 	const char *host = NULL;
 	const char *user = NULL;
 	const char *pass = NULL;
 	const char *sche = NULL;
-	config_t *cfgctx = &ctx->cfgctx;
+	const char dflt_sche[] = "freundt";
 
 	/* try and read the stuff from the config file */
-	config_lookup_string(cfgctx, "dso-xdr-instr.dbhost", &host);
-	config_lookup_string(cfgctx, "dso-xdr-instr.dbuser", &user);
-	config_lookup_string(cfgctx, "dso-xdr-instr.dbpass", &pass);
-	config_lookup_string(cfgctx, "dso-xdr-instr.dbschema", &sche);
+	config_setting_lookup_string(spec, "host", &host);
+	config_setting_lookup_string(spec, "user", &user);
+	config_setting_lookup_string(spec, "pass", &pass);
+	config_setting_lookup_string(spec, "schema", &sche);
 
 	if (host == NULL || user == NULL || pass == NULL) {
-		/* fall back on defaults */
-		host = dflt_host;
-		user = dflt_user;
-		pass = dflt_pass;
-		sche = dflt_sche;
+		return conn = NULL;
 	} else if (sche == NULL) {
 		/* just assume the schema exists as we know it */
 		sche = dflt_sche;
@@ -354,8 +347,6 @@ db_disconnect(void)
 void
 dso_xdr_instr_mysql_LTX_init(void *clo)
 {
-	ud_ctx_t ctx = clo;
-
 	UD_DEBUG("mod/xdr-instr-mysql: loading ...");
 	/* create the catalogue */
 	if (instrs == NULL) {
@@ -365,7 +356,7 @@ dso_xdr_instr_mysql_LTX_init(void *clo)
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("connecting to database ...");
-	if (db_connect(ctx) == NULL) {
+	if (db_connect(clo) == NULL) {
 		UD_DBGCONT("failed\n");
 		return;
 	}

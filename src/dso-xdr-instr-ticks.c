@@ -201,13 +201,12 @@ instr_tick_by_instr_svc(job_t j)
 static const char *dbhost, *dbuser, *dbpass, *dbsche;
 
 static void
-frob_db_settings(ud_ctx_t ctx)
+frob_db_settings(void *spec)
 {
-	config_t *cfgctx = &ctx->cfgctx;
-	config_lookup_string(cfgctx, "dso-xdr-instr.dbhost", &dbhost);
-	config_lookup_string(cfgctx, "dso-xdr-instr.dbuser", &dbuser);
-	config_lookup_string(cfgctx, "dso-xdr-instr.dbpass", &dbpass);
-	config_lookup_string(cfgctx, "dso-xdr-instr.dbschema", &dbsche);
+	config_setting_lookup_string(spec, "host", &dbhost);
+	config_setting_lookup_string(spec, "user", &dbuser);
+	config_setting_lookup_string(spec, "pass", &dbpass);
+	config_setting_lookup_string(spec, "schema", &dbsche);
 	return;
 }
 

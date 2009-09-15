@@ -2,10 +2,19 @@
 
 # xdr mysql db fetcher
 dso-xdr-instr: {
-	dbhost = "cobain";
-	dbport = 3306;
-	dbuser = "GAT_user";
-	dbpass = "EFGau5A4A5BLGAme";
-	dbschema = "freundt";
+	db: {
+		type = "mysql";
+		host = "cobain";
+		port = 3306;
+		user = "GAT_user";
+		pass = "EFGau5A4A5BLGAme";
+		schema = "freundt";
+	};
+	instr_fetcher: {
+		source = "db";
+	};
+	ticks_fetcher: {
+		source = "db";
+	};
 };
 

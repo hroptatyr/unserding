@@ -452,9 +452,6 @@ main(int argc, const char *argv[])
 	/* initialise modules */
 	ud_init_modules(rest, &__ctx);
 
-	/* just before we start the action, kick the config context */
-	ud_free_config(&__ctx);
-
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);
@@ -529,6 +526,9 @@ main(int argc, const char *argv[])
 
 	/* destroy the default evloop */
 	ev_default_destroy();
+
+	/* kick the config context */
+	ud_free_config(&__ctx);
 
 	/* close our log output */	
 	fflush(logout);

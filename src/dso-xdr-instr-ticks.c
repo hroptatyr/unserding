@@ -66,8 +66,7 @@
 # include <mysql/mysql.h>
 #endif	/* HAVE_MYSQL */
 
-static void db_connect(void *UNUSED());
-static void db_disconnect(void);
+static void obtain_tick_urns(void *UNUSED());
 
 /* tick services */
 #define index_t	size_t
@@ -215,30 +214,15 @@ static const char *sche = NULL;
 /* mysql conn, kept open */
 static void *conn;
 
-static void
-db_connect(void *UNUSED(clo))
+static void*
+db_connect(void)
 {
 /* we assume that SPEC is a config_setting_t pointing to database mumbojumbo */
 	MYSQL *res;
 	const char dflt_sche[] = "freundt";
 
-	UD_DEBUG("deferred tick loader: loading ...");
-	/* have we got a catalogue? */
-	if (instrs == NULL) {
-		UD_DBGCONT("failed (no catalogue found)\n");
-		return;
-	} else if (conn != NULL) {
-		UD_DBGCONT("failed (already connected)\n");
-		return;
-	}
-	UD_DBGCONT("done\n");
-
-	UD_DEBUG("connecting to database ...");
-
 	if (host == NULL || user == NULL || pass == NULL) {
-		conn = NULL;
-		UD_DBGCONT("failed\n");
-		return;
+		return conn = NULL;
 	} else if (sche == NULL) {
 		/* just assume the schema exists as we know it */
 		sche = dflt_sche;
@@ -247,13 +231,9 @@ db_connect(void *UNUSED(clo))
 	res = mysql_init(NULL);
 	if (!mysql_real_connect(res, host, user, pass, sche, 0, NULL, 0)) {
 		mysql_close(res);
-		conn = NULL;
-		UD_DBGCONT("failed\n");
-		return;
+		return conn = NULL;
 	}
-	conn = res;
-	UD_DBGCONT("done\n");
-	return;
+	return conn = res;
 }
 
 static void __attribute__((unused))
@@ -275,6 +255,87 @@ frob_db_specs(void *clo)
 }
 
 
+/* overview and administrative bullshit */
+static const char ovqry[] =
+	"SELECT "
+#define INSTR_ID	0
+	"`uiu`.`ga_instr_id`, "
+#define URN_ID		1
+	"`uiu`.`ga_urn_id`, "
+#define URN		2
+	"`uiu`.`urn`, "
+#define MIN_DT		3
+	"`uiu`.`min_dt`, "
+#define MAX_DT		4
+	"`uiu`.`max_dt` "
+	"FROM `freundt`.`ga_instr_urns` AS `uiu`";
+
+static void
+ovqry_rowf(void **row, size_t nflds)
+{
+	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
+
+	switch (urn_id) {
+	case 1 ... 3:
+		UD_DEBUG("Once-A-Day tick for %s\n", (char*)row[INSTR_ID]);
+	default:
+		break;
+	}
+	return;
+}
+
+static void
+fetch_tick_overview(void)
+{
+	void *res;
+
+	/* off we go */
+	if (mysql_real_query(conn, ovqry, sizeof(ovqry)-1) != 0) {
+		/* dont know */
+		return;
+	}
+	/* otherwise fetch the result */
+	if ((res = mysql_store_result(conn)) == NULL) {
+		/* bummer */
+		return;
+	}
+	/* process him */
+	{
+		size_t nflds = mysql_num_fields(res);
+		MYSQL_ROW r;
+
+		while ((r = mysql_fetch_row(res))) {
+			ovqry_rowf((void**)r, nflds);
+		}
+	}
+
+	/* and free the result object */
+	mysql_free_result(res);
+	return;
+}
+
+static void
+obtain_tick_urns(void *UNUSED(clo))
+{
+	UD_DEBUG("deferred tick loader: loading ...");
+	/* have we got a catalogue? */
+	if (instrs == NULL) {
+		UD_DBGCONT("failed (no catalogue found)\n");
+		return;
+	} else if (conn != NULL) {
+		UD_DBGCONT("failed (already connected)\n");
+		return;
+	} else if (db_connect() == NULL) {
+		UD_DBGCONT("failed (db connexion cunted)\n");
+		return;
+	}
+	/* really fetch the eejit now */
+	fetch_tick_overview();
+	UD_DBGCONT("done\n");
+	return;
+}
+
+
 #define DEFERRAL_TIME	10.0
 
 void
@@ -290,7 +351,7 @@ dso_xdr_instr_ticks_LTX_init(void *clo)
 
 	/* store the config file settings for later use */
 	frob_db_specs(tmp->spec);
-	schedule_timer_once(tmp->ctx, db_connect, NULL, DEFERRAL_TIME);
+	schedule_timer_once(tmp->ctx, obtain_tick_urns, NULL, DEFERRAL_TIME);
 	return;
 }
 

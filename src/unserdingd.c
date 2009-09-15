@@ -346,6 +346,72 @@ ud_parse_cl(size_t argc, const char *argv[])
         return poptGetArgs(opt_ctx);
 }
 
+#define GLOB_CFG_PRE	"/etc/unserding"
+#if !defined MAX_PATH_LEN
+# define MAX_PATH_LEN	64
+#endif	/* !MAX_PATH_LEN */
+
+/* do me properly */
+static const char cfg_glob_prefix[] = GLOB_CFG_PRE;
+static const char cfg_file_name[] = "unserdingrc";
+
+static FILE*
+ud_fopen_user_cfg(void)
+{
+	char uhome[MAX_PATH_LEN], *p;
+
+	/* get the user's home dir */
+	p = stpcpy(uhome, getenv("HOME"));
+	*p++ = '/';
+	*p++ = '.';
+	strncpy(p, cfg_file_name, sizeof(cfg_file_name));
+
+	return fopen(uhome, "r");
+}
+
+static FILE*
+ud_fopen_glob_cfg(void)
+{
+	char globf[MAX_PATH_LEN], *p;
+
+	/* get the user's home dir */
+	strncpy(globf, cfg_glob_prefix, sizeof(cfg_glob_prefix));
+	p = globf + sizeof(cfg_glob_prefix);
+	*p++ = '/';
+	strncpy(p, cfg_file_name, sizeof(cfg_file_name));
+
+	return fopen(globf, "r");
+}
+
+static void
+ud_read_config(ud_ctx_t ctx)
+{
+	config_t *cfgctx = &ctx->cfgctx;
+	FILE *f;
+
+        UD_DEBUG("reading configuration from config file\n");
+	config_init(cfgctx);
+
+	/* we prefer the user's config file, then fall back to the
+	 * global config file if that's not available */
+
+	if ((f = ud_fopen_user_cfg()) != NULL) {
+		config_read(cfgctx, f);
+		fclose(f);
+	} else if ((f = ud_fopen_glob_cfg()) != NULL) {
+		config_read(cfgctx, f);
+		fclose(f);
+	}
+	return;
+}
+
+static void
+ud_free_config(ud_ctx_t ctx)
+{
+	config_destroy(&ctx->cfgctx);
+	return;
+}
+
 
 int
 main(int argc, const char *argv[])
@@ -366,6 +432,9 @@ main(int argc, const char *argv[])
 	/* parse the command line */
 	rest = ud_parse_cl(argc, argv);
 
+	/* try and read the context file */
+	ud_read_config(&__ctx);
+
 	/* run as daemon, do me properly */
 	if (daemonisep) {
 		daemonise();
@@ -373,20 +442,19 @@ main(int argc, const char *argv[])
 	/* initialise the main loop */
 	loop = ev_default_loop(0);
 	__ctx.mainloop = loop;
-	/* and the context file */
-	config_init(&__ctx.cfgctx);
 
 	/* initialise global job q */
 	init_glob_jq(&__glob_jq);
 
-	/* initialise the proto core */
+	/* initialise the proto core (no-op at the mo) */
 	init_proto();
 
 	/* initialise modules */
 	ud_init_modules(rest, &__ctx);
 
 	/* just before we start the action, kick the config context */
-	config_destroy(&__ctx.cfgctx);
+	ud_free_config(&__ctx);
+
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);

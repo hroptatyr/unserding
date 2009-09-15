@@ -1,0 +1,11 @@
+## unserding example config
+
+# xdr mysql db fetcher
+dso-xdr-instr: {
+	dbhost = "cobain";
+	dbport = 3306;
+	dbuser = "GAT_user";
+	dbpass = "EFGau5A4A5BLGAme";
+	dbschema = "freundt";
+};
+

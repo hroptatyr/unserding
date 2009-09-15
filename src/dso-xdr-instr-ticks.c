@@ -66,6 +66,9 @@
 # include <mysql/mysql.h>
 #endif	/* HAVE_MYSQL */
 
+static void db_connect(void *UNUSED());
+static void db_disconnect(void);
+
 /* tick services */
 #define index_t	size_t
 typedef struct spitfire_ctx_s *spitfire_ctx_t;
@@ -287,7 +290,7 @@ dso_xdr_instr_ticks_LTX_init(void *clo)
 
 	/* store the config file settings for later use */
 	frob_db_specs(tmp->spec);
-	schedule_timer_once(tmp->ctx, db_connect, tmp->spec, DEFERRAL_TIME);
+	schedule_timer_once(tmp->ctx, db_connect, NULL, DEFERRAL_TIME);
 	return;
 }
 

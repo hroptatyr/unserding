@@ -78,7 +78,7 @@ bool
 read_lua_config(const char *file)
 {
 	lua_State *L = lua_open();
-	bool res;
+	int res;
 
 	/* add our bindings */
 	register_funs(L);
@@ -86,7 +86,7 @@ read_lua_config(const char *file)
 	res = luaL_dofile(L, file);
 	/* and fuck off */
 	lua_close(L);
-	return res;
+	return res == 0;
 }
 
 #if defined STANDALONE

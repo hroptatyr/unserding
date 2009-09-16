@@ -55,6 +55,7 @@
 #endif
 /* check for me */
 #include <ltdl.h>
+#include <limits.h>
 
 #include "module.h"
 #include "unserding-dbg.h"
@@ -84,6 +85,23 @@ been_there(void *handle)
 		}
 	}
 	return NULL;
+}
+
+static void
+add_myself(void)
+{
+	const char myself[] = "/proc/self/exe";
+	char wd[PATH_MAX], *dp;
+	size_t sz;
+
+	sz = readlink(myself, wd, sizeof(wd));
+	wd[sz] = '\0';
+	if ((dp = strrchr(wd, '/'))) {
+		*dp = '\0';
+		UD_DEBUG("adding %s\n", wd);
+		lt_dladdsearchdir(wd);
+	}
+	return;
 }
 
 /**
@@ -193,20 +211,11 @@ ud_mod_dump(FILE *whither)
 void
 ud_init_modules(const char *const *rest, void *clo)
 {
-	/* linux only */
-	char buffer[BUFSIZ], *s;
-
 	/* initialise the dl system */
 	lt_dlinit();
 
-	readlink("/proc/self/exe", buffer, BUFSIZ);
-	if ((s = strrchr(buffer, '/')) != NULL) {
-		*s = '\0';
-	}
-
-	if (lt_dlsetsearchpath(buffer)) {
-		return;
-	}
+	/* add current exec path to search path */
+	add_myself();
 
 	/* now load modules */
 	if (rest == NULL) {

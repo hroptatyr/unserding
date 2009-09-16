@@ -38,6 +38,6 @@
 #if !defined INCLUDED_lua_config_h_
 #define INCLUDED_lua_config_h_
 
-extern void read_lua_config(const char *file);
+extern bool read_lua_config(const char *file);
 
 #endif	/* INCLUDED_lua_config_h_ */

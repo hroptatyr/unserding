@@ -38,8 +38,15 @@
 #if !defined INCLUDED_unserding_ctx_h_
 #define INCLUDED_unserding_ctx_h_
 
+#undef	USE_LIBCONFIG
+#define USE_LUA
 #include "unserding.h"
-#include <libconfig.h>
+#if defined USE_LIBCONFIG
+# include <libconfig.h>
+#endif	/* USE_LIBCONFIG */
+#if defined USE_LUA
+# include "lua-config.h"
+#endif	/* USE_LUA */
 
 /**
  * Unserding context structure, passed along to submods. */
@@ -50,8 +57,10 @@ typedef struct ud_ctx_s *ud_ctx_t;
 struct ud_ctx_s {
 	/** libev's mainloop */
 	void *mainloop;
+#if defined USE_LIBCONFIG
 	/** libconfig's context */
 	struct config_t cfgctx;
+#endif	/* USE_LIBCONFIG */
 };
 
 #endif	/* INCLUDED_unserding_ctx_h_ */

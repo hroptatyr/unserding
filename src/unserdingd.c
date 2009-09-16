@@ -464,6 +464,8 @@ ud_parse_cl(size_t argc, const char *argv[])
 
 /* do me properly */
 static const char cfg_glob_prefix[] = GLOB_CFG_PRE;
+
+#if defined USE_LIBCONFIG
 static const char cfg_file_name[] = "unserdingrc";
 
 static FILE*
@@ -522,6 +524,66 @@ ud_free_config(ud_ctx_t ctx)
 	config_destroy(&ctx->cfgctx);
 	return;
 }
+
+#elif defined USE_LUA
+static const char cfg_file_name[] = "unserding.lua";
+
+static void
+ud_expand_user_cfg_file_name(char *tgt)
+{
+	char *p;
+
+	/* get the user's home dir */
+	p = stpcpy(tgt, getenv("HOME"));
+	*p++ = '/';
+	*p++ = '.';
+	strncpy(p, cfg_file_name, sizeof(cfg_file_name));
+	return;
+}
+
+static void
+ud_expand_glob_cfg_file_name(char *tgt)
+{
+	char *p;
+
+	/* get the user's home dir */
+	strncpy(tgt, cfg_glob_prefix, sizeof(cfg_glob_prefix));
+	p = tgt + sizeof(cfg_glob_prefix);
+	*p++ = '/';
+	strncpy(p, cfg_file_name, sizeof(cfg_file_name));
+	return;
+}
+
+static void
+ud_read_config(ud_ctx_t ctx)
+{
+	char cfgf[MAX_PATH_LEN];
+
+        UD_DEBUG("reading configuration from config file ...");
+
+	/* we prefer the user's config file, then fall back to the
+	 * global config file if that's not available */
+	ud_expand_user_cfg_file_name(cfgf);
+	if (read_lua_config(cfgf)) {
+		UD_DBGCONT("done\n");
+		return;
+	}
+	/* otherwise there must have been an error */
+	ud_expand_glob_cfg_file_name(cfgf);
+	if (read_lua_config(cfgf)) {
+		UD_DBGCONT("done\n");
+		return;
+	}
+	UD_DBGCONT("failed\n");
+	return;
+}
+
+static void
+ud_free_config(ud_ctx_t ctx)
+{
+	return;
+}
+#endif
 
 
 int

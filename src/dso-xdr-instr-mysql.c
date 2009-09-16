@@ -317,11 +317,13 @@ db_connect(void *spec)
 	const char *sche = NULL;
 	const char dflt_sche[] = "freundt";
 
+#if defined USE_LIBCONFIG
 	/* try and read the stuff from the config file */
 	config_setting_lookup_string(spec, "host", &host);
 	config_setting_lookup_string(spec, "user", &user);
 	config_setting_lookup_string(spec, "pass", &pass);
 	config_setting_lookup_string(spec, "schema", &sche);
+#endif	/* USE_LIBCONFIG */
 
 	if (host == NULL || user == NULL || pass == NULL) {
 		return conn = NULL;

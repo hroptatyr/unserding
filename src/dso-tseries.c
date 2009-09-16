@@ -208,6 +208,7 @@ instr_tick_by_instr_svc(job_t j)
 }
 
 
+#if defined USE_LIBCONFIG
 /* config file mumbo jumbo */
 #define CFG_GROUP	"dso-xdr-instr"
 #define CFG_TFETCHER	"ticks_fetcher"
@@ -276,13 +277,16 @@ load_ticks_fetcher(void *clo, void *grpcfg, void *spec)
 	}
 	return;
 }
+#endif	/* USE_LIBCONFIG */
 
 
 void
 dso_tseries_LTX_init(void *clo)
 {
+#if defined USE_LIBCONFIG
 	ud_ctx_t ctx = clo;
 	void *settings, *tmp;
+#endif	/* USE_LIBCONFIG */
 
 	UD_DEBUG("mod/tseries: loading ...");
 	/* tick service */
@@ -290,6 +294,7 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 
+#if defined USE_LIBCONFIG
 	/* take a gaze at what we're supposed to do */
 	if ((settings = frob_relevant_config(&ctx->cfgctx)) == NULL) {
 		/* fuck off immediately */
@@ -299,6 +304,7 @@ dso_tseries_LTX_init(void *clo)
 	if ((tmp = asked_for_ticks_p(settings))) {
 		load_ticks_fetcher(clo, settings, tmp);
 	}
+#endif	/* USE_LIBCONFIG */
 	return;
 }
 

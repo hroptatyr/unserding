@@ -447,6 +447,7 @@ deferred_dl(BLA *w, int revents)
 #endif	/* big-0 */
 
 
+#if defined USE_LIBCONFIG
 /* config file mumbo jumbo */
 #define CFG_GROUP	"dso-xdr-instr"
 #define CFG_TFETCHER	"ticks_fetcher"
@@ -515,13 +516,16 @@ load_instr_fetcher(void *clo, void *grpcfg, void *spec)
 	}
 	return;
 }
+#endif
 
 
 void
 dso_xdr_instr_LTX_init(void *clo)
 {
+#if defined USE_LIBCONFIG
 	ud_ctx_t ctx = clo;
 	void *settings, *tmp;
+#endif	/* USE_LIBCONFIG */
 
 	UD_DEBUG("mod/xdr-instr: loading ...");
 	/* create the catalogue */
@@ -533,6 +537,7 @@ dso_xdr_instr_LTX_init(void *clo)
 	ud_set_service(0x421c, instr_dump_to_file_svc, NULL);
 	UD_DBGCONT("done\n");
 
+#if defined USE_LIBCONFIG
 	/* take a gaze at what we're supposed to do */
 	if ((settings = frob_relevant_config(&ctx->cfgctx)) == NULL) {
 		/* fuck off immediately */
@@ -542,6 +547,7 @@ dso_xdr_instr_LTX_init(void *clo)
 	if ((tmp = asked_for_instrs_p(settings))) {
 		load_instr_fetcher(clo, settings, tmp);
 	}
+#endif	/* USE_LIBCONFIG */
 	return;
 }
 

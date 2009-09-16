@@ -88,29 +88,28 @@ udctx_get_setting(ud_ctx_t ctx)
 /* config mumbojumbo, just redirs to the lua cruft */
 #if defined USE_LUA
 static inline ud_cfgset_t
-config_cfgtbl_lookup(ud_ctx_t ctx, ud_cfgset_t s, const char *name)
+udcfg_tbl_lookup(ud_ctx_t ctx, ud_cfgset_t s, const char *name)
 {
 	return lc_cfgtbl_lookup(ctx->cfgctx, s, name);
 }
 
 static inline size_t
-config_cfgtbl_lookup_s(const char **t, ud_ctx_t c, ud_cfgset_t s, const char *n)
+udcfg_tbl_lookup_s(const char **t, ud_ctx_t c, ud_cfgset_t s, const char *n)
 {
 	return lc_cfgtbl_lookup_s(t, c->cfgctx, s, n);
 }
 
-#elif defined USE_LIBCONFIG
-static inline ud_cfgset_t
-config_cfgtbl_lookup(ud_ctx_t ctx, ud_cfgset_t s, const char *name)
+static inline size_t
+udcfg_glob_lookup_s(const char **t, ud_ctx_t c, const char *n)
 {
-	return config_lookup(&ctx->cfgctx, name);
+	return lc_globcfg_lookup_s(t, c->cfgctx, n);
 }
 
-static inline size_t
-config_cfgtbl_lookup_s(const char **t, ud_ctx_t c, ud_cfgset_t s, const char *n)
+static inline bool
+udcfg_glob_lookup_b(ud_ctx_t ctx, const char *name)
 {
-	return config_setting_lookup_string(s, n, t);
+	return lc_globcfg_lookup_b(ctx->cfgctx, name);
 }
-#endif	/* USE_LUA || USE_LIBCONFIG */
+#endif	/* USE_LUA */
 
 #endif	/* INCLUDED_unserding_ctx_h_ */

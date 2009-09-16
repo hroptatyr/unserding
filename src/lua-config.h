@@ -48,4 +48,8 @@ lc_cfgtbl_lookup(void *L, void *s, const char *name);
 extern size_t
 lc_cfgtbl_lookup_s(const char **res, void *L, void *s, const char *name);
 
+extern bool lc_globcfg_lookup_b(void *L, const char *name);
+extern size_t
+lc_globcfg_lookup_s(const char **res, void *L, const char *name);
+
 #endif	/* INCLUDED_lua_config_h_ */

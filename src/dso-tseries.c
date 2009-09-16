@@ -229,7 +229,7 @@ static void*
 cfgspec_get_source(void *ctx, void *spec)
 {
 #define CFG_SOURCE	"source"
-	return config_cfgtbl_lookup(ctx, spec, CFG_SOURCE);
+	return udcfg_tbl_lookup(ctx, spec, CFG_SOURCE);
 }
 
 typedef enum {
@@ -242,8 +242,9 @@ cfgsrc_type(void *ctx, void *spec)
 {
 #define CFG_TYPE	"type"
 	const char *type = NULL;
-	config_cfgtbl_lookup_s(&type, ctx, spec, CFG_TYPE);
+	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
 
+	UD_DEBUG("type %s %p\n", type, spec);
 	if (type == NULL) {
 		return CST_UNK;
 	} else if (memcmp(type, "mysql", 5) == 0) {

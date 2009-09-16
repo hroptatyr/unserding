@@ -613,6 +613,8 @@ main(int argc, const char *argv[])
 	/* try and read the context file */
 	ud_read_config(&__ctx);
 
+	daemonisep |= udcfg_glob_lookup_b(&__ctx, "daemonise");
+
 	/* run as daemon, do me properly */
 	if (daemonisep) {
 		daemonise();

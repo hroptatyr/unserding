@@ -50,6 +50,31 @@
 
 #include "lua-config.h"
 
+
+/* inlines */
+static inline void*
+lc_ref(void *L)
+{
+	int r = luaL_ref(L, LUA_REGISTRYINDEX);
+	return (void*)(long int)r;
+}
+
+static inline void
+lc_deref(void *L, void *ref)
+{
+	int r = (long int)ref;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, r);
+	return;
+}
+
+static inline void
+lc_freeref(void *L, void *ref)
+{
+	int r = (long int)ref;
+	luaL_unref(L, LUA_REGISTRYINDEX, r);
+}
+
+
 /* config setting fetchers */
 void*
 lc_cfgtbl_lookup(void *L, void *s, const char *name)
@@ -65,13 +90,35 @@ lc_cfgtbl_lookup(void *L, void *s, const char *name)
 size_t
 lc_cfgtbl_lookup_s(const char **res, void *L, void *s, const char *name)
 {
-	int idx = (long int)s;
 	size_t len;
 
-	lua_rawgeti(L, LUA_GLOBALSINDEX, idx);
-	lua_getfield(L, 1, name);
-	*res = lua_tolstring(L, 2, &len);
+	lc_deref(L, s);
+	lua_getfield(L, -1, name);
+	*res = lua_tolstring(L, -1, &len);
+	lua_pop(L, 1);
 	return len;
+}
+
+size_t
+lc_globcfg_lookup_s(const char **res, void *L, const char *name)
+{
+	size_t len;
+
+	lua_getglobal(L, name);
+	*res = lua_tolstring(L, -1, &len);
+	lua_pop(L, 1);
+	return len;
+}
+
+bool
+lc_globcfg_lookup_b(void *L, const char *name)
+{
+	bool res;
+
+	lua_getglobal(L, name);
+	res = lua_toboolean(L, -1);
+	lua_pop(L, 1);
+	return res;
 }
 
 
@@ -81,21 +128,17 @@ extern void ud_defer_dso(const char *name, void *cfgset);
 static int
 lc_load_module(lua_State *L)
 {
-	size_t len;
 	const char *p;
-	int idx;
+	void *cfgset;
 
 	if (!lua_istable(L, 1)) {
 		fprintf(stderr, "need a table you fuckwit\n");
 		return 0;
 	}
-	idx = luaL_ref(L, LUA_GLOBALSINDEX);
+	cfgset = lc_ref(L);
 
-	lua_rawgeti(L, LUA_GLOBALSINDEX, idx);
-	lua_getfield(L, 1, "file");
-	p = lua_tolstring(L, 2, &len);
-
-	ud_defer_dso(p, (void*)(long int)idx);
+	lc_cfgtbl_lookup_s(&p, L, cfgset, "file");
+	ud_defer_dso(p, cfgset);
 	return 0;
 }
 

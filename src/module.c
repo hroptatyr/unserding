@@ -59,12 +59,15 @@
 
 #include "module.h"
 #include "unserding-dbg.h"
+#include "unserding-nifty.h"
+#include "unserding-ctx.h"
 
 /**
  * \addtogroup dso
  * \{ */
 
 typedef struct ud_mod_s *ud_mod_t;
+typedef struct ud_deferred_s *ud_deferred_t;
 
 struct ud_mod_s {
 	void *handle;
@@ -74,7 +77,25 @@ struct ud_mod_s {
 	ud_mod_t next;
 };
 
+struct ud_deferred_s {
+	const char *fn;
+	void *cfgset;
+	ud_deferred_t next;
+};
+
 static ud_mod_t ud_mods = NULL;
+static ud_deferred_t ud_defs = NULL;
+
+void
+ud_defer_dso(const char *name, void *cfgset)
+{
+	ud_deferred_t res = xnew(*res);
+	res->fn = name;
+	res->cfgset = cfgset;
+	res->next = ud_defs;
+	ud_defs = res;
+	return;
+}
 
 static ud_mod_t
 been_there(void *handle)
@@ -208,16 +229,9 @@ ud_mod_dump(FILE *whither)
 }
 
 
-void
-ud_init_modules(const char *const *rest, void *clo)
+static void
+load_climods(const char *const *rest, void *clo)
 {
-	/* initialise the dl system */
-	lt_dlinit();
-
-	/* add current exec path to search path */
-	add_myself();
-
-	/* now load modules */
 	if (rest == NULL) {
 		/* no modules at all */
 		return;
@@ -229,6 +243,34 @@ ud_init_modules(const char *const *rest, void *clo)
 		UD_DEBUG("loading module \"%s\"\n", *mod);
 		open_aux(*mod, clo);
 	}
+	return;
+}
+
+static void
+load_deferred(void *clo)
+{
+	UD_DEBUG("deferred mods %p\n", ud_defs);
+	for (ud_deferred_t mod = ud_defs; mod; mod = mod->next) {
+		UD_DEBUG("loading module \"%s\"\n", mod->fn);
+		udctx_set_setting(clo, mod->cfgset);
+		open_aux(mod->fn, clo);
+	}
+	return;
+}
+
+void
+ud_init_modules(const char *const *rest, void *clo)
+{
+	/* initialise the dl system */
+	lt_dlinit();
+
+	/* add current exec path to search path */
+	add_myself();
+
+	/* now load modules */
+	load_climods(rest, clo);
+	/* load all deferred modules */
+	load_deferred(clo);
 	return;
 }
 

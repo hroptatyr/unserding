@@ -75,6 +75,9 @@ lc_cfgtbl_lookup_s(const char **res, void *L, void *s, const char *name)
 }
 
 
+/* i'm too lazy to include module.h */
+extern void ud_defer_dso(const char *name, void *cfgset);
+
 static int
 lc_load_module(lua_State *L)
 {
@@ -87,12 +90,12 @@ lc_load_module(lua_State *L)
 		return 0;
 	}
 	idx = luaL_ref(L, LUA_GLOBALSINDEX);
-	fprintf(stderr, "idx is %d\n", idx);
 
 	lua_rawgeti(L, LUA_GLOBALSINDEX, idx);
 	lua_getfield(L, 1, "file");
 	p = lua_tolstring(L, 2, &len);
-	fprintf(stderr, "loading %s\n", p);
+
+	ud_defer_dso(p, (void*)(long int)idx);
 	return 0;
 }
 

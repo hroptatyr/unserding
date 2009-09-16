@@ -290,7 +290,9 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 
-	load_ticks_fetcher(clo, settings);
+	if (settings != NULL) {
+		load_ticks_fetcher(clo, settings);
+	}
 	return;
 }
 

@@ -604,6 +604,9 @@ main(int argc, const char *argv[])
 	/* whither to log */
 	logout = stderr;
 
+	/* wipe stack pollution */
+	memset(&__ctx, 0, sizeof(__ctx));
+
 	/* parse the command line */
 	rest = ud_parse_cl(argc, argv);
 

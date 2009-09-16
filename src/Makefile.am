@@ -19,11 +19,13 @@ noinst_HEADERS = arrqueue.h dllqueue.h protocore-private.h
 unserdingd_SOURCES = unserdingd.c mcast.c
 unserdingd_SOURCES += protocore.c arrqueue.c dllqueue.c seria.c
 unserdingd_SOURCES += module.c
+unserdingd_SOURCES += lua-config.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
 unserdingd_CPPFLAGS += $(LIBEV_CPPFLAGS) $(LIBCONFIG_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt
 unserdingd_LDFLAGS += $(shell pkg-config --libs libxml-2.0)
 unserdingd_LDFLAGS += $(LIBCONFIG_LIBS)
+unserdingd_LDFLAGS += -llua
 unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL)
 
 ## server modules

@@ -208,136 +208,6 @@ instr_tick_by_instr_svc(job_t j)
 }
 
 
-/* db connectors */
-static const char *host = NULL;
-static const char *user = NULL;
-static const char *pass = NULL;
-static const char *sche = NULL;
-/* mysql conn, kept open */
-static void *conn;
-
-static void*
-db_connect(void)
-{
-/* we assume that SPEC is a config_setting_t pointing to database mumbojumbo */
-	MYSQL *res;
-	const char dflt_sche[] = "freundt";
-
-	if (host == NULL || user == NULL || pass == NULL) {
-		return conn = NULL;
-	} else if (sche == NULL) {
-		/* just assume the schema exists as we know it */
-		sche = dflt_sche;
-	}
-
-	res = mysql_init(NULL);
-	if (!mysql_real_connect(res, host, user, pass, sche, 0, NULL, 0)) {
-		mysql_close(res);
-		return conn = NULL;
-	}
-	return conn = res;
-}
-
-static void __attribute__((unused))
-db_disconnect(void)
-{
-	(void)mysql_close(conn);
-	conn = NULL;
-	return;
-}
-
-static void
-frob_db_specs(void *clo)
-{
-	/* try and read the stuff from the config file */
-	config_setting_lookup_string(clo, "host", &host);
-	config_setting_lookup_string(clo, "user", &user);
-	config_setting_lookup_string(clo, "pass", &pass);
-	config_setting_lookup_string(clo, "schema", &sche);
-}
-
-
-/* overview and administrative bullshit */
-static const char ovqry[] =
-	"SELECT "
-#define INSTR_ID	0
-	"`uiu`.`ga_instr_id`, "
-#define URN_ID		1
-	"`uiu`.`ga_urn_id`, "
-#define URN		2
-	"`uiu`.`urn`, "
-#define MIN_DT		3
-	"`uiu`.`min_dt`, "
-#define MAX_DT		4
-	"`uiu`.`max_dt` "
-	"FROM `freundt`.`ga_instr_urns` AS `uiu`";
-
-static void
-ovqry_rowf(void **row, size_t nflds)
-{
-	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
-
-	switch (urn_id) {
-	case 1 ... 3:
-		UD_DEBUG("Once-A-Day tick for %s\n", (char*)row[INSTR_ID]);
-	default:
-		break;
-	}
-	return;
-}
-
-static void
-fetch_tick_overview(void)
-{
-	void *res;
-
-	/* off we go */
-	if (mysql_real_query(conn, ovqry, sizeof(ovqry)-1) != 0) {
-		/* dont know */
-		return;
-	}
-	/* otherwise fetch the result */
-	if ((res = mysql_store_result(conn)) == NULL) {
-		/* bummer */
-		return;
-	}
-	/* process him */
-	{
-		size_t nflds = mysql_num_fields(res);
-		MYSQL_ROW r;
-
-		while ((r = mysql_fetch_row(res))) {
-			ovqry_rowf((void**)r, nflds);
-		}
-	}
-
-	/* and free the result object */
-	mysql_free_result(res);
-	return;
-}
-
-static void
-obtain_tick_urns(void *UNUSED(clo))
-{
-	UD_DEBUG("deferred tick loader: loading ...");
-	/* have we got a catalogue? */
-	if (instrs == NULL) {
-		UD_DBGCONT("failed (no catalogue found)\n");
-		return;
-	} else if (conn != NULL) {
-		UD_DBGCONT("failed (already connected)\n");
-		return;
-	} else if (db_connect() == NULL) {
-		UD_DBGCONT("failed (db connexion cunted)\n");
-		return;
-	}
-	/* really fetch the eejit now */
-	fetch_tick_overview();
-	UD_DBGCONT("done\n");
-	return;
-}
-
-
 /* config file mumbo jumbo */
 #define CFG_GROUP	"dso-xdr-instr"
 #define CFG_TFETCHER	"ticks_fetcher"
@@ -408,23 +278,11 @@ load_ticks_fetcher(void *clo, void *grpcfg, void *spec)
 }
 
 
-#define DEFERRAL_TIME	10.0
-
 void
 dso_tseries_LTX_init(void *clo)
 {
 	ud_ctx_t ctx = clo;
 	void *settings, *tmp;
-
-#if 0
-	struct {ud_ctx_t ctx; void *spec;} *tmp = clo;
-
-	UD_DEBUG("mod/xdr-instr-ticks: loading ...");
-
-	/* store the config file settings for later use */
-	frob_db_specs(tmp->spec);
-	schedule_timer_once(tmp->ctx, obtain_tick_urns, NULL, DEFERRAL_TIME);
-#endif
 
 	UD_DEBUG("mod/tseries: loading ...");
 	/* tick service */

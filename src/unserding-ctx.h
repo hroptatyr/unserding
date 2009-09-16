@@ -60,6 +60,8 @@ struct ud_ctx_s {
 #if defined USE_LIBCONFIG
 	/** libconfig's context */
 	struct config_t cfgctx;
+#elif defined USE_LUA
+	void *cfgctx;
 #endif	/* USE_LIBCONFIG */
 };
 

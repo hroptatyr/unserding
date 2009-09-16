@@ -38,6 +38,9 @@
 #if !defined INCLUDED_lua_config_h_
 #define INCLUDED_lua_config_h_
 
-extern bool read_lua_config(const char *file);
+extern bool read_lua_config(void *L, const char *file);
+
+extern void lua_config_init(void**);
+extern void lua_config_deinit(void**);
 
 #endif	/* INCLUDED_lua_config_h_ */

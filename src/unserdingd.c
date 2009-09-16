@@ -560,17 +560,18 @@ ud_read_config(ud_ctx_t ctx)
 	char cfgf[MAX_PATH_LEN];
 
         UD_DEBUG("reading configuration from config file ...");
+	lua_config_init(&ctx->cfgctx);
 
 	/* we prefer the user's config file, then fall back to the
 	 * global config file if that's not available */
 	ud_expand_user_cfg_file_name(cfgf);
-	if (read_lua_config(cfgf)) {
+	if (read_lua_config(ctx->cfgctx, cfgf)) {
 		UD_DBGCONT("done\n");
 		return;
 	}
 	/* otherwise there must have been an error */
 	ud_expand_glob_cfg_file_name(cfgf);
-	if (read_lua_config(cfgf)) {
+	if (read_lua_config(ctx->cfgctx, cfgf)) {
 		UD_DBGCONT("done\n");
 		return;
 	}
@@ -581,6 +582,7 @@ ud_read_config(ud_ctx_t ctx)
 static void
 ud_free_config(ud_ctx_t ctx)
 {
+	lua_config_deinit(&ctx->cfgctx);
 	return;
 }
 #endif

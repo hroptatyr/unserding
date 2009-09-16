@@ -75,18 +75,29 @@ register_funs(lua_State *L)
 }
 
 bool
-read_lua_config(const char *file)
+read_lua_config(void *L, const char *file)
 {
-	lua_State *L = lua_open();
 	int res;
 
-	/* add our bindings */
-	register_funs(L);
 	/* eval the input file */
 	res = luaL_dofile(L, file);
-	/* and fuck off */
-	lua_close(L);
 	return res == 0;
+}
+
+void
+lua_config_init(void **state)
+{
+	*state = lua_open();
+	/* add our bindings */
+	register_funs(*state);
+	return;
+}
+
+void
+lua_config_deinit(void **state)
+{
+	lua_close(*state);
+	return;
 }
 
 #if defined STANDALONE

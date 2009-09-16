@@ -31,6 +31,7 @@ mod_LTLIBRARIES =
 mod_LTLIBRARIES += dso-cli.la dso-scscp.la dso-scscp2.la dso-bbdb.la dso-xbbdb.la
 #mod_LTLIBRARIES += dso-instr.la
 mod_LTLIBRARIES += dso-xdr-instr.la
+mod_LTLIBRARIES += dso-tseries.la
 dso_cli_la_LDFLAGS = -module
 dso_scscp_la_LDFLAGS = -module
 dso_scscp2_la_LDFLAGS = -module
@@ -38,9 +39,8 @@ dso_bbdb_la_LDFLAGS = -module
 ## the xml bbdb module
 dso_xbbdb_la_CPPFLAGS = $(shell pkg-config --cflags libxml-2.0)
 dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
+
 ## the catalogue module
-#dso_instr_la_LDFLAGS = -module
-#header_HEADERS += catalogue.h
 dso_xdr_instr_la_LDFLAGS = -module $(LIBPFACK_LDFLAGS)
 dso_xdr_instr_la_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
 dso_xdr_instr_la_LIBADD = $(LIBPFACK_LIBS)
@@ -51,9 +51,22 @@ endif
 dso_xdr_instr_la_SOURCES = catalogue.c dso-xdr-instr.c
 if USE_MYSQL
 dso_xdr_instr_la_SOURCES += dso-xdr-instr-mysql.c
-dso_xdr_instr_la_SOURCES += dso-xdr-instr-ticks.c
 endif
 header_HEADERS += xdr-instr-seria.h
+
+## the time series module
+dso_tseries_la_LDFLAGS = -module $(LIBPFACK_LDFLAGS)
+dso_tseries_la_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
+dso_tseries_la_LIBADD = $(LIBPFACK_LIBS)
+if USE_MYSQL
+dso_tseries_la_CPPFLAGS += $(MYSQL_CPPFLAGS)
+dso_tseries_la_LDFLAGS += $(MYSQL_LDFLAGS) -lmysqlclient
+endif
+dso_tseries_la_SOURCES = dso-tseries.c
+if USE_MYSQL
+dso_tseries_la_SOURCES += dso-tseries-mysql.c
+endif
+
 ## to fiddle with option chains and other instruments
 instrumenstruation_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
 instrumenstruation_LDFLAGS = $(LIBPFACK_LDFLAGS)

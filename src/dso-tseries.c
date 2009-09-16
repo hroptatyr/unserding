@@ -1,4 +1,4 @@
-/*** dso-xdr-instr-ticks.c -- ticks of instruments
+/*** dso-tseries.c -- ticks of instruments
  *
  * Copyright (C) 2008, 2009 Sebastian Freundt
  *
@@ -56,8 +56,6 @@
 #include "unserding-ctx.h"
 #include "unserding-private.h"
 
-#include <pfack/instruments.h>
-#include "catalogue.h"
 #include "xdr-instr-seria.h"
 #include "xdr-instr-private.h"
 
@@ -340,23 +338,110 @@ obtain_tick_urns(void *UNUSED(clo))
 }
 
 
+/* config file mumbo jumbo */
+#define CFG_GROUP	"dso-xdr-instr"
+#define CFG_TFETCHER	"ticks_fetcher"
+#define CFG_IFETCHER	"instr_fetcher"
+
+static void*
+frob_relevant_config(config_t *cfg)
+{
+	return config_lookup(cfg, CFG_GROUP);
+}
+
+static void*
+asked_for_ticks_p(config_setting_t *cfgs)
+{
+	return config_setting_get_member(cfgs, CFG_TFETCHER);
+}
+
+static void*
+cfgspec_get_source(void *grp, void *spec)
+{
+#define CFG_SOURCE	"source"
+	const char *src = NULL;
+	config_setting_lookup_string(spec, CFG_SOURCE, &src);
+	return config_setting_get_member(grp, src);
+}
+
+typedef enum {
+	CST_UNK,
+	CST_MYSQL,
+} cfgsrc_type_t;
+
+static cfgsrc_type_t
+cfgsrc_type(void *spec)
+{
+#define CFG_TYPE	"type"
+	const char *type = NULL;
+	config_setting_lookup_string(spec, CFG_TYPE, &type);
+
+	if (type == NULL) {
+		return CST_UNK;
+	} else if (memcmp(type, "mysql", 5) == 0) {
+		return CST_MYSQL;
+	}
+	return CST_UNK;
+}
+
+static void
+load_ticks_fetcher(void *clo, void *grpcfg, void *spec)
+{
+	void *src = cfgspec_get_source(grpcfg, spec);
+	struct {ud_ctx_t ctx; void *spec;} tmp = {.ctx = clo, .spec = src};
+
+	/* find out about its type */
+	switch (cfgsrc_type(src)) {
+	case CST_MYSQL:
+#if defined HAVE_MYSQL
+		/* fetch some instruments by sql */
+		dso_tseries_mysql_LTX_init(&tmp);
+#endif	/* HAVE_MYSQL */
+		break;
+
+	case CST_UNK:
+	default:
+		/* do fuckall */
+		break;
+	}
+	return;
+}
+
+
 #define DEFERRAL_TIME	10.0
 
 void
-dso_xdr_instr_ticks_LTX_init(void *clo)
+dso_tseries_LTX_init(void *clo)
 {
+	ud_ctx_t ctx = clo;
+	void *settings, *tmp;
+
+#if 0
 	struct {ud_ctx_t ctx; void *spec;} *tmp = clo;
 
 	UD_DEBUG("mod/xdr-instr-ticks: loading ...");
+
+	/* store the config file settings for later use */
+	frob_db_specs(tmp->spec);
+	schedule_timer_once(tmp->ctx, obtain_tick_urns, NULL, DEFERRAL_TIME);
+#endif
+
+	UD_DEBUG("mod/tseries: loading ...");
 	/* tick service */
 	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 
-	/* store the config file settings for later use */
-	frob_db_specs(tmp->spec);
-	schedule_timer_once(tmp->ctx, obtain_tick_urns, NULL, DEFERRAL_TIME);
+	/* take a gaze at what we're supposed to do */
+	if ((settings = frob_relevant_config(&ctx->cfgctx)) == NULL) {
+		/* fuck off immediately */
+		return;
+	}
+	/* load the ticks fetcher if need be */
+	if ((tmp = asked_for_ticks_p(settings))) {
+		load_ticks_fetcher(clo, settings, tmp);
+	}
 	return;
 }
 
-/* dso-xdr-instr-ticks.c */
+/* dso-tseries.c */

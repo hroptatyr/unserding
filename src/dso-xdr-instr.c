@@ -459,12 +459,6 @@ frob_relevant_config(config_t *cfg)
 }
 
 static void*
-asked_for_ticks_p(config_setting_t *cfgs)
-{
-	return config_setting_get_member(cfgs, CFG_TFETCHER);
-}
-
-static void*
 asked_for_instrs_p(config_setting_t *cfgs)
 {
 	return config_setting_get_member(cfgs, CFG_IFETCHER);
@@ -500,29 +494,6 @@ cfgsrc_type(void *spec)
 }
 
 static void
-load_ticks_fetcher(void *clo, void *grpcfg, void *spec)
-{
-	void *src = cfgspec_get_source(grpcfg, spec);
-	struct {ud_ctx_t ctx; void *spec;} tmp = {.ctx = clo, .spec = src};
-
-	/* find out about its type */
-	switch (cfgsrc_type(src)) {
-	case CST_MYSQL:
-#if defined HAVE_MYSQL
-		/* fetch some instruments by sql */
-		dso_xdr_instr_ticks_LTX_init(&tmp);
-#endif	/* HAVE_MYSQL */
-		break;
-
-	case CST_UNK:
-	default:
-		/* do fuckall */
-		break;
-	}
-	return;
-}
-
-static void
 load_instr_fetcher(void *clo, void *grpcfg, void *spec)
 {
 	void *src = cfgspec_get_source(grpcfg, spec);
@@ -545,6 +516,7 @@ load_instr_fetcher(void *clo, void *grpcfg, void *spec)
 	return;
 }
 
+
 void
 dso_xdr_instr_LTX_init(void *clo)
 {
@@ -565,10 +537,6 @@ dso_xdr_instr_LTX_init(void *clo)
 	if ((settings = frob_relevant_config(&ctx->cfgctx)) == NULL) {
 		/* fuck off immediately */
 		return;
-	}
-	/* load the ticks fetcher if need be */
-	if ((tmp = asked_for_ticks_p(settings))) {
-		load_ticks_fetcher(clo, settings, tmp);
 	}
 	/* load the instr fetcher if need be */
 	if ((tmp = asked_for_instrs_p(settings))) {

@@ -53,6 +53,10 @@
 typedef struct ud_ctx_s *ud_ctx_t;
 
 /**
+ * Opaque data type for settings tables whither configuration goes. */
+typedef void *ud_cfgset_t;
+
+/**
  * Guts of the unserding context struct. */
 struct ud_ctx_s {
 	/** libev's mainloop */
@@ -63,6 +67,50 @@ struct ud_ctx_s {
 #elif defined USE_LUA
 	void *cfgctx;
 #endif	/* USE_LIBCONFIG */
+	ud_cfgset_t curr_cfgset;
 };
+
+/* only used during the module load stage, could be a separate arg one day */
+static inline void
+udctx_set_setting(ud_ctx_t ctx, ud_cfgset_t setting)
+{
+	ctx->curr_cfgset = setting;
+}
+
+static inline ud_cfgset_t
+udctx_get_setting(ud_ctx_t ctx)
+{
+	void *res = ctx->curr_cfgset;
+	ctx->curr_cfgset = NULL;
+	return res;
+}
+
+/* config mumbojumbo, just redirs to the lua cruft */
+#if defined USE_LUA
+static inline ud_cfgset_t
+config_cfgtbl_lookup(ud_ctx_t ctx, ud_cfgset_t s, const char *name)
+{
+	return lc_cfgtbl_lookup(ctx->cfgctx, s, name);
+}
+
+static inline size_t
+config_cfgtbl_lookup_s(const char **t, ud_ctx_t c, ud_cfgset_t s, const char *n)
+{
+	return lc_cfgtbl_lookup_s(t, c->cfgctx, s, n);
+}
+
+#elif defined USE_LIBCONFIG
+static inline ud_cfgset_t
+config_cfgtbl_lookup(ud_ctx_t ctx, ud_cfgset_t s, const char *name)
+{
+	return config_lookup(&ctx->cfgctx, name);
+}
+
+static inline size_t
+config_cfgtbl_lookup_s(const char **t, ud_ctx_t c, ud_cfgset_t s, const char *n)
+{
+	return config_setting_lookup_string(s, n, t);
+}
+#endif	/* USE_LUA || USE_LIBCONFIG */
 
 #endif	/* INCLUDED_unserding_ctx_h_ */

@@ -50,17 +50,46 @@
 
 #include "lua-config.h"
 
+/* config setting fetchers */
+void*
+lc_cfgtbl_lookup(void *L, void *s, const char *name)
+{
+	int idx = (long int)s;
+	lua_rawgeti(L, LUA_GLOBALSINDEX, idx);
+	lua_getfield(L, 1, name);
+	/* fucking memleak this is! */
+	idx = luaL_ref(L, LUA_GLOBALSINDEX);
+	return (void*)(long int)idx;
+}
+
+size_t
+lc_cfgtbl_lookup_s(const char **res, void *L, void *s, const char *name)
+{
+	int idx = (long int)s;
+	size_t len;
+
+	lua_rawgeti(L, LUA_GLOBALSINDEX, idx);
+	lua_getfield(L, 1, name);
+	*res = lua_tolstring(L, 2, &len);
+	return len;
+}
+
+
 static int
 lc_load_module(lua_State *L)
 {
 	size_t len;
 	const char *p;
+	int idx;
 
 	if (!lua_istable(L, 1)) {
 		fprintf(stderr, "need a table you fuckwit\n");
 		return 0;
 	}
+	idx = luaL_ref(L, LUA_GLOBALSINDEX);
+	fprintf(stderr, "idx is %d\n", idx);
 
+	lua_rawgeti(L, LUA_GLOBALSINDEX, idx);
 	lua_getfield(L, 1, "file");
 	p = lua_tolstring(L, 2, &len);
 	fprintf(stderr, "loading %s\n", p);

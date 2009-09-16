@@ -68,8 +68,6 @@
 # endif
 #endif	/* HAVE_MYSQL */
 
-static void obtain_tick_urns(void *UNUSED());
-
 /* tick services */
 #define index_t	size_t
 typedef struct spitfire_ctx_s *spitfire_ctx_t;
@@ -225,14 +223,13 @@ asked_for_ticks_p(config_setting_t *cfgs)
 {
 	return config_setting_get_member(cfgs, CFG_TFETCHER);
 }
+#endif
 
 static void*
-cfgspec_get_source(void *grp, void *spec)
+cfgspec_get_source(void *ctx, void *spec)
 {
 #define CFG_SOURCE	"source"
-	const char *src = NULL;
-	config_setting_lookup_string(spec, CFG_SOURCE, &src);
-	return config_setting_get_member(grp, src);
+	return config_cfgtbl_lookup(ctx, spec, CFG_SOURCE);
 }
 
 typedef enum {
@@ -241,11 +238,11 @@ typedef enum {
 } cfgsrc_type_t;
 
 static cfgsrc_type_t
-cfgsrc_type(void *spec)
+cfgsrc_type(void *ctx, void *spec)
 {
 #define CFG_TYPE	"type"
 	const char *type = NULL;
-	config_setting_lookup_string(spec, CFG_TYPE, &type);
+	config_cfgtbl_lookup_s(&type, ctx, spec, CFG_TYPE);
 
 	if (type == NULL) {
 		return CST_UNK;
@@ -256,17 +253,19 @@ cfgsrc_type(void *spec)
 }
 
 static void
-load_ticks_fetcher(void *clo, void *grpcfg, void *spec)
+load_ticks_fetcher(void *clo, void *spec)
 {
-	void *src = cfgspec_get_source(grpcfg, spec);
-	struct {ud_ctx_t ctx; void *spec;} tmp = {.ctx = clo, .spec = src};
+	void *src = cfgspec_get_source(clo, spec);
+
+	/* pass along the src settings */
+	udctx_set_setting(clo, src);
 
 	/* find out about its type */
-	switch (cfgsrc_type(src)) {
+	switch (cfgsrc_type(clo, src)) {
 	case CST_MYSQL:
 #if defined HAVE_MYSQL
 		/* fetch some instruments by sql */
-		dso_tseries_mysql_LTX_init(&tmp);
+		dso_tseries_mysql_LTX_init(clo);
 #endif	/* HAVE_MYSQL */
 		break;
 
@@ -277,16 +276,13 @@ load_ticks_fetcher(void *clo, void *grpcfg, void *spec)
 	}
 	return;
 }
-#endif	/* USE_LIBCONFIG */
 
 
 void
 dso_tseries_LTX_init(void *clo)
 {
-#if defined USE_LIBCONFIG
 	ud_ctx_t ctx = clo;
-	void *settings, *tmp;
-#endif	/* USE_LIBCONFIG */
+	void *settings = udctx_get_setting(ctx);
 
 	UD_DEBUG("mod/tseries: loading ...");
 	/* tick service */
@@ -294,17 +290,7 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 
-#if defined USE_LIBCONFIG
-	/* take a gaze at what we're supposed to do */
-	if ((settings = frob_relevant_config(&ctx->cfgctx)) == NULL) {
-		/* fuck off immediately */
-		return;
-	}
-	/* load the ticks fetcher if need be */
-	if ((tmp = asked_for_ticks_p(settings))) {
-		load_ticks_fetcher(clo, settings, tmp);
-	}
-#endif	/* USE_LIBCONFIG */
+	load_ticks_fetcher(clo, settings);
 	return;
 }
 

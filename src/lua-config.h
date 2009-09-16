@@ -43,4 +43,9 @@ extern bool read_lua_config(void *L, const char *file);
 extern void lua_config_init(void**);
 extern void lua_config_deinit(void**);
 
+extern void*
+lc_cfgtbl_lookup(void *L, void *s, const char *name);
+extern size_t
+lc_cfgtbl_lookup_s(const char **res, void *L, void *s, const char *name);
+
 #endif	/* INCLUDED_lua_config_h_ */

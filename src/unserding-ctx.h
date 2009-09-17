@@ -38,12 +38,8 @@
 #if !defined INCLUDED_unserding_ctx_h_
 #define INCLUDED_unserding_ctx_h_
 
-#undef	USE_LIBCONFIG
 #define USE_LUA
 #include "unserding.h"
-#if defined USE_LIBCONFIG
-# include <libconfig.h>
-#endif	/* USE_LIBCONFIG */
 #if defined USE_LUA
 # include "lua-config.h"
 #endif	/* USE_LUA */
@@ -61,12 +57,9 @@ typedef void *ud_cfgset_t;
 struct ud_ctx_s {
 	/** libev's mainloop */
 	void *mainloop;
-#if defined USE_LIBCONFIG
-	/** libconfig's context */
-	struct config_t cfgctx;
-#elif defined USE_LUA
+#if defined USE_LUA
 	void *cfgctx;
-#endif	/* USE_LIBCONFIG */
+#endif	/* USE_LUA */
 	ud_cfgset_t curr_cfgset;
 };
 

@@ -465,67 +465,7 @@ ud_parse_cl(size_t argc, const char *argv[])
 /* do me properly */
 static const char cfg_glob_prefix[] = GLOB_CFG_PRE;
 
-#if defined USE_LIBCONFIG
-static const char cfg_file_name[] = "unserdingrc";
-
-static FILE*
-ud_fopen_user_cfg(void)
-{
-	char uhome[MAX_PATH_LEN], *p;
-
-	/* get the user's home dir */
-	p = stpcpy(uhome, getenv("HOME"));
-	*p++ = '/';
-	*p++ = '.';
-	strncpy(p, cfg_file_name, sizeof(cfg_file_name));
-
-	return fopen(uhome, "r");
-}
-
-static FILE*
-ud_fopen_glob_cfg(void)
-{
-	char globf[MAX_PATH_LEN], *p;
-
-	/* get the user's home dir */
-	strncpy(globf, cfg_glob_prefix, sizeof(cfg_glob_prefix));
-	p = globf + sizeof(cfg_glob_prefix);
-	*p++ = '/';
-	strncpy(p, cfg_file_name, sizeof(cfg_file_name));
-
-	return fopen(globf, "r");
-}
-
-static void
-ud_read_config(ud_ctx_t ctx)
-{
-	config_t *cfgctx = &ctx->cfgctx;
-	FILE *f;
-
-        UD_DEBUG("reading configuration from config file\n");
-	config_init(cfgctx);
-
-	/* we prefer the user's config file, then fall back to the
-	 * global config file if that's not available */
-
-	if ((f = ud_fopen_user_cfg()) != NULL) {
-		config_read(cfgctx, f);
-		fclose(f);
-	} else if ((f = ud_fopen_glob_cfg()) != NULL) {
-		config_read(cfgctx, f);
-		fclose(f);
-	}
-	return;
-}
-
-static void
-ud_free_config(ud_ctx_t ctx)
-{
-	config_destroy(&ctx->cfgctx);
-	return;
-}
-
-#elif defined USE_LUA
+#if defined USE_LUA
 static const char cfg_file_name[] = "unserding.lua";
 
 static void

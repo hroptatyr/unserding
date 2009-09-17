@@ -206,25 +206,6 @@ instr_tick_by_instr_svc(job_t j)
 }
 
 
-#if defined USE_LIBCONFIG
-/* config file mumbo jumbo */
-#define CFG_GROUP	"dso-xdr-instr"
-#define CFG_TFETCHER	"ticks_fetcher"
-#define CFG_IFETCHER	"instr_fetcher"
-
-static void*
-frob_relevant_config(config_t *cfg)
-{
-	return config_lookup(cfg, CFG_GROUP);
-}
-
-static void*
-asked_for_ticks_p(config_setting_t *cfgs)
-{
-	return config_setting_get_member(cfgs, CFG_TFETCHER);
-}
-#endif
-
 static void*
 cfgspec_get_source(void *ctx, void *spec)
 {

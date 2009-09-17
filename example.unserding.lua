@@ -2,7 +2,7 @@
 
 -- database resources
 db_local = {
-	type = MYSQL,
+	type = "mysql",
 	host = "::1",
 	port = 3306,
 	user = "GAT_user",
@@ -11,7 +11,7 @@ db_local = {
 }
 
 db_cobain = {
-	type = MYSQL,
+	type = "mysql",
 	host = "cobain",
 	port = 3306,
 	user = "GAT_user",

@@ -297,7 +297,11 @@ dso_tseries_LTX_init(void *clo)
 
 	if ((settings = udctx_get_setting(ctx)) != NULL) {
 		load_ticks_fetcher(clo, settings);
+		/* be so kind as to unref the settings */
+		udcfg_tbl_free(ctx, settings);
 	}
+	/* clean up */
+	udctx_set_setting(ctx, NULL);
 	return;
 }
 

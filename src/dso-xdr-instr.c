@@ -529,7 +529,11 @@ dso_xdr_instr_LTX_init(void *clo)
 	if ((settings = udctx_get_setting(ctx)) != NULL) {
 		/* we are configured, load the instrs */
 		load_instr_fetcher(clo, settings);
+		/* be so kind as to unref the settings */
+		udcfg_tbl_free(ctx, settings);
 	}
+	/* clean up */
+	udctx_set_setting(ctx, NULL);
 	return;
 }
 

@@ -66,6 +66,8 @@
 #  include <mysql.h>
 # endif
 #endif	/* HAVE_MYSQL */
+/* some common routines */
+#include "mysql-helpers.h"
 
 #if !defined countof
 # define countof(x)	(sizeof(x) / sizeof(*x))
@@ -274,77 +276,6 @@ iqry_rowf(void **row, size_t nflds)
 	return;
 }
 
-static void
-fetch_instrs(void)
-{
-	void *res;
-
-	/* off we go */
-	if (mysql_real_query(conn, iqry, sizeof(iqry)-1) != 0) {
-		/* dont know */
-		return;
-	}
-	/* otherwise fetch the result */
-	if ((res = mysql_store_result(conn)) == NULL) {
-		/* bummer */
-		return;
-	}
-	/* process him */
-	{
-		size_t nflds = mysql_num_fields(res);
-		MYSQL_ROW r;
-
-		while ((r = mysql_fetch_row(res))) {
-			iqry_rowf((void**)r, nflds);
-		}
-	}
-
-	/* and free the result object */
-	mysql_free_result(res);
-	return;
-}
-
-
-/* db connectors */
-static void*
-db_connect(ud_ctx_t ctx, ud_cfgset_t spec)
-{
-/* we assume that SPEC is a config_setting_t pointing to database mumbojumbo */
-	MYSQL *res;
-	const char *host = NULL;
-	const char *user = NULL;
-	const char *pass = NULL;
-	const char *sche = NULL;
-	const char dflt_sche[] = "freundt";
-
-	udcfg_tbl_lookup_s(&host, ctx, spec, "host");
-	udcfg_tbl_lookup_s(&user, ctx, spec, "user");
-	udcfg_tbl_lookup_s(&pass, ctx, spec, "pass");
-	udcfg_tbl_lookup_s(&sche, ctx, spec, "schema");
-
-	if (host == NULL || user == NULL || pass == NULL) {
-		return conn = NULL;
-	} else if (sche == NULL) {
-		/* just assume the schema exists as we know it */
-		sche = dflt_sche;
-	}
-
-	res = mysql_init(NULL);
-	if (!mysql_real_connect(res, host, user, pass, sche, 0, NULL, 0)) {
-		mysql_close(res);
-		return conn = NULL;
-	}
-	return conn = res;
-}
-
-static void
-db_disconnect(void)
-{
-	(void)mysql_close(conn);
-	conn = NULL;
-	return;
-}
-
 
 /* initialiser code */
 void
@@ -361,18 +292,19 @@ dso_xdr_instr_mysql_LTX_init(void *clo)
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("connecting to database ...");
-	if (db_connect(clo, spec) == NULL) {
+	if ((conn = uddb_connect(clo, spec)) == NULL) {
 		UD_DBGCONT("failed\n");
 		return;
 	}
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("leeching instruments ...");
-	fetch_instrs();
+	uddb_qry(conn, iqry, sizeof(iqry)-1, iqry_rowf);
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("kthxbye ...");
-	db_disconnect();
+	uddb_disconnect(conn);
+	conn = NULL;
 	UD_DBGCONT("done\n");
 	return;
 }

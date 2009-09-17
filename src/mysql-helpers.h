@@ -1,4 +1,4 @@
-/*** dso-tseries-mysql.c -- ticks from mysql databases
+/*** mysql-helpers.h -- some static routines used frequently in the DSOs
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,28 +35,13 @@
  *
  ***/
 
+#if !defined INCLUDED_mysql_helpers_h_
+#define INCLUDED_mysql_helpers_h_
+
+/* this defines serious stuff, don't include if you don't want it. */
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
-#include <stdlib.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <unistd.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <fcntl.h>
-#include <pthread.h>
-
-/* our master include */
-#include "unserding.h"
-#include "module.h"
-#include "protocore.h"
-#define UNSERSRV
-#include "unserding-dbg.h"
-#include "unserding-ctx.h"
-
-#include "xdr-instr-private.h"
-
 #if defined HAVE_MYSQL
 # if defined HAVE_MYSQL_MYSQL_H
 #  include <mysql/mysql.h>
@@ -64,64 +49,79 @@
 #  include <mysql.h>
 # endif
 #endif	/* HAVE_MYSQL */
-/* some common routines */
-#include "mysql-helpers.h"
+/* for the config stuff and the context */
+#include "unserding-ctx.h"
 
-#if !defined countof
-# define countof(x)	(sizeof(x) / sizeof(*x))
-#endif	/* !countof */
+typedef void *ud_conn_t;
+typedef void(*ud_row_f)(void**, size_t);
 
-/* mysql conn, kept open */
-static void *conn;
-
-
-/* overview and administrative bullshit */
-static const char ovqry[] =
-	"SELECT "
-#define INSTR_ID	0
-	"`uiu`.`ga_instr_id`, "
-#define URN_ID		1
-	"`uiu`.`ga_urn_id`, "
-#define URN		2
-	"`uiu`.`urn`, "
-#define MIN_DT		3
-	"`uiu`.`min_dt`, "
-#define MAX_DT		4
-	"`uiu`.`max_dt` "
-	"FROM `freundt`.`ga_instr_urns` AS `uiu`";
-
-static void
-ovqry_rowf(void **row, size_t nflds)
+static ud_conn_t __attribute__((unused))
+uddb_connect(ud_ctx_t ctx, ud_cfgset_t spec)
 {
-	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
+/* we assume that SPEC is a config_setting_t pointing to database mumbojumbo */
+	MYSQL *res;
+	const char *host = NULL;
+	const char *user = NULL;
+	const char *pass = NULL;
+	const char *sche = NULL;
+	/* fucking amazing huh? */
+	const char dflt_sche[] = "freundt";
 
-	switch (urn_id) {
-	case 1 ... 3:
-		UD_DEBUG("Once-A-Day tick for %s\n", (char*)row[INSTR_ID]);
-	default:
-		break;
+	udcfg_tbl_lookup_s(&host, ctx, spec, "host");
+	udcfg_tbl_lookup_s(&user, ctx, spec, "user");
+	udcfg_tbl_lookup_s(&pass, ctx, spec, "pass");
+	udcfg_tbl_lookup_s(&sche, ctx, spec, "schema");
+
+	if (host == NULL || user == NULL || pass == NULL) {
+		return NULL;
+	} else if (sche == NULL) {
+		/* just assume the schema exists as we know it */
+		sche = dflt_sche;
 	}
+
+	res = mysql_init(NULL);
+	if (!mysql_real_connect(res, host, user, pass, sche, 0, NULL, 0)) {
+		mysql_close(res);
+		return NULL;
+	}
+	return res;
+}
+
+static void __attribute__((unused))
+uddb_disconnect(ud_conn_t conn)
+{
+	(void)mysql_close(conn);
 	return;
 }
 
-
-/* initialiser code */
-void
-dso_tseries_mysql_LTX_init(void *clo)
+static void __attribute__((unused))
+uddb_qry(ud_conn_t conn, const char *qry, size_t len, ud_row_f cb)
 {
-	void *spec = udctx_get_setting(clo);
+	void *res;
 
-	UD_DEBUG("mod/tseries-mysql: connecting ...");
-	if ((conn = uddb_connect(clo, spec)) == NULL) {
-		UD_DBGCONT("failed\n");
+	/* off we go */
+	if (mysql_real_query(conn, qry, len) != 0) {
+		/* dont know */
 		return;
 	}
-	UD_DBGCONT("done\n");
+	/* otherwise fetch the result */
+	if ((res = mysql_store_result(conn)) == NULL) {
+		/* bummer */
+		return;
+	}
+	/* process him */
+	{
+		size_t nflds = mysql_num_fields(res);
+		MYSQL_ROW r;
 
-	UD_DEBUG("leeching overview ...");
-	uddb_qry(conn, ovqry, sizeof(ovqry)-1, ovqry_rowf);
-	UD_DBGCONT("done\n");
+		while ((r = mysql_fetch_row(res))) {
+			(*cb)((void**)r, nflds);
+		}
+	}
+
+	/* and free the result object */
+	mysql_free_result(res);
 	return;
 }
 
-/* dso-tseries-mysql.c */
+#endif	/* INCLUDED_mysql_helpers_h_ */

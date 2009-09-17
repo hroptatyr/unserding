@@ -187,7 +187,8 @@ AC_SUBST([LIBREADLINE_CPPFLAGS])
 PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
 
 ## check if we've got libconfig
-PKG_CHECK_MODULES([LIBCONFIG], [libconfig])
+dnl PKG_CHECK_MODULES([LIBCONFIG], [libconfig])
+## check for lua instead!
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])

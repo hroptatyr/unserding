@@ -307,7 +307,7 @@ fetch_instrs(void)
 
 /* db connectors */
 static void*
-db_connect(void *spec)
+db_connect(ud_ctx_t ctx, ud_cfgset_t spec)
 {
 /* we assume that SPEC is a config_setting_t pointing to database mumbojumbo */
 	MYSQL *res;
@@ -317,13 +317,10 @@ db_connect(void *spec)
 	const char *sche = NULL;
 	const char dflt_sche[] = "freundt";
 
-#if defined USE_LIBCONFIG
-	/* try and read the stuff from the config file */
-	config_setting_lookup_string(spec, "host", &host);
-	config_setting_lookup_string(spec, "user", &user);
-	config_setting_lookup_string(spec, "pass", &pass);
-	config_setting_lookup_string(spec, "schema", &sche);
-#endif	/* USE_LIBCONFIG */
+	udcfg_tbl_lookup_s(&host, ctx, spec, "host");
+	udcfg_tbl_lookup_s(&user, ctx, spec, "user");
+	udcfg_tbl_lookup_s(&pass, ctx, spec, "pass");
+	udcfg_tbl_lookup_s(&sche, ctx, spec, "schema");
 
 	if (host == NULL || user == NULL || pass == NULL) {
 		return conn = NULL;
@@ -353,7 +350,7 @@ db_disconnect(void)
 void
 dso_xdr_instr_mysql_LTX_init(void *clo)
 {
-	struct {ud_ctx_t ctx; void *spec;} *tmp = clo;
+	void *spec = udctx_get_setting(clo);
 
 	UD_DEBUG("mod/xdr-instr-mysql: loading ...");
 	/* create the catalogue */
@@ -364,7 +361,7 @@ dso_xdr_instr_mysql_LTX_init(void *clo)
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("connecting to database ...");
-	if (db_connect(tmp->spec) == NULL) {
+	if (db_connect(clo, spec) == NULL) {
 		UD_DBGCONT("failed\n");
 		return;
 	}

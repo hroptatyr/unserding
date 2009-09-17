@@ -79,12 +79,29 @@ lc_freeref(void *L, void *ref)
 void*
 lc_cfgtbl_lookup(void *L, void *s, const char *name)
 {
-	int idx = (long int)s;
-	lua_rawgeti(L, LUA_GLOBALSINDEX, idx);
-	lua_getfield(L, 1, name);
-	/* fucking memleak this is! */
-	idx = luaL_ref(L, LUA_GLOBALSINDEX);
-	return (void*)(long int)idx;
+	void *res;
+
+	/* push the value of S on the stack */
+	lc_deref(L, s);
+	if (lua_istable(L, -1)) {
+		/* get the NAME slot */
+		lua_getfield(L, -1, name);
+		/* ref the result for later use, fucking memleak */
+		res = lc_ref(L);
+	} else {
+		/* dont bother passing NILs around */
+		res = NULL;
+	}
+	/* pop S */
+	lua_pop(L, 1);
+	return res;
+}
+
+void
+lc_cfgtbl_free(void *L, void *s)
+{
+	lc_freeref(L, s);
+	return;
 }
 
 size_t

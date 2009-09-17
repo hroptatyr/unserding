@@ -45,6 +45,8 @@ extern void lua_config_deinit(void**);
 
 extern void*
 lc_cfgtbl_lookup(void *L, void *s, const char *name);
+extern void
+lc_cfgtbl_free(void *L, void *s);
 extern size_t
 lc_cfgtbl_lookup_s(const char **res, void *L, void *s, const char *name);
 

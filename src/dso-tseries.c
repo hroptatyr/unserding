@@ -275,6 +275,10 @@ load_ticks_fetcher(void *clo, void *spec)
 		/* do fuckall */
 		break;
 	}
+
+	/* clean up */
+	udctx_set_setting(clo, NULL);
+	udcfg_tbl_free(clo, src);
 	return;
 }
 
@@ -283,7 +287,7 @@ void
 dso_tseries_LTX_init(void *clo)
 {
 	ud_ctx_t ctx = clo;
-	void *settings = udctx_get_setting(ctx);
+	void *settings;
 
 	UD_DEBUG("mod/tseries: loading ...");
 	/* tick service */
@@ -291,7 +295,7 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 
-	if (settings != NULL) {
+	if ((settings = udctx_get_setting(ctx)) != NULL) {
 		load_ticks_fetcher(clo, settings);
 	}
 	return;

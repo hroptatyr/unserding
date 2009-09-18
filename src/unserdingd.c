@@ -554,6 +554,7 @@ main(int argc, const char *argv[])
 	ud_read_config(&__ctx);
 
 	daemonisep |= udcfg_glob_lookup_b(&__ctx, "daemonise");
+	prefer6p |= udcfg_glob_lookup_b(&__ctx, "prefer_ipv6");
 
 	/* run as daemon, do me properly */
 	if (daemonisep) {

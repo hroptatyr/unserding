@@ -243,7 +243,7 @@ make_interest_rate(instr_t in, uint32_t id, void **rows, size_t nflds)
 }
 
 static void
-iqry_rowf(void **row, size_t nflds)
+iqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 {
 	uint32_t id = strtoul(row[GAID], NULL, 10);
 	uint16_t ty = strtoul(row[INSTTY], NULL, 10);
@@ -299,7 +299,7 @@ dso_xdr_instr_mysql_LTX_init(void *clo)
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("leeching instruments ...");
-	uddb_qry(conn, iqry, sizeof(iqry)-1, iqry_rowf);
+	uddb_qry(conn, iqry, sizeof(iqry)-1, iqry_rowf, NULL);
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("kthxbye ...");

@@ -76,6 +76,36 @@
 static void *conn;
 
 
+static void
+qry_rowf(void **row, size_t nflds, void *UNUSED(clo))
+{
+	UD_DEBUG("found quote %s\n", (char*)row[1]);
+	return;
+}
+
+void
+fetch_ticks_intv_mysql(tick_by_instr_hdr_t hdr, time_t beg, time_t end)
+{
+/* assumes eod ticks for now */
+	char begs[16], ends[16];
+	char qry[224];
+	size_t len;
+	
+	print_ds_into(begs, sizeof(begs), beg);
+	print_ds_into(ends, sizeof(ends), end);
+	UD_DEBUG("querying: SELECT bla BETWEEN '%s' AND '%s'\n", begs, ends);
+	len = snprintf(
+		qry, sizeof(qry),
+		"SELECT `date`, `close` "
+		"FROM `GAT_static`.`eod_interest_rates2` "
+		"WHERE contractId = %d AND `date` BETWEEN '%s' AND '%s' "
+		"ORDER BY `date`", hdr->secu.instr, begs, ends);
+	UD_DEBUG("querying: %s\n", qry);
+	uddb_qry(conn, qry, len, qry_rowf, NULL);
+	return;
+}
+
+
 /* overview and administrative bullshit */
 static const char ovqry[] =
 	"SELECT "
@@ -92,7 +122,7 @@ static const char ovqry[] =
 	"FROM `freundt`.`ga_instr_urns` AS `uiu`";
 
 static void
-ovqry_rowf(void **row, size_t nflds)
+ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 {
 	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
 
@@ -105,27 +135,6 @@ ovqry_rowf(void **row, size_t nflds)
 	return;
 }
 
-void
-fetch_ticks_intv_mysql(tick_by_instr_hdr_t hdr, time_t beg, time_t end)
-{
-/* assumes eod ticks for now */
-	char begs[16], ends[16];
-	char qry[224];
-	
-	print_ds_into(begs, sizeof(begs), beg);
-	print_ds_into(ends, sizeof(ends), end);
-	UD_DEBUG("querying: SELECT bla BETWEEN '%s' AND '%s'\n", begs, ends);
-	snprintf(
-		qry, sizeof(qry),
-		"SELECT `date`, `close` "
-		"FROM `GAT_static`.`eod_interest_rates2` "
-		"WHERE contractId = %d AND `date` BETWEEN '%s' AND '%s' "
-		"ORDER BY `date`", hdr->secu.instr, begs, ends);
-	UD_DEBUG("querying: %s\n", qry);
-	return;
-}
-
-
 /* initialiser code */
 void
 dso_tseries_mysql_LTX_init(void *clo)
@@ -140,7 +149,7 @@ dso_tseries_mysql_LTX_init(void *clo)
 	UD_DBGCONT("done\n");
 
 	UD_DEBUG("leeching overview ...");
-	uddb_qry(conn, ovqry, sizeof(ovqry)-1, ovqry_rowf);
+	uddb_qry(conn, ovqry, sizeof(ovqry)-1, ovqry_rowf, NULL);
 	UD_DBGCONT("done\n");
 	return;
 }

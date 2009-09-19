@@ -53,7 +53,7 @@
 #include "unserding-ctx.h"
 
 typedef void *ud_conn_t;
-typedef void(*ud_row_f)(void**, size_t);
+typedef void(*ud_row_f)(void**, size_t, void *clo);
 
 static ud_conn_t __attribute__((unused))
 uddb_connect(ud_ctx_t ctx, ud_cfgset_t spec)
@@ -95,7 +95,7 @@ uddb_disconnect(ud_conn_t conn)
 }
 
 static void __attribute__((unused))
-uddb_qry(ud_conn_t conn, const char *qry, size_t len, ud_row_f cb)
+uddb_qry(ud_conn_t conn, const char *qry, size_t len, ud_row_f cb, void *clo)
 {
 	void *res;
 
@@ -115,7 +115,7 @@ uddb_qry(ud_conn_t conn, const char *qry, size_t len, ud_row_f cb)
 		MYSQL_ROW r;
 
 		while ((r = mysql_fetch_row(res))) {
-			(*cb)((void**)r, nflds);
+			(*cb)((void**)r, nflds, clo);
 		}
 	}
 

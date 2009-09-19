@@ -73,6 +73,19 @@
 typedef struct spitfire_ctx_s *spitfire_ctx_t;
 typedef enum spitfire_res_e spitfire_res_t;
 
+typedef struct tser_pkt_s *tser_pkt_t;
+typedef struct tser_qry_intv_s *tser_qry_intv_t;
+
+/* packet of 10 ticks */
+struct tser_pkt_s {
+	monetary32_t t[10];
+};
+
+struct tser_qry_intv_s {
+	time_t beg;
+	time_t end;
+};
+
 struct spitfire_ctx_s {
 	secu_t secu;
 	size_t slen;
@@ -195,6 +208,19 @@ instr_tick_by_instr_svc(job_t j)
 
 	UD_DEBUG("0x4222: %u/%u@%u filtered for %u time stamps\n",
 		 hdr.secu.instr, hdr.secu.unit, hdr.secu.pot, nfilt);
+
+	if (nfilt == 0) {
+		return;
+	}
+	/* obtain the time intervals we need */
+	{
+		struct tser_qry_intv_s intv;
+
+		intv.beg = __last_monday(filt[0]);
+		intv.end = intv.beg + 13 * 86400;
+		fetch_ticks_intv_mysql(&hdr, intv.beg, intv.end);
+	}
+
 	/* prepare the reply packet ... */
 	copy_pkt(&rplj, j);
 	clear_pkt(&rplsctx, &rplj);

@@ -45,6 +45,9 @@
 #include "protocore.h"
 #include "seria.h"
 
+/* wise? it's just for the mysql tick fetcher */
+#include "xdr-instr-seria.h"
+
 #if !defined xnew
 # define xnew(_x)	malloc(sizeof(_x))
 #endif	/* !xnew */
@@ -78,6 +81,9 @@ extern void dso_xdr_instr_LTX_init(void*);
 extern void dso_xdr_instr_mysql_LTX_init(void*);
 extern void dso_tseries_LTX_init(void*);
 extern void dso_tseries_mysql_LTX_init(void*);
+
+extern void
+fetch_ticks_intv_mysql(tick_by_instr_hdr_t hdr, time_t beg, time_t end);
 
 
 /* inlines */
@@ -120,6 +126,54 @@ hrclock_print(void)
 	clock_gettime(CLOCK_REALTIME, &tsp);
 	fprintf(stderr, "%lu.%09u", tsp.tv_sec, (unsigned int)tsp.tv_nsec);
 	return;
+}
+
+
+/* from pfack.h */
+static inline time_t __attribute__((always_inline))
+__midnight(time_t ts)
+{
+	return ts - ts % 86400UL;
+}
+
+static inline long int __attribute__((always_inline))
+__daydiff(time_t t1, time_t t2)
+{
+	return (__midnight(t2) - __midnight(t1)) / 86400L;
+}
+
+static inline int __attribute__((always_inline))
+__dayofweek(time_t t)
+{
+	/* we know that 15/01/1984 was a sunday, and this is 442972800 */
+	t = __daydiff((time_t)442972800, t);
+	return (int)(t % 7);
+}
+
+static inline time_t __attribute__((always_inline))
+__last_monday(time_t ts)
+{
+	return ts - 86400 * ((__dayofweek(ts) - 1) % 7);
+}
+
+static inline size_t
+print_ts_into(char *restrict tgt, size_t len, time_t ts)
+{
+	struct tm tm;
+
+	memset(&tm, 0, sizeof(tm));
+	(void)gmtime_r(&ts, &tm);
+	return strftime(tgt, len, "%Y-%m-%d %H:%M:%S", &tm);
+}
+
+static inline size_t
+print_ds_into(char *restrict tgt, size_t len, time_t ts)
+{
+	struct tm tm;
+
+	memset(&tm, 0, sizeof(tm));
+	(void)gmtime_r(&ts, &tm);
+	return strftime(tgt, len, "%Y-%m-%d", &tm);
 }
 
 #endif	/* INCLUDED_xdr_instr_private_h_ */

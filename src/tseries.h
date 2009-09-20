@@ -38,6 +38,8 @@
 #if !defined INCLUDED_tseries_h_
 #define INCLUDED_tseries_h_
 
+#include "xdr-instr-seria.h"
+
 /* migrate to ffff tseries */
 typedef struct tseries_s *tseries_t;
 typedef struct tser_cons_s *tser_cons_t;

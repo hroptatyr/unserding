@@ -57,6 +57,7 @@
 
 #include "xdr-instr-private.h"
 #include "xdr-instr-seria.h"
+#include "tseries.h"
 
 #if defined HAVE_MYSQL
 # if defined HAVE_MYSQL_MYSQL_H
@@ -67,6 +68,7 @@
 #endif	/* HAVE_MYSQL */
 /* some common routines */
 #include "mysql-helpers.h"
+#include "tseries.h"
 
 #if !defined countof
 # define countof(x)	(sizeof(x) / sizeof(*x))
@@ -75,33 +77,43 @@
 /* mysql conn, kept open */
 static void *conn;
 
+struct tser_pkt_idx_s {
+	uint32_t i;
+	tser_pkt_t pkt;
+};
+
 
 static void
-qry_rowf(void **row, size_t nflds, void *UNUSED(clo))
+qry_rowf(void **row, size_t nflds, void *clo)
 {
-	UD_DEBUG("found quote %s\n", (char*)row[1]);
+	m32_t p = ffff_monetary32_get_s(row[1]);
+	struct tser_pkt_idx_s *tmp = clo;
+	tmp->pkt->t[tmp->i++] = p;
 	return;
 }
 
 void
-fetch_ticks_intv_mysql(tick_by_instr_hdr_t hdr, time_t beg, time_t end)
+fetch_ticks_intv_mysql(
+	tser_pkt_t pkt, tick_by_instr_hdr_t hdr, time_t beg, time_t end)
 {
 /* assumes eod ticks for now */
 	char begs[16], ends[16];
 	char qry[224];
 	size_t len;
+	struct tser_pkt_idx_s pi = {.i = 0, .pkt = pkt};
 	
 	print_ds_into(begs, sizeof(begs), beg);
 	print_ds_into(ends, sizeof(ends), end);
-	UD_DEBUG("querying: SELECT bla BETWEEN '%s' AND '%s'\n", begs, ends);
 	len = snprintf(
 		qry, sizeof(qry),
 		"SELECT `date`, `close` "
 		"FROM `GAT_static`.`eod_interest_rates2` "
 		"WHERE contractId = %d AND `date` BETWEEN '%s' AND '%s' "
-		"ORDER BY `date`", hdr->secu.instr, begs, ends);
+		"ORDER BY 1",
+		hdr->secu.instr, begs, ends);
 	UD_DEBUG("querying: %s\n", qry);
-	uddb_qry(conn, qry, len, qry_rowf, NULL);
+	uddb_qry(conn, qry, len, qry_rowf, &pi);
+	UD_DEBUG("got %u prices\n", pi.i);
 	return;
 }
 

@@ -82,9 +82,6 @@ extern void dso_xdr_instr_mysql_LTX_init(void*);
 extern void dso_tseries_LTX_init(void*);
 extern void dso_tseries_mysql_LTX_init(void*);
 
-extern void
-fetch_ticks_intv_mysql(tick_by_instr_hdr_t hdr, time_t beg, time_t end);
-
 
 /* inlines */
 static inline void
@@ -150,10 +147,24 @@ __dayofweek(time_t t)
 	return (int)(t % 7);
 }
 
+static inline int __attribute__((always_inline))
+__dayofweek_14algn(time_t t)
+{
+	/* we know that 15/01/1984 was a sunday, and this is 442972800 */
+	t = __daydiff((time_t)442972800, t);
+	return (int)(t % 14);
+}
+
 static inline time_t __attribute__((always_inline))
 __last_monday(time_t ts)
 {
 	return ts - 86400 * ((__dayofweek(ts) - 1) % 7);
+}
+
+static inline time_t __attribute__((always_inline))
+__last_monday_14algn(time_t ts)
+{
+	return ts - 86400 * ((__dayofweek_14algn(ts) - 1) % 14);
 }
 
 static inline size_t

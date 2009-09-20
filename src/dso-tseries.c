@@ -67,24 +67,80 @@
 #  include <mysql.h>
 # endif
 #endif	/* HAVE_MYSQL */
+/* tseries stuff, to be replaced with ffff */
+#include "tseries.h"
 
 /* tick services */
 #define index_t	size_t
+
+static tseries_t tseries = NULL;
+
+
+static tseries_t
+make_tseries(void)
+{
+	tseries_t res = xnew(*res);
+	res->size = 0;
+	res->conses = NULL;
+	return res;
+}
+
+static tser_pkt_t
+find_tser_pkt(tseries_t tser, time_t ts)
+{
+	for (tser_cons_t res = tser->conses; res; res = res->next) {
+		if (ts < res->pktbe.beg) {
+			continue;
+		} else if (ts <= res->pktbe.end) {
+			return &res->pktbe.pkt;
+		}
+	}
+	return NULL;
+}
+
+static void
+add_tser_pktbe(tseries_t tser, tser_pktbe_t pktbe)
+{
+	tser_cons_t res, c;
+
+	if (tser->conses == NULL || pktbe->beg <= tser->conses->pktbe.beg) {
+		/* we're the first, sort is trivial */
+		c = xnew(*c);
+		c->next = tser->conses;
+		c->cache_expiry = -1UL;
+		c->pktbe = *pktbe;
+		/* prepend to tser->conses */
+		tser->conses = c;
+		UD_DEBUG("added in front\n");
+		return;
+	}
+	/* otherwise find the right place first */
+	for (res = tser->conses; res && res->next; res = res->next) {
+		if (pktbe->beg <= res->next->pktbe.beg) {
+			c = xnew(*c);
+			c->next = res->next;
+			c->cache_expiry = -1UL;
+			c->pktbe = *pktbe;
+			/* prepend to res */
+			res->next = c;
+			UD_DEBUG("added after %p\n", res);
+			return;
+		}
+	}
+	/* if we reach this, we have to append the fucker */
+	c = xnew(*c);
+	c->next = NULL;
+	c->cache_expiry = -1UL;
+	c->pktbe = *pktbe;
+	/* prepend to res */
+	res->next = c;
+	UD_DEBUG("added at the end\n");
+	return;
+}
+
+
 typedef struct spitfire_ctx_s *spitfire_ctx_t;
 typedef enum spitfire_res_e spitfire_res_t;
-
-typedef struct tser_pkt_s *tser_pkt_t;
-typedef struct tser_qry_intv_s *tser_qry_intv_t;
-
-/* packet of 10 ticks */
-struct tser_pkt_s {
-	monetary32_t t[10];
-};
-
-struct tser_qry_intv_s {
-	time_t beg;
-	time_t end;
-};
 
 struct spitfire_ctx_s {
 	secu_t secu;
@@ -212,22 +268,34 @@ instr_tick_by_instr_svc(job_t j)
 	if (nfilt == 0) {
 		return;
 	}
-	/* obtain the time intervals we need */
-	{
-		struct tser_qry_intv_s intv;
-
-		intv.beg = __last_monday(filt[0]);
-		intv.end = intv.beg + 13 * 86400;
-		fetch_ticks_intv_mysql(&hdr, intv.beg, intv.end);
-	}
-
 	/* prepare the reply packet ... */
 	copy_pkt(&rplj, j);
 	clear_pkt(&rplsctx, &rplj);
-	/* let the luser know we deliver our shit later on */
-	udpc_set_defer_fina_pkt(JOB_PACKET(&rplj));
-	/* send what we've got */
-	send_pkt(&rplsctx, &rplj);
+
+	/* obtain the time intervals we need */
+	tseries_t tser = tseries;
+	tser_pkt_t pkt;
+
+	if ((pkt = find_tser_pkt(tseries, filt[0])) == NULL) {
+		struct tser_pktbe_s p;
+
+		/* let the luser know we deliver our shit later on */
+		udpc_set_defer_fina_pkt(JOB_PACKET(&rplj));
+		/* send what we've got */
+		send_pkt(&rplsctx, &rplj);
+
+		/* now care about fetching the bugger */
+		p.beg = __last_monday_14algn(filt[0]);
+		p.end = p.beg + 13 * 86400;
+		fetch_ticks_intv_mysql(&p.pkt, &hdr, p.beg, p.end);
+		add_tser_pktbe(tser, &p);
+	} else {
+		UD_DEBUG("yay, cached\n");
+		/* let the luser know we deliver our shit later on */
+		udpc_set_defer_fina_pkt(JOB_PACKET(&rplj));
+		/* send what we've got */
+		send_pkt(&rplsctx, &rplj);
+	}
 	return;
 }
 
@@ -297,6 +365,8 @@ dso_tseries_LTX_init(void *clo)
 	void *settings;
 
 	UD_DEBUG("mod/tseries: loading ...");
+	/* create the catalogue */
+	tseries = make_tseries();
 	/* tick service */
 	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);

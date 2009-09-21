@@ -102,6 +102,11 @@ typedef struct tick_by_instr_hdr_s *tick_by_instr_hdr_t;
 typedef struct sl1tp_s *sl1tp_t;
 typedef struct sl1t_s *sl1t_t;
 
+/** (semi)sparse once-a-day level 1 ticks */
+typedef struct sl1oadt_s *sl1oadt_t;
+/** days since epoch type, goes till ... */
+typedef uint16_t dse16_t;
+
 /**
  * Condensed version of:
  *   // upper 10 bits
@@ -132,6 +137,7 @@ typedef uint16_t l1t_auxinfo_t;
 #define TICK_OLD	((uint16_t)1021)
 #define TICK_SOON	((uint16_t)1020)
 
+
 /**
  * Sparse level 1 ticks, packed. */
 struct sl1tp_s {
@@ -192,6 +198,18 @@ struct tser_cons_s {
 struct tser_qry_intv_s {
 	time_t beg;
 	time_t end;
+};
+
+struct sl1oadt_s {
+	uint32_t instr;
+	uint32_t unit;
+	/** consists of 10 bits for pot, 6 bits for tt */
+	uint16_t mux;
+	/** number of values in the vector below */
+	uint8_t nticks;
+	/** days since epoch */
+	dse16_t dse;
+	uint32_t value[252];
 };
 
 
@@ -374,6 +392,38 @@ fill_sl1t_tick(sl1t_t l1t, time_t ts, uint16_t msec, uint8_t tt, uint32_t v)
 	return;
 }
 
+/**
+ * Instantiate a sparse level 1 once-a-day tick for HDR. */
+static inline void
+fill_sl1oadt_1(
+	sl1oadt_t oadt, tick_by_instr_hdr_t hdr,
+	uint8_t tt, time_t ts, uint32_t pri)
+{
+	oadt->instr = hdr->secu.instr;
+	oadt->unit = hdr->secu.unit;
+	oadt->mux = ((hdr->secu.pot & 0x3ff) << 6) | (tt & 0x3f);
+	oadt->nticks = 1;
+	oadt->value[0] = pri;
+	return;
+}
+
+/**
+ * Instantiate a sequence of level 1 once-a-day ticks for HDR. */
+static inline void
+fill_sl1oadt(
+	sl1oadt_t oadt, tick_by_instr_hdr_t hdr,
+	uint8_t tt, time_t ts, uint32_t pri[], uint8_t nticks)
+{
+	oadt->instr = hdr->secu.instr;
+	oadt->unit = hdr->secu.unit;
+	oadt->mux = ((hdr->secu.pot & 0x3ff) << 6) | (tt & 0x3f);
+	oadt->nticks = nticks;
+	for (uint8_t i = 0; i < nticks; i++) {
+		oadt->value[i] = pri[i];
+	}
+	return;
+}
+
 
 /* (de)serialisers */
 static inline void
@@ -444,6 +494,36 @@ static inline bool
 udpc_seria_des_sl1tick(sl1tick_t t, udpc_seria_t sctx)
 {
 	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
+}
+
+static inline void
+udpc_seria_add_sl1oadt(udpc_seria_t sctx, sl1oadt_t oadt)
+{
+	/* we send of the first 3 slots, 32b 32b 16b, as secu */
+	udpc_seria_add_secu(sctx, (void*)oadt);
+	/* now comes the semi-sparse entry */
+	udpc_seria_add_byte(sctx, oadt->nticks);
+	udpc_seria_add_ui16(sctx, oadt->dse);
+	/* and the vector */
+	for (uint8_t i = 0; i < oadt->nticks; i++) {
+		udpc_seria_add_ui32(sctx, oadt->value[i]);
+	}
+	return;
+}
+
+static inline void
+udpc_seria_des_sl1oadt(sl1oadt_t oadt, udpc_seria_t sctx)
+{
+	/* we send of the first 3 slots, 32b 32b 16b, as secu */
+	udpc_seria_des_secu((void*)oadt, sctx);
+	/* now comes the semi-sparse entry */
+	oadt->nticks = udpc_seria_des_byte(sctx);
+	oadt->dse = udpc_seria_des_ui16(sctx);
+	/* and the vector */
+	for (uint8_t i = 0; i < oadt->nticks; i++) {
+		oadt->value[i] = udpc_seria_des_ui32(sctx);
+	}
+	return;
 }
 
 #endif	/* INCLUDED_tseries_h_ */

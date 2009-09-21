@@ -240,36 +240,6 @@ instr_tick_by_ts_svc(job_t j)
 }
 
 
-/* (semi)sparse once-a-day level 1 ticks */
-typedef struct sl1oadt_s *sl1oadt_t;
-/* days since epoch type, goes till ... */
-typedef uint16_t dse16_t;
-
-struct sl1oadt_s {
-	uint32_t instr;
-	uint32_t unit;
-	/** consists of 10 bits for pot, 6 bits for tt */
-	uint16_t mux;
-	/** number of values in the vector below */
-	uint8_t nticks;
-	/** days since epoch */
-	dse16_t dse;
-	m32_t value[252];
-};
-
-static void
-fill_in_sl1oadt_1(
-	sl1oadt_t oadt, tick_by_instr_hdr_t hdr,
-	uint8_t tt, time_t ts, m32_t pri)
-{
-	oadt->instr = hdr->secu.instr;
-	oadt->unit = hdr->secu.unit;
-	oadt->mux = ((hdr->secu.pot & 0x3ff) << 6) | (tt & 0x3f);
-	oadt->nticks = 1;
-	oadt->value[0] = pri;
-	return;
-}
-
 static inline dse16_t
 time_to_dse(time_t ts)
 {
@@ -289,21 +259,6 @@ tser_pkt_beg_dse(dse16_t dse)
 {
 	uint8_t sub = find_index_in_pkt(dse);
 	return dse - sub;
-}
-
-static inline void
-udpc_seria_add_sl1oadt(udpc_seria_t sctx, sl1oadt_t oadt)
-{
-	/* we send of the first 3 slots, 32b 32b 16b, as secu */
-	udpc_seria_add_secu(sctx, (void*)oadt);
-	/* now comes the semi-sparse entry */
-	udpc_seria_add_byte(sctx, oadt->nticks);
-	udpc_seria_add_ui16(sctx, oadt->dse);
-	/* and the vector */
-	for (uint8_t i = 0; i < oadt->nticks; i++) {
-		udpc_seria_add_ui32(sctx, oadt->value[i]);
-	}
-	return;
 }
 
 static void
@@ -361,7 +316,7 @@ instr_tick_by_instr_svc(job_t j)
 		m32_t pri = pkt->t[idx];
 
 		UD_DEBUG("yay, cached\n");
-		fill_in_sl1oadt_1(&oadt, &hdr, PFTT_EOD, dse, pri);
+		fill_sl1oadt_1(&oadt, &hdr, PFTT_EOD, dse, pri);
 		udpc_seria_add_sl1oadt(&rplsctx, &oadt);
 		/* send what we've got */
 		send_pkt(&rplsctx, &rplj);

@@ -40,7 +40,7 @@
 
 #include "tseries.h"
 
-extern void
+extern size_t
 fetch_ticks_intv_mysql(tser_pktbe_t, tick_by_instr_hdr_t);
 
 #endif	/* INCLUDED_tseries_private_h_ */

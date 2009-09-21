@@ -93,7 +93,7 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	return;
 }
 
-void
+size_t
 fetch_ticks_intv_mysql(tser_pktbe_t pkt, tick_by_instr_hdr_t hdr)
 {
 /* assumes eod ticks for now */
@@ -115,7 +115,7 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, tick_by_instr_hdr_t hdr)
 	UD_DEBUG("querying: %s\n", qry);
 	uddb_qry(conn, qry, len, qry_rowf, &pi);
 	UD_DEBUG("got %u prices\n", pi.i);
-	return;
+	return pi.i;
 }
 
 

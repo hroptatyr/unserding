@@ -461,11 +461,12 @@ sl1oadt_value(sl1oadt_t oadt, uint8_t idx)
 static inline void
 fill_sl1oadt_1(
 	sl1oadt_t oadt, tick_by_instr_hdr_t hdr,
-	uint8_t tt, time_t ts, uint32_t pri)
+	uint8_t tt, dse16_t dse, uint32_t pri)
 {
 	oadt->instr = hdr->secu.instr;
 	oadt->unit = hdr->secu.unit;
 	oadt->mux = ((hdr->secu.pot & 0x3ff) << 6) | (tt & 0x3f);
+	oadt->dse = dse;
 	oadt->nticks = 1;
 	oadt->value[0] = pri;
 	return;
@@ -476,11 +477,12 @@ fill_sl1oadt_1(
 static inline void
 fill_sl1oadt(
 	sl1oadt_t oadt, tick_by_instr_hdr_t hdr,
-	uint8_t tt, time_t ts, uint32_t pri[], uint8_t nticks)
+	uint8_t tt, dse16_t dse, uint32_t pri[], uint8_t nticks)
 {
 	oadt->instr = hdr->secu.instr;
 	oadt->unit = hdr->secu.unit;
 	oadt->mux = ((hdr->secu.pot & 0x3ff) << 6) | (tt & 0x3f);
+	oadt->dse = dse;
 	oadt->nticks = nticks;
 	for (uint8_t i = 0; i < nticks; i++) {
 		oadt->value[i] = pri[i];

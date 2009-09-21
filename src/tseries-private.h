@@ -1,6 +1,6 @@
-/*** xdr-instr-seria.h -- unserding serialisation for xdr instruments
+/*** tseries.h -- stuff that is soon to be replaced by ffff's tseries
  *
- * Copyright (C) 2008, 2009 Sebastian Freundt
+ * Copyright (C) 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
@@ -35,46 +35,10 @@
  *
  ***/
 
-#if !defined INCLUDED_xdr_instr_seria_h_
-#define INCLUDED_xdr_instr_seria_h_
+#if !defined INCLUDED_tseries_private_h_
+#define INCLUDED_tseries_private_h_
 
-#include <stdbool.h>
-#include <time.h>
-#include <pfack/instruments.h>
-#include "unserding.h"
-#include "protocore.h"
-#include "seria.h"
-
-/**
- * Service 421a:
- * Get instrument definitions.
- * sig: 421a((si32 gaid)*)
- *   Returns the instruments whose ids match the given ones.  In the
- *   special case that no id is given, all instruments are dumped.
- **/
-#define UD_SVC_INSTR_BY_ATTR	0x421a
-
-
-/* helper funs, to simplify the unserding access */
-/**
- * Deliver the guts of the instrument specified by CONT_ID via XDR.
- * \param hdl the unserding handle to use
- * \param tgt a buffer that the XDR encoded instrument is banged into,
- *   reserve at least UDPC_PLLEN bytes
- * \param inst_id the GA instrument identifier
- * \return the number of bytes copied into TGT.
- * The instrument is delivered in encoded form and can be decoded
- * with libpfack's deser_instrument().
- **/
-extern size_t
-ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t inst_id);
-
-/**
- * Query a bunch of instruments at once, calling CB() on each result. */
 extern void
-ud_find_many_instrs(
-	ud_handle_t hdl,
-	void(*cb)(const char *tgt, size_t len, void *clo), void *clo,
-	uint32_t cont_id[], size_t len);
+fetch_ticks_intv_mysql(tser_pkt_t, tick_by_instr_hdr_t, time_t beg, time_t end);
 
-#endif	/* INCLUDED_xdr_instr_seria_h_ */
+#endif	/* INCLUDED_tseries_private_h_ */

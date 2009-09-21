@@ -3,7 +3,7 @@
 #include <pfack/tick.h>
 #include "unserding.h"
 #include "protocore.h"
-#include "xdr-instr-seria.h"
+#include "tseries.h"
 
 static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;

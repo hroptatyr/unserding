@@ -69,9 +69,7 @@
 #endif	/* HAVE_MYSQL */
 /* tseries stuff, to be replaced with ffff */
 #include "tseries.h"
-
-/* tick services */
-#define index_t	size_t
+#include "tseries-private.h"
 
 static tseries_t tseries = NULL;
 

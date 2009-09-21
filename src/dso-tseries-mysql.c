@@ -58,6 +58,7 @@
 #include "xdr-instr-private.h"
 #include "xdr-instr-seria.h"
 #include "tseries.h"
+#include "tseries-private.h"
 
 #if defined HAVE_MYSQL
 # if defined HAVE_MYSQL_MYSQL_H

@@ -46,8 +46,8 @@
 #include "unserding.h"
 #include "protocore.h"
 #include "protocore-private.h"
-#include <pfack/instruments.h>
 #include "xdr-instr-seria.h"
+#include "tseries.h"
 
 #if !defined UNLIKELY
 # define UNLIKELY(_x)	__builtin_expect((_x), 0)

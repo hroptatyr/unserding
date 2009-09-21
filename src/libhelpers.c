@@ -241,7 +241,7 @@ ud_find_ticks_by_ts(
 void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
-	void(*cb)(sl1tick_t, void *clo), void *clo,
+	void(*cb)(sl1oadt_t, void *clo), void *clo,
 	secu_t s, uint32_t bs,
 	time_t *ts, size_t tslen)
 {
@@ -255,13 +255,14 @@ ud_find_ticks_by_instr(
 
 	do {
 		struct udpc_seria_s sctx;
-		struct sl1tick_s t;
+		struct sl1oadt_s t;
 		char buf[UDPC_PKTLEN];
 		ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
 		ud_convo_t cno = hdl->convo++;
 
 		retry--;
 		memset(buf, 0, sizeof(buf));
+		memset(&t, 0, sizeof(t));
 		udpc_make_pkt(pkt, cno, 0, UD_SVC_TICK_BY_INSTR);
 		udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
 /* compute me! */
@@ -280,11 +281,14 @@ ud_find_ticks_by_instr(
 		ud_recv_convo(hdl, &pkt, (5 - retry) * UD_SVC_TIMEOUT, cno);
 		udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
 
-		/* we assume that instrs are sent in the same order as
-		 * requested *inside* the packet */
-		while (udpc_seria_des_sl1tick(&t, &sctx)) {
+		/* check for deferral notices */
+		if (udpc_pktsched(pkt) != UDPC_PKTSCHED_NOW) {
+			continue;
+		}
+
+		while (udpc_seria_des_sl1oadt(&t, &sctx)) {
 			/* marking-less approach, so we could make s[] const */
-			if (sl1tick_instr(&t) == s[rcvd].instr) {
+			if (sl1oadt_instr(&t) == s[rcvd].instr) {
 				rcvd++;
 			}
 			/* callback */

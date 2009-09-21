@@ -11,14 +11,13 @@ static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
 
 static void
-t_cb(sl1tick_t t, void *clo)
+t_cb(sl1oadt_t t, void *clo)
 {
-	fprintf(stdout, "ii:%u  tt:%d ts:%ld.%03d v:%2.4f\n",
-		sl1tick_instr(t),
-		sl1tick_tick_type(t),
-		(long int)sl1tick_timestamp(t),
-		(short int)sl1tick_msec(t),
-		ffff_monetary32_d(sl1tick_value(t)));
+	fprintf(stdout, "ii:%u  tt:%d ts:%u v:%2.4f\n",
+		sl1oadt_instr(t),
+		sl1oadt_tick_type(t),
+		(unsigned int)sl1oadt_dse(t),
+		ffff_monetary32_d(sl1oadt_value(t, 0)));
 	return;
 }
 

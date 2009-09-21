@@ -240,27 +240,6 @@ instr_tick_by_ts_svc(job_t j)
 }
 
 
-static inline dse16_t
-time_to_dse(time_t ts)
-{
-	return (dse16_t)(ts / 86400);
-}
-
-static inline uint8_t
-find_index_in_pkt(dse16_t dse)
-{
-/* find the index of the date encoded in dse inside a tick bouquet */
-	dse16_t anchor = time_to_dse(442972800);
-	return (uint8_t)((((dse - anchor) % 14) - 1) % 14);
-}
-
-static inline dse16_t
-tser_pkt_beg_dse(dse16_t dse)
-{
-	uint8_t sub = find_index_in_pkt(dse);
-	return dse - sub;
-}
-
 static void
 instr_tick_by_instr_svc(job_t j)
 {
@@ -272,6 +251,9 @@ instr_tick_by_instr_svc(job_t j)
 	/* allow to filter for 64 time stamps at once */
 	time_t filt[64];
 	unsigned int nfilt = 0;
+	tseries_t tser = tseries;
+	tser_pkt_t pkt;
+	struct sl1oadt_s oadt;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -293,9 +275,6 @@ instr_tick_by_instr_svc(job_t j)
 	clear_pkt(&rplsctx, &rplj);
 
 	/* obtain the time intervals we need */
-	tseries_t tser = tseries;
-	tser_pkt_t pkt;
-
 	if ((pkt = find_tser_pkt(tseries, filt[0])) == NULL) {
 		struct tser_pktbe_s p;
 
@@ -310,7 +289,6 @@ instr_tick_by_instr_svc(job_t j)
 		fetch_ticks_intv_mysql(&p.pkt, &hdr, p.beg, p.end);
 		add_tser_pktbe(tser, &p);
 	} else {
-		struct sl1oadt_s oadt;
 		uint16_t dse = time_to_dse(filt[0]);
 		uint8_t idx = find_index_in_pkt(dse);
 		m32_t pri = pkt->t[idx];

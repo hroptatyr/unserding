@@ -242,7 +242,7 @@ ud_find_ticks_by_ts(
 extern void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
-	void(*cb)(sl1tick_t, void *clo), void *clo,
+	void(*cb)(sl1oadt_t, void *clo), void *clo,
 	secu_t s, uint32_t bs,
 	time_t *ts, size_t tslen);
 
@@ -392,6 +392,70 @@ fill_sl1t_tick(sl1t_t l1t, time_t ts, uint16_t msec, uint8_t tt, uint32_t v)
 	return;
 }
 
+/* sl1oadt accessors */
+static inline dse16_t
+time_to_dse(time_t ts)
+{
+	return (dse16_t)(ts / 86400);
+}
+
+static inline time_t
+dse_to_time(dse16_t ts)
+{
+	return (time_t)(ts * 86400);
+}
+
+static inline uint32_t
+sl1oadt_instr(sl1oadt_t t)
+{
+	return t->instr;
+}
+
+static inline uint32_t
+sl1oadt_unit(sl1oadt_t t)
+{
+	return t->unit;
+}
+
+static inline uint16_t
+sl1oadt_pot(sl1oadt_t t)
+{
+	return (uint16_t)(t->mux >> 6);
+}
+
+static inline uint8_t
+sl1oadt_tick_type(sl1oadt_t t)
+{
+	return (uint8_t)(t->mux & 0x3f);
+}
+
+static inline dse16_t
+sl1oadt_dse(sl1oadt_t t)
+{
+	return t->dse;
+}
+
+static inline uint8_t
+find_index_in_pkt(dse16_t dse)
+{
+/* find the index of the date encoded in dse inside a tick bouquet */
+	dse16_t anchor = time_to_dse(442972800);
+	return (uint8_t)((((dse - anchor) % 14) - 1) % 14);
+}
+
+static inline dse16_t
+tser_pkt_beg_dse(dse16_t dse)
+{
+	uint8_t sub = find_index_in_pkt(dse);
+	return dse - sub;
+}
+
+static inline uint32_t
+sl1oadt_value(sl1oadt_t oadt, uint8_t idx)
+{
+	return oadt->value[idx];
+}
+
 /**
  * Instantiate a sparse level 1 once-a-day tick for HDR. */
 static inline void
@@ -500,7 +564,9 @@ static inline void
 udpc_seria_add_sl1oadt(udpc_seria_t sctx, sl1oadt_t oadt)
 {
 	/* we send of the first 3 slots, 32b 32b 16b, as secu */
-	udpc_seria_add_secu(sctx, (void*)oadt);
+	udpc_seria_add_ui32(sctx, sl1oadt_instr(oadt));
+	udpc_seria_add_ui32(sctx, sl1oadt_unit(oadt));
+	udpc_seria_add_ui16(sctx, oadt->mux);
 	/* now comes the semi-sparse entry */
 	udpc_seria_add_byte(sctx, oadt->nticks);
 	udpc_seria_add_ui16(sctx, oadt->dse);
@@ -511,11 +577,13 @@ udpc_seria_add_sl1oadt(udpc_seria_t sctx, sl1oadt_t oadt)
 	return;
 }
 
-static inline void
+static inline size_t
 udpc_seria_des_sl1oadt(sl1oadt_t oadt, udpc_seria_t sctx)
 {
 	/* we send of the first 3 slots, 32b 32b 16b, as secu */
-	udpc_seria_des_secu((void*)oadt, sctx);
+	oadt->instr = udpc_seria_des_ui32(sctx);
+	oadt->unit = udpc_seria_des_ui32(sctx);
+	oadt->mux = udpc_seria_des_ui16(sctx);
 	/* now comes the semi-sparse entry */
 	oadt->nticks = udpc_seria_des_byte(sctx);
 	oadt->dse = udpc_seria_des_ui16(sctx);
@@ -523,7 +591,7 @@ udpc_seria_des_sl1oadt(sl1oadt_t oadt, udpc_seria_t sctx)
 	for (uint8_t i = 0; i < oadt->nticks; i++) {
 		oadt->value[i] = udpc_seria_des_ui32(sctx);
 	}
-	return;
+	return oadt->nticks;
 }
 
 #endif	/* INCLUDED_tseries_h_ */

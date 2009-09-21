@@ -38,7 +38,9 @@
 #if !defined INCLUDED_tseries_private_h_
 #define INCLUDED_tseries_private_h_
 
+#include "tseries.h"
+
 extern void
-fetch_ticks_intv_mysql(tser_pkt_t, tick_by_instr_hdr_t, time_t beg, time_t end);
+fetch_ticks_intv_mysql(tser_pktbe_t, tick_by_instr_hdr_t);
 
 #endif	/* INCLUDED_tseries_private_h_ */

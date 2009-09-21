@@ -274,8 +274,11 @@ instr_tick_by_instr_svc(job_t j)
 	copy_pkt(&rplj, j);
 	clear_pkt(&rplsctx, &rplj);
 
+	/* ugly, but we have to loop-ify this anyway */
+	dse16_t refts = time_to_dse(filt[0]);
+	uint8_t idx = find_index_in_pkt(refts);
 	/* obtain the time intervals we need */
-	if ((pkt = find_tser_pkt(tseries, filt[0])) == NULL) {
+	if ((pkt = find_tser_pkt(tseries, refts)) == NULL) {
 		struct tser_pktbe_s p;
 
 		/* let the luser know we deliver our shit later on */
@@ -284,21 +287,24 @@ instr_tick_by_instr_svc(job_t j)
 		send_pkt(&rplsctx, &rplj);
 
 		/* now care about fetching the bugger */
-		p.beg = __last_monday_14algn(filt[0]);
-		p.end = p.beg + 13 * 86400;
-		fetch_ticks_intv_mysql(&p.pkt, &hdr, p.beg, p.end);
+		p.beg = refts - idx;
+		p.end = p.beg + 13;
+		fetch_ticks_intv_mysql(&p, &hdr);
 		add_tser_pktbe(tser, &p);
+
+		/* reset the packet */
+		clear_pkt(&rplsctx, &rplj);
+		fill_sl1oadt_1(&oadt, &hdr, PFTT_EOD, refts, p.pkt.t[idx]);
+		udpc_seria_add_sl1oadt(&rplsctx, &oadt);
 	} else {
-		uint16_t dse = time_to_dse(filt[0]);
-		uint8_t idx = find_index_in_pkt(dse);
 		m32_t pri = pkt->t[idx];
 
 		UD_DEBUG("yay, cached\n");
-		fill_sl1oadt_1(&oadt, &hdr, PFTT_EOD, dse, pri);
+		fill_sl1oadt_1(&oadt, &hdr, PFTT_EOD, refts, pri);
 		udpc_seria_add_sl1oadt(&rplsctx, &oadt);
-		/* send what we've got */
-		send_pkt(&rplsctx, &rplj);
 	}
+	/* send what we've got */
+	send_pkt(&rplsctx, &rplj);
 	return;
 }
 

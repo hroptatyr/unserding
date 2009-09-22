@@ -289,7 +289,7 @@ instr_tick_by_instr_svc(job_t j)
 
 		/* now care about fetching the bugger */
 		p.beg = refts - idx;
-		p.end = p.beg + 14;
+		p.end = p.beg + 13;
 
 		if (fetch_ticks_intv_mysql(&p, tsa) == 0) {
 			/* we shoul send something like quote invalid or so */

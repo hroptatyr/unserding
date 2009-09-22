@@ -490,7 +490,7 @@ find_index_in_pkt(dse16_t dse)
 	if (res > 0) {
 		return res - 1;
 	} else {
-		return 14;
+		return 13;
 	}
 }
 

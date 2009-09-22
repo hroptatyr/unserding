@@ -71,18 +71,9 @@
 #include "tseries.h"
 #include "tseries-private.h"
 
-static tseries_t tseries = NULL;
+static tscache_t tscache = NULL;
 
 
-static tseries_t
-make_tseries(void)
-{
-	tseries_t res = xnew(*res);
-	res->size = 0;
-	res->conses = NULL;
-	return res;
-}
-
 static tser_pkt_t
 find_tser_pkt(tseries_t tser, time_t ts)
 {
@@ -251,7 +242,7 @@ instr_tick_by_instr_svc(job_t j)
 	/* allow to filter for 64 time stamps at once */
 	time_t filt[64];
 	unsigned int nfilt = 0;
-	tseries_t tser = tseries;
+	tseries_t tser;
 	tser_pkt_t pkt;
 	struct sl1oadt_s oadt;
 
@@ -260,6 +251,15 @@ instr_tick_by_instr_svc(job_t j)
 	/* read the header off of the wire */
 	udpc_seria_des_tick_by_instr_hdr(&hdr, &sctx);
 
+	/* get us the tseries we're talking about */
+	if ((tser = find_tseries_by_secu(tscache, &hdr.secu)) == NULL) {
+		struct tseries_s tmp = {
+			.kacke = hdr.secu.instr,
+			.size = 0,
+			.conses = NULL,
+		};
+		tser = tscache_bang_series(tscache, &tmp);
+	}
 	/* triples of instrument identifiers */
 	while ((filt[nfilt] = udpc_seria_des_ui32(&sctx)) &&
 	       ++nfilt < countof(filt));
@@ -278,7 +278,7 @@ instr_tick_by_instr_svc(job_t j)
 	dse16_t refts = time_to_dse(filt[0]);
 	uint8_t idx = find_index_in_pkt(refts);
 	/* obtain the time intervals we need */
-	if ((pkt = find_tser_pkt(tseries, refts)) == NULL) {
+	if ((pkt = find_tser_pkt(tser, refts)) == NULL) {
 		struct tser_pktbe_s p;
 
 		/* let the luser know we deliver our shit later on */
@@ -289,7 +289,10 @@ instr_tick_by_instr_svc(job_t j)
 		/* now care about fetching the bugger */
 		p.beg = refts - idx;
 		p.end = p.beg + 13;
-		fetch_ticks_intv_mysql(&p, &hdr);
+		if (fetch_ticks_intv_mysql(&p, &hdr) == 0) {
+			/* we shoul send something like quote invalid or so */
+			return;
+		}
 		add_tser_pktbe(tser, &p);
 
 		/* reset the packet */
@@ -375,7 +378,7 @@ dso_tseries_LTX_init(void *clo)
 
 	UD_DEBUG("mod/tseries: loading ...");
 	/* create the catalogue */
-	tseries = make_tseries();
+	tscache = make_tscache();
 	/* tick service */
 	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);

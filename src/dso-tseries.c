@@ -280,6 +280,7 @@ instr_tick_by_instr_svc(job_t j)
 	/* obtain the time intervals we need */
 	if ((pkt = find_tser_pkt(tser, refts)) == NULL) {
 		struct tser_pktbe_s p;
+		ts_anno_t tsa = tscache_tseries_annotation(tser);
 
 		/* let the luser know we deliver our shit later on */
 		udpc_set_defer_fina_pkt(JOB_PACKET(&rplj));
@@ -290,7 +291,7 @@ instr_tick_by_instr_svc(job_t j)
 		p.beg = refts - idx;
 		p.end = p.beg + 14;
 
-		if (fetch_ticks_intv_mysql(&p, &hdr) == 0) {
+		if (fetch_ticks_intv_mysql(&p, tsa) == 0) {
 			/* we shoul send something like quote invalid or so */
 			return;
 		}

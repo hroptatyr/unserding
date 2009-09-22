@@ -94,7 +94,7 @@ qry_rowf(void **row, size_t nflds, void *clo)
 }
 
 size_t
-fetch_ticks_intv_mysql(tser_pktbe_t pkt, tick_by_instr_hdr_t hdr)
+fetch_ticks_intv_mysql(tser_pktbe_t pkt, ts_anno_t tsa)
 {
 /* assumes eod ticks for now */
 	char begs[16], ends[16];
@@ -108,10 +108,10 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, tick_by_instr_hdr_t hdr)
 	len = snprintf(
 		qry, sizeof(qry),
 		"SELECT `date`, `close` "
-		"FROM `GAT_static`.`eod_interest_rates2` "
+		"FROM %s "
 		"WHERE contractId = %d AND `date` BETWEEN '%s' AND '%s' "
 		"ORDER BY 1",
-		hdr->secu.instr, begs, ends);
+		tsa->tbl, tsa->instr, begs, ends);
 	UD_DEBUG("querying: %s\n", qry);
 	uddb_qry(conn, qry, len, qry_rowf, &pi);
 	UD_DEBUG("got %u prices\n", pi.i);

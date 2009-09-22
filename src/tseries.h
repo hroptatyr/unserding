@@ -107,6 +107,9 @@ typedef struct sl1oadt_s *sl1oadt_t;
 /** days since epoch type, goes till ... */
 typedef uint16_t dse16_t;
 
+typedef union time_dse_u udate_t;
+typedef uint32_t date_t;
+
 /**
  * Condensed version of:
  *   // upper 10 bits
@@ -182,9 +185,14 @@ struct tser_pkt_s {
 	monetary32_t t[10];
 };
 
+union time_dse_u {
+	time_t time;
+	dse16_t dse16;
+};
+
 struct tser_pktbe_s {
-	time_t beg;
-	time_t end;
+	date_t beg;
+	date_t end;
 	struct tser_pkt_s pkt;
 };
 
@@ -264,7 +272,8 @@ ud_find_ticks_by_instr(
 typedef struct ts_anno_s {
 	uint32_t instr;
 	const char *tbl;
-	dse16_t from, to;
+	time_t from, to;
+	uint32_t types;
 } *ts_anno_t;
 
 /**
@@ -332,7 +341,7 @@ tseries_last(tseries_t tser)
 	return res;
 }
 
-static inline time_t
+static inline date_t
 tseries_beg(tseries_t tser)
 {
 	if (tser->size > 0) {
@@ -340,7 +349,7 @@ tseries_beg(tseries_t tser)
 	}
 }
 
-static inline time_t
+static inline date_t
 tseries_end(tseries_t tser)
 {
 	if (tser->size > 0) {
@@ -477,7 +486,12 @@ find_index_in_pkt(dse16_t dse)
 {
 /* find the index of the date encoded in dse inside a tick bouquet */
 	dse16_t anchor = time_to_dse(442972800);
-	return (uint8_t)((((dse - anchor) % 14) - 1) % 14);
+	uint8_t res = (dse - anchor) % 14;
+	if (res > 0) {
+		return res - 1;
+	} else {
+		return 14;
+	}
 }
 
 static inline dse16_t

@@ -75,7 +75,7 @@ tscache_t tscache = NULL;
 
 
 static tser_pkt_t
-find_tser_pkt(tseries_t tser, time_t ts)
+find_tser_pkt(tseries_t tser, date_t ts)
 {
 	for (tser_cons_t res = tser->conses; res; res = res->next) {
 		if (ts < res->pktbe.beg) {
@@ -251,11 +251,6 @@ instr_tick_by_instr_svc(job_t j)
 	/* read the header off of the wire */
 	udpc_seria_des_tick_by_instr_hdr(&hdr, &sctx);
 
-	/* get us the tseries we're talking about */
-	if ((tser = find_tseries_by_secu(tscache, &hdr.secu)) == NULL) {
-		struct tseries_s tmp = {.size = 0, .conses = NULL};
-		tser = tscache_bang_series(tscache, &hdr.secu, &tmp);
-	}
 	/* triples of instrument identifiers */
 	while ((filt[nfilt] = udpc_seria_des_ui32(&sctx)) &&
 	       ++nfilt < countof(filt));
@@ -266,6 +261,15 @@ instr_tick_by_instr_svc(job_t j)
 	if (nfilt == 0) {
 		return;
 	}
+
+	/* get us the tseries we're talking about */
+	if ((tser = find_tseries_by_secu(tscache, &hdr.secu)) == NULL) {
+		/* means we have no means of fetching */
+		/* we could issue a packet saying so */
+		UD_DEBUG("No way of fetching stuff\n");
+		return;
+	}
+
 	/* prepare the reply packet ... */
 	copy_pkt(&rplj, j);
 	clear_pkt(&rplsctx, &rplj);
@@ -284,7 +288,8 @@ instr_tick_by_instr_svc(job_t j)
 
 		/* now care about fetching the bugger */
 		p.beg = refts - idx;
-		p.end = p.beg + 13;
+		p.end = p.beg + 14;
+
 		if (fetch_ticks_intv_mysql(&p, &hdr) == 0) {
 			/* we shoul send something like quote invalid or so */
 			return;

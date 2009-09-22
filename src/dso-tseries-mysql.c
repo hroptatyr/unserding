@@ -120,6 +120,24 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, tick_by_instr_hdr_t hdr)
 
 
 /* overview and administrative bullshit */
+static time_t
+parse_time(const char *t)
+{
+	struct tm tm;
+	char *on;
+
+	memset(&tm, 0, sizeof(tm));
+	on = strptime(t, "%Y-%m-%d", &tm);
+	if (on == NULL) {
+		return 0;
+	}
+	if (on[0] == ' ' || on[0] == 'T' || on[0] == '\t') {
+		on++;
+	}
+	(void)strptime(on, "%H:%M:%S", &tm);
+	return timegm(&tm);
+}
+
 static const char ovqry[] =
 	"SELECT "
 #define INSTR_ID	0
@@ -131,17 +149,37 @@ static const char ovqry[] =
 #define MIN_DT		3
 	"`uiu`.`min_dt`, "
 #define MAX_DT		4
-	"`uiu`.`max_dt` "
+	"`uiu`.`max_dt`, "
+#define TYPES_BS	5
+	"`uiu`.`types_bitset` "
 	"FROM `freundt`.`ga_instr_urns` AS `uiu`";
 
 static void
 ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 {
-	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
+	long unsigned int urn_id = strtoul(row[URN_ID], NULL, 10);
+	struct secu_s secu;
+	tseries_t tser;
+	ts_anno_t tsa;
+
+	secu.instr = strtoul(row[INSTR_ID], NULL, 10);
+	secu.unit = 0;
+	secu.pot = 0;
 
 	switch (urn_id) {
 	case 1 ... 3:
-		UD_DEBUG("Once-A-Day tick for %s\n", (char*)row[INSTR_ID]);
+		UD_DEBUG("Once-A-Day tick for %u\n", secu.instr);
+		if ((tser = find_tseries_by_secu(tscache, &secu)) == NULL) {
+			struct tseries_s tmp = {.size = 0, .conses = NULL};
+			tser = tscache_bang_series(tscache, &secu, &tmp);
+		}
+		tsa = tscache_tseries_annotation(tser);
+		tsa->instr = secu.instr;
+		tsa->tbl = strdup(row[URN]);
+		tsa->from = parse_time(row[MIN_DT]);
+		tsa->to = parse_time(row[MAX_DT]);
+		tsa->types = strtoul(row[TYPES_BS], NULL, 10);
+
 	default:
 		break;
 	}

@@ -40,6 +40,9 @@
 
 #include "tseries.h"
 
+/* the main one used in dso-tseries.c */
+extern tscache_t tscache;
+
 extern size_t
 fetch_ticks_intv_mysql(tser_pktbe_t, tick_by_instr_hdr_t);
 

@@ -71,7 +71,7 @@
 #include "tseries.h"
 #include "tseries-private.h"
 
-static tscache_t tscache = NULL;
+tscache_t tscache = NULL;
 
 
 static tser_pkt_t
@@ -253,12 +253,8 @@ instr_tick_by_instr_svc(job_t j)
 
 	/* get us the tseries we're talking about */
 	if ((tser = find_tseries_by_secu(tscache, &hdr.secu)) == NULL) {
-		struct tseries_s tmp = {
-			.kacke = hdr.secu.instr,
-			.size = 0,
-			.conses = NULL,
-		};
-		tser = tscache_bang_series(tscache, &tmp);
+		struct tseries_s tmp = {.size = 0, .conses = NULL};
+		tser = tscache_bang_series(tscache, &hdr.secu, &tmp);
 	}
 	/* triples of instrument identifiers */
 	while ((filt[nfilt] = udpc_seria_des_ui32(&sctx)) &&

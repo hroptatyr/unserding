@@ -172,7 +172,6 @@ struct sl1t_s {
 };
 
 struct tseries_s {
-	uint32_t kacke;
 	size_t size;
 	/** vector of cons cells, nope, it's a list at the mo */
 	tser_cons_t conses;
@@ -215,7 +214,6 @@ struct sl1oadt_s {
 
 
 /* the global tscache container */
-
 /**
  * The time series cache data type, just a husk. */
 typedef void *tscache_t;
@@ -224,7 +222,7 @@ extern tscache_t make_tscache(void);
 extern void free_tscache(tscache_t tsc);
 extern size_t tscache_size(tscache_t tsc);
 
-extern tseries_t tscache_bang_series(tscache_t tsc, tseries_t s);
+extern tseries_t tscache_bang_series(tscache_t tsc, secu_t s, tseries_t ts);
 extern tseries_t find_tseries_by_secu(tscache_t tsc, secu_t secu);
 
 
@@ -260,6 +258,30 @@ ud_find_ticks_by_instr(
 	void(*cb)(sl1oadt_t, void *clo), void *clo,
 	secu_t s, uint32_t bs,
 	time_t *ts, size_t tslen);
+
+/**
+ * Annotation space inside the cache. */
+typedef struct ts_anno_s {
+	uint32_t instr;
+	const char *tbl;
+	dse16_t from, to;
+} *ts_anno_t;
+
+/**
+ * Like tseries but with annotation goodness. */
+typedef struct anno_tseries_s *anno_tseries_t;
+struct anno_tseries_s {
+	struct tseries_s tseries;
+	struct ts_anno_s anno;
+};
+
+/**
+ * Return the annotation of a tseries ts from within a tscache object. */
+static inline ts_anno_t
+tscache_tseries_annotation(tseries_t i)
+{
+	return &(((anno_tseries_t)(void*)i)->anno);
+}
 
 
 /* inlines, type (de)muxers */

@@ -71,7 +71,7 @@ struct keyval_s {
 struct tscache_s {
 	size_t nseries;
 	size_t alloc_sz;
-	struct tseries_s *series;
+	struct anno_tseries_s *as;
 	struct keyval_s *keys;
 	pthread_mutex_t mtx;
 };
@@ -82,6 +82,12 @@ static inline bool
 secukey_equal_p(secukey_t id1, secukey_t id2)
 {
 	return id1 == id2 && id1 != 0;
+}
+
+static inline secukey_t
+secukey_from_secu(secu_t s)
+{
+	return s->instr;
 }
 
 /* state-of-the-art hash seems to be murmur2, so let's adapt it for gaids */
@@ -139,7 +145,14 @@ slot(struct keyval_s *keys, size_t size, secukey_t key)
 static inline tseries_t
 tscache_series(_tscache_t c, index_t i)
 {
-	tseries_t s = c->series;
+	anno_tseries_t s = c->as;
+	return &s[i].tseries;
+}
+
+static inline anno_tseries_t
+tscache_anno_tseries(_tscache_t c, index_t i)
+{
+	anno_tseries_t s = c->as;
 	return &s[i];
 }
 
@@ -209,7 +222,7 @@ make_tscache(void)
 	_tscache_t res = xnew(struct tscache_s);
 
 	pthread_mutex_init(&res->mtx, NULL);
-	res->series = malloc(sizeof(*res->series) * INITIAL_SIZE);
+	res->as = malloc(sizeof(*res->as) * INITIAL_SIZE);
 	init_keys(res, INITIAL_SIZE);
 	res->alloc_sz = INITIAL_SIZE;
 	res->nseries = 0;
@@ -225,7 +238,7 @@ free_tscache(tscache_t tsc)
 	pthread_mutex_unlock(&c->mtx);
 	pthread_mutex_destroy(&c->mtx);
 
-	free(c->series);
+	free(c->as);
 	free_keys(c);
 	free(c);
 	return;
@@ -251,7 +264,7 @@ check_resize(_tscache_t c)
 		/* resize */
 		size_t old_sz = c->alloc_sz;
 		size_t new_sz = c->alloc_sz * 2;
-		c->series = realloc(c->series, new_sz * sizeof(*c->series));
+		c->as = realloc(c->as, new_sz * sizeof(*c->as));
 		resize_keys(c, old_sz, new_sz);
 		c->alloc_sz = new_sz;
 		/* indicate that we did resize */
@@ -263,12 +276,12 @@ check_resize(_tscache_t c)
 
 
 tseries_t
-tscache_bang_series(tscache_t tsc, tseries_t s)
+tscache_bang_series(tscache_t tsc, secu_t s, tseries_t ts)
 {
 /* returns the next instrument we've banged into */
 	_tscache_t c = tsc;
-	tseries_t res;
-	secukey_t sk = s->kacke;
+	anno_tseries_t res;
+	secukey_t sk = secukey_from_secu(s);
 	/* key slot and instr slot */
 	uint32_t ks, is;
 
@@ -276,17 +289,17 @@ tscache_bang_series(tscache_t tsc, tseries_t s)
 	(void)check_resize(c);
 	ks = slot(c->keys, c->alloc_sz, sk);
 	if (UNLIKELY(c->keys[ks].key != 0)) {
-		res = (void*)tscache_series(c, c->keys[ks].val);
+		res = tscache_anno_tseries(c, c->keys[ks].val);
 		pthread_mutex_unlock(&c->mtx);
-		return res;
+		return (void*)res;
 	}
 	is = c->nseries++;
 	c->keys[ks].key = sk;
 	c->keys[ks].val = is;
-	res = (void*)tscache_series(c, is);
-	memcpy(res, s, sizeof(*s));
+	res = tscache_anno_tseries(c, is);
+	memcpy(res, ts, sizeof(*ts));
 	pthread_mutex_unlock(&c->mtx);
-	return res;
+	return (void*)res;
 }
 
 tseries_t
@@ -297,7 +310,7 @@ find_tseries_by_secu(tscache_t tsc, secu_t secu)
 	uint32_t ks;
 
 	pthread_mutex_lock(&c->mtx);
-	ks = slot(c->keys, c->alloc_sz, secu->instr);
+	ks = slot(c->keys, c->alloc_sz, secukey_from_secu(secu));
 	if (UNLIKELY(ks == -1U)) {
 		res = NULL;
 	} else if (LIKELY(c->keys[ks].key != 0)) {

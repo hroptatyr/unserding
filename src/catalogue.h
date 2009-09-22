@@ -47,10 +47,6 @@
  * The catalogue data type, just a husk. */
 typedef void *cat_t;
 
-/**
- * The annotation structure to refer to resources. */
-typedef struct anno_s *anno_t;
-
 /* and the instr version */
 typedef struct anno_instr_s *anno_instr_t;
 
@@ -63,11 +59,9 @@ struct keyval_s {
 
 /**
  * Annotation structure for annotated instruments. */
-struct anno_s {
-	const char *tbl_name;
-	time_t from;
-	time_t to;
-};
+typedef struct cat_anno_s {
+	;
+} *cat_anno_t;
 
 /**
  * Use annotated instruments, this is the class to do so.  Actually,
@@ -77,7 +71,7 @@ struct anno_s {
  * directly. */
 struct anno_instr_s {
 	struct instr_s instr;
-	struct anno_s anno;
+	struct cat_anno_s anno;
 };
 
 /**
@@ -108,16 +102,12 @@ extern instr_t cat_bang_instr(cat_t cat, instr_t i);
 static inline void
 cat_annotate_instr(cat_t c, instr_t i, const char *tbl, time_t from, time_t to)
 {
-	anno_instr_t ai = (void*)i;
-	ai->anno.tbl_name = tbl;
-	ai->anno.from = from;
-	ai->anno.to = to;
 	return;
 }
 
 /**
  * Return the annotation of an instrument I from within the catalogue. */
-static inline anno_t
+static inline cat_anno_t
 cat_instr_annotation(instr_t i)
 {
 	return &(((anno_instr_t)(void*)i)->anno);

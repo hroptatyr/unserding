@@ -131,6 +131,10 @@ ud_find_many_instrs(
 
 
 /* tick finders */
+#undef USE_TICK_BY_TS
+#define USE_TICK_BY_INSTR
+
+#if defined USE_TICK_BY_TS
 size_t
 ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 {
@@ -159,6 +163,36 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 	memcpy(tgt, UDPC_PAYLOAD(pkt.pbuf), len - UDPC_HDRLEN);
 	return len - UDPC_HDRLEN;
 }
+#elif defined USE_TICK_BY_INSTR
+size_t
+ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
+{
+	struct udpc_seria_s sctx;
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
+	ud_convo_t cno = hdl->convo++;
+	struct tick_by_instr_hdr_s hdr = {.secu = *s, .types = bs};
+	size_t len;
+
+	memset(buf, 0, sizeof(buf));
+	udpc_make_pkt(pkt, cno, 0, UD_SVC_TICK_BY_INSTR);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	/* 4222(secu, tick_bitset, ts, ts, ts, ...) */
+	udpc_seria_add_tick_by_instr_hdr(&sctx, &hdr);
+	udpc_seria_add_ui32(&sctx, ts);
+	/* prepare packet for sending im off */
+	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+	ud_send_raw(hdl, pkt);
+
+	pkt.plen = sizeof(buf);
+	ud_recv_convo(hdl, &pkt, UD_SVC_TIMEOUT, cno);
+	if (UNLIKELY((len = pkt.plen) == 0)) {
+		return 0;
+	}
+	memcpy(tgt, UDPC_PAYLOAD(pkt.pbuf), len - UDPC_HDRLEN);
+	return len - UDPC_HDRLEN;
+}
+#endif	/* USE_TICK_BY_TS || USE_TICK_BY_INSTR */
 
 static size_t
 max_num_ticks(uint32_t bitset)

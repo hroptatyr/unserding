@@ -154,6 +154,20 @@ static const char ovqry[] =
 	"`uiu`.`types_bitset` "
 	"FROM `freundt`.`ga_instr_urns` AS `uiu`";
 
+static char *urns[64];
+static size_t nurns = 0;
+
+static const char*
+find_urn(const char *urn)
+{
+	for (index_t i = 0; i < nurns; i++) {
+		if (strcmp(urns[i], urn) == 0) {
+			return urns[i];
+		}
+	}
+	return urns[nurns++] = strdup(urn);
+}
+
 static void
 ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 {
@@ -175,7 +189,7 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 		}
 		tsa = tscache_tseries_annotation(tser);
 		tsa->instr = secu.instr;
-		tsa->tbl = strdup(row[URN]);
+		tsa->tbl = find_urn(row[URN]);
 		tsa->from = parse_time(row[MIN_DT]);
 		tsa->to = parse_time(row[MAX_DT]);
 		tsa->types = strtoul(row[TYPES_BS], NULL, 10);

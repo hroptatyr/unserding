@@ -57,6 +57,7 @@
 
 #include "xdr-instr-private.h"
 #include "xdr-instr-seria.h"
+#include "urn.h"
 #include "tseries.h"
 #include "tseries-private.h"
 
@@ -107,15 +108,171 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, ts_anno_t tsa)
 	print_ds_into(ends, sizeof(ends), dse_to_time(end));
 	len = snprintf(
 		qry, sizeof(qry),
-		"SELECT `date`, `close` "
+		"SELECT `%s`, `%s` "
 		"FROM %s "
-		"WHERE contractId = %d AND `date` BETWEEN '%s' AND '%s' "
+		"WHERE `%s` = %d AND `%s` BETWEEN '%s' AND '%s' "
 		"ORDER BY 1",
-		tsa->tbl, tsa->instr, begs, ends);
+		urn_fld_date(tsa->urn), urn_fld_close(tsa->urn),
+		tsa->urn->dbtbl,
+		urn_fld_id(tsa->urn), tsa->instr,
+		urn_fld_date(tsa->urn), begs, ends);
 	UD_DEBUG("querying: %s\n", qry);
 	uddb_qry(conn, qry, len, qry_rowf, &pi);
 	UD_DEBUG("got %u prices\n", pi.i);
 	return pi.i;
+}
+
+
+/* urn bollocks */
+static struct urn_s urns[64];
+static size_t nurns = 0;
+
+static bool
+fld_id_p(const char *row_name)
+{
+	return strcmp(row_name, "contractId") == 0 ||
+		strcmp(row_name, "ga_instr_id") == 0;
+}
+
+static bool
+fld_date_p(const char *row_name)
+{
+	return strcmp(row_name, "date") == 0;
+}
+
+static bool
+fld_open_p(const char *row_name)
+{
+	return row_name[0] == 'o';
+}
+
+static bool
+fld_high_p(const char *row_name)
+{
+	return row_name[0] == 'h';
+}
+
+static bool
+fld_low_p(const char *row_name)
+{
+	return row_name[0] == 'l';
+}
+
+static bool
+fld_close_p(const char *r)
+{
+	return r[0] == 'c' && (r[1] == '\0' || r[1] == 'l');
+}
+
+static bool
+fld_volume_p(const char *row_name)
+{
+	return row_name[0] == 'v';
+}
+
+static const_urn_t
+find_urn(urn_type_t type, const char *urn)
+{
+	index_t idx;
+	for (index_t i = 0; i < nurns; i++) {
+		if (strcmp(urns[i].dbtbl, urn) == 0) {
+			return &urns[i];
+		}
+	}
+	idx = nurns++;
+	memset(&urns[idx], 0, sizeof(urns[idx]));
+	urns[idx].type = type;
+	urns[idx].dbtbl = strdup(urn);
+	return &urns[idx];
+}
+
+static void
+fill_oad_c(urn_t urn, const char *r)
+{
+	if (urn->flds.oad_c.fld_close == NULL && fld_close_p(r)) {
+		urn->flds.oad_c.fld_close = strdup(r);
+	}
+	return;
+}
+
+static void
+fill_oad_ohlc(urn_t urn, const char *r)
+{
+	if (urn->flds.oad_ohlc.fld_open == NULL && fld_open_p(r)) {
+		urn->flds.oad_ohlc.fld_open = strdup(r);
+
+	} else if (urn->flds.oad_ohlc.fld_high == NULL && fld_high_p(r)) {
+		urn->flds.oad_ohlc.fld_high = strdup(r);
+
+	} else if (urn->flds.oad_ohlc.fld_low == NULL && fld_low_p(r)) {
+		urn->flds.oad_ohlc.fld_low = strdup(r);
+
+	} else if (urn->flds.oad_ohlc.fld_close == NULL && fld_close_p(r)) {
+		urn->flds.oad_ohlc.fld_close = strdup(r);
+	}
+	return;
+}
+
+static void
+fill_oad_ohlcv(urn_t urn, const char *r)
+{
+	if (urn->flds.oad_ohlcv.fld_open == NULL && fld_open_p(r)) {
+		urn->flds.oad_ohlcv.fld_open = strdup(r);
+
+	} else if (urn->flds.oad_ohlcv.fld_high == NULL && fld_high_p(r)) {
+		urn->flds.oad_ohlcv.fld_high = strdup(r);
+
+	} else if (urn->flds.oad_ohlcv.fld_low == NULL && fld_low_p(r)) {
+		urn->flds.oad_ohlcv.fld_low = strdup(r);
+
+	} else if (urn->flds.oad_ohlcv.fld_close == NULL && fld_close_p(r)) {
+		urn->flds.oad_ohlcv.fld_close = strdup(r);
+
+	} else if (urn->flds.oad_ohlcv.fld_volume == NULL && fld_volume_p(r)) {
+		urn->flds.oad_ohlcv.fld_volume = strdup(r);
+	}
+	return;
+}
+
+static void
+urnqry_rowf(void **row, size_t nflds, void *clo)
+{
+	urn_t urn = clo;
+
+	UD_DEBUG("column %s %s\n", urn->dbtbl, (char*)row[0]);
+	if (urn->flds.unk.fld_id == NULL && fld_id_p(row[0])) {
+		urn->flds.unk.fld_id = strdup(row[0]);
+	} else if (urn->flds.unk.fld_date == NULL && fld_date_p(row[0])) {
+		urn->flds.unk.fld_date = strdup(row[0]);
+	} else if (urn->type == URN_OAD_C) {
+		fill_oad_c(urn, row[0]);
+	} else if (urn->type == URN_OAD_OHLC) {
+		fill_oad_ohlc(urn, row[0]);
+	} else if (urn->type == URN_OAD_OHLCV) {
+		fill_oad_ohlcv(urn, row[0]);
+	}
+	return;
+}
+
+static void
+fill_urn(urn_t urn)
+{
+	char qry[224];
+	size_t len;
+
+	len = snprintf(qry, sizeof(qry), "SHOW COLUMNS FROM %s", urn->dbtbl);
+	uddb_qry(conn, qry, len, urnqry_rowf, urn);
+	return;
+}
+
+static void
+fill_urns(void)
+{
+/* fetch field info */
+	for (index_t i = 0; i < nurns; i++) {
+		fill_urn(&urns[i]);
+	}
+	return;
 }
 
 
@@ -160,20 +317,6 @@ static const char ovqry[] =
 /* if TBS_OAD is set, this indicates if there are 5 days in a week */
 #define TBS_5DW		0x02
 
-static char *urns[64];
-static size_t nurns = 0;
-
-static const char*
-find_urn(const char *urn)
-{
-	for (index_t i = 0; i < nurns; i++) {
-		if (strcmp(urns[i], urn) == 0) {
-			return urns[i];
-		}
-	}
-	return urns[nurns++] = strdup(urn);
-}
-
 static void
 ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 {
@@ -197,11 +340,10 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 		}
 		tsa = tscache_tseries_annotation(tser);
 		tsa->instr = secu.instr;
-		tsa->tbl = find_urn(row[URN]);
+		tsa->urn = find_urn(urn_id, row[URN]);
 		tsa->from = parse_time(row[MIN_DT]);
 		tsa->to = parse_time(row[MAX_DT]);
 		tsa->types = tbs;
-		tsa->urn_id = urn_id;
 
 	default:
 		break;
@@ -224,6 +366,10 @@ dso_tseries_mysql_LTX_init(void *clo)
 
 	UD_DEBUG("leeching overview ...");
 	uddb_qry(conn, ovqry, sizeof(ovqry)-1, ovqry_rowf, NULL);
+	UD_DBGCONT("done\n");
+
+	UD_DEBUG("inspecting URNs ...");
+	fill_urns();
 	UD_DBGCONT("done\n");
 	return;
 }

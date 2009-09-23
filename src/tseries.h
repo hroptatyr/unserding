@@ -44,6 +44,7 @@
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"
+#include "urn.h"
 
 /* tick services */
 #if !defined index_t
@@ -271,10 +272,9 @@ ud_find_ticks_by_instr(
  * Annotation space inside the cache. */
 typedef struct ts_anno_s {
 	uint32_t instr;
-	const char *tbl;
+	const_urn_t urn;
 	time_t from, to;
 	uint32_t types;
-	uint32_t urn_id;
 } *ts_anno_t;
 
 /**

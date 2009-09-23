@@ -274,6 +274,7 @@ typedef struct ts_anno_s {
 	const char *tbl;
 	time_t from, to;
 	uint32_t types;
+	uint32_t urn_id;
 } *ts_anno_t;
 
 /**

@@ -154,6 +154,12 @@ static const char ovqry[] =
 	"`uiu`.`types_bitset` "
 	"FROM `freundt`.`ga_instr_urns` AS `uiu`";
 
+/* type_bs stuff */
+/* if it is a once-a-day tick */
+#define TBS_OAD		0x01
+/* if TBS_OAD is set, this indicates if there are 5 days in a week */
+#define TBS_5DW		0x02
+
 static char *urns[64];
 static size_t nurns = 0;
 
@@ -171,10 +177,11 @@ find_urn(const char *urn)
 static void
 ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 {
-	long unsigned int urn_id = strtoul(row[URN_ID], NULL, 10);
+	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
 	struct secu_s secu;
 	tseries_t tser;
 	ts_anno_t tsa;
+	uint32_t tbs = strtoul(row[TYPES_BS], NULL, 10);
 
 	secu.instr = strtoul(row[INSTR_ID], NULL, 10);
 	secu.unit = 0;
@@ -182,7 +189,8 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 
 	switch (urn_id) {
 	case 1 ... 3:
-		UD_DEBUG("Once-A-Day tick for %u\n", secu.instr);
+		/* once-a-day, 5-a-week */
+		UD_DEBUG("OAD/5DW tick for %u\n", secu.instr);
 		if ((tser = find_tseries_by_secu(tscache, &secu)) == NULL) {
 			struct tseries_s tmp = {.size = 0, .conses = NULL};
 			tser = tscache_bang_series(tscache, &secu, &tmp);
@@ -192,7 +200,8 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 		tsa->tbl = find_urn(row[URN]);
 		tsa->from = parse_time(row[MIN_DT]);
 		tsa->to = parse_time(row[MAX_DT]);
-		tsa->types = strtoul(row[TYPES_BS], NULL, 10);
+		tsa->types = tbs;
+		tsa->urn_id = urn_id;
 
 	default:
 		break;

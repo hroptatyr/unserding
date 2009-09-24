@@ -166,6 +166,7 @@ tscache_bang_anno(tseries_t ts, ts_anno_t anno)
 	ts_anno_t tgt = tscache_tseries_annotation(ts);
 	if (tgt->instr == 0) {
 		memcpy(tgt, anno, sizeof(*anno));
+		tgt->next = NULL;
 	} else {
 		ts_anno_t tmp = tgt;
 		/* skip to the right tgt */

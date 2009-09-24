@@ -163,7 +163,18 @@ tscache_tseries_annotation(tseries_t ts)
 void
 tscache_bang_anno(tseries_t ts, ts_anno_t anno)
 {
-	memcpy(tscache_tseries_annotation(ts), anno, sizeof(*anno));
+	ts_anno_t tgt = tscache_tseries_annotation(ts);
+	if (tgt->instr == 0) {
+		memcpy(tgt, anno, sizeof(*anno));
+	} else {
+		ts_anno_t tmp = tgt;
+		/* skip to the right tgt */
+		for (; tmp->next; tmp = tmp->next);
+		tgt = xnew(*tgt);
+		tmp->next = tgt;
+		memcpy(tgt, anno, sizeof(*anno));
+		tgt->next = NULL;
+	}
 	return;
 }
 
@@ -201,6 +212,15 @@ static void
 free_keys(_tscache_t c)
 {
 	free(c->keys);
+	return;
+}
+
+static void
+init_series(_tscache_t c, size_t ini_sz)
+{
+	size_t msz = ini_sz * sizeof(*c->as);
+	c->as = malloc(msz);
+	memset(c->as, 0, msz);
 	return;
 }
 
@@ -254,7 +274,7 @@ make_tscache(void)
 	_tscache_t res = xnew(struct tscache_s);
 
 	pthread_mutex_init(&res->mtx, NULL);
-	res->as = malloc(sizeof(*res->as) * INITIAL_SIZE);
+	init_series(res, INITIAL_SIZE);
 	init_keys(res, INITIAL_SIZE);
 	res->alloc_sz = INITIAL_SIZE;
 	res->nseries = 0;

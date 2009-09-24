@@ -270,12 +270,14 @@ ud_find_ticks_by_instr(
 
 /**
  * Annotation space inside the cache. */
-typedef struct ts_anno_s {
+typedef struct ts_anno_s *ts_anno_t;
+struct ts_anno_s {
 	uint32_t instr;
 	const_urn_t urn;
 	time_t from, to;
 	uint32_t types;
-} *ts_anno_t;
+	ts_anno_t next;
+};
 
 extern void
 tscache_bang_anno(tseries_t ts, ts_anno_t anno);

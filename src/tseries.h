@@ -277,21 +277,10 @@ typedef struct ts_anno_s {
 	uint32_t types;
 } *ts_anno_t;
 
-/**
- * Like tseries but with annotation goodness. */
-typedef struct anno_tseries_s *anno_tseries_t;
-struct anno_tseries_s {
-	struct tseries_s tseries;
-	struct ts_anno_s anno;
-};
-
-/**
- * Return the annotation of a tseries ts from within a tscache object. */
-static inline ts_anno_t
-tscache_tseries_annotation(tseries_t i)
-{
-	return &(((anno_tseries_t)(void*)i)->anno);
-}
+extern void
+tscache_bang_anno(tseries_t ts, ts_anno_t anno);
+extern void
+tscache_unbang_anno(ts_anno_t anno, tseries_t ts);
 
 
 /* inlines, type (de)muxers */

@@ -323,7 +323,7 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
 	struct secu_s secu;
 	tseries_t tser;
-	ts_anno_t tsa;
+	struct ts_anno_s tsa;
 	uint32_t tbs = strtoul(row[TYPES_BS], NULL, 10);
 
 	secu.instr = strtoul(row[INSTR_ID], NULL, 10);
@@ -338,12 +338,13 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 			struct tseries_s tmp = {.size = 0, .conses = NULL};
 			tser = tscache_bang_series(tscache, &secu, &tmp);
 		}
-		tsa = tscache_tseries_annotation(tser);
-		tsa->instr = secu.instr;
-		tsa->urn = find_urn(urn_id, row[URN]);
-		tsa->from = parse_time(row[MIN_DT]);
-		tsa->to = parse_time(row[MAX_DT]);
-		tsa->types = tbs;
+		tsa.instr = secu.instr;
+		tsa.urn = find_urn(urn_id, row[URN]);
+		tsa.from = parse_time(row[MIN_DT]);
+		tsa.to = parse_time(row[MAX_DT]);
+		tsa.types = tbs;
+		/* now let tser know */
+		tscache_bang_anno(tser, &tsa);
 
 	default:
 		break;

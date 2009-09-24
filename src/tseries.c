@@ -67,13 +67,23 @@ struct keyval_s {
 
 /**
  * The time series cache data structure.
- * Naive, just an array of instruments, used as hash table. */
+ * Naive, just an array of time series, used as hash table
+ * per the keys vector which gives a primitive lookup from
+ * the hashing key to the index in the former vector. */
 struct tscache_s {
 	size_t nseries;
 	size_t alloc_sz;
 	struct anno_tseries_s *as;
 	struct keyval_s *keys;
 	pthread_mutex_t mtx;
+};
+
+/**
+ * Like tseries but with annotation goodness. */
+typedef struct anno_tseries_s *anno_tseries_t;
+struct anno_tseries_s {
+	struct tseries_s tseries;
+	struct ts_anno_s anno;
 };
 
 
@@ -140,6 +150,28 @@ slot(struct keyval_s *keys, size_t size, secukey_t key)
 	}
 	/* means we're full :O */
 	return -1;
+}
+
+/**
+ * Return the annotation of a tseries ts from within a tscache object. */
+static inline ts_anno_t
+tscache_tseries_annotation(tseries_t ts)
+{
+	return &(((anno_tseries_t)(void*)ts)->anno);
+}
+
+void
+tscache_bang_anno(tseries_t ts, ts_anno_t anno)
+{
+	memcpy(tscache_tseries_annotation(ts), anno, sizeof(*anno));
+	return;
+}
+
+void
+tscache_unbang_anno(ts_anno_t anno, tseries_t ts)
+{
+	memcpy(anno, tscache_tseries_annotation(ts), sizeof(*anno));
+	return;
 }
 
 static inline tseries_t

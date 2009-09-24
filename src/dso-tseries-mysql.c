@@ -97,7 +97,10 @@ qry_rowf(void **row, size_t nflds, void *clo)
 size_t
 fetch_ticks_intv_mysql(tser_pktbe_t pkt, ts_anno_t tsa)
 {
-/* assumes eod ticks for now */
+/* assumes eod ticks for now,
+ * i wonder if it's wise to have all the intelligence in here
+ * to go through various different tsa's as they are now chained
+ * together */
 	char begs[16], ends[16];
 	char qry[224];
 	size_t len;

@@ -1,4 +1,4 @@
-/*** unserding-nifty.h -- generally handy macroes
+/*** intvtree.h -- interval trees based on red-black trees
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,31 +35,27 @@
  *
  ***/
 
-#if !defined INCLUDED_unserding_nifty_h_
-#define INCLUDED_unserding_nifty_h_
+#if !defined INCLUDED_intvtree_h_
+#define INCLUDED_intvtree_h_
 
-#include <unistd.h>
+#include <stdbool.h>
 
-typedef size_t index_t;
+typedef struct itree_s *itree_t;
+typedef struct it_node_s *it_node_t;
 
-#if !defined LIKELY
-# define LIKELY(_x)	__builtin_expect((_x), 1)
-#endif
-#if !defined UNLIKELY
-# define UNLIKELY(_x)	__builtin_expect((_x), 0)
-#endif
-#define UNUSED(_x)	__attribute__((unused)) _x
-#define ALGN16(_x)	__attribute__((aligned(16))) _x
+struct itree_s {
+	it_node_t root;
+	it_node_t nil;
+};
 
-#define countof(x)		(sizeof(x) / sizeof(*x))
-#define countof_m1(x)		(countof(x) - 1)
+extern itree_t make_itree(void);
+extern void free_itree(itree_t);
+extern it_node_t itree_add(itree_t it, void *data);
+extern void *itree_del_node(itree_t it, it_node_t z);
+extern it_node_t itree_succ_of(itree_t it, it_node_t x);
+extern it_node_t itree_pred_of(itree_t it, it_node_t x);
 
-/* The encoded parameter sizes will be rounded up to match pointer alignment. */
-#define ROUND(s, a)		(a * ((s + a - 1) / a))
-#define aligned_sizeof(t)	ROUND(sizeof(t), __alignof(void*))
+/* subject to sudden extinction */
+extern void itree_print(itree_t it);
 
-#if !defined xnew
-# define xnew(_a)	(malloc(sizeof(_a)))
-#endif	/* !xnew */
-
-#endif	/* INCLUDED_unserding_nifty_h_ */
+#endif	/* INCLUDED_intvtree_h_ */

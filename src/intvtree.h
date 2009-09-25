@@ -38,6 +38,7 @@
 #if !defined INCLUDED_intvtree_h_
 #define INCLUDED_intvtree_h_
 
+#include <stdint.h>
 #include <stdbool.h>
 
 typedef struct itree_s *itree_t;
@@ -50,7 +51,7 @@ struct itree_s {
 
 extern itree_t make_itree(void);
 extern void free_itree(itree_t);
-extern it_node_t itree_add(itree_t it, void *data);
+extern it_node_t itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data);
 extern void *itree_del_node(itree_t it, it_node_t z);
 extern it_node_t itree_succ_of(itree_t it, it_node_t x);
 extern it_node_t itree_pred_of(itree_t it, it_node_t x);

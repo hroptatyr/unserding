@@ -45,12 +45,14 @@
 #include "unserding-nifty.h"
 #include "intvtree.h"
 
+#define MIN_KEY		0
+#define MAX_KEY		-1U
 
 struct it_node_s {
 	/* book-keeping */
-	int key;
-	int high;
-	int max_high;
+	uint32_t key;
+	uint32_t high;
+	uint32_t max_high;
 	bool redp;
 
 	/* tree navigation */
@@ -72,10 +74,14 @@ max(int a, int b)
 
 /* nodes, ctor */
 static it_node_t
-make_node(void)
+make_node(uint32_t lo, uint32_t hi, void *data)
 {
 	it_node_t n = xnew(struct it_node_s);
 	memset(n, 0, sizeof(*n));
+	n->key = lo;
+	n->high = hi;
+	n->max_high = hi;
+	n->data = data;
 	return n;
 }
 
@@ -94,14 +100,14 @@ make_itree(void)
 {
 	itree_t res = xnew(struct itree_s);
 
-	res->nil = make_node();
+	res->nil = make_node(0, 0, NULL);
 	res->nil->left = res->nil->right = res->nil->parent = res->nil;
 	res->nil->redp = false;
-	res->nil->key = res->nil->high = res->nil->max_high = INT_MIN;
+	res->nil->key = res->nil->high = res->nil->max_high = MIN_KEY;
 
-	res->root = make_node();
+	res->root = make_node(0, 0, NULL);
 	res->root->parent = res->root->left = res->root->right = res->nil;
-	res->root->key = res->root->high = res->root->max_high = INT_MAX;
+	res->root->key = res->root->high = res->root->max_high = MAX_KEY;
 	res->root->redp = false;
 	return res;
 }
@@ -228,11 +234,11 @@ itree_fixup_max_high(itree_t it, it_node_t x)
 }
 
 it_node_t
-itree_add(itree_t it, void *data)
+itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data)
 {
 	it_node_t x, y, res;
 
-	res = x = make_node();
+	res = x = make_node(lo, hi, data);
 	itree_ins_help(it, x);
 	itree_fixup_max_high(it, x->parent);
 	x->redp = true;
@@ -418,7 +424,7 @@ itree_del_node(itree_t it, it_node_t z)
 	if (y != z) {
 		/* y should not be nil in this case */
 		/* y is the node to splice out and x is its child */
-		y->max_high = INT_MIN;
+		y->max_high = MIN_KEY;
 		y->left = z->left;
 		y->right = z->right;
 		y->parent = z->parent;

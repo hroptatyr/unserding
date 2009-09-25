@@ -47,6 +47,12 @@
 
 #define MIN_KEY		0
 #define MAX_KEY		-1U
+#define NDSTK_SIZE	16
+
+struct itree_s {
+	it_node_t root;
+	it_node_t nil;
+};
 
 struct it_node_s {
 	/* book-keeping */
@@ -99,6 +105,9 @@ itree_t
 make_itree(void)
 {
 	itree_t res = xnew(struct itree_s);
+
+	/* clean sweep */
+	memset(res, 0, sizeof(*res));
 
 	res->nil = make_node(0, 0, NULL);
 	res->nil->left = res->nil->right = res->nil->parent = res->nil;
@@ -464,27 +473,36 @@ overlapp(int a1, int a2, int b1, int b2)
 	}
 }
 
+static inline bool
+node_overlaps_pivot_p(it_node_t n, uint32_t pivot)
+{
+	if (n->key <= pivot) {
+		return pivot <= n->high;
+	}
+	return false;
+}
+
 
 /* printer shit */
 static void
 it_node_print(it_node_t in, it_node_t nil, it_node_t root)
 {
 	printf("k=%i, h=%i, mh=%i", in->key, in->high, in->max_high);
-	puts("  l->key=");
+	fputs("  l->key=", stdout);
 	if (in->left == nil) {
-		puts("NULL");
+		fputs("NULL", stdout);
 	} else {
 		printf("%i", in->left->key);
 	}
-	puts("  r->key=");
+	fputs("  r->key=", stdout);
 	if (in->right == nil) {
-		puts("NULL");
+		fputs("NULL", stdout);
 	} else {
 		printf("%i", in->right->key);
 	}
-	puts("  p->key=");
+	fputs("  p->key=", stdout);
 	if (in->parent == root) {
-		puts("NULL");
+		fputs("NULL", stdout);
 	} else {
 		printf("%i", in->parent->key);
 	}
@@ -507,6 +525,113 @@ void
 itree_print(itree_t it)
 {
 	itree_print_helper(it, it->root->left);
+	return;
+}
+
+
+/* iterators and node stack fiddlers*/
+static inline void
+itree_push(itree_t it, it_node_t nd)
+{
+	return;
+}
+
+static inline it_node_t
+itree_pop(itree_t it)
+{
+	return NULL;
+}
+
+static inline it_node_t
+itree_top(itree_t it)
+{
+	return NULL;
+}
+
+static inline bool
+stk_node_marked_p(it_node_t nd)
+{
+	return (void*)((long unsigned int)(void*)nd & 1L);
+}
+
+static inline it_node_t
+cleanse_stk_node(it_node_t nd)
+{
+	return (void*)((long unsigned int)(void*)nd & ~1L);
+}
+
+static inline it_node_t
+mark_stk_node(it_node_t nd)
+{
+	return (void*)((long unsigned int)(void*)nd | 1L);
+}
+
+static void
+__itree_trav_in_order(itree_t it, it_trav_f cb, void *clo, it_node_t me)
+{
+	if (me->left != it->nil) {
+		__itree_trav_in_order(it, cb, clo, me->left);
+	}
+	cb(me->key, me->high, me->data, clo);
+	if (me->right != it->nil) {
+		__itree_trav_in_order(it, cb, clo, me->right);
+	}
+	return;
+}
+
+/* travel IT in order and call CB on each node. */
+void
+itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
+{
+	/* left child, me, right child */
+	it_node_t me = it->root;
+	__itree_trav_in_order(it, cb, clo, me);
+	return;
+}
+
+static void
+itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
+{
+	it_node_t x = it->root->left;
+	bool moarp = (x != it->nil);
+
+	while (moarp) {
+		if (node_overlaps_pivot_p(x, p)) {
+			//enumResultStack->Push(x->storedInterval);
+			//recursionNodeStack[currentParent].tryRightBranch=1;
+		}
+		if (x->left->max_high >= p) {
+			/* implies x != nil */
+#if 0
+			if (recursionNodeStackTop == recursionNodeStackSize) {
+				recursionNodeStackSize *= 2;
+				recursionNodeStack = (it_recursion_node *) 
+					realloc(recursionNodeStack,
+						recursionNodeStackSize * sizeof(it_recursion_node));
+				if (recursionNodeStack == NULL) 
+					ExitProgramMacro("realloc failed in IntervalTree::Enumerate\n");
+			}
+			recursionNodeStack[recursionNodeStackTop].start_node = x;
+			recursionNodeStack[recursionNodeStackTop].tryRightBranch = 0;
+			recursionNodeStack[recursionNodeStackTop].parentIndex = currentParent;
+			currentParent = recursionNodeStackTop++;
+#endif
+			x = x->left;
+		} else {
+			x = x->right;
+		}
+		moarp = (x != it->nil);
+		while ((!moarp) && 1 /*(recursionNodeStackTop > 1)*/) {
+			if (1/*recursionNodeStack[--recursionNodeStackTop].tryRightBranch*/) {
+#if 0
+				x=recursionNodeStack[recursionNodeStackTop].start_node->right;
+				currentParent=recursionNodeStack[recursionNodeStackTop].parentIndex;
+				recursionNodeStack[currentParent].tryRightBranch=1;
+#endif
+				moarp = ( x != it->nil);
+			}
+		}
+	}
 	return;
 }
 

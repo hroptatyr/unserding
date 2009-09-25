@@ -43,11 +43,7 @@
 
 typedef struct itree_s *itree_t;
 typedef struct it_node_s *it_node_t;
-
-struct itree_s {
-	it_node_t root;
-	it_node_t nil;
-};
+typedef void(*it_trav_f)(uint32_t lo, uint32_t hi, void *data, void *clo);
 
 extern itree_t make_itree(void);
 extern void free_itree(itree_t);
@@ -55,6 +51,9 @@ extern it_node_t itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data);
 extern void *itree_del_node(itree_t it, it_node_t z);
 extern it_node_t itree_succ_of(itree_t it, it_node_t x);
 extern it_node_t itree_pred_of(itree_t it, it_node_t x);
+
+/* iterators */
+extern void itree_trav_in_order(itree_t it, it_trav_f cb, void *clo);
 
 /* subject to sudden extinction */
 extern void itree_print(itree_t it);

@@ -575,42 +575,44 @@ itree_print(itree_t it)
 
 
 /* iterators and node stack fiddlers*/
+typedef struct it_ndstk_s *it_ndstk_t;
+struct it_ndstk_s {
+	index_t idx;
+	it_node_t *stk;
+};
+
 static inline void
-itree_push(itree_t it, it_node_t nd)
+stack_push(it_ndstk_t stk, it_node_t nd)
 {
+	stk->stk[stk->idx++] = nd;
 	return;
 }
 
 static inline it_node_t
-itree_pop(itree_t it)
+stack_pop(it_ndstk_t stk)
 {
-	return NULL;
+	if (stk->idx == 0) {
+		return itree_nil_node();
+	}
+	return stk->stk[--stk->idx];
 }
 
 static inline it_node_t
-itree_top(itree_t it)
+stack_top(it_ndstk_t stk)
 {
-	return NULL;
+	if (stk->idx == 0) {
+		return itree_nil_node();
+	}
+	return stk->stk[stk->idx - 1];
 }
 
-static inline bool
-stk_node_marked_p(it_node_t nd)
+static inline size_t
+stack_size(it_ndstk_t stk)
 {
-	return (void*)((long unsigned int)(void*)nd & 1L);
+	return stk->idx;
 }
 
-static inline it_node_t
-cleanse_stk_node(it_node_t nd)
-{
-	return (void*)((long unsigned int)(void*)nd & ~1L);
-}
-
-static inline it_node_t
-mark_stk_node(it_node_t nd)
-{
-	return (void*)((long unsigned int)(void*)nd | 1L);
-}
-
+#if 0
 static void
 __itree_trav_in_order(itree_t it, it_trav_f cb, void *clo, it_node_t me)
 {
@@ -633,6 +635,69 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 	/* left child, me, right child */
 	it_node_t me = itree_root_node(it);
 	__itree_trav_in_order(it, cb, clo, me);
+	return;
+}
+#endif
+
+static void __attribute__((unused))
+__itree_trav_pre_order(itree_t it, it_trav_f cb, void *clo, it_ndstk_t stk)
+{
+	while (stack_size(stk)) {
+		it_node_t top = stack_pop(stk);
+		if (!itree_nil_node_p(top->right)) {
+			stack_push(stk, top->right);
+		}
+		if (!itree_nil_node_p(top->left)) {
+			stack_push(stk, top->left);
+		}
+		cb(top->key, top->high, top->data, clo);
+	}
+	return;
+}
+
+void
+itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
+{
+/* left child, me, right child */
+	/* root node has no right child, proceed with the left one */
+	it_node_t curr = itree_left_root(it);
+	it_node_t ____stk[128];
+	struct it_ndstk_s __stk = {.idx = 0, .stk = ____stk}, *stk = &__stk;
+
+#define proc(_x)						\
+	do {							\
+		it_node_t _y = _x;				\
+		if (!itree_nil_node_p(_y)) {			\
+			cb(_y->key, _y->high, _y->data, clo);	\
+		}						\
+	} while (0)
+
+	while (!itree_nil_node_p(curr)) {
+		/* all depends on the right slot, and that we've
+		 * got a left-full tree */
+		if (!itree_nil_node_p(curr->right)) {
+			stack_push(stk, curr->right);
+			if (!itree_nil_node_p(curr->left)) {
+				stack_push(stk, curr);
+				curr = curr->left;
+			} else {
+				proc(curr);
+				proc(stack_pop(stk));
+				curr = stack_pop(stk);
+			}
+		} else {
+			/* we just work off the shite, knowing there's
+			 * a balance and the left subtree consists of
+			 * only one node */
+			if (!itree_nil_node_p(curr->left)) {
+				proc(curr->left);
+			}
+			proc(curr);
+			proc(stack_pop(stk));
+			curr = stack_pop(stk);
+		}
+	}
+#undef proc
 	return;
 }
 

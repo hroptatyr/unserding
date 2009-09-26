@@ -617,7 +617,9 @@ __itree_trav_in_order(itree_t it, it_trav_f cb, void *clo, it_node_t me)
 	if (!itree_nil_node_p(me->left)) {
 		__itree_trav_in_order(it, cb, clo, me->left);
 	}
-	cb(me->key, me->high, me->data, clo);
+	if (!itree_root_node_p(it, me)) {
+		cb(me->key, me->high, me->data, clo);
+	}
 	if (!itree_nil_node_p(me->right)) {
 		__itree_trav_in_order(it, cb, clo, me->right);
 	}

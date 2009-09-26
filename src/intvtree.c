@@ -51,7 +51,6 @@
 
 struct itree_s {
 	it_node_t root;
-	it_node_t nil;
 };
 
 struct it_node_s {
@@ -70,12 +69,23 @@ struct it_node_s {
 	void *data;
 };
 
-
 static inline int
 max(int a, int b)
 {
 	return a > b ? a : b;
 }
+
+static struct it_node_s __nil = {
+	.key = MIN_KEY,
+	.high = MIN_KEY,
+	.max_high = MIN_KEY,
+	.redp = false,
+	.left = &__nil,
+	.right = &__nil,
+	.parent = &__nil,
+	.data = NULL,
+};
+static it_node_t nil = &__nil;
 
 
 /* nodes, ctor */
@@ -99,6 +109,50 @@ free_node(it_node_t in)
 	return;
 }
 
+static inline bool
+itree_nil_node_p(it_node_t in)
+{
+	return in == nil;
+}
+
+static inline it_node_t
+itree_nil_node(void)
+{
+	return nil;
+}
+
+static inline bool
+itree_root_node_p(itree_t it, it_node_t in)
+{
+	return in == it->root;
+}
+
+static inline it_node_t
+itree_root_node(itree_t it)
+{
+	return it->root;
+}
+
+static inline it_node_t
+itree_left_root(itree_t it)
+{
+	return itree_root_node(it)->left;
+}
+
+static inline uint32_t
+max_high(it_node_t nd)
+{
+	return nd->max_high;
+}
+
+static inline uint32_t
+children_max_high(it_node_t x)
+{
+	uint32_t xlh = max_high(x->left);
+	uint32_t xrh = max_high(x->right);
+	return max(xlh, xrh);
+}
+
 
 /* ctor */
 itree_t
@@ -106,16 +160,8 @@ make_itree(void)
 {
 	itree_t res = xnew(struct itree_s);
 
-	/* clean sweep */
-	memset(res, 0, sizeof(*res));
-
-	res->nil = make_node(0, 0, NULL);
-	res->nil->left = res->nil->right = res->nil->parent = res->nil;
-	res->nil->redp = false;
-	res->nil->key = res->nil->high = res->nil->max_high = MIN_KEY;
-
 	res->root = make_node(0, 0, NULL);
-	res->root->parent = res->root->left = res->root->right = res->nil;
+	res->root->parent = res->root->left = res->root->right = nil;
 	res->root->key = res->root->high = res->root->max_high = MAX_KEY;
 	res->root->redp = false;
 	return res;
@@ -124,9 +170,9 @@ make_itree(void)
 void
 free_itree(itree_t it)
 {
-	it_node_t x = it->root->left;
+	it_node_t x = itree_left_root(it);
 
-	if (x != it->nil) {
+	if (!itree_nil_node_p(x)) {
 #if 0
 /* implement me */
 		if (x->left != it->nil) {
@@ -148,7 +194,6 @@ free_itree(itree_t it)
 		}
 #endif
 	}
-	free_node(it->nil);
 	free_node(it->root);
 	return;
 }
@@ -161,7 +206,7 @@ itree_rot_left(itree_t it, it_node_t p)
 
 	p->right = y->left;
 
-	if (y->left != it->nil) {
+	if (!itree_nil_node_p(y->left)) {
 		y->left->parent = p;
 	}
 	y->parent = p->parent;
@@ -174,8 +219,8 @@ itree_rot_left(itree_t it, it_node_t p)
 	y->left = p;
 	p->parent = y;
 
-	p->max_high = max(p->left->max_high, max(p->right->max_high, p->high));
-	y->max_high = max(p->max_high, max(y->right->max_high, y->high));
+	p->max_high = max(p->high, children_max_high(p));
+	y->max_high = max(max_high(p), max(max_high(y->right), y->high));
 	return;
 }
 
@@ -186,7 +231,7 @@ itree_rot_right(itree_t it, it_node_t p)
 
 	p->left = x->right;
 
-	if (it->nil != x->right) {
+	if (!itree_nil_node_p(x->right)) {
 		x->right->parent = p;
 	}
 	x->parent = p->parent;
@@ -200,21 +245,20 @@ itree_rot_right(itree_t it, it_node_t p)
 	x->right = p;
 	p->parent = x;
 
-	p->max_high = max(p->left->max_high, max(p->right->max_high, p->high));
-	x->max_high = max(x->left->max_high, max(p->max_high, x->high));
+	p->max_high = max(p->high, children_max_high(p));
+	x->max_high = max(max_high(x->left), max(max_high(p), x->high));
 	return;
 }
 
 static void
 itree_ins_help(itree_t it, it_node_t z)
 {
-	/*  This function should only be called by InsertITTree (see above) */
 	it_node_t x, y;
     
-	z->left = z->right = it->nil;
-	y = it->root;
-	x = it->root->left;
-	while (x != it->nil) {
+	z->left = z->right = itree_nil_node();
+	y = itree_root_node(it);
+	x = itree_left_root(it);
+	while (!itree_nil_node_p(x)) {
 		y = x;
 		if (x->key > z->key) { 
 			x = x->left;
@@ -223,7 +267,7 @@ itree_ins_help(itree_t it, it_node_t z)
 		}
 	}
 	z->parent = y;
-	if ((y == it->root) || (y->key > z->key)) { 
+	if ((y == itree_root_node(it)) || (y->key > z->key)) { 
 		y->left = z;
 	} else {
 		y->right = z;
@@ -234,9 +278,8 @@ itree_ins_help(itree_t it, it_node_t z)
 static void
 itree_fixup_max_high(itree_t it, it_node_t x)
 {
-	while (x != it->root) {
-		x->max_high = max(
-			x->high, max(x->left->max_high, x->right->max_high));
+	while (x != itree_root_node(it)) {
+		x->max_high = max(x->high, children_max_high(x));
 		x = x->parent;
 	}
 	return;
@@ -247,15 +290,15 @@ itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data)
 {
 	it_node_t x, y, res;
 
-	res = x = make_node(lo, hi, data);
+	x = res = make_node(lo, hi, data);
 	itree_ins_help(it, x);
 	itree_fixup_max_high(it, x->parent);
 	x->redp = true;
-	while (x->parent->redp) {
+	while (x->parent->redp && x->parent->parent) {
 		/* use sentinel instead of checking for root */
 		if (x->parent == x->parent->parent->left) {
 			y = x->parent->parent->right;
-			if (y->redp) {
+			if (y && y->redp) {
 				x->parent->redp = false;
 				y->redp = false;
 				x->parent->parent->redp = true;
@@ -274,7 +317,7 @@ itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data)
 			/* this part is just like the section above with */
 			/* left and right interchanged */
 			y = x->parent->parent->left;
-			if (y->redp) {
+			if (y && y->redp) {
 				x->parent->redp = false;
 				y->redp = false;
 				x->parent->parent->redp = true;
@@ -290,9 +333,9 @@ itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data)
 			}
 		}
 	}
-	it->root->left->redp = false;
-
-	res->data = data;
+	if (!itree_nil_node_p(x = itree_left_root(it))) {
+		x->redp = false;
+	}
 	return res;
 }
 
@@ -301,9 +344,9 @@ itree_succ_of(itree_t it, it_node_t x)
 { 
 	it_node_t y;
 
-	if (it->nil != (y = x->right)) {
+	if (!itree_nil_node_p((y = x->right))) {
 		/* get the minimum of the right subtree of x */
-		while (y->left != it->nil) {
+		while (!itree_nil_node_p(y->left)) {
 			y = y->left;
 		}
 		return y;
@@ -313,8 +356,8 @@ itree_succ_of(itree_t it, it_node_t x)
 			x = y;
 			y = y->parent;
 		}
-		if (y == it->root) {
-			return it->nil;
+		if (y == itree_root_node(it)) {
+			return itree_nil_node();
 		}
 		return y;
 	}
@@ -325,8 +368,8 @@ itree_pred_of(itree_t it, it_node_t x)
 {
 	it_node_t y;
 
-	if (it->nil != (y = x->left)) {
-		while (y->right != it->nil) {
+	if (!itree_nil_node_p((y = x->left))) {
+		while (!itree_nil_node_p(y->right)) {
 			/* returns the maximum of the left subtree of x */
 			y = y->right;
 		}
@@ -334,8 +377,8 @@ itree_pred_of(itree_t it, it_node_t x)
 	} else {
 		y = x->parent;
 		while (x == y->left) { 
-			if (y == it->root) {
-				return it->nil;
+			if (y == itree_root_node(it)) {
+				return itree_nil_node();
 			}
 			x = y;
 			y = y->parent;
@@ -347,7 +390,7 @@ itree_pred_of(itree_t it, it_node_t x)
 static void
 itree_del_fixup(itree_t it, it_node_t x)
 {
-	it_node_t rl = it->root->left;
+	it_node_t rl = itree_left_root(it);
 
 	while ((!x->redp) && (rl != x)) {
 		it_node_t w;
@@ -413,15 +456,17 @@ itree_del_node(itree_t it, it_node_t z)
 	it_node_t y, x;
 	void *res = z->data;
 
-	y = ((z->left == it->nil) || (z->right == it->nil))
-		? z
-		: itree_succ_of(it, z);
-	x = (y->left == it->nil)
+	if ((itree_nil_node_p(z->left) || itree_nil_node_p(z->right))) {
+		y = z;
+	} else {
+		y = itree_succ_of(it, z);
+	}
+	x = itree_nil_node_p(y->left)
 		? y->right
 		: y->left;
 
-	if (it->root == (x->parent = y->parent)) {
-		it->root->left = x;
+	if (itree_root_node(it) == (x->parent = y->parent)) {
+		itree_root_node(it)->left = x;
 
 	} else {
 		if (y == y->parent->left) {
@@ -484,24 +529,24 @@ node_overlaps_pivot_p(it_node_t n, uint32_t pivot)
 
 
 /* printer shit */
-static void
-it_node_print(it_node_t in, it_node_t nil, it_node_t root)
+static void __attribute__((noinline))
+it_node_print(itree_t it, it_node_t in)
 {
 	printf("k=%i, h=%i, mh=%i", in->key, in->high, in->max_high);
 	fputs("  l->key=", stdout);
-	if (in->left == nil) {
+	if (itree_nil_node_p(in->left)) {
 		fputs("NULL", stdout);
 	} else {
 		printf("%i", in->left->key);
 	}
 	fputs("  r->key=", stdout);
-	if (in->right == nil) {
+	if (itree_nil_node_p(in->right)) {
 		fputs("NULL", stdout);
 	} else {
 		printf("%i", in->right->key);
 	}
 	fputs("  p->key=", stdout);
-	if (in->parent == root) {
+	if (in->parent == itree_root_node(it)) {
 		fputs("NULL", stdout);
 	} else {
 		printf("%i", in->parent->key);
@@ -513,9 +558,9 @@ it_node_print(it_node_t in, it_node_t nil, it_node_t root)
 static void
 itree_print_helper(itree_t it, it_node_t x)
 {
-	if (x != it->nil) {
+	if (!itree_nil_node_p(x)) {
 		itree_print_helper(it, x->left);
-		it_node_print(x, it->nil, it->root);
+		it_node_print(it, x);
 		itree_print_helper(it, x->right);
 	}
 	return;
@@ -524,7 +569,7 @@ itree_print_helper(itree_t it, it_node_t x)
 void
 itree_print(itree_t it)
 {
-	itree_print_helper(it, it->root->left);
+	itree_print_helper(it, itree_left_root(it));
 	return;
 }
 
@@ -569,11 +614,11 @@ mark_stk_node(it_node_t nd)
 static void
 __itree_trav_in_order(itree_t it, it_trav_f cb, void *clo, it_node_t me)
 {
-	if (me->left != it->nil) {
+	if (!itree_nil_node_p(me->left)) {
 		__itree_trav_in_order(it, cb, clo, me->left);
 	}
 	cb(me->key, me->high, me->data, clo);
-	if (me->right != it->nil) {
+	if (!itree_nil_node_p(me->right)) {
 		__itree_trav_in_order(it, cb, clo, me->right);
 	}
 	return;
@@ -584,7 +629,7 @@ void
 itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 {
 	/* left child, me, right child */
-	it_node_t me = it->root;
+	it_node_t me = itree_root_node(it);
 	__itree_trav_in_order(it, cb, clo, me);
 	return;
 }
@@ -592,6 +637,7 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 static void
 itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 {
+#if 0
 	it_node_t x = it->root->left;
 	bool moarp = (x != it->nil);
 
@@ -602,7 +648,6 @@ itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 		}
 		if (x->left->max_high >= p) {
 			/* implies x != nil */
-#if 0
 			if (recursionNodeStackTop == recursionNodeStackSize) {
 				recursionNodeStackSize *= 2;
 				recursionNodeStack = (it_recursion_node *) 
@@ -615,7 +660,6 @@ itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 			recursionNodeStack[recursionNodeStackTop].tryRightBranch = 0;
 			recursionNodeStack[recursionNodeStackTop].parentIndex = currentParent;
 			currentParent = recursionNodeStackTop++;
-#endif
 			x = x->left;
 		} else {
 			x = x->right;
@@ -632,6 +676,7 @@ itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 			}
 		}
 	}
+#endif
 	return;
 }
 

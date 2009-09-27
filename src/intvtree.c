@@ -110,13 +110,13 @@ free_node(it_node_t in)
 }
 
 static inline bool
-itree_nil_node_p(it_node_t in)
+nil_node_p(it_node_t in)
 {
 	return in == nil;
 }
 
 static inline it_node_t
-itree_nil_node(void)
+nil_node(void)
 {
 	return nil;
 }
@@ -153,6 +153,12 @@ children_max_high(it_node_t x)
 	return max(xlh, xrh);
 }
 
+static bool
+inner_node_p(it_node_t nd)
+{
+	return !(nil_node_p(nd->left) || nil_node_p(nd->right));
+}
+
 
 /* ctor */
 itree_t
@@ -172,7 +178,7 @@ free_itree(itree_t it)
 {
 	it_node_t x = itree_left_root(it);
 
-	if (!itree_nil_node_p(x)) {
+	if (!nil_node_p(x)) {
 #if 0
 /* implement me */
 		if (x->left != it->nil) {
@@ -206,7 +212,7 @@ itree_rot_left(itree_t it, it_node_t p)
 
 	p->right = y->left;
 
-	if (!itree_nil_node_p(y->left)) {
+	if (!nil_node_p(y->left)) {
 		y->left->parent = p;
 	}
 	y->parent = p->parent;
@@ -231,7 +237,7 @@ itree_rot_right(itree_t it, it_node_t p)
 
 	p->left = x->right;
 
-	if (!itree_nil_node_p(x->right)) {
+	if (!nil_node_p(x->right)) {
 		x->right->parent = p;
 	}
 	x->parent = p->parent;
@@ -255,10 +261,10 @@ itree_ins_help(itree_t it, it_node_t z)
 {
 	it_node_t x, y;
     
-	z->left = z->right = itree_nil_node();
+	z->left = z->right = nil_node();
 	y = itree_root_node(it);
 	x = itree_left_root(it);
-	while (!itree_nil_node_p(x)) {
+	while (!nil_node_p(x)) {
 		y = x;
 		if (x->key > z->key) { 
 			x = x->left;
@@ -333,7 +339,7 @@ itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data)
 			}
 		}
 	}
-	if (!itree_nil_node_p(x = itree_left_root(it))) {
+	if (!nil_node_p(x = itree_left_root(it))) {
 		x->redp = false;
 	}
 	return res;
@@ -344,9 +350,9 @@ itree_succ_of(itree_t it, it_node_t x)
 { 
 	it_node_t y;
 
-	if (!itree_nil_node_p((y = x->right))) {
+	if (!nil_node_p((y = x->right))) {
 		/* get the minimum of the right subtree of x */
-		while (!itree_nil_node_p(y->left)) {
+		while (!nil_node_p(y->left)) {
 			y = y->left;
 		}
 		return y;
@@ -357,7 +363,7 @@ itree_succ_of(itree_t it, it_node_t x)
 			y = y->parent;
 		}
 		if (y == itree_root_node(it)) {
-			return itree_nil_node();
+			return nil_node();
 		}
 		return y;
 	}
@@ -368,8 +374,8 @@ itree_pred_of(itree_t it, it_node_t x)
 {
 	it_node_t y;
 
-	if (!itree_nil_node_p((y = x->left))) {
-		while (!itree_nil_node_p(y->right)) {
+	if (!nil_node_p((y = x->left))) {
+		while (!nil_node_p(y->right)) {
 			/* returns the maximum of the left subtree of x */
 			y = y->right;
 		}
@@ -378,7 +384,7 @@ itree_pred_of(itree_t it, it_node_t x)
 		y = x->parent;
 		while (x == y->left) { 
 			if (y == itree_root_node(it)) {
-				return itree_nil_node();
+				return nil_node();
 			}
 			x = y;
 			y = y->parent;
@@ -456,12 +462,12 @@ itree_del_node(itree_t it, it_node_t z)
 	it_node_t y, x;
 	void *res = z->data;
 
-	if ((itree_nil_node_p(z->left) || itree_nil_node_p(z->right))) {
+	if (!inner_node_p(z)) {
 		y = z;
 	} else {
 		y = itree_succ_of(it, z);
 	}
-	x = itree_nil_node_p(y->left)
+	x = nil_node_p(y->left)
 		? y->right
 		: y->left;
 
@@ -508,25 +514,6 @@ itree_del_node(itree_t it, it_node_t z)
 	return res;
 }
 
-static inline bool
-overlapp(int a1, int a2, int b1, int b2)
-{
-	if (a1 <= b1) {
-		return (b1 <= a2);
-	} else {
-		return (a1 <= b2);
-	}
-}
-
-static inline bool
-node_overlaps_pivot_p(it_node_t n, uint32_t pivot)
-{
-	if (n->key <= pivot) {
-		return pivot <= n->high;
-	}
-	return false;
-}
-
 
 /* printer shit */
 static void __attribute__((noinline))
@@ -534,13 +521,13 @@ it_node_print(itree_t it, it_node_t in)
 {
 	printf("k=%i, h=%i, mh=%i", in->key, in->high, in->max_high);
 	fputs("  l->key=", stdout);
-	if (itree_nil_node_p(in->left)) {
+	if (nil_node_p(in->left)) {
 		fputs("NULL", stdout);
 	} else {
 		printf("%i", in->left->key);
 	}
 	fputs("  r->key=", stdout);
-	if (itree_nil_node_p(in->right)) {
+	if (nil_node_p(in->right)) {
 		fputs("NULL", stdout);
 	} else {
 		printf("%i", in->right->key);
@@ -558,7 +545,7 @@ it_node_print(itree_t it, it_node_t in)
 static void
 itree_print_helper(itree_t it, it_node_t x)
 {
-	if (!itree_nil_node_p(x)) {
+	if (!nil_node_p(x)) {
 		itree_print_helper(it, x->left);
 		it_node_print(it, x);
 		itree_print_helper(it, x->right);
@@ -592,7 +579,7 @@ static inline it_node_t
 stack_pop(it_ndstk_t stk)
 {
 	if (stk->idx == 0) {
-		return itree_nil_node();
+		return nil_node();
 	}
 	return stk->stk[--stk->idx];
 }
@@ -601,7 +588,7 @@ static inline it_node_t
 stack_top(it_ndstk_t stk)
 {
 	if (stk->idx == 0) {
-		return itree_nil_node();
+		return nil_node();
 	}
 	return stk->stk[stk->idx - 1];
 }
@@ -616,13 +603,13 @@ stack_size(it_ndstk_t stk)
 static void
 __itree_trav_in_order(itree_t it, it_trav_f cb, void *clo, it_node_t me)
 {
-	if (!itree_nil_node_p(me->left)) {
+	if (!nil_node_p(me->left)) {
 		__itree_trav_in_order(it, cb, clo, me->left);
 	}
 	if (!itree_root_node_p(it, me)) {
 		cb(me->key, me->high, me->data, clo);
 	}
-	if (!itree_nil_node_p(me->right)) {
+	if (!nil_node_p(me->right)) {
 		__itree_trav_in_order(it, cb, clo, me->right);
 	}
 	return;
@@ -644,10 +631,10 @@ __itree_trav_pre_order(itree_t it, it_trav_f cb, void *clo, it_ndstk_t stk)
 {
 	while (stack_size(stk)) {
 		it_node_t top = stack_pop(stk);
-		if (!itree_nil_node_p(top->right)) {
+		if (!nil_node_p(top->right)) {
 			stack_push(stk, top->right);
 		}
-		if (!itree_nil_node_p(top->left)) {
+		if (!nil_node_p(top->left)) {
 			stack_push(stk, top->left);
 		}
 		cb(top->key, top->high, top->data, clo);
@@ -667,35 +654,28 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 #define proc(_x)						\
 	do {							\
 		it_node_t _y = _x;				\
-		if (!itree_nil_node_p(_y)) {			\
+		if (!nil_node_p(_y)) {			\
 			cb(_y->key, _y->high, _y->data, clo);	\
 		}						\
 	} while (0)
 
-	while (!itree_nil_node_p(curr)) {
-		if (!itree_nil_node_p(curr->left) &&
-		    !itree_nil_node_p(curr->right)) {
+	while (!nil_node_p(curr)) {
+		if (inner_node_p(curr)) {
 			stack_push(stk, curr->right);
-			if (!itree_nil_node_p(curr->left)) {
-				stack_push(stk, curr);
-				curr = curr->left;
-			} else {
-				proc(curr);
-				proc(stack_pop(stk));
-				curr = stack_pop(stk);
-			}
+			stack_push(stk, curr);
+			curr = curr->left;
 
 		} else {
 			/* we just work off the shite, knowing there's
 			 * a balance and the subtree consists of only
 			 * one node */
-			if (!itree_nil_node_p(curr->left)) {
+			if (!nil_node_p(curr->left)) {
 				proc(curr->left);
 			}
-			if (!itree_nil_node_p(curr->right)) {
+			proc(curr);
+			if (!nil_node_p(curr->right)) {
 				proc(curr->right);
 			}
-			proc(curr);
 			proc(stack_pop(stk));
 			curr = stack_pop(stk);
 		}
@@ -704,49 +684,99 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 	return;
 }
 
-static void
+static inline bool
+node_contains_pivot_p(it_node_t n, uint32_t pivot)
+{
+	if (n->key <= pivot) {
+		return pivot <= n->high;
+	}
+	return false;
+}
+
+static inline bool
+tree_contains_pivot_p(it_node_t n, uint32_t pivot)
+{
+	if (n->key <= pivot) {
+		return pivot <= max_high(n);
+	}
+	return false;
+}
+
+/* 0 if N contains P, 1 if P is right of N and -1 if N is right of P. */
+static inline int
+tree_pivot_rel(it_node_t n, uint32_t p)
+{
+	if (p < n->key) {
+		return -1;
+	} else if (p > max_high(n)) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+void
 itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 {
-#if 0
-	it_node_t x = it->root->left;
-	bool moarp = (x != it->nil);
+/* left child, me, right child */
+	/* root node has no right child, proceed with the left one */
+	it_node_t curr = itree_left_root(it);
+	it_node_t ____stk[128];
+	struct it_ndstk_s __stk = {.idx = 0, .stk = ____stk}, *stk = &__stk;
 
-	while (moarp) {
-		if (node_overlaps_pivot_p(x, p)) {
-			//enumResultStack->Push(x->storedInterval);
-			//recursionNodeStack[currentParent].tryRightBranch=1;
+#define proc(_x)						\
+	do {							\
+		it_node_t _y = _x;				\
+		if (!nil_node_p(_y) &&			\
+		    node_contains_pivot_p(_y, p)) {		\
+			cb(_y->key, _y->high, _y->data, clo);	\
+		}						\
+	} while (0)
+
+	while (!nil_node_p(curr)) {
+		switch (tree_pivot_rel(curr, p)) {
+		case -1:
+			/* if the pivot is truly to the left of curr, descend */
+			curr = curr->left;
+			continue;
+		case 1:
+			/* pivot is beyond the scope, ascend */
+			proc(stack_pop(stk));
+			curr = stack_pop(stk);
+			continue;
+		case 0:
+		default:
+			break;
 		}
-		if (x->left->max_high >= p) {
-			/* implies x != nil */
-			if (recursionNodeStackTop == recursionNodeStackSize) {
-				recursionNodeStackSize *= 2;
-				recursionNodeStack = (it_recursion_node *) 
-					realloc(recursionNodeStack,
-						recursionNodeStackSize * sizeof(it_recursion_node));
-				if (recursionNodeStack == NULL) 
-					ExitProgramMacro("realloc failed in IntervalTree::Enumerate\n");
+		/* we know now that curr's right subtree contains the pivot
+		 * however the left tree could contain the pivot as well so
+		 * descend there */
+		if (inner_node_p(curr)) {
+			if (tree_pivot_rel(curr->left, p) == 0) {
+				stack_push(stk, curr->right);
+				stack_push(stk, curr);
+				curr = curr->left;
+			} else {
+				proc(curr);
+				curr = curr->right;
 			}
-			recursionNodeStack[recursionNodeStackTop].start_node = x;
-			recursionNodeStack[recursionNodeStackTop].tryRightBranch = 0;
-			recursionNodeStack[recursionNodeStackTop].parentIndex = currentParent;
-			currentParent = recursionNodeStackTop++;
-			x = x->left;
+
 		} else {
-			x = x->right;
-		}
-		moarp = (x != it->nil);
-		while ((!moarp) && 1 /*(recursionNodeStackTop > 1)*/) {
-			if (1/*recursionNodeStack[--recursionNodeStackTop].tryRightBranch*/) {
-#if 0
-				x=recursionNodeStack[recursionNodeStackTop].start_node->right;
-				currentParent=recursionNodeStack[recursionNodeStackTop].parentIndex;
-				recursionNodeStack[currentParent].tryRightBranch=1;
-#endif
-				moarp = ( x != it->nil);
+			/* we just work off the shite, knowing there's
+			 * a balance and the subtree consists of only
+			 * one node */
+			if (!nil_node_p(curr->left)) {
+				proc(curr->left);
 			}
+			proc(curr);
+			if (!nil_node_p(curr->right)) {
+				proc(curr->right);
+			}
+			proc(stack_pop(stk));
+			curr = stack_pop(stk);
 		}
 	}
-#endif
+#undef proc
 	return;
 }
 

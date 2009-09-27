@@ -55,6 +55,7 @@ extern it_node_t itree_pred_of(itree_t it, it_node_t x);
 /* iterators */
 extern void itree_trav_in_order(itree_t it, it_trav_f cb, void *clo);
 extern void itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo);
+extern void itree_find_point_1(itree_t it, uint32_t p, it_trav_f cb, void *clo);
 
 /* subject to sudden extinction */
 extern void itree_print(itree_t it);

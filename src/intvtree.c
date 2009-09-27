@@ -654,7 +654,7 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 #define proc(_x)						\
 	do {							\
 		it_node_t _y = _x;				\
-		if (!nil_node_p(_y)) {			\
+		if (!nil_node_p(_y)) {				\
 			cb(_y->key, _y->high, _y->data, clo);	\
 		}						\
 	} while (0)
@@ -684,22 +684,17 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 	return;
 }
 
-static inline bool
-node_contains_pivot_p(it_node_t n, uint32_t pivot)
+/* 0 if N contains P, 1 if P is right of N and -1 if N is right of P. */
+static inline int
+node_pivot_rel(it_node_t n, uint32_t p)
 {
-	if (n->key <= pivot) {
-		return pivot <= n->high;
+	if (p < n->key) {
+		return -1;
+	} else if (p > n->high) {
+		return 1;
+	} else {
+		return 0;
 	}
-	return false;
-}
-
-static inline bool
-tree_contains_pivot_p(it_node_t n, uint32_t pivot)
-{
-	if (n->key <= pivot) {
-		return pivot <= max_high(n);
-	}
-	return false;
 }
 
 /* 0 if N contains P, 1 if P is right of N and -1 if N is right of P. */
@@ -727,8 +722,8 @@ itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 #define proc(_x)						\
 	do {							\
 		it_node_t _y = _x;				\
-		if (!nil_node_p(_y) &&			\
-		    node_contains_pivot_p(_y, p)) {		\
+		if (!nil_node_p(_y) &&				\
+		    node_pivot_rel(_y, p) == 0) {		\
 			cb(_y->key, _y->high, _y->data, clo);	\
 		}						\
 	} while (0)
@@ -774,6 +769,48 @@ itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 			}
 			proc(stack_pop(stk));
 			curr = stack_pop(stk);
+		}
+	}
+#undef proc
+	return;
+}
+
+void
+itree_find_point_1(itree_t it, uint32_t p, it_trav_f cb, void *clo)
+{
+/* like itree_find_point() but stop after one occurrence,
+ * prefer the right branch for nebulous reasons */
+	/* root node has no right child, proceed with the left one */
+	it_node_t curr = itree_left_root(it);
+
+#define proc(_x)						\
+	do {							\
+		it_node_t _y = _x;				\
+		cb(_y->key, _y->high, _y->data, clo);		\
+	} while (0)
+
+	while (!nil_node_p(curr)) {
+		switch (tree_pivot_rel(curr, p)) {
+		case -1:
+			/* if the pivot is truly to the left of curr, descend */
+			curr = curr->left;
+			continue;
+		case 1:
+			/* pivot is beyond the scope, return */
+			return;
+		case 0:
+		default:
+			break;
+		}
+
+		if (node_pivot_rel(curr, p) == 0) {
+			/* bingo, mother load */
+			proc(curr);
+			return;
+		} else {
+			/* this means the above was 1, -1 isn't possible here
+			 * unless the machine is retarded */
+			curr = curr->right;
 		}
 	}
 #undef proc

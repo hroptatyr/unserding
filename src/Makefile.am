@@ -63,7 +63,7 @@ if USE_MYSQL
 dso_tseries_la_CPPFLAGS += $(MYSQL_CPPFLAGS)
 dso_tseries_la_LDFLAGS += $(MYSQL_LDFLAGS) -lmysqlclient
 endif
-dso_tseries_la_SOURCES = tseries.c dso-tseries.c
+dso_tseries_la_SOURCES = intvtree.c tseries.c dso-tseries.c
 if USE_MYSQL
 dso_tseries_la_SOURCES += dso-tseries-mysql.c
 endif

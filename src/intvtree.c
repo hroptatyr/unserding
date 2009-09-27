@@ -673,9 +673,8 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 	} while (0)
 
 	while (!itree_nil_node_p(curr)) {
-		/* all depends on the right slot, and that we've
-		 * got a left-full tree */
-		if (!itree_nil_node_p(curr->right)) {
+		if (!itree_nil_node_p(curr->left) &&
+		    !itree_nil_node_p(curr->right)) {
 			stack_push(stk, curr->right);
 			if (!itree_nil_node_p(curr->left)) {
 				stack_push(stk, curr);
@@ -685,12 +684,16 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 				proc(stack_pop(stk));
 				curr = stack_pop(stk);
 			}
+
 		} else {
 			/* we just work off the shite, knowing there's
-			 * a balance and the left subtree consists of
-			 * only one node */
+			 * a balance and the subtree consists of only
+			 * one node */
 			if (!itree_nil_node_p(curr->left)) {
 				proc(curr->left);
+			}
+			if (!itree_nil_node_p(curr->right)) {
+				proc(curr->right);
 			}
 			proc(curr);
 			proc(stack_pop(stk));

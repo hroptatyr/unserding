@@ -45,6 +45,7 @@ typedef struct itree_s *itree_t;
 typedef struct it_node_s *it_node_t;
 typedef void(*it_trav_f)(uint32_t lo, uint32_t hi, void *data, void *clo);
 
+extern void init_itree(itree_t it);
 extern itree_t make_itree(void);
 extern void free_itree(itree_t);
 extern it_node_t itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data);

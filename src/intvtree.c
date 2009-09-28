@@ -49,10 +49,6 @@
 #define MAX_KEY		-1U
 #define NDSTK_SIZE	16
 
-struct itree_s {
-	it_node_t root;
-};
-
 struct it_node_s {
 	/* book-keeping */
 	uint32_t key;
@@ -69,11 +65,9 @@ struct it_node_s {
 	void *data;
 };
 
-static inline int
-max(int a, int b)
-{
-	return a > b ? a : b;
-}
+struct itree_s {
+	struct it_node_s root;
+};
 
 static struct it_node_s __nil = {
 	.key = MIN_KEY,
@@ -89,15 +83,23 @@ static it_node_t nil = &__nil;
 
 
 /* nodes, ctor */
+static void
+init_node(it_node_t nd, uint32_t lo, uint32_t hi, void *data)
+{
+	memset(nd, 0, sizeof(*nd));
+	nd->key = lo;
+	nd->high = nd->max_high = hi;
+	nd->data = data;
+
+	nd->left = nd->right = nd->parent = nil;
+	return;
+}
+
 static it_node_t
 make_node(uint32_t lo, uint32_t hi, void *data)
 {
 	it_node_t n = xnew(struct it_node_s);
-	memset(n, 0, sizeof(*n));
-	n->key = lo;
-	n->high = hi;
-	n->max_high = hi;
-	n->data = data;
+	init_node(n, lo, hi, data);
 	return n;
 }
 
@@ -107,6 +109,12 @@ free_node(it_node_t in)
 	memset(in, 0, sizeof(*in));
 	free(in);
 	return;
+}
+
+static inline int
+max(int a, int b)
+{
+	return a > b ? a : b;
 }
 
 static inline bool
@@ -121,16 +129,16 @@ nil_node(void)
 	return nil;
 }
 
-static inline bool
-itree_root_node_p(itree_t it, it_node_t in)
-{
-	return in == it->root;
-}
-
 static inline it_node_t
 itree_root_node(itree_t it)
 {
-	return it->root;
+	return &it->root;
+}
+
+static inline bool
+itree_root_node_p(itree_t it, it_node_t in)
+{
+	return in == itree_root_node(it);
 }
 
 static inline it_node_t
@@ -161,15 +169,22 @@ inner_node_p(it_node_t nd)
 
 
 /* ctor */
+void
+init_itree(itree_t it)
+{
+	init_node(itree_root_node(it), MAX_KEY, MAX_KEY, NULL);
+	itree_root_node(it)->redp = false;
+	return;
+}
+
 itree_t
 make_itree(void)
 {
 	itree_t res = xnew(struct itree_s);
 
-	res->root = make_node(0, 0, NULL);
-	res->root->parent = res->root->left = res->root->right = nil;
-	res->root->key = res->root->high = res->root->max_high = MAX_KEY;
-	res->root->redp = false;
+	init_node(itree_root_node(res), MAX_KEY, MAX_KEY, NULL);
+	res->root.parent = res->root.left = res->root.right = nil;
+	res->root.redp = false;
 	return res;
 }
 
@@ -200,7 +215,7 @@ free_itree(itree_t it)
 		}
 #endif
 	}
-	free_node(it->root);
+	memset(itree_root_node(it), 0, sizeof(struct it_node_s));
 	return;
 }
 

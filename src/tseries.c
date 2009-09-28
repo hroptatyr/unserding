@@ -50,6 +50,7 @@
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "tseries.h"
+#include "intvtree.h"
 
 typedef struct tscache_s *_tscache_t;
 typedef uint32_t secukey_t;
@@ -62,7 +63,7 @@ struct keyval_s {
 	/** official, external id of the instrument */
 	secukey_t key;
 	/** local index in our table */
-	uint32_t val;
+	void *val;
 };
 
 /**
@@ -73,8 +74,7 @@ struct keyval_s {
 struct tscache_s {
 	size_t nseries;
 	size_t alloc_sz;
-	struct anno_tseries_s *as;
-	struct keyval_s *keys;
+	struct keyval_s *tbl;
 	pthread_mutex_t mtx;
 };
 
@@ -89,9 +89,15 @@ struct anno_tseries_s {
 
 /* helpers */
 static inline bool
+secukey_valid_p(secukey_t k)
+{
+	return k != 0;
+}
+
+static inline bool
 secukey_equal_p(secukey_t id1, secukey_t id2)
 {
-	return id1 == id2 && id1 != 0;
+	return id1 == id2 && secukey_valid_p(id1);
 }
 
 static inline secukey_t
@@ -128,23 +134,23 @@ murmur2(secukey_t key)
 }
 
 static uint32_t
-slot(struct keyval_s *keys, size_t size, secukey_t key)
+slot(struct keyval_s *tbl, size_t size, secukey_t key)
 {
-/* return the first slot in c->keys that either contains gaid or would
+/* return the first slot in c->tbl that either contains gaid or would
  * be a warm n cuddly place for it */
 	uint32_t res = murmur2(key) % size;
 	for (uint32_t i = res; i < size; i++) {
-		if (keys[i].key == 0) {
+		if (tbl[i].key == 0) {
 			return i;
-		} else if (secukey_equal_p(keys[i].key, key)) {
+		} else if (secukey_equal_p(tbl[i].key, key)) {
 			return i;
 		}
 	}
 	/* rotate round */
 	for (uint32_t i = 0; i < res; i++) {
-		if (keys[i].key == 0) {
+		if (tbl[i].key == 0) {
 			return i;
-		} else if (secukey_equal_p(keys[i].key, key)) {
+		} else if (secukey_equal_p(tbl[i].key, key)) {
 			return i;
 		}
 	}
@@ -189,81 +195,50 @@ tscache_unbang_anno(ts_anno_t anno, tseries_t ts)
 static inline tseries_t
 tscache_series(_tscache_t c, index_t i)
 {
-	anno_tseries_t s = c->as;
-	return &s[i].tseries;
-}
-
-static inline anno_tseries_t
-tscache_anno_tseries(_tscache_t c, index_t i)
-{
-	anno_tseries_t s = c->as;
-	return &s[i];
+	return c->tbl[i].val;
 }
 
 static void
-init_keys(_tscache_t c, size_t ini_sz)
+init_tbl(_tscache_t c, size_t ini_sz)
 {
-	size_t msz = ini_sz * sizeof(*c->keys);
-	c->keys = malloc(msz);
-	memset(c->keys, 0, msz);
+	size_t msz = ini_sz * sizeof(*c->tbl);
+	c->tbl = malloc(msz);
+	memset(c->tbl, 0, msz);
 	return;
 }
 
 static void
-free_keys(_tscache_t c)
+free_tbl(_tscache_t c)
 {
-	free(c->keys);
-	return;
-}
-
-static void
-init_series(_tscache_t c, size_t ini_sz)
-{
-	size_t msz = ini_sz * sizeof(*c->as);
-	c->as = malloc(msz);
-	memset(c->as, 0, msz);
-	return;
-}
-
-static inline uint32_t
-get_val(_tscache_t c, secukey_t key)
-{
-	uint32_t s = slot(c->keys, c->alloc_sz, key);
-
-	if (s != -1U && c->keys[s].key != 0) {
-		return c->keys[s].val;
+	for (index_t i = 0; i < c->alloc_sz; i++) {
+		if (secukey_valid_p(c->tbl[i].key)) {
+			free_itree(c->tbl[i].val);
+		}
 	}
-	return -1;
-}
-
-static inline void
-add_key(_tscache_t c, secukey_t key, uint32_t idx)
-{
-	uint32_t s = slot(c->keys, c->alloc_sz, key);
-	c->keys[s].val = idx;
+	free(c->tbl);
 	return;
 }
 
 static void
-resize_keys(_tscache_t c, size_t old_sz, size_t new_sz)
+resize_tbl(_tscache_t c, size_t old_sz, size_t new_sz)
 {
-	size_t new_msz = new_sz * sizeof(*c->keys);
+	size_t new_msz = new_sz * sizeof(*c->tbl);
 	struct keyval_s *new = malloc(new_msz);
 
 	memset(new, 0, new_msz);
 	for (uint32_t i = 0; i < old_sz; i++) {
 		uint32_t new_s;
 
-		if (c->keys[i].key == 0) {
+		if (c->tbl[i].key == 0) {
 			continue;
 		}
-		new_s = slot(new, new_sz, c->keys[i].key);
-		new[new_s].key = c->keys[i].key;
-		new[new_s].val = c->keys[i].val;
+		new_s = slot(new, new_sz, c->tbl[i].key);
+		new[new_s].key = c->tbl[i].key;
+		new[new_s].val = c->tbl[i].val;
 	}
-	free(c->keys);
+	free(c->tbl);
 	/* assign the new one */
-	c->keys = new;
+	c->tbl = new;
 	return;
 }
 
@@ -275,8 +250,7 @@ make_tscache(void)
 	_tscache_t res = xnew(struct tscache_s);
 
 	pthread_mutex_init(&res->mtx, NULL);
-	init_series(res, INITIAL_SIZE);
-	init_keys(res, INITIAL_SIZE);
+	init_tbl(res, INITIAL_SIZE);
 	res->alloc_sz = INITIAL_SIZE;
 	res->nseries = 0;
 	return res;
@@ -291,8 +265,7 @@ free_tscache(tscache_t tsc)
 	pthread_mutex_unlock(&c->mtx);
 	pthread_mutex_destroy(&c->mtx);
 
-	free(c->as);
-	free_keys(c);
+	free_tbl(c);
 	free(c);
 	return;
 }
@@ -317,8 +290,7 @@ check_resize(_tscache_t c)
 		/* resize */
 		size_t old_sz = c->alloc_sz;
 		size_t new_sz = c->alloc_sz * 2;
-		c->as = realloc(c->as, new_sz * sizeof(*c->as));
-		resize_keys(c, old_sz, new_sz);
+		resize_tbl(c, old_sz, new_sz);
 		c->alloc_sz = new_sz;
 		/* indicate that we did resize */
 		return true;
@@ -340,17 +312,17 @@ tscache_bang_series(tscache_t tsc, secu_t s, tseries_t ts)
 
 	pthread_mutex_lock(&c->mtx);
 	(void)check_resize(c);
-	ks = slot(c->keys, c->alloc_sz, sk);
-	if (UNLIKELY(c->keys[ks].key != 0)) {
-		res = tscache_anno_tseries(c, c->keys[ks].val);
+	ks = slot(c->tbl, c->alloc_sz, sk);
+	if (UNLIKELY(secukey_valid_p(c->tbl[ks].key))) {
+		res = NULL; //tscache_tseries(c, c->tbl[ks].val);
 		pthread_mutex_unlock(&c->mtx);
 		return (void*)res;
 	}
 	is = c->nseries++;
-	c->keys[ks].key = sk;
-	c->keys[ks].val = is;
-	res = tscache_anno_tseries(c, is);
-	memcpy(res, ts, sizeof(*ts));
+	c->tbl[ks].key = sk;
+	c->tbl[ks].val = make_itree(); //is;
+	//res = tscache_anno_tseries(c, is);
+	//memcpy(res, ts, sizeof(*ts));
 	pthread_mutex_unlock(&c->mtx);
 	return (void*)res;
 }
@@ -363,12 +335,11 @@ find_tseries_by_secu(tscache_t tsc, secu_t secu)
 	uint32_t ks;
 
 	pthread_mutex_lock(&c->mtx);
-	ks = slot(c->keys, c->alloc_sz, secukey_from_secu(secu));
+	ks = slot(c->tbl, c->alloc_sz, secukey_from_secu(secu));
 	if (UNLIKELY(ks == -1U)) {
 		res = NULL;
-	} else if (LIKELY(c->keys[ks].key != 0)) {
-		uint32_t is = c->keys[ks].val;
-		res = (void*)tscache_series(c, is);
+	} else if (LIKELY(secukey_valid_p(c->tbl[ks].key))) {
+		res = c->tbl[ks].val;
 	} else {
 		res = NULL;
 	}

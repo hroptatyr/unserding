@@ -299,8 +299,8 @@ instr_tick_by_instr_svc(job_t j)
 		p.beg = refts - idx;
 		p.end = p.beg + 13;
 
-		if (fetch_ticks_intv_mysql(&p, tsc, tser) == 0) {
-			/* we shoul send something like quote invalid or so */
+		if (fetch_ticks_intv_mysql(&p, tser) == 0) {
+			/* we should send something like quote invalid or so */
 			return;
 		}
 		tseries_add(tser, &p);

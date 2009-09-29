@@ -46,6 +46,6 @@
 extern tscache_t tscache;
 
 extern size_t
-fetch_ticks_intv_mysql(tser_pktbe_t pkt, tscoll_t tsc, tseries_t tser);
+fetch_ticks_intv_mysql(tser_pktbe_t pkt, tseries_t tser);
 
 #endif	/* INCLUDED_tseries_private_h_ */

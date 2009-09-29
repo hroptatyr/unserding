@@ -111,7 +111,7 @@ find_right_tsa(tser_pktbe_t pkt, ts_anno_t tsa)
 #endif
 
 size_t
-fetch_ticks_intv_mysql(tser_pktbe_t pkt, tscoll_t tsc, tseries_t tser)
+fetch_ticks_intv_mysql(tser_pktbe_t pkt, tseries_t tser)
 {
 /* assumes eod ticks for now,
  * i wonder if it's wise to have all the intelligence in here

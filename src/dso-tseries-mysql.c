@@ -86,13 +86,36 @@ struct tser_pkt_idx_s {
 	tser_pkt_t pkt;
 };
 
+static time_t
+parse_time(const char *t)
+{
+	struct tm tm;
+	char *on;
+
+	memset(&tm, 0, sizeof(tm));
+	on = strptime(t, "%Y-%m-%d", &tm);
+	if (on == NULL) {
+		return 0;
+	}
+	if (on[0] == ' ' || on[0] == 'T' || on[0] == '\t') {
+		on++;
+	}
+	(void)strptime(on, "%H:%M:%S", &tm);
+	return timegm(&tm);
+}
+
 
 static void
 qry_rowf(void **row, size_t nflds, void *clo)
 {
+	dse16_t ds = time_to_dse(parse_time(row[0]));
 	m32_t p = ffff_monetary32_get_s(row[1]);
 	struct tser_pkt_idx_s *tmp = clo;
-	tmp->pkt->t[tmp->i++] = p;
+	uint8_t iip = index_in_pkt(ds);
+	
+	UD_DEBUG("putting %s into slot %d\n", (char*)row[0], iip);
+	tmp->pkt->t[iip] = p;
+	tmp->i++;
 	return;
 }
 
@@ -109,6 +132,7 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, tseries_t tser)
 	struct tser_pkt_idx_s pi = {.i = 0, .pkt = &pkt->pkt};
 	dse16_t beg = pkt->beg, end = pkt->end;
 
+	memset(pi.pkt, 0, sizeof(*pi.pkt));
 	print_ds_into(begs, sizeof(begs), dse_to_time(beg));
 	print_ds_into(ends, sizeof(ends), dse_to_time(end));
 	len = snprintf(
@@ -282,24 +306,6 @@ fill_urns(void)
 
 
 /* overview and administrative bullshit */
-static time_t
-parse_time(const char *t)
-{
-	struct tm tm;
-	char *on;
-
-	memset(&tm, 0, sizeof(tm));
-	on = strptime(t, "%Y-%m-%d", &tm);
-	if (on == NULL) {
-		return 0;
-	}
-	if (on[0] == ' ' || on[0] == 'T' || on[0] == '\t') {
-		on++;
-	}
-	(void)strptime(on, "%H:%M:%S", &tm);
-	return timegm(&tm);
-}
-
 static const char ovqry[] =
 	"SELECT "
 #define INSTR_ID	0

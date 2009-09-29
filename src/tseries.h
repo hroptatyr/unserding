@@ -405,7 +405,7 @@ sl1oadt_dse(sl1oadt_t t)
 }
 
 static inline uint8_t
-find_index_in_pkt(dse16_t dse)
+index_in_pkt(dse16_t dse)
 {
 /* find the index of the date encoded in dse inside a tick bouquet */
 	dse16_t anchor = time_to_dse(442972800);
@@ -420,7 +420,7 @@ find_index_in_pkt(dse16_t dse)
 static inline dse16_t
 tser_pkt_beg_dse(dse16_t dse)
 {
-	uint8_t sub = find_index_in_pkt(dse);
+	uint8_t sub = index_in_pkt(dse);
 	return dse - sub;
 }
 

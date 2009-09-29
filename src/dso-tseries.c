@@ -235,6 +235,13 @@ instr_tick_by_ts_svc(job_t j)
 
 
 static void
+cb(uint32_t lo, uint32_t hi, void *data, void *clo)
+{
+	UD_DBGCONT("  %i to %i\n", lo, hi);
+	return;
+}
+
+static void
 instr_tick_by_instr_svc(job_t j)
 {
 	struct udpc_seria_s sctx;
@@ -276,6 +283,8 @@ instr_tick_by_instr_svc(job_t j)
 	if ((tser = tscoll_find_series(tsc, filt[0])) == NULL) {
 		/* no way of obtaining ticks */
 		UD_DEBUG("Found instr but no suitable URN\n");
+		UD_DEBUG("available URNs:\n");
+		(void)itree_trav_in_order(tsc, &cb, NULL);
 		return;
 	}
 

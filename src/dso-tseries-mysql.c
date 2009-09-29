@@ -398,4 +398,3 @@ dso_tseries_mysql_LTX_init(void *clo)
 }
 
 /* dso-tseries-mysql.c */
-                                                                

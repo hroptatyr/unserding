@@ -68,6 +68,8 @@
 # endif
 #endif	/* HAVE_MYSQL */
 /* tseries stuff, to be replaced with ffff */
+#include "tscache.h"
+#include "tscoll.h"
 #include "tseries.h"
 #include "tseries-private.h"
 
@@ -263,7 +265,7 @@ instr_tick_by_instr_svc(job_t j)
 	}
 
 	/* get us the tseries we're talking about */
-	if ((tser = find_tseries_by_secu(tscache, &hdr.secu)) == NULL) {
+	if ((tser = find_tscoll_by_secu(tscache, &hdr.secu)) == NULL) {
 		/* means we have no means of fetching */
 		/* we could issue a packet saying so */
 		UD_DEBUG("No way of fetching stuff\n");

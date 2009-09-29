@@ -1,4 +1,4 @@
-/*** tseries.h -- stuff that is soon to be replaced by ffff's tseries
+/*** tscoll.h -- collections of time series
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,17 +35,27 @@
  *
  ***/
 
-#if !defined INCLUDED_tseries_private_h_
-#define INCLUDED_tseries_private_h_
+#if !defined INCLUDED_tscoll_h_
+#define INCLUDED_tscoll_h_
 
+#include <stdbool.h>
+#include <time.h>
+#include "unserding.h"
+#include "protocore.h"
+#include "seria.h"
+#include "urn.h"
 #include "tseries.h"
-#include "tscoll.h"
-#include "tscache.h"
 
-/* the main one used in dso-tseries.c */
-extern tscache_t tscache;
+/* tick services */
+#if !defined index_t
+# define index_t	size_t
+#endif	/* !index_t */
 
-extern size_t
-fetch_ticks_intv_mysql(tser_pktbe_t pkt, ts_anno_t tsa);
+typedef void *tscoll_t;
 
-#endif	/* INCLUDED_tseries_private_h_ */
+extern tscoll_t make_tscoll(void);
+extern void free_tscoll(tscoll_t tsc);
+
+extern void tscoll_add(tscoll_t tsc, time_t from, time_t to, void *data);
+
+#endif	/* INCLUDED_tscoll_h_ */

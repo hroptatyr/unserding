@@ -58,6 +58,8 @@
 #include "xdr-instr-private.h"
 #include "xdr-instr-seria.h"
 #include "urn.h"
+#include "tscache.h"
+#include "tscoll.h"
 #include "tseries.h"
 #include "tseries-private.h"
 
@@ -341,7 +343,7 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 {
 	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
 	struct secu_s secu;
-	tseries_t tser;
+	tscoll_t tsc;
 	struct ts_anno_s tsa;
 	uint32_t tbs = strtoul(row[TYPES_BS], NULL, 10);
 
@@ -353,17 +355,17 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 	case 1 ... 3:
 		/* once-a-day, 5-a-week */
 		UD_DEBUG("OAD/5DW tick for %u\n", secu.instr);
-		if ((tser = find_tseries_by_secu(tscache, &secu)) == NULL) {
-			struct tseries_s tmp = {.size = 0, .conses = NULL};
-			tser = tscache_bang_series(tscache, &secu, &tmp);
-		}
+		tsc = find_tscoll_by_secu(tscache, &secu);
+
 		tsa.instr = secu.instr;
 		tsa.urn = find_urn(urn_id, row[URN]);
 		tsa.from = parse_time(row[MIN_DT]);
 		tsa.to = parse_time(row[MAX_DT]);
 		tsa.types = tbs;
 		/* now let tser know */
-		tscache_bang_anno(tser, &tsa);
+		//tscache_bang_anno(tser, &tsa);
+		/* shall we do this? */
+		tscoll_add(tsc, tsa.from, tsa.to, NULL);
 
 	default:
 		break;

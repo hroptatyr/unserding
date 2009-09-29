@@ -1,4 +1,4 @@
-/*** tseries.h -- stuff that is soon to be replaced by ffff's tseries
+/*** tscache.h -- time series collection cache
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,17 +35,29 @@
  *
  ***/
 
-#if !defined INCLUDED_tseries_private_h_
-#define INCLUDED_tseries_private_h_
+#if !defined INCLUDED_tscache_h_
+#define INCLUDED_tscache_h_
 
-#include "tseries.h"
+#include <stdbool.h>
+#include <time.h>
+#include "unserding.h"
+#include "protocore.h"
+#include "seria.h"
+#include "urn.h"
 #include "tscoll.h"
-#include "tscache.h"
 
-/* the main one used in dso-tseries.c */
-extern tscache_t tscache;
+/* tick services */
+#if !defined index_t
+# define index_t	size_t
+#endif	/* !index_t */
 
-extern size_t
-fetch_ticks_intv_mysql(tser_pktbe_t pkt, ts_anno_t tsa);
+typedef void *tscache_t;
 
-#endif	/* INCLUDED_tseries_private_h_ */
+extern tscache_t make_tscache(void);
+extern void free_tscache(tscache_t tsc);
+extern size_t tscache_size(tscache_t tsc);
+
+extern tscoll_t add_tscoll_for_secu(tscache_t tsc, secu_t s);
+extern tscoll_t find_tscoll_by_secu(tscache_t tsc, secu_t s);
+
+#endif	/* INCLUDED_tscache_h_ */

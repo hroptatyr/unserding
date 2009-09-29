@@ -222,19 +222,6 @@ struct sl1oadt_s {
 };
 
 
-/* the global tscache container */
-/**
- * The time series cache data type, just a husk. */
-typedef void *tscache_t;
-
-extern tscache_t make_tscache(void);
-extern void free_tscache(tscache_t tsc);
-extern size_t tscache_size(tscache_t tsc);
-
-extern tseries_t tscache_bang_series(tscache_t tsc, secu_t s, tseries_t ts);
-extern tseries_t find_tseries_by_secu(tscache_t tsc, secu_t secu);
-
-
 /**
  * Deliver a tick packet for S at TS.
  * \param hdl the unserding handle to use

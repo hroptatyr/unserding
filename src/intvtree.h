@@ -45,9 +45,21 @@ typedef struct itree_s *itree_t;
 typedef struct it_node_s *it_node_t;
 typedef void(*it_trav_f)(uint32_t lo, uint32_t hi, void *data, void *clo);
 
-extern void init_itree(itree_t it);
+/**
+ * Create an itree. */
 extern itree_t make_itree(void);
+/**
+ * Create an itree and reserve SAT_SIZE bytes for satellite data,
+ * which can be obtained by `itree_satellite()'.
+ * copy the satellite data in SAT into the satellite space. */
+extern itree_t make_itree_sat(void *sat, size_t sat_size);
+/**
+ * Free all resources of an itree including its satellite data page. */
 extern void free_itree(itree_t);
+/**
+ * Return the address of the satellite data page inside IT. */
+extern void *itree_satellite(itree_t it);
+
 extern it_node_t itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data);
 extern void *itree_del_node(itree_t it, it_node_t z);
 extern it_node_t itree_succ_of(itree_t it, it_node_t x);

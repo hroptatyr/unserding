@@ -260,7 +260,7 @@ find_tscoll_by_secu(tscache_t tsc, secu_t secu)
 	} else {
 		/* means the slot is there, but it hasnt got a coll
 		 * associated */
-		res = make_tscoll();
+		res = make_tscoll(secu);
 	}
 	pthread_mutex_unlock(&c->mtx);
 	return res;

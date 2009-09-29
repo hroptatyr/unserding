@@ -255,22 +255,6 @@ ud_find_ticks_by_instr(
 	secu_t s, uint32_t bs,
 	time_t *ts, size_t tslen);
 
-/**
- * Annotation space inside the cache. */
-typedef struct ts_anno_s *ts_anno_t;
-struct ts_anno_s {
-	uint32_t instr;
-	const_urn_t urn;
-	time_t from, to;
-	uint32_t types;
-	ts_anno_t next;
-};
-
-extern void
-tscache_bang_anno(tseries_t ts, ts_anno_t anno);
-extern void
-tscache_unbang_anno(ts_anno_t anno, tseries_t ts);
-
 
 /* inlines, type (de)muxers */
 static inline l1t_auxinfo_t

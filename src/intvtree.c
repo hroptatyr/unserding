@@ -67,6 +67,7 @@ struct it_node_s {
 
 struct itree_s {
 	struct it_node_s root;
+	char satellite[] __attribute__((aligned(__alignof__(void*))));
 };
 
 static struct it_node_s __nil = {
@@ -169,7 +170,7 @@ inner_node_p(it_node_t nd)
 
 
 /* ctor */
-void
+static inline void
 init_itree(itree_t it)
 {
 	init_node(itree_root_node(it), MAX_KEY, MAX_KEY, NULL);
@@ -180,11 +181,17 @@ init_itree(itree_t it)
 itree_t
 make_itree(void)
 {
-	itree_t res = xnew(struct itree_s);
+	itree_t res = xnew(sizeof(struct itree_s));
+	init_itree(res);
+	return res;
+}
 
-	init_node(itree_root_node(res), MAX_KEY, MAX_KEY, NULL);
-	res->root.parent = res->root.left = res->root.right = nil;
-	res->root.redp = false;
+itree_t
+make_itree_sat(void *sat, size_t sat_size)
+{
+	itree_t res = malloc(sizeof(struct itree_s) + sat_size);
+	init_itree(res);
+	memcpy(res->satellite, sat, sat_size);
 	return res;
 }
 
@@ -217,6 +224,12 @@ free_itree(itree_t it)
 	}
 	memset(itree_root_node(it), 0, sizeof(struct it_node_s));
 	return;
+}
+
+void*
+itree_satellite(itree_t it)
+{
+	return it->satellite;
 }
 
 /* opers */

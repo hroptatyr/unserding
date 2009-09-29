@@ -52,10 +52,18 @@
 #endif	/* !index_t */
 
 typedef void *tscoll_t;
+typedef struct tscoll_spec_s *tscoll_spec_t;
 
-extern tscoll_t make_tscoll(void);
+struct tscoll_spec_s {
+	const_urn_t urn;
+	time_t from, to;
+	uint32_t types;
+};
+
+extern tscoll_t make_tscoll(secu_t secu);
 extern void free_tscoll(tscoll_t tsc);
 
-extern void tscoll_add(tscoll_t tsc, time_t from, time_t to, void *data);
+extern void tscoll_add(tscoll_t tsc, tscoll_spec_t);
+extern secu_t tscoll_secu(tscoll_t tsc);
 
 #endif	/* INCLUDED_tscoll_h_ */

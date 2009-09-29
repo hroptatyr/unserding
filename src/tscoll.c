@@ -45,9 +45,9 @@
 #include "intvtree.h"
 
 tscoll_t
-make_tscoll(void)
+make_tscoll(secu_t s)
 {
-	return make_itree();
+	return make_itree_sat(s, sizeof(*s));
 }
 
 void
@@ -58,10 +58,19 @@ free_tscoll(tscoll_t tsc)
 }
 
 void
-tscoll_add(tscoll_t tsc, time_t from, time_t to, void *data)
+tscoll_add(tscoll_t tsc, tscoll_spec_t sp)
 {
-	itree_add(tsc, from, to, data);
+	time_t from = sp->from;
+	time_t to = sp->to;
+
+	itree_add(tsc, from, to, sp);
 	return;
+}
+
+secu_t
+tscoll_secu(tscoll_t tsc)
+{
+	return itree_satellite(tsc);
 }
 
 /* tscoll.c ends here */

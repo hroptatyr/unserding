@@ -137,11 +137,13 @@ murmur2(secukey_t key)
 	return h;
 }
 
+#define SLOTS_FULL	((uint32_t)0xffffffff)
 static uint32_t
 slot(struct keyval_s *tbl, size_t size, secukey_t key)
 {
 /* return the first slot in c->tbl that either contains gaid or would
- * be a warm n cuddly place for it */
+ * be a warm n cuddly place for it
+ * linear probing */
 	uint32_t res = murmur2(key) % size;
 	for (uint32_t i = res; i < size; i++) {
 		if (tbl[i].key == 0) {
@@ -159,7 +161,7 @@ slot(struct keyval_s *tbl, size_t size, secukey_t key)
 		}
 	}
 	/* means we're full :O */
-	return -1;
+	return SLOTS_FULL;
 }
 
 static void
@@ -250,17 +252,17 @@ find_tscoll_by_secu(tscache_t tsc, secu_t secu)
 	uint32_t ks;
 
 	pthread_mutex_lock(&c->mtx);
-	(void)check_resize(c);
 	ks = slot(c->tbl, c->alloc_sz, secukey_from_secu(secu));
-	if (UNLIKELY(ks == -1U)) {
-		res = NULL;
-		abort();
-	} else if (LIKELY(secukey_valid_p(c->tbl[ks].key))) {
+	if (LIKELY(ks != SLOTS_FULL && secukey_valid_p(c->tbl[ks].key))) {
 		res = c->tbl[ks].val;
 	} else {
 		/* means the slot is there, but it hasnt got a coll
 		 * associated */
-		res = make_tscoll(secu);
+		(void)check_resize(c);
+		ks = slot(c->tbl, c->alloc_sz, secukey_from_secu(secu));
+		c->tbl[ks].key = secukey_from_secu(secu);
+		res = c->tbl[ks].val = make_tscoll(secu);
+		c->nseries++;
 	}
 	pthread_mutex_unlock(&c->mtx);
 	return res;

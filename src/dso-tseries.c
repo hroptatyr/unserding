@@ -273,6 +273,7 @@ instr_tick_by_instr_svc(job_t j)
 		UD_DEBUG("No way of fetching stuff\n");
 		return;
 	}
+	fprintf(stderr, "tsc %p\n", tsc);
 	if ((tser = tscoll_find_series(tsc, filt[0])) == NULL) {
 		/* no way of obtaining ticks */
 		UD_DEBUG("Found instr but no suitable URN\n");

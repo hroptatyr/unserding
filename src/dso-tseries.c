@@ -287,7 +287,7 @@ instr_tick_by_instr_svc(job_t j)
 	dse16_t refts = time_to_dse(filt[0]);
 	uint8_t idx = find_index_in_pkt(refts);
 	/* obtain the time intervals we need */
-	if ((pkt = tseries_find_pkt(tser, filt[0])) == NULL) {
+	if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
 		struct tser_pktbe_s p;
 
 		/* let the luser know we deliver our shit later on */

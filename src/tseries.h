@@ -410,11 +410,10 @@ index_in_pkt(dse16_t dse)
 /* find the index of the date encoded in dse inside a tick bouquet */
 	dse16_t anchor = time_to_dse(442972800);
 	uint8_t res = (dse - anchor) % 14;
-	if (res > 0) {
-		return res - 1;
-	} else {
-		return 13;
-	}
+	static uint8_t offs[14] = {
+		-1, 0, 1, 2, 3, 4, -1, -1, 5, 6, 7, 8, 9, -1
+	};
+	return offs[res];
 }
 
 static inline dse16_t

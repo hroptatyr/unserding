@@ -76,61 +76,6 @@
 tscache_t tscache = NULL;
 
 
-#if 0
-static tser_pkt_t
-find_tser_pkt(tseries_t tser, date_t ts)
-{
-	for (tser_cons_t res = tser->conses; res; res = res->next) {
-		if (ts < res->pktbe.beg) {
-			continue;
-		} else if (ts <= res->pktbe.end) {
-			return &res->pktbe.pkt;
-		}
-	}
-	return NULL;
-}
-
-static void
-add_tser_pktbe(tseries_t tser, tser_pktbe_t pktbe)
-{
-	tser_cons_t res, c;
-
-	if (tser->conses == NULL || pktbe->beg <= tser->conses->pktbe.beg) {
-		/* we're the first, sort is trivial */
-		c = xnew(*c);
-		c->next = tser->conses;
-		c->cache_expiry = -1UL;
-		c->pktbe = *pktbe;
-		/* prepend to tser->conses */
-		tser->conses = c;
-		UD_DEBUG("added in front\n");
-		return;
-	}
-	/* otherwise find the right place first */
-	for (res = tser->conses; res && res->next; res = res->next) {
-		if (pktbe->beg <= res->next->pktbe.beg) {
-			c = xnew(*c);
-			c->next = res->next;
-			c->cache_expiry = -1UL;
-			c->pktbe = *pktbe;
-			/* prepend to res */
-			res->next = c;
-			UD_DEBUG("added after %p\n", res);
-			return;
-		}
-	}
-	/* if we reach this, we have to append the fucker */
-	c = xnew(*c);
-	c->next = NULL;
-	c->cache_expiry = -1UL;
-	c->pktbe = *pktbe;
-	/* prepend to res */
-	res->next = c;
-	UD_DEBUG("added at the end\n");
-	return;
-}
-#endif
-
 typedef struct spitfire_ctx_s *spitfire_ctx_t;
 typedef enum spitfire_res_e spitfire_res_t;
 

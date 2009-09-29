@@ -96,20 +96,6 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	return;
 }
 
-#if 0
-static ts_anno_t
-find_right_tsa(tser_pktbe_t pkt, ts_anno_t tsa)
-{
-	for (; tsa; tsa = tsa->next) {
-		if (time_to_dse(tsa->from) <= pkt->beg &&
-		    pkt->end <= time_to_dse(tsa->to)) {
-			return tsa;
-		}
-	}
-	return NULL;
-}
-#endif
-
 size_t
 fetch_ticks_intv_mysql(tser_pktbe_t pkt, tseries_t tser)
 {
@@ -122,12 +108,6 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, tseries_t tser)
 	size_t len;
 	struct tser_pkt_idx_s pi = {.i = 0, .pkt = &pkt->pkt};
 	dse16_t beg = pkt->beg, end = pkt->end;
-
-#if 0
-	if ((tsa = find_right_tsa(pkt, tsa)) == NULL) {
-		return 0;
-	}
-#endif
 
 	print_ds_into(begs, sizeof(begs), dse_to_time(beg));
 	print_ds_into(ends, sizeof(ends), dse_to_time(end));

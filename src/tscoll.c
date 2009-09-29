@@ -43,6 +43,7 @@
 #include "urn.h"
 #include "tscoll.h"
 #include "intvtree.h"
+#include "unserding-nifty.h"
 
 tscoll_t
 make_tscoll(secu_t s)
@@ -57,20 +58,60 @@ free_tscoll(tscoll_t tsc)
 	return;
 }
 
-void
-tscoll_add(tscoll_t tsc, tscoll_spec_t sp)
-{
-	time_t from = sp->from;
-	time_t to = sp->to;
-
-	itree_add(tsc, from, to, sp);
-	return;
-}
-
 secu_t
 tscoll_secu(tscoll_t tsc)
 {
 	return itree_satellite(tsc);
+}
+
+void
+tscoll_add(tscoll_t tsc, tseries_t sp)
+{
+	tseries_t copy_sp = xnew(*sp);
+	time_t from = sp->from;
+	time_t to = sp->to;
+
+	memcpy(copy_sp, sp, sizeof(*sp));
+	copy_sp->secu = tscoll_secu(tsc);
+	copy_sp->private = make_itree();
+	itree_add(tsc, from, to, copy_sp);
+	return;
+}
+
+tseries_t
+tscoll_add2(tscoll_t tsc, const_urn_t urn, time_t from, time_t to, uint32_t ty)
+{
+	tseries_t sp = xnew(*sp);
+
+	sp->urn = urn;
+	sp->from = from;
+	sp->to = to;
+	sp->types = ty;
+	sp->secu = tscoll_secu(tsc);
+	sp->private = make_itree();
+	itree_add(tsc, from, to, sp);
+	return sp;
+}
+
+tseries_t
+tscoll_find_series(tscoll_t tsc, time_t ts)
+{
+	return itree_find_point(tsc, ts);
+}
+
+tser_pkt_t
+tseries_find_pkt(tseries_t tser, time_t ts)
+{
+	return itree_find_point(tser->private, ts);
+}
+
+void
+tseries_add(tseries_t tser, tser_pktbe_t pktbe)
+{
+	tser_pkt_t p = xnew(*p);
+	memcpy(p, &pktbe->pkt, sizeof(*p));
+	itree_add(tser->private, pktbe->beg, pktbe->end, p);
+	return;
 }
 
 /* tscoll.c ends here */

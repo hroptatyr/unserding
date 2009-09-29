@@ -67,7 +67,7 @@ struct it_node_s {
 
 struct itree_s {
 	struct it_node_s root;
-	char satellite[] __attribute__((aligned(__alignof__(void*))));
+	char satellite[] __attribute__((aligned(__alignof(void*))));
 };
 
 static struct it_node_s __nil = {
@@ -181,7 +181,7 @@ init_itree(itree_t it)
 itree_t
 make_itree(void)
 {
-	itree_t res = xnew(sizeof(struct itree_s));
+	itree_t res = xnew(struct itree_s);
 	init_itree(res);
 	return res;
 }
@@ -739,7 +739,7 @@ tree_pivot_rel(it_node_t n, uint32_t p)
 }
 
 void
-itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
+itree_find_point_cb(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 {
 /* left child, me, right child */
 	/* root node has no right child, proceed with the left one */
@@ -804,7 +804,7 @@ itree_find_point(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 }
 
 void
-itree_find_point_1(itree_t it, uint32_t p, it_trav_f cb, void *clo)
+itree_find_point_cb1(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 {
 /* like itree_find_point() but stop after one occurrence,
  * prefer the right branch for nebulous reasons */
@@ -843,6 +843,40 @@ itree_find_point_1(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 	}
 #undef proc
 	return;
+}
+
+void*
+itree_find_point(itree_t it, uint32_t p)
+{
+/* like itree_find_point() but stop after one occurrence,
+ * prefer the right branch for nebulous reasons */
+	/* root node has no right child, proceed with the left one */
+	it_node_t curr = itree_left_root(it);
+
+	while (!nil_node_p(curr)) {
+		switch (tree_pivot_rel(curr, p)) {
+		case -1:
+			/* if the pivot is truly to the left of curr, descend */
+			curr = curr->left;
+			continue;
+		case 1:
+			/* pivot is beyond the scope, return */
+			return NULL;
+		case 0:
+		default:
+			break;
+		}
+
+		if (node_pivot_rel(curr, p) == 0) {
+			/* bingo, mother load */
+			return curr->data;
+		} else {
+			/* this means the above was 1, -1 isn't possible here
+			 * unless the machine is retarded */
+			curr = curr->right;
+		}
+	}
+	return NULL;
 }
 
 /* intvtree.c ends here */

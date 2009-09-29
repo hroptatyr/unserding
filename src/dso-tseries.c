@@ -76,6 +76,7 @@
 tscache_t tscache = NULL;
 
 
+#if 0
 static tser_pkt_t
 find_tser_pkt(tseries_t tser, date_t ts)
 {
@@ -128,7 +129,7 @@ add_tser_pktbe(tseries_t tser, tser_pktbe_t pktbe)
 	UD_DEBUG("added at the end\n");
 	return;
 }
-
+#endif
 
 typedef struct spitfire_ctx_s *spitfire_ctx_t;
 typedef enum spitfire_res_e spitfire_res_t;
@@ -244,6 +245,7 @@ instr_tick_by_instr_svc(job_t j)
 	/* allow to filter for 64 time stamps at once */
 	time_t filt[64];
 	unsigned int nfilt = 0;
+	tscoll_t tsc;
 	tseries_t tser;
 	tser_pkt_t pkt;
 	struct sl1oadt_s oadt;
@@ -265,10 +267,15 @@ instr_tick_by_instr_svc(job_t j)
 	}
 
 	/* get us the tseries we're talking about */
-	if ((tser = find_tscoll_by_secu(tscache, &hdr.secu)) == NULL) {
+	if ((tsc = find_tscoll_by_secu(tscache, &hdr.secu)) == NULL) {
 		/* means we have no means of fetching */
 		/* we could issue a packet saying so */
 		UD_DEBUG("No way of fetching stuff\n");
+		return;
+	}
+	if ((tser = tscoll_find_series(tsc, filt[0])) == NULL) {
+		/* no way of obtaining ticks */
+		UD_DEBUG("Found instr but no suitable URN\n");
 		return;
 	}
 
@@ -280,9 +287,8 @@ instr_tick_by_instr_svc(job_t j)
 	dse16_t refts = time_to_dse(filt[0]);
 	uint8_t idx = find_index_in_pkt(refts);
 	/* obtain the time intervals we need */
-	if ((pkt = find_tser_pkt(tser, refts)) == NULL) {
+	if ((pkt = tseries_find_pkt(tser, filt[0])) == NULL) {
 		struct tser_pktbe_s p;
-		struct ts_anno_s tsa;
 
 		/* let the luser know we deliver our shit later on */
 		udpc_set_defer_fina_pkt(JOB_PACKET(&rplj));
@@ -293,12 +299,11 @@ instr_tick_by_instr_svc(job_t j)
 		p.beg = refts - idx;
 		p.end = p.beg + 13;
 
-		tscache_unbang_anno(&tsa, tser);
-		if (fetch_ticks_intv_mysql(&p, &tsa) == 0) {
+		if (fetch_ticks_intv_mysql(&p, tsc, tser) == 0) {
 			/* we shoul send something like quote invalid or so */
 			return;
 		}
-		add_tser_pktbe(tser, &p);
+		tseries_add(tser, &p);
 
 		/* reset the packet */
 		clear_pkt(&rplsctx, &rplj);

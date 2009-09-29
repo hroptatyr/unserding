@@ -96,6 +96,7 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	return;
 }
 
+#if 0
 static ts_anno_t
 find_right_tsa(tser_pktbe_t pkt, ts_anno_t tsa)
 {
@@ -107,9 +108,10 @@ find_right_tsa(tser_pktbe_t pkt, ts_anno_t tsa)
 	}
 	return NULL;
 }
+#endif
 
 size_t
-fetch_ticks_intv_mysql(tser_pktbe_t pkt, ts_anno_t tsa)
+fetch_ticks_intv_mysql(tser_pktbe_t pkt, tscoll_t tsc, tseries_t tser)
 {
 /* assumes eod ticks for now,
  * i wonder if it's wise to have all the intelligence in here
@@ -121,9 +123,11 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, ts_anno_t tsa)
 	struct tser_pkt_idx_s pi = {.i = 0, .pkt = &pkt->pkt};
 	dse16_t beg = pkt->beg, end = pkt->end;
 
+#if 0
 	if ((tsa = find_right_tsa(pkt, tsa)) == NULL) {
 		return 0;
 	}
+#endif
 
 	print_ds_into(begs, sizeof(begs), dse_to_time(beg));
 	print_ds_into(ends, sizeof(ends), dse_to_time(end));
@@ -133,10 +137,10 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, ts_anno_t tsa)
 		"FROM %s "
 		"WHERE `%s` = %d AND `%s` BETWEEN '%s' AND '%s' "
 		"ORDER BY 1",
-		urn_fld_date(tsa->urn), urn_fld_close(tsa->urn),
-		tsa->urn->dbtbl,
-		urn_fld_id(tsa->urn), tsa->instr,
-		urn_fld_date(tsa->urn), begs, ends);
+		urn_fld_date(tser->urn), urn_fld_close(tser->urn),
+		urn_fld_dbtbl(tser->urn),
+		urn_fld_id(tser->urn), tser->secu->instr,
+		urn_fld_date(tser->urn), begs, ends);
 	UD_DEBUG("querying: %s\n", qry);
 	uddb_qry(conn, qry, len, qry_rowf, &pi);
 	UD_DEBUG("got %u prices\n", pi.i);
@@ -344,7 +348,7 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
 	struct secu_s secu;
 	tscoll_t tsc;
-	struct tscoll_spec_s tscsp;
+	struct tseries_s tser;
 	uint32_t tbs = strtoul(row[TYPES_BS], NULL, 10);
 
 	secu.instr = strtoul(row[INSTR_ID], NULL, 10);
@@ -357,12 +361,12 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 		UD_DEBUG("OAD/5DW tick for %u\n", secu.instr);
 		tsc = find_tscoll_by_secu(tscache, &secu);
 
-		tscsp.urn = find_urn(urn_id, row[URN]);
-		tscsp.from = parse_time(row[MIN_DT]);
-		tscsp.to = parse_time(row[MAX_DT]);
-		tscsp.types = tbs;
+		tser.urn = find_urn(urn_id, row[URN]);
+		tser.from = parse_time(row[MIN_DT]);
+		tser.to = parse_time(row[MAX_DT]);
+		tser.types = tbs;
 		/* add to the collection of time stamps */
-		tscoll_add(tsc, &tscsp);
+		tscoll_add(tsc, &tser);
 
 	default:
 		break;
@@ -394,3 +398,4 @@ dso_tseries_mysql_LTX_init(void *clo)
 }
 
 /* dso-tseries-mysql.c */
+                                                                

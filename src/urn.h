@@ -134,4 +134,10 @@ urn_fld_close(const_urn_t urn)
 	}
 }
 
+static inline const char*
+urn_fld_dbtbl(const_urn_t urn)
+{
+	return urn->dbtbl;
+}
+
 #endif	/* INCLUDED_urn_h_ */

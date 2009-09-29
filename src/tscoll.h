@@ -52,18 +52,28 @@
 #endif	/* !index_t */
 
 typedef void *tscoll_t;
-typedef struct tscoll_spec_s *tscoll_spec_t;
+typedef struct tseries_s *tseries_t;
 
-struct tscoll_spec_s {
+struct tseries_s {
 	const_urn_t urn;
 	time_t from, to;
 	uint32_t types;
+	/** points back into the tscoll satellite */
+	secu_t secu;
+	/** do not fiddle with me */
+	void *private;
 };
 
 extern tscoll_t make_tscoll(secu_t secu);
 extern void free_tscoll(tscoll_t tsc);
 
-extern void tscoll_add(tscoll_t tsc, tscoll_spec_t);
+extern void tscoll_add(tscoll_t tsc, tseries_t);
+extern tseries_t tscoll_add2(tscoll_t, const_urn_t, time_t, time_t, uint32_t);
 extern secu_t tscoll_secu(tscoll_t tsc);
+
+extern tseries_t tscoll_find_series(tscoll_t tsc, time_t ts);
+/* move to tseries.[ch]? */
+extern tser_pkt_t tseries_find_pkt(tseries_t tsc, time_t ts);
+extern void tseries_add(tseries_t tsc, tser_pktbe_t pktbe);
 
 #endif	/* INCLUDED_tscoll_h_ */

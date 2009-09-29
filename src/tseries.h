@@ -90,7 +90,6 @@
 #define sl1tick_pot		sl1tp_exch
 
 /* migrate to ffff tseries */
-typedef struct tseries_s *tseries_t;
 typedef struct tser_cons_s *tser_cons_t;
 typedef struct tser_qry_intv_s *tser_qry_intv_t;
 typedef struct tser_pktbe_s *tser_pktbe_t;
@@ -173,12 +172,6 @@ struct tick_by_instr_hdr_s {
 struct sl1t_s {
 	struct secu_s secu;
 	struct l1tick_s tick;
-};
-
-struct tseries_s {
-	size_t size;
-	/** vector of cons cells, nope, it's a list at the mo */
-	tser_cons_t conses;
 };
 
 /* packet of 10 ticks, fuck ugly */
@@ -285,39 +278,6 @@ static inline uint8_t
 l1t_auxinfo_tt(l1t_auxinfo_t ai)
 {
 	return (ai & 0x3f);
-}
-
-static inline tser_cons_t
-tseries_first(tseries_t tser)
-{
-	if (tser->size > 0) {
-		return tser->conses;
-	}
-	return NULL;
-}
-
-static inline tser_cons_t
-tseries_last(tseries_t tser)
-{
-	tser_cons_t res;
-	for (res = tser->conses; res && res->next; res = res->next);
-	return res;
-}
-
-static inline date_t
-tseries_beg(tseries_t tser)
-{
-	if (tser->size > 0) {
-		return tser->conses->pktbe.beg;
-	}
-}
-
-static inline date_t
-tseries_end(tseries_t tser)
-{
-	if (tser->size > 0) {
-		return tseries_last(tser)->pktbe.end;
-	}
 }
 
 /* the sl1tp packed tick, consumes 12 or 20 bytes */

@@ -545,7 +545,14 @@ static inline size_t
 udpc_seria_des_sl1oadt(sl1oadt_t oadt, udpc_seria_t sctx)
 {
 	/* we send of the first 3 slots, 32b 32b 16b, as secu */
-	oadt->instr = udpc_seria_des_ui32(sctx);
+	if ((oadt->instr = udpc_seria_des_ui32(sctx)) == 0) {
+		/* cunt off right away */
+		oadt->unit = 0;
+		oadt->mux = 0;
+		oadt->nticks = 0;
+		oadt->dse = 0;
+		return 0;
+	}
 	oadt->unit = udpc_seria_des_ui32(sctx);
 	oadt->mux = udpc_seria_des_ui16(sctx);
 	/* now comes the semi-sparse entry */

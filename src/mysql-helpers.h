@@ -94,20 +94,21 @@ uddb_disconnect(ud_conn_t conn)
 	return;
 }
 
-static void __attribute__((unused))
+static size_t __attribute__((unused))
 uddb_qry(ud_conn_t conn, const char *qry, size_t len, ud_row_f cb, void *clo)
 {
 	void *res;
+	size_t nres = 0;
 
 	/* off we go */
 	if (mysql_real_query(conn, qry, len) != 0) {
 		/* dont know */
-		return;
+		return 0;
 	}
 	/* otherwise fetch the result */
 	if ((res = mysql_store_result(conn)) == NULL) {
 		/* bummer */
-		return;
+		return 0;
 	}
 	/* process him */
 	{
@@ -116,12 +117,13 @@ uddb_qry(ud_conn_t conn, const char *qry, size_t len, ud_row_f cb, void *clo)
 
 		while ((r = mysql_fetch_row(res))) {
 			(*cb)((void**)r, nflds, clo);
+			nres++;
 		}
 	}
 
 	/* and free the result object */
 	mysql_free_result(res);
-	return;
+	return nres;
 }
 
 #endif	/* INCLUDED_mysql_helpers_h_ */

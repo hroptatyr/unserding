@@ -110,21 +110,20 @@ qry_rowf(void **row, size_t nflds, void *clo)
 {
 	dse16_t ds = time_to_dse(parse_time(row[0]));
 	m32_t p = ffff_monetary32_get_s(row[1]);
-	struct tser_pkt_idx_s *tmp = clo;
+	tser_pkt_t pkt = clo;
 	uint8_t iip = index_in_pkt(ds);
 
-	if (UNLIKELY(iip >= countof(tmp->pkt->t))) {
+	if (UNLIKELY(iip >= countof(pkt->t))) {
 		return;
 	}
 	UD_DEBUG("putting %s %2.4f into slot %d\n",
 		 (char*)row[0], ffff_monetary32_d(p), iip);
-	tmp->pkt->t[iip] = p;
-	tmp->i++;
+	pkt->t[iip] = p;
 	return;
 }
 
 size_t
-fetch_ticks_intv_mysql(tser_pktbe_t pkt, tseries_t tser)
+fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
 {
 /* assumes eod ticks for now,
  * i wonder if it's wise to have all the intelligence in here
@@ -133,10 +132,9 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, tseries_t tser)
 	char begs[16], ends[16];
 	char qry[224];
 	size_t len;
-	struct tser_pkt_idx_s pi = {.i = 0, .pkt = &pkt->pkt};
-	dse16_t beg = pkt->beg, end = pkt->end;
+	size_t nres;
 
-	memset(pi.pkt, 0, sizeof(*pi.pkt));
+	memset(pkt, 0, sizeof(*pkt));
 	print_ds_into(begs, sizeof(begs), dse_to_time(beg));
 	print_ds_into(ends, sizeof(ends), dse_to_time(end));
 	len = snprintf(
@@ -150,9 +148,9 @@ fetch_ticks_intv_mysql(tser_pktbe_t pkt, tseries_t tser)
 		urn_fld_id(tser->urn), tser->secu->instr,
 		urn_fld_date(tser->urn), begs, ends);
 	UD_DEBUG("querying: %s\n", qry);
-	uddb_qry(conn, qry, len, qry_rowf, &pi);
-	UD_DEBUG("got %u prices\n", pi.i);
-	return pi.i;
+	nres = uddb_qry(conn, qry, len, qry_rowf, pkt);
+	UD_DEBUG("got %lu prices\n", (long unsigned int)nres);
+	return nres;
 }
 
 

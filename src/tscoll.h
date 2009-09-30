@@ -74,6 +74,6 @@ extern secu_t tscoll_secu(tscoll_t tsc);
 extern tseries_t tscoll_find_series(tscoll_t tsc, time_t ts);
 /* move to tseries.[ch]? */
 extern tser_pkt_t tseries_find_pkt(tseries_t tsc, time_t ts);
-extern void tseries_add(tseries_t tsc, tser_pktbe_t pktbe);
+extern void tseries_add(tseries_t tsc, dse16_t beg, dse16_t end, tser_pkt_t p);
 
 #endif	/* INCLUDED_tscoll_h_ */

@@ -106,11 +106,11 @@ tseries_find_pkt(tseries_t tser, time_t ts)
 }
 
 void
-tseries_add(tseries_t tser, tser_pktbe_t pktbe)
+tseries_add(tseries_t tser, dse16_t beg, dse16_t end, tser_pkt_t pkt)
 {
 	tser_pkt_t p = xnew(*p);
-	memcpy(p, &pktbe->pkt, sizeof(*p));
-	itree_add(tser->private, pktbe->beg, pktbe->end, p);
+	memcpy(p, pkt, sizeof(*p));
+	itree_add(tser->private, beg, end, p);
 	return;
 }
 

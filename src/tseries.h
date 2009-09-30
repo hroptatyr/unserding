@@ -52,6 +52,16 @@
 #endif	/* !index_t */
 
 /**
+ * Time series (per instrument) and market snapshots (per point in time)
+ * need the best of both worlds, low latency on the one hand and small
+ * memory footprint on the other, yet allowing for a rich variety of
+ * gatherable information.
+ * Specifically we want to answer questions like:
+ * -
+ * -
+ **/
+
+/**
  * Service 4220:
  * Find ticks of one time stamp over instruments (market snapshot).
  * This service can be used to get a succinct set of ticks, usually the
@@ -66,14 +76,16 @@
 #define UD_SVC_TICK_BY_TS	0x4220
 
 /**
- * Time series (per instrument) and market snapshots (per point in time)
- * need the best of both worlds, low latency on the one hand and small
- * memory footprint on the other, yet allowing for a rich variety of
- * gatherable information.
- * Specifically we want to answer questions like:
- * -
- * -
- **/
+ * Service 4222:
+ * Find ticks of one instrument at several given points in time.
+ *
+ * sig: 4222(ui32 secu, ui32 fund, ui32 exch, ui32 types, (ui32 ts)+)
+ *   As a wildcard for all funds or all exchanges 0x00000000 can be used.
+ *
+ * The TYPES parameter is a bitset made up of PFTB_* values as specified
+ * in pfack/tick.h
+ * This service is best used in conjunction with `ud_find_ticks_by_instr'
+ * because several optimisation strategies apply. */
 #define UD_SVC_TICK_BY_INSTR	0x4222
 
 /* points to the tick-type of the day */
@@ -90,10 +102,6 @@
 #define sl1tick_pot		sl1tp_exch
 
 /* migrate to ffff tseries */
-typedef struct tser_cons_s *tser_cons_t;
-typedef struct tser_qry_intv_s *tser_qry_intv_t;
-typedef struct tser_pktbe_s *tser_pktbe_t;
-
 typedef struct tser_pkt_s *tser_pkt_t;
 
 typedef struct secu_s *secu_t;
@@ -182,24 +190,6 @@ struct tser_pkt_s {
 union time_dse_u {
 	time_t time;
 	dse16_t dse16;
-};
-
-struct tser_pktbe_s {
-	date_t beg;
-	date_t end;
-	struct tser_pkt_s pkt;
-};
-
-struct tser_cons_s {
-	tser_cons_t next;
-	time_t cache_expiry;
-	struct tser_pktbe_s pktbe;
-};
-
-
-struct tser_qry_intv_s {
-	time_t beg;
-	time_t end;
 };
 
 struct sl1oadt_s {
@@ -433,12 +423,11 @@ sl1oadt_value(sl1oadt_t oadt, uint8_t idx)
  * Instantiate a sparse level 1 once-a-day tick for HDR. */
 static inline void
 fill_sl1oadt_1(
-	sl1oadt_t oadt, tick_by_instr_hdr_t hdr,
-	uint8_t tt, dse16_t dse, uint32_t pri)
+	sl1oadt_t oadt, secu_t secu, uint8_t tt, dse16_t dse, uint32_t pri)
 {
-	oadt->instr = hdr->secu.instr;
-	oadt->unit = hdr->secu.unit;
-	oadt->mux = ((hdr->secu.pot & 0x3ff) << 6) | (tt & 0x3f);
+	oadt->instr = secu->instr;
+	oadt->unit = secu->unit;
+	oadt->mux = ((secu->pot & 0x3ff) << 6) | (tt & 0x3f);
 	oadt->dse = dse;
 	oadt->nticks = 1;
 	oadt->value[0] = pri;

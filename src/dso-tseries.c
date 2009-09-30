@@ -179,12 +179,120 @@ instr_tick_by_ts_svc(job_t j)
 }
 
 
-/* ugly */
+/* ugly, we don't know if it's an itree */
 extern void itree_trav_in_order(void*, void*, void*);
 static void
 cb(uint32_t lo, uint32_t hi, void *data, void *clo)
 {
 	UD_DBGCONT("  %i to %i\n", lo, hi);
+	return;
+}
+
+/* we sort the list of requested time stamps to collapse contiguous ones */
+static index_t
+selsort_minidx(time_t arr[], size_t narr, index_t offs)
+{
+	index_t minidx = offs;
+
+	for (index_t i = offs+1; i < narr; i++) {
+		if (arr[i] < arr[minidx]) {
+			minidx = i;
+		}
+	}
+	return minidx;
+}
+
+static inline void
+selsort_swap(time_t arr[], index_t i1, index_t i2)
+{
+	time_t tmp;
+	tmp = arr[i1];
+	arr[i1] = arr[i2];
+	arr[i2] = tmp;
+	return;
+}
+
+static void
+selsort_in_situ(time_t arr[], size_t narr)
+{
+	for (index_t i = 0; i < narr-1; i++) {
+		index_t minidx = selsort_minidx(arr, narr, i);
+		selsort_swap(arr, i, minidx);
+	}
+	return;
+}
+
+static size_t
+snarf_times(udpc_seria_t sctx, time_t ts[], size_t nts)
+{
+	size_t nfilt = 0;
+	while ((ts[nfilt] = udpc_seria_des_ui32(sctx)) && ++nfilt < nts);
+	selsort_in_situ(ts, nfilt);
+	return nfilt;
+}
+
+static void
+frob_stuff(tser_pkt_t p, tseries_t tser, dse16_t begds)
+{
+	dse16_t endds = begds + 13;
+
+	/* let the luser know we deliver our shit later on */
+	//udpc_set_defer_fina_pkt(JOB_PACKET(&rplj));
+	/* send what we've got */
+	//send_pkt(&rplsctx, &rplj);
+
+	if (fetch_ticks_intv_mysql(p, tser, begds, endds) == 0) {
+		/* we should send something like quote invalid or so */
+		return;
+	}
+	/* cache him */
+	tseries_add(tser, begds, endds, p);
+
+	/* reset the packet */
+	//clear_pkt(&rplsctx, &rplj);
+	return;
+}
+
+static void
+proc_filt(udpc_seria_t sctx, secu_t s, tscoll_t tsc, time_t ts)
+{
+	tseries_t tser;
+	tser_pkt_t pkt;
+	dse16_t refts = time_to_dse(ts);
+	uint8_t idx;
+	struct sl1oadt_s oadt;
+
+	/* this is the 10-ticks per 2 weeks fragment, so dont bother
+	 * looking up saturdays and sundays */
+#define TICKS_PER_FORTNIGHT	10
+	if ((idx = index_in_pkt(refts)) >= TICKS_PER_FORTNIGHT) {
+		/* leave a note in the packet? */
+		return;
+	}
+
+	if ((tser = tscoll_find_series(tsc, ts)) == NULL) {
+		/* no way of obtaining ticks */
+		UD_DEBUG("No suitable URN found (%i)\n", (uint32_t)ts);
+		UD_DEBUG("available URNs:\n");
+		/* how do we know it's an itree? */
+		(void)itree_trav_in_order(tsc, &cb, NULL);
+		return;
+	}
+
+	if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
+		/* fetch from data source */
+		struct tser_pkt_s np;
+		frob_stuff(&np, tser, refts - idx);
+		fill_sl1oadt_1(&oadt, s, PFTT_EOD, refts, np.t[idx]);
+		udpc_seria_add_sl1oadt(sctx, &oadt);
+	} else {
+		/* bother the cache */
+		m32_t pri = pkt->t[idx];
+
+		UD_DEBUG("yay, cached\n");
+		fill_sl1oadt_1(&oadt, s, PFTT_EOD, refts, pri);
+		udpc_seria_add_sl1oadt(sctx, &oadt);
+	}
 	return;
 }
 
@@ -197,29 +305,22 @@ instr_tick_by_instr_svc(job_t j)
 	/* in args */
 	struct tick_by_instr_hdr_s hdr;
 	/* allow to filter for 64 time stamps at once */
-	time_t filt[64];
+#define NFILT	64
+	time_t filt[NFILT];
 	unsigned int nfilt = 0;
 	tscoll_t tsc;
-	tseries_t tser;
-	tser_pkt_t pkt;
-	struct sl1oadt_s oadt;
-	uint8_t idx;
+	bool moarp = true;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the header off of the wire */
 	udpc_seria_des_tick_by_instr_hdr(&hdr, &sctx);
-
-	/* triples of instrument identifiers */
-	while ((filt[nfilt] = udpc_seria_des_ui32(&sctx)) &&
-	       ++nfilt < countof(filt));
-
-	UD_DEBUG("0x4222: %u/%u@%u filtered for %u time stamps\n",
-		 hdr.secu.instr, hdr.secu.unit, hdr.secu.pot, nfilt);
-
-	if (nfilt == 0) {
+	/* get all the timestamps */
+	if ((nfilt = snarf_times(&sctx, filt, countof(filt))) == 0) {
 		return;
 	}
+	UD_DEBUG("0x4222: %u/%u@%u filtered for %u time stamps\n",
+		 hdr.secu.instr, hdr.secu.unit, hdr.secu.pot, nfilt);
 
 	/* get us the tseries we're talking about */
 	if ((tsc = find_tscoll_by_secu(tscache, &hdr.secu)) == NULL) {
@@ -228,55 +329,21 @@ instr_tick_by_instr_svc(job_t j)
 		UD_DEBUG("No way of fetching stuff\n");
 		return;
 	}
-	if ((tser = tscoll_find_series(tsc, filt[0])) == NULL) {
-		/* no way of obtaining ticks */
-		UD_DEBUG("No suitable URN found (%i)\n", (uint32_t)filt[0]);
-		UD_DEBUG("available URNs:\n");
-		(void)itree_trav_in_order(tsc, &cb, NULL);
-		return;
-	}
 
-	/* ugly, but we have to loop-ify this anyway */
-	dse16_t refts = time_to_dse(filt[0]);
-	if ((idx = index_in_pkt(refts)) >= countof(pkt->t)) {
-		return;
-	}
-
-	/* prepare the reply packet ... */
-	copy_pkt(&rplj, j);
-	clear_pkt(&rplsctx, &rplj);
-	/* obtain the time intervals we need */
-	if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
-		struct tser_pktbe_s p;
-
-		/* let the luser know we deliver our shit later on */
-		udpc_set_defer_fina_pkt(JOB_PACKET(&rplj));
-		/* send what we've got */
-		send_pkt(&rplsctx, &rplj);
-
-		/* now care about fetching the bugger */
-		p.beg = refts - idx;
-		p.end = p.beg + 13;
-
-		if (fetch_ticks_intv_mysql(&p, tser) == 0) {
-			/* we should send something like quote invalid or so */
-			return;
-		}
-		tseries_add(tser, &p);
-
-		/* reset the packet */
+	for (index_t i = 0; moarp;) {
+		/* prepare the reply packet ... */
+		copy_pkt(&rplj, j);
 		clear_pkt(&rplsctx, &rplj);
-		fill_sl1oadt_1(&oadt, &hdr, PFTT_EOD, refts, p.pkt.t[idx]);
-		udpc_seria_add_sl1oadt(&rplsctx, &oadt);
-	} else {
-		m32_t pri = pkt->t[idx];
-
-		UD_DEBUG("yay, cached\n");
-		fill_sl1oadt_1(&oadt, &hdr, PFTT_EOD, refts, pri);
-		udpc_seria_add_sl1oadt(&rplsctx, &oadt);
-	}
-	/* send what we've got */
-	send_pkt(&rplsctx, &rplj);
+		/* process some time stamps, this fills the packet */
+		do {
+			proc_filt(&rplsctx, &hdr.secu, tsc, filt[i]);
+		} while (++i < nfilt &&
+			 udpc_seria_msglen(&rplsctx) < UDPC_PLLEN - 8);
+		/* has to be true to keep going */
+		moarp = i < nfilt;
+		/* send what we've got so far */
+		send_pkt(&rplsctx, &rplj);
+	} while (moarp);
 	return;
 }
 

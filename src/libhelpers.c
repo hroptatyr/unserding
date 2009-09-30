@@ -272,6 +272,18 @@ ud_find_ticks_by_ts(
 	return;
 }
 
+static index_t
+whereis(sl1oadt_t t, time_t ts[], size_t nts)
+{
+/* look if the tick in t has been asked for and return the index */
+	for (index_t i = 0; i < nts; i++) {
+		if (sl1oadt_dse(t) == time_to_dse(ts[i])) {
+			return i;
+		}
+	}
+	return nts;
+}
+
 void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
@@ -303,8 +315,11 @@ ud_find_ticks_by_instr(
 #define FILL	(48 / max_num_ticks(bs))
 		/* 4222(instr-triple, tick_bitset, ts, ts, ts, ...) */
 		udpc_seria_add_tick_by_instr_hdr(&sctx, &hdr);
-		for (index_t j = 0, i = rcvd; j < FILL && i < tslen; i++, j++) {
-			udpc_seria_add_ui32(&sctx, ts[i]);
+		for (index_t j = 0, i = 0; j < FILL && i < tslen; i++) {
+			if (ts[i] != -1) {
+				udpc_seria_add_ui32(&sctx, ts[i]);
+				j++;
+			}
 		}
 #undef FILL
 		/* prepare packet for sending im off */
@@ -321,9 +336,11 @@ ud_find_ticks_by_instr(
 		}
 
 		while (udpc_seria_des_sl1oadt(&t, &sctx)) {
-			/* marking-less approach, so we could make s[] const */
-			if (sl1oadt_instr(&t) == s[rcvd].instr) {
+			index_t where;
+			if ((where = whereis(&t, ts, tslen)) < tslen) {
 				rcvd++;
+				/* mark it, is it okay to fuck ts up? */
+				ts[where] = -1;
 			}
 			/* callback */
 			cb(&t, clo);

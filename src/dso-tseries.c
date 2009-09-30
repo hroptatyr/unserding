@@ -203,6 +203,7 @@ instr_tick_by_instr_svc(job_t j)
 	tseries_t tser;
 	tser_pkt_t pkt;
 	struct sl1oadt_s oadt;
+	uint8_t idx;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -235,13 +236,15 @@ instr_tick_by_instr_svc(job_t j)
 		return;
 	}
 
+	/* ugly, but we have to loop-ify this anyway */
+	dse16_t refts = time_to_dse(filt[0]);
+	if ((idx = index_in_pkt(refts)) >= countof(pkt->t)) {
+		return;
+	}
+
 	/* prepare the reply packet ... */
 	copy_pkt(&rplj, j);
 	clear_pkt(&rplsctx, &rplj);
-
-	/* ugly, but we have to loop-ify this anyway */
-	dse16_t refts = time_to_dse(filt[0]);
-	uint8_t idx = index_in_pkt(refts);
 	/* obtain the time intervals we need */
 	if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
 		struct tser_pktbe_s p;

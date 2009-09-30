@@ -112,7 +112,10 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	m32_t p = ffff_monetary32_get_s(row[1]);
 	struct tser_pkt_idx_s *tmp = clo;
 	uint8_t iip = index_in_pkt(ds);
-	
+
+	if (UNLIKELY(iip >= countof(tmp->pkt->t))) {
+		return;
+	}
 	UD_DEBUG("putting %s %2.4f into slot %d\n",
 		 (char*)row[0], ffff_monetary32_d(p), iip);
 	tmp->pkt->t[iip] = p;

@@ -253,6 +253,7 @@ frob_stuff(tser_pkt_t p, tseries_t tser, dse16_t begds)
 	return;
 }
 
+#define TICK_NEXIST	1
 static void
 proc_filt(udpc_seria_t sctx, secu_t s, tscoll_t tsc, time_t ts)
 {
@@ -267,32 +268,30 @@ proc_filt(udpc_seria_t sctx, secu_t s, tscoll_t tsc, time_t ts)
 #define TICKS_PER_FORTNIGHT	10
 	if ((idx = index_in_pkt(refts)) >= TICKS_PER_FORTNIGHT) {
 		/* leave a note in the packet? */
-		return;
-	}
+		fill_sl1oadt_1(&oadt, s, PFTT_EOD, refts, TICK_NEXIST);
 
-	if ((tser = tscoll_find_series(tsc, ts)) == NULL) {
+	} else if ((tser = tscoll_find_series(tsc, ts)) == NULL) {
 		/* no way of obtaining ticks */
 		UD_DEBUG("No suitable URN found (%i)\n", (uint32_t)ts);
 		UD_DEBUG("available URNs:\n");
 		/* how do we know it's an itree? */
 		(void)itree_trav_in_order(tsc, &cb, NULL);
 		return;
-	}
 
-	if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
+	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
 		/* fetch from data source */
 		struct tser_pkt_s np;
 		frob_stuff(&np, tser, refts - idx);
 		fill_sl1oadt_1(&oadt, s, PFTT_EOD, refts, np.t[idx]);
-		udpc_seria_add_sl1oadt(sctx, &oadt);
+
 	} else {
 		/* bother the cache */
 		m32_t pri = pkt->t[idx];
 
 		UD_DEBUG("yay, cached\n");
 		fill_sl1oadt_1(&oadt, s, PFTT_EOD, refts, pri);
-		udpc_seria_add_sl1oadt(sctx, &oadt);
 	}
+	udpc_seria_add_sl1oadt(sctx, &oadt);
 	return;
 }
 

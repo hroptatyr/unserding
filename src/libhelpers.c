@@ -272,6 +272,27 @@ ud_find_ticks_by_ts(
 	return;
 }
 
+
+/* by instr aka 4222 */
+typedef struct ftbi_ctx_s *ftbi_ctx_t;
+struct ftbi_ctx_s {
+	ud_handle_t hdl;
+	uint8_t retry;
+	uint8_t rcvd;
+	ud_convo_t cno;
+	char buf[UDPC_PKTLEN];
+	struct sl1oadt_s oadt;
+	struct udpc_seria_s sctx;
+	secu_t secu;
+	uint32_t types;
+	ud_packet_t pkt;
+	/* hope this still works on 32b systems
+	 * oh oh, this implicitly encodes NFILL (which is 64 at the mo) */
+	uint64_t seen;
+	void(*cb)(sl1oadt_t, void *clo);
+	void *clo;
+};
+
 static index_t
 whereis(sl1oadt_t t, time_t ts[], size_t nts)
 {
@@ -284,6 +305,80 @@ whereis(sl1oadt_t t, time_t ts[], size_t nts)
 	return nts;
 }
 
+static void
+new_convo(ftbi_ctx_t bictx)
+{
+	bictx->cno = bictx->hdl->convo++;
+	bictx->pkt.plen = sizeof(bictx->buf);
+	bictx->pkt.pbuf = bictx->buf;
+
+	bictx->retry--;
+	memset(bictx->buf, 0, sizeof(bictx->buf));
+	memset(&bictx->oadt, 0, sizeof(bictx->oadt));
+	udpc_make_pkt(bictx->pkt, bictx->cno, 0, UD_SVC_TICK_BY_INSTR);
+	udpc_seria_init(&bictx->sctx, UDPC_PAYLOAD(bictx->buf), UDPC_PLLEN);
+	return;
+}
+
+static void
+feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
+{
+#define FILL(X)	(48 / max_num_ticks(X))
+	udpc_seria_add_secu(&bictx->sctx, bictx->secu);
+	udpc_seria_add_ui32(&bictx->sctx, bictx->types);
+	for (index_t j = 0, i = 0; j < FILL(bictx->types) && i < nts; i++) {
+		if (ts[i] != -1) {
+			udpc_seria_add_ui32(&bictx->sctx, ts[i]);
+			j++;
+		}
+	}
+#undef FILL
+	return;
+}
+
+static void
+send_stamps(ftbi_ctx_t bictx)
+{
+	bictx->pkt.plen = udpc_seria_msglen(&bictx->sctx) + UDPC_HDRLEN;
+	ud_send_raw(bictx->hdl, bictx->pkt);
+	return;
+}
+
+static void
+recv_ticks(ftbi_ctx_t bc)
+{
+	int to = (5 - bc->retry) * UD_SVC_TIMEOUT;
+	bc->pkt.plen = sizeof(bc->buf);
+	ud_recv_convo(bc->hdl, &bc->pkt, to, bc->cno);
+	udpc_seria_init(&bc->sctx, UDPC_PAYLOAD(bc->pkt.pbuf), bc->pkt.plen);
+	return;
+}
+
+static void
+frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
+{
+	while (udpc_seria_des_sl1oadt(&bictx->oadt, &bictx->sctx)) {
+		index_t where;
+		if ((where = whereis(&bictx->oadt, ts, nts)) < nts) {
+			bictx->rcvd++;
+			/* mark it, is it okay to fuck ts up? */
+			ts[where] = -1;
+		}
+		/* callback */
+		(*bictx->cb)(&bictx->oadt, bictx->clo);
+		bictx->retry = 4;
+	}
+	return;
+}
+
+static inline void
+lodge_closure(ftbi_ctx_t bictx, void(*cb)(sl1oadt_t, void *clo), void *clo)
+{
+	bictx->cb = cb;
+	bictx->clo = clo;
+	return;
+}
+
 void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
@@ -292,61 +387,28 @@ ud_find_ticks_by_instr(
 	time_t *ts, size_t tslen)
 {
 /* fixme, the retry cruft should be a parameter? */
-	index_t rcvd = 0;
-	index_t retry = 4;
-	struct tick_by_instr_hdr_s hdr;
+	struct ftbi_ctx_s __bictx, *bictx = &__bictx;
 
-	hdr.secu = *s;
-	hdr.types = bs;
+	bictx->hdl = hdl;
+	bictx->retry = 4;
+	bictx->secu = s;
+	bictx->types = bs;
+	bictx->rcvd = 0;
+	lodge_closure(bictx, cb, clo);
 
 	do {
-		struct udpc_seria_s sctx;
-		struct sl1oadt_s t;
-		char buf[UDPC_PKTLEN];
-		ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
-		ud_convo_t cno = hdl->convo++;
-
-		retry--;
-		memset(buf, 0, sizeof(buf));
-		memset(&t, 0, sizeof(t));
-		udpc_make_pkt(pkt, cno, 0, UD_SVC_TICK_BY_INSTR);
-		udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-/* compute me! */
-#define FILL	(48 / max_num_ticks(bs))
+		/* initiate new conversation */
+		new_convo(bictx);
 		/* 4222(instr-triple, tick_bitset, ts, ts, ts, ...) */
-		udpc_seria_add_tick_by_instr_hdr(&sctx, &hdr);
-		for (index_t j = 0, i = 0; j < FILL && i < tslen; i++) {
-			if (ts[i] != -1) {
-				udpc_seria_add_ui32(&sctx, ts[i]);
-				j++;
-			}
-		}
-#undef FILL
+		feed_stamps(bictx, ts, tslen);
 		/* prepare packet for sending im off */
-		pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
-		ud_send_raw(hdl, pkt);
+		send_stamps(bictx);
 
-		pkt.plen = sizeof(buf);
-		ud_recv_convo(hdl, &pkt, (5 - retry) * UD_SVC_TIMEOUT, cno);
-		udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
-
-		/* check for deferral notices */
-		if (udpc_pktsched(pkt) != UDPC_PKTSCHED_NOW) {
-			continue;
-		}
-
-		while (udpc_seria_des_sl1oadt(&t, &sctx)) {
-			index_t where;
-			if ((where = whereis(&t, ts, tslen)) < tslen) {
-				rcvd++;
-				/* mark it, is it okay to fuck ts up? */
-				ts[where] = -1;
-			}
-			/* callback */
-			cb(&t, clo);
-			retry = 4;
-		}
-	} while (rcvd < tslen && retry > 0);
+		/* receive one answer, linear back off */
+		recv_ticks(bictx);
+		/* eval, possibly marking them */
+		frob_ticks(bictx, ts, tslen);
+	} while (bictx->rcvd < tslen && bictx->retry > 0);
 	return;
 }
 

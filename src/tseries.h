@@ -148,6 +148,9 @@ typedef uint16_t l1t_auxinfo_t;
 #define TICK_OLD	((uint16_t)1021)
 #define TICK_SOON	((uint16_t)1020)
 
+#define OADT_NEXIST	0x80000000
+#define OADT_ONHOLD	0x80000001
+
 
 /**
  * Sparse level 1 ticks, packed. */

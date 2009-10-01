@@ -179,14 +179,15 @@ instr_tick_by_ts_svc(job_t j)
 }
 
 
-/* ugly, we don't know if it's an itree */
-extern void itree_trav_in_order(void*, void*, void*);
-static void
-cb(uint32_t lo, uint32_t hi, void *data, void *clo)
-{
-	UD_DBGCONT("  %i to %i\n", lo, hi);
-	return;
-}
+/* define if frobnication shall take place afterwards */
+#define DEFERRED_FROB	1
+
+typedef struct oadt_ctx_s *oadt_ctx_t;
+struct oadt_ctx_s {
+	udpc_seria_t sctx;
+	secu_t secu;
+	tscoll_t coll;
+};
 
 /* we sort the list of requested time stamps to collapse contiguous ones */
 static index_t
@@ -236,26 +237,23 @@ frob_stuff(tser_pkt_t p, tseries_t tser, dse16_t begds)
 {
 	dse16_t endds = begds + 13;
 
-	/* let the luser know we deliver our shit later on */
-	//udpc_set_defer_fina_pkt(JOB_PACKET(&rplj));
-	/* send what we've got */
-	//send_pkt(&rplsctx, &rplj);
-
 	if (fetch_ticks_intv_mysql(p, tser, begds, endds) == 0) {
 		/* we should send something like quote invalid or so */
 		return;
 	}
 	/* cache him */
 	tseries_add(tser, begds, endds, p);
-
-	/* reset the packet */
-	//clear_pkt(&rplsctx, &rplj);
 	return;
 }
 
-#define TICK_NEXIST	1
 static void
-proc_filt(udpc_seria_t sctx, secu_t s, tscoll_t tsc, time_t ts)
+defer_frob(oadt_ctx_t octx, tseries_t tser, dse16_t refts)
+{
+	return;
+}
+
+static void
+proc_filt(oadt_ctx_t octx, time_t ts)
 {
 	tseries_t tser;
 	tser_pkt_t pkt;
@@ -268,30 +266,33 @@ proc_filt(udpc_seria_t sctx, secu_t s, tscoll_t tsc, time_t ts)
 #define TICKS_PER_FORTNIGHT	10
 	if ((idx = index_in_pkt(refts)) >= TICKS_PER_FORTNIGHT) {
 		/* leave a note in the packet? */
-		fill_sl1oadt_1(&oadt, s, PFTT_EOD, refts, TICK_NEXIST);
+		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_NEXIST);
 
-	} else if ((tser = tscoll_find_series(tsc, ts)) == NULL) {
+	} else if ((tser = tscoll_find_series(octx->coll, ts)) == NULL) {
 		/* no way of obtaining ticks */
 		UD_DEBUG("No suitable URN found (%i)\n", (uint32_t)ts);
-		UD_DEBUG("available URNs:\n");
-		/* how do we know it's an itree? */
-		(void)itree_trav_in_order(tsc, &cb, NULL);
+		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_NEXIST);
 		return;
 
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
+#if defined DEFERRED_FROB
+		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_ONHOLD);
+		defer_frob(octx, tser, refts);
+#else
 		/* fetch from data source */
 		struct tser_pkt_s np;
 		frob_stuff(&np, tser, refts - idx);
-		fill_sl1oadt_1(&oadt, s, PFTT_EOD, refts, np.t[idx]);
+		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, np.t[idx]);
+#endif
 
 	} else {
 		/* bother the cache */
 		m32_t pri = pkt->t[idx];
 
 		UD_DEBUG("yay, cached\n");
-		fill_sl1oadt_1(&oadt, s, PFTT_EOD, refts, pri);
+		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, pri);
 	}
-	udpc_seria_add_sl1oadt(sctx, &oadt);
+	udpc_seria_add_sl1oadt(octx->sctx, &oadt);
 	return;
 }
 
@@ -335,7 +336,12 @@ instr_tick_by_instr_svc(job_t j)
 		clear_pkt(&rplsctx, &rplj);
 		/* process some time stamps, this fills the packet */
 		do {
-			proc_filt(&rplsctx, &hdr.secu, tsc, filt[i]);
+			struct oadt_ctx_s oadtctx = {
+				.sctx = &rplsctx,
+				.secu = &hdr.secu,
+				.coll = tsc,
+			};
+			proc_filt(&oadtctx, filt[i]);
 		} while (++i < nfilt &&
 			 udpc_seria_msglen(&rplsctx) < UDPC_PLLEN - 8);
 		/* has to be true to keep going */

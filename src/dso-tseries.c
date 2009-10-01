@@ -323,13 +323,13 @@ proc_one(oadt_ctx_t octx, time_t ts)
 #define TICKS_PER_FORTNIGHT	10
 	if ((idx = index_in_pkt(refts)) >= TICKS_PER_FORTNIGHT) {
 		/* leave a note in the packet? */
+		UD_DEBUG("week end tick (%i)\n", (uint32_t)ts);
 		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_NEXIST);
 
 	} else if ((tser = tscoll_find_series(octx->coll, ts)) == NULL) {
 		/* no way of obtaining ticks */
 		UD_DEBUG("No suitable URN found (%i)\n", (uint32_t)ts);
 		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_NEXIST);
-		return;
 
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
 #if defined DEFERRED_FROB

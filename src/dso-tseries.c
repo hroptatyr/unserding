@@ -187,6 +187,8 @@ struct oadt_ctx_s {
 	udpc_seria_t sctx;
 	secu_t secu;
 	tscoll_t coll;
+	time_t *filt;
+	size_t nfilt;
 };
 
 /* we sort the list of requested time stamps to collapse contiguous ones */
@@ -253,7 +255,7 @@ defer_frob(oadt_ctx_t octx, tseries_t tser, dse16_t refts)
 }
 
 static void
-proc_filt(oadt_ctx_t octx, time_t ts)
+proc_one(oadt_ctx_t octx, time_t ts)
 {
 	tseries_t tser;
 	tser_pkt_t pkt;
@@ -296,11 +298,27 @@ proc_filt(oadt_ctx_t octx, time_t ts)
 	return;
 }
 
+static inline bool
+one_moar_p(oadt_ctx_t octx)
+{
+	return udpc_seria_msglen(octx->sctx) < UDPC_PLLEN - 8;
+}
+
+static bool
+proc_some(oadt_ctx_t octx, index_t i)
+{
+	for (; i < octx->nfilt && one_moar_p(octx); i++) {
+		proc_one(octx, octx->filt[i]);
+	}
+	return i < octx->nfilt;
+}
+
 static void
 instr_tick_by_instr_svc(job_t j)
 {
 	struct udpc_seria_s sctx;
 	struct udpc_seria_s rplsctx;
+	struct oadt_ctx_s oadtctx;
 	struct job_s rplj;
 	/* in args */
 	struct tick_by_instr_hdr_s hdr;
@@ -330,22 +348,19 @@ instr_tick_by_instr_svc(job_t j)
 		return;
 	}
 
+	/* initialise our context */
+	oadtctx.sctx = &rplsctx;
+	oadtctx.secu = &hdr.secu;
+	oadtctx.coll = tsc;
+	oadtctx.filt = filt;
+	oadtctx.nfilt = nfilt;
+
 	for (index_t i = 0; moarp;) {
 		/* prepare the reply packet ... */
 		copy_pkt(&rplj, j);
 		clear_pkt(&rplsctx, &rplj);
 		/* process some time stamps, this fills the packet */
-		do {
-			struct oadt_ctx_s oadtctx = {
-				.sctx = &rplsctx,
-				.secu = &hdr.secu,
-				.coll = tsc,
-			};
-			proc_filt(&oadtctx, filt[i]);
-		} while (++i < nfilt &&
-			 udpc_seria_msglen(&rplsctx) < UDPC_PLLEN - 8);
-		/* has to be true to keep going */
-		moarp = i < nfilt;
+		moarp = proc_some(&oadtctx, i);
 		/* send what we've got so far */
 		send_pkt(&rplsctx, &rplj);
 	} while (moarp);

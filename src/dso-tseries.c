@@ -181,14 +181,19 @@ instr_tick_by_ts_svc(job_t j)
 
 /* define if frobnication shall take place afterwards */
 #define DEFERRED_FROB	1
+/* number of stamps we can process at once */
+#define NFILT	64
 
 typedef struct oadt_ctx_s *oadt_ctx_t;
 struct oadt_ctx_s {
 	udpc_seria_t sctx;
 	secu_t secu;
 	tscoll_t coll;
-	time_t *filt;
+	time_t filt[NFILT];
+	tseries_t frob[NFILT];
+	dse16_t refds[NFILT];
 	size_t nfilt;
+	size_t nfrob;
 };
 
 /* we sort the list of requested time stamps to collapse contiguous ones */
@@ -234,6 +239,22 @@ snarf_times(udpc_seria_t sctx, time_t ts[], size_t nts)
 	return nfilt;
 }
 
+#if defined DEFERRED_FROB
+static void
+frob_one(tseries_t tser, dse16_t begds)
+{
+	struct tser_pkt_s pkt;
+	dse16_t endds = begds + 13;
+
+	if (fetch_ticks_intv_mysql(&pkt, tser, begds, endds) == 0) {
+		/* we should send something like quote invalid or so */
+		return;
+	}
+	/* cache him */
+	tseries_add(tser, begds, endds, &pkt);
+	return;
+}
+#else  /* !DEFERRED_FROB */
 static void
 frob_stuff(tser_pkt_t p, tseries_t tser, dse16_t begds)
 {
@@ -247,10 +268,44 @@ frob_stuff(tser_pkt_t p, tseries_t tser, dse16_t begds)
 	tseries_add(tser, begds, endds, p);
 	return;
 }
+#endif	/* DEFERRED_FROB */
 
 static void
-defer_frob(oadt_ctx_t octx, tseries_t tser, dse16_t refts)
+frob_some(oadt_ctx_t octx)
 {
+	for (index_t i = 0; i < octx->nfrob; i++) {
+		frob_one(octx->frob[i], octx->refds[i]);
+	}
+	return;
+}
+
+static inline bool
+frob_seen_p(oadt_ctx_t octx, index_t i, tseries_t tser, dse16_t refds)
+{
+	return octx->frob[i] == tser && octx->refds[i] == refds;
+}
+
+static inline index_t
+find_frob_slot(oadt_ctx_t octx, tseries_t tser, dse16_t refds)
+{
+	for (index_t i = 0; i < octx->nfrob; i++) {
+		if (frob_seen_p(octx, i, tser, refds)) {
+			return i;
+		}
+	}
+	return octx->nfrob++;
+}
+
+static void
+defer_frob(oadt_ctx_t octx, tseries_t tser, dse16_t refds)
+{
+	index_t slot;
+	if (octx->nfrob > (slot = find_frob_slot(octx, tser, refds))) {
+		/* already known */
+		return;
+	}
+	octx->frob[slot] = tser;
+	octx->refds[slot] = refds;
 	return;
 }
 
@@ -279,7 +334,7 @@ proc_one(oadt_ctx_t octx, time_t ts)
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
 #if defined DEFERRED_FROB
 		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_ONHOLD);
-		defer_frob(octx, tser, refts);
+		defer_frob(octx, tser, refts - idx);
 #else
 		/* fetch from data source */
 		struct tser_pkt_s np;
@@ -323,8 +378,6 @@ instr_tick_by_instr_svc(job_t j)
 	/* in args */
 	struct tick_by_instr_hdr_s hdr;
 	/* allow to filter for 64 time stamps at once */
-#define NFILT	64
-	time_t filt[NFILT];
 	unsigned int nfilt = 0;
 	tscoll_t tsc;
 	bool moarp = true;
@@ -334,7 +387,7 @@ instr_tick_by_instr_svc(job_t j)
 	/* read the header off of the wire */
 	udpc_seria_des_tick_by_instr_hdr(&hdr, &sctx);
 	/* get all the timestamps */
-	if ((nfilt = snarf_times(&sctx, filt, countof(filt))) == 0) {
+	if ((nfilt = snarf_times(&sctx, oadtctx.filt, NFILT)) == 0) {
 		return;
 	}
 	UD_DEBUG("0x4222: %u/%u@%u filtered for %u time stamps\n",
@@ -352,8 +405,8 @@ instr_tick_by_instr_svc(job_t j)
 	oadtctx.sctx = &rplsctx;
 	oadtctx.secu = &hdr.secu;
 	oadtctx.coll = tsc;
-	oadtctx.filt = filt;
 	oadtctx.nfilt = nfilt;
+	oadtctx.nfrob = 0;
 
 	for (index_t i = 0; moarp;) {
 		/* prepare the reply packet ... */
@@ -364,6 +417,11 @@ instr_tick_by_instr_svc(job_t j)
 		/* send what we've got so far */
 		send_pkt(&rplsctx, &rplj);
 	} while (moarp);
+
+#if defined DEFERRED_FROB
+/* we cater for any frobnication desires now */
+	frob_some(&oadtctx);
+#endif
 	return;
 }
 

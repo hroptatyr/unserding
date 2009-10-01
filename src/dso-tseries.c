@@ -224,7 +224,8 @@ static void
 selsort_in_situ(time_t arr[], size_t narr)
 {
 	for (index_t i = 0; i < narr-1; i++) {
-		index_t minidx = selsort_minidx(arr, narr, i);
+		index_t minidx;
+		minidx = selsort_minidx(arr, narr, i);
 		selsort_swap(arr, i, minidx);
 	}
 	return;
@@ -235,7 +236,9 @@ snarf_times(udpc_seria_t sctx, time_t ts[], size_t nts)
 {
 	size_t nfilt = 0;
 	while ((ts[nfilt] = udpc_seria_des_ui32(sctx)) && ++nfilt < nts);
-	selsort_in_situ(ts, nfilt);
+	if (LIKELY(nfilt > 0)) {
+		selsort_in_situ(ts, nfilt);
+	}
 	return nfilt;
 }
 

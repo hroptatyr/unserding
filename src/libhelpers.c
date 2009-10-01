@@ -390,9 +390,11 @@ frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 	while (udpc_seria_des_sl1oadt(&bictx->oadt, &bictx->sctx)) {
 		index_t where;
 		if ((where = whereis(&bictx->oadt, ts, nts)) < nts) {
-			bictx->rcvd++;
-			/* mark it, use our mark vector */
-			set_seen(bictx, where);
+			if (bictx->oadt.value[0] != OADT_ONHOLD) {
+				bictx->rcvd++;
+				/* mark it, use our mark vector */
+				set_seen(bictx, where);
+			}
 		}
 		/* callback */
 		(*bictx->cb)(&bictx->oadt, bictx->clo);

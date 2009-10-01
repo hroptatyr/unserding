@@ -293,6 +293,17 @@ struct ftbi_ctx_s {
 	void *clo;
 };
 
+#define NRETRIES	4
+
+static inline void
+init_bictx(ftbi_ctx_t bictx, ud_handle_t hdl)
+{
+	bictx->hdl = hdl;
+	bictx->retry = NRETRIES;
+	bictx->rcvd = 0;
+	return;
+}
+
 static index_t
 whereis(sl1oadt_t t, time_t ts[], size_t nts)
 {
@@ -320,6 +331,19 @@ new_convo(ftbi_ctx_t bictx)
 	return;
 }
 
+static inline bool
+seenp(ftbi_ctx_t bictx, index_t i)
+{
+	return bictx->seen & (1 << i);
+}
+
+static inline void
+set_seen(ftbi_ctx_t bictx, index_t i)
+{
+	bictx->seen |= (1 << i);
+	return;
+}
+
 static void
 feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 {
@@ -327,7 +351,7 @@ feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 	udpc_seria_add_secu(&bictx->sctx, bictx->secu);
 	udpc_seria_add_ui32(&bictx->sctx, bictx->types);
 	for (index_t j = 0, i = 0; j < FILL(bictx->types) && i < nts; i++) {
-		if (ts[i] != -1) {
+		if (!seenp(bictx, i)) {
 			udpc_seria_add_ui32(&bictx->sctx, ts[i]);
 			j++;
 		}
@@ -347,7 +371,13 @@ send_stamps(ftbi_ctx_t bictx)
 static void
 recv_ticks(ftbi_ctx_t bc)
 {
-	int to = (5 - bc->retry) * UD_SVC_TIMEOUT;
+	static int tos[4] = {
+		12 * UD_SVC_TIMEOUT,
+		8 * UD_SVC_TIMEOUT,
+		4 * UD_SVC_TIMEOUT,
+		2 * UD_SVC_TIMEOUT,
+	};
+	int to = bc->retry >= 4 ? UD_SVC_TIMEOUT : tos[bc->retry];
 	bc->pkt.plen = sizeof(bc->buf);
 	ud_recv_convo(bc->hdl, &bc->pkt, to, bc->cno);
 	udpc_seria_init(&bc->sctx, UDPC_PAYLOAD(bc->pkt.pbuf), bc->pkt.plen);
@@ -361,12 +391,12 @@ frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 		index_t where;
 		if ((where = whereis(&bictx->oadt, ts, nts)) < nts) {
 			bictx->rcvd++;
-			/* mark it, is it okay to fuck ts up? */
-			ts[where] = -1;
+			/* mark it, use our mark vector */
+			set_seen(bictx, where);
 		}
 		/* callback */
 		(*bictx->cb)(&bictx->oadt, bictx->clo);
-		bictx->retry = 4;
+		bictx->retry = NRETRIES;
 	}
 	return;
 }
@@ -376,6 +406,14 @@ lodge_closure(ftbi_ctx_t bictx, void(*cb)(sl1oadt_t, void *clo), void *clo)
 {
 	bictx->cb = cb;
 	bictx->clo = clo;
+	return;
+}
+
+static inline void
+lodge_ihdr(ftbi_ctx_t bictx, secu_t secu, uint32_t types)
+{
+	bictx->secu = secu;
+	bictx->types = types;
 	return;
 }
 
@@ -389,11 +427,8 @@ ud_find_ticks_by_instr(
 /* fixme, the retry cruft should be a parameter? */
 	struct ftbi_ctx_s __bictx, *bictx = &__bictx;
 
-	bictx->hdl = hdl;
-	bictx->retry = 4;
-	bictx->secu = s;
-	bictx->types = bs;
-	bictx->rcvd = 0;
+	init_bictx(bictx, hdl);
+	lodge_ihdr(bictx, s, bs);
 	lodge_closure(bictx, cb, clo);
 
 	do {

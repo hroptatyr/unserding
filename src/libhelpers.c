@@ -301,6 +301,7 @@ init_bictx(ftbi_ctx_t bictx, ud_handle_t hdl)
 	bictx->hdl = hdl;
 	bictx->retry = NRETRIES;
 	bictx->rcvd = 0;
+	bictx->seen = 0;
 	return;
 }
 

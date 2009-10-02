@@ -398,6 +398,18 @@ sl1oadt_dse(sl1oadt_t t)
 }
 
 static inline uint8_t
+sl1oadt_nticks(sl1oadt_t oadt)
+{
+	return oadt->nticks;
+}
+
+static inline uint32_t
+sl1oadt_value(sl1oadt_t oadt, uint8_t idx)
+{
+	return oadt->value[idx];
+}
+
+static inline uint8_t
 index_in_pkt(dse16_t dse)
 {
 /* find the index of the date encoded in dse inside a tick bouquet */
@@ -414,12 +426,6 @@ tser_pkt_beg_dse(dse16_t dse)
 {
 	uint8_t sub = index_in_pkt(dse);
 	return dse - sub;
-}
-
-static inline uint32_t
-sl1oadt_value(sl1oadt_t oadt, uint8_t idx)
-{
-	return oadt->value[idx];
 }
 
 /**

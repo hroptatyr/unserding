@@ -11,13 +11,35 @@ static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
 
 static void
+t1(sl1oadt_t t, uint8_t i)
+{
+	fprintf(stdout, "  tick:%i ts:%i v:%2.4f\n",
+		i, sl1oadt_dse(t) + i, ffff_monetary32_d(sl1oadt_value(t, i)));
+	return;
+}
+
+static void
 t_cb(sl1oadt_t t, void *clo)
 {
-	fprintf(stdout, "ii:%u  tt:%d ts:%u v:%2.4f\n",
+	fprintf(stdout, "tick storm, ticks:%i ii:%u tt:%i\n",
+		sl1oadt_nticks(t),
 		sl1oadt_instr(t),
-		sl1oadt_tick_type(t),
-		(unsigned int)sl1oadt_dse(t),
-		ffff_monetary32_d(sl1oadt_value(t, 0)));
+		sl1oadt_tick_type(t));
+	for (uint8_t i = 0; i < sl1oadt_nticks(t); i++) {
+		switch (sl1oadt_value(t, i)) {
+		case OADT_NEXIST:
+			fprintf(stdout, "  tick:%i ts:%i v:does not exist\n",
+				i, sl1oadt_dse(t) + i);
+			break;
+		case OADT_ONHOLD:
+			fprintf(stdout, "  tick:%i ts:%i v:deferred\n",
+				i, sl1oadt_dse(t) + i);
+			break;
+		default:
+			t1(t, i);
+			break;
+		}
+	}
 	return;
 }
 

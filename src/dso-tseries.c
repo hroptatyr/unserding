@@ -486,6 +486,16 @@ load_ticks_fetcher(void *clo, void *spec)
 	return;
 }
 
+static void
+unload_ticks_fetcher(void *clo)
+{
+#if defined HAVE_MYSQL
+	/* fetch some instruments by sql */
+	dso_tseries_mysql_LTX_deinit(clo);
+#endif	/* HAVE_MYSQL */
+	return;
+}
+
 
 void
 dso_tseries_LTX_init(void *clo)
@@ -508,6 +518,14 @@ dso_tseries_LTX_init(void *clo)
 	}
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
+	return;
+}
+
+void
+dso_tseries_LTX_deinit(void *clo)
+{
+	free_tscache(tscache);
+	unload_ticks_fetcher(clo);
 	return;
 }
 

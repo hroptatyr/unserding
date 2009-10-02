@@ -509,6 +509,12 @@ load_instr_fetcher(void *clo, void *spec)
 	return;
 }
 
+static void
+unload_instr_fetcher(void *clo)
+{
+	return;
+}
+
 
 void
 dso_xdr_instr_LTX_init(void *clo)
@@ -534,6 +540,14 @@ dso_xdr_instr_LTX_init(void *clo)
 	}
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
+	return;
+}
+
+void
+dso_xdr_instr_LTX_deinit(void *clo)
+{
+	free_cat(instrs);
+	unload_instr_fetcher(clo);
 	return;
 }
 

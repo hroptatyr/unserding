@@ -385,4 +385,11 @@ dso_tseries_mysql_LTX_init(void *clo)
 	return;
 }
 
+void
+dso_tseries_mysql_LTX_deinit(void *clo)
+{
+	uddb_disconnect(conn);
+	return;
+}
+
 /* dso-tseries-mysql.c */

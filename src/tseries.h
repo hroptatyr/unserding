@@ -44,7 +44,6 @@
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"
-#include "urn.h"
 
 /* tick services */
 #if !defined index_t
@@ -94,12 +93,17 @@
 #define fill_sl1tick_shdr	fill_sl1tp_shdr
 #define fill_sl1tick_tick	fill_sl1tp_tick
 #define sl1tick_value		sl1tp_value
+#define sl1tick_set_value	sl1tp_set_value
 #define sl1tick_tick_type	sl1tp_tt
 #define sl1tick_timestamp	sl1tp_ts
+#define sl1tick_set_stamp	sl1tp_set_stamp
 #define sl1tick_msec		sl1tp_msec
 #define sl1tick_instr		sl1tp_inst
+#define sl1tick_set_instr	sl1tp_set_inst
 #define sl1tick_unit		sl1tp_unit
+#define sl1tick_set_unit	sl1tp_set_unit
 #define sl1tick_pot		sl1tp_exch
+#define sl1tick_set_pot		sl1tp_set_exch
 
 /* migrate to ffff tseries */
 typedef struct tser_pkt_s *tser_pkt_t;
@@ -221,6 +225,9 @@ struct sl1oadt_s {
 extern size_t
 ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
 
+extern void
+ud_find_1oadt(ud_handle_t hdl, sl1oadt_t tgt, secu_t s, uint32_t bs, time_t ts);
+
 /**
  * Deliver a packet storm of ticks for instruments specified by S at TS.
  * Call the callback function CB() for every tick in the packet storm. */
@@ -298,10 +305,24 @@ sl1tp_value(sl1tp_t t)
 	return t->val;
 }
 
+static inline void
+sl1tp_set_value(sl1tp_t tgt, uint32_t v)
+{
+	tgt->val = v;
+	return;
+}
+
 static inline uint8_t
 sl1tp_tt(sl1tp_t t)
 {
 	return l1t_auxinfo_tt(t->auxinfo);
+}
+
+static inline void
+sl1tp_set_tt(sl1tp_t t, uint8_t tt)
+{
+	l1t_auxinfo_set_tt(t->auxinfo, tt);
+	return;
 }
 
 static inline uint16_t
@@ -316,10 +337,25 @@ sl1tp_ts(sl1tp_t t)
 	return t->ts;
 }
 
+static inline void
+sl1tp_set_stamp(sl1tp_t t, uint32_t ts, uint16_t msec)
+{
+	t->ts = ts;
+	l1t_auxinfo_set_msec(t->auxinfo, msec);
+	return;
+}
+
 static inline uint32_t
 sl1tp_inst(sl1tp_t t)
 {
 	return t->inst;
+}
+
+static inline void
+sl1tp_set_inst(sl1tp_t t, uint32_t inst)
+{
+	t->inst = inst;
+	return;
 }
 
 static inline uint32_t
@@ -328,10 +364,24 @@ sl1tp_unit(sl1tp_t t)
 	return t->unit;
 }
 
+static inline void
+sl1tp_set_unit(sl1tp_t t, uint32_t unit)
+{
+	t->unit = unit;
+	return;
+}
+
 static inline uint16_t
 sl1tp_exch(sl1tp_t t)
 {
 	return t->exch;
+}
+
+static inline void
+sl1tp_set_exch(sl1tp_t t, uint16_t exch)
+{
+	t->exch = exch;
+	return;
 }
 
 /* them old sl1t ticks, consumes 28 bytes */
@@ -458,6 +508,19 @@ fill_sl1oadt(
 	for (uint8_t i = 0; i < nticks; i++) {
 		oadt->value[i] = pri[i];
 	}
+	return;
+}
+
+/* cross setters/converters */
+static inline void
+sl1tick_from_oadt(sl1tick_t tgt, sl1oadt_t src)
+{
+	sl1tick_set_instr(tgt, sl1oadt_instr(src));
+	sl1tick_set_unit(tgt, sl1oadt_unit(src));
+	sl1tick_set_pot(tgt, sl1oadt_pot(src));
+	sl1tick_set_tt(tgt, sl1oadt_tick_type(src));
+	sl1tick_set_stamp(tgt, dse_to_time(sl1oadt_dse(src)), 0);
+	sl1tick_set_value(tgt, sl1oadt_value(src, 0));
 	return;
 }
 

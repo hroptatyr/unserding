@@ -53,7 +53,7 @@ dso_xdr_instr_la_SOURCES = catalogue.c dso-xdr-instr.c
 if USE_MYSQL
 dso_xdr_instr_la_SOURCES += dso-xdr-instr-mysql.c
 endif
-header_HEADERS += xdr-instr-seria.h
+header_HEADERS += xdr-instr-seria.h tseries.h
 
 ## the time series module
 dso_tseries_la_LDFLAGS = -module $(LIBPFACK_LDFLAGS)

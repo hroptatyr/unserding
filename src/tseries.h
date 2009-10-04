@@ -95,6 +95,7 @@
 #define sl1tick_value		sl1tp_value
 #define sl1tick_set_value	sl1tp_set_value
 #define sl1tick_tick_type	sl1tp_tt
+#define sl1tick_set_tick_type	sl1tp_set_tt
 #define sl1tick_timestamp	sl1tp_ts
 #define sl1tick_set_stamp	sl1tp_set_stamp
 #define sl1tick_msec		sl1tp_msec
@@ -518,7 +519,7 @@ sl1tick_from_oadt(sl1tick_t tgt, sl1oadt_t src)
 	sl1tick_set_instr(tgt, sl1oadt_instr(src));
 	sl1tick_set_unit(tgt, sl1oadt_unit(src));
 	sl1tick_set_pot(tgt, sl1oadt_pot(src));
-	sl1tick_set_tt(tgt, sl1oadt_tick_type(src));
+	sl1tick_set_tick_type(tgt, sl1oadt_tick_type(src));
 	sl1tick_set_stamp(tgt, dse_to_time(sl1oadt_dse(src)), 0);
 	sl1tick_set_value(tgt, sl1oadt_value(src, 0));
 	return;

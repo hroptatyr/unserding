@@ -109,7 +109,7 @@ static void
 qry_rowf(void **row, size_t nflds, void *clo)
 {
 	dse16_t ds = time_to_dse(parse_time(row[0]));
-	m32_t p = ffff_monetary32_get_s(row[1]);
+	m32_t p = row[1] ? ffff_monetary32_get_s(row[1]) : 0 /* wise? */;
 	tser_pkt_t pkt = clo;
 	uint8_t iip = index_in_pkt(ds);
 
@@ -350,8 +350,18 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 		tsc = find_tscoll_by_secu(tscache, &secu);
 
 		tser.urn = find_urn(urn_id, row[URN]);
+		if (UNLIKELY(row[MIN_DT] == NULL)) {
+			/* i'm not entirely sure about the meaning of this */
+			break;
+		}
 		tser.from = parse_time(row[MIN_DT]);
-		tser.to = parse_time(row[MAX_DT]);
+		if (UNLIKELY(row[MAX_DT] == NULL)) {
+			/* we agreed on saying that this means up-to-date
+			 * so consequently we assign the maximum key */
+			tser.to = 0x7fffffff;
+		} else {
+			tser.to = parse_time(row[MAX_DT]);
+		}
 		tser.types = tbs;
 		/* add to the collection of time stamps */
 		tscoll_add(tsc, &tser);

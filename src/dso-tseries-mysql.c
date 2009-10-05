@@ -109,11 +109,17 @@ static void
 qry_rowf(void **row, size_t nflds, void *clo)
 {
 	dse16_t ds = time_to_dse(parse_time(row[0]));
-	m32_t p = row[1] ? ffff_monetary32_get_s(row[1]) : 0 /* wise? */;
 	tser_pkt_t pkt = clo;
 	uint8_t iip = index_in_pkt(ds);
+	m32_t p;
 
+	if (UNLIKELY(row[1] == NULL)) {
+		/* do not cahe NULL prices */
+		return;
+	}
+	p = ffff_monetary32_get_s(row[1]);
 	if (UNLIKELY(iip >= countof(pkt->t))) {
+		/* do not cache weekend `prices' */
 		return;
 	}
 	UD_DEBUG("putting %s %2.4f into slot %d\n",

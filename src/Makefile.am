@@ -6,8 +6,8 @@ AM_LDFLAGS = -lpthread
 headerdir = $(includedir)/unserding
 moddir = $(libdir)/unserding
 
-bin_PROGRAMS = unserdingd unsercli instrumenstruation
-noinst_PROGRAMS = ud-instr ud-snap ud-tick ##e123ify
+bin_PROGRAMS = unserdingd unsercli ud-instr ud-snap ud-tick
+noinst_PROGRAMS = instrumenstruation
 lib_LTLIBRARIES = libunserding.la
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)

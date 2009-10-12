@@ -174,31 +174,36 @@ fld_id_p(const char *row_name)
 static bool
 fld_date_p(const char *row_name)
 {
-	return strcmp(row_name, "date") == 0;
+	return strcmp(row_name, "date") == 0 ||
+		strcmp(row_name, "stamp") == 0;
 }
 
 static bool
 fld_open_p(const char *row_name)
 {
-	return row_name[0] == 'o';
+	return (row_name[0] == 't' && row_name[1] == 'o') ||
+		row_name[0] == 'o';
 }
 
 static bool
 fld_high_p(const char *row_name)
 {
-	return row_name[0] == 'h';
+	return (row_name[0] == 't' && row_name[1] == 'h') ||
+		row_name[0] == 'h';
 }
 
 static bool
 fld_low_p(const char *row_name)
 {
-	return row_name[0] == 'l';
+	return (row_name[0] == 't' && row_name[1] == 'l') ||
+		row_name[0] == 'l';
 }
 
 static bool
 fld_close_p(const char *r)
 {
-	return r[0] == 'c' && (r[1] == '\0' || r[1] == 'l');
+	return (r[0] == 't' && r[1] == 'c') ||
+		(r[0] == 'c' && (r[1] == '\0' || r[1] == 'l'));
 }
 
 static bool

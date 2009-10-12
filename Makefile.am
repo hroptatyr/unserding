@@ -3,7 +3,7 @@ LC_ALL = C
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = src
+SUBDIRS = libltdl src
 
 pkgconfigdir = @libdir@/pkgconfig
 pkgconfig_DATA = unserding.pc

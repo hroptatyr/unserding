@@ -186,6 +186,11 @@ AC_SUBST([LIBREADLINE_CPPFLAGS])
 ## check if we've got libedit, we don't use it though at the moment
 PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
 
+## just so we know what to build
+AM_CONDITIONAL([BUILD_SERVER], [test "1" = "1"])
+AM_CONDITIONAL([BUILD_CLIAPPS], [test "1" = "1"])
+AM_CONDITIONAL([BUILD_LIBRARY], [test "1" = "1"])
+
 ## check if we've got libconfig
 dnl PKG_CHECK_MODULES([LIBCONFIG], [libconfig])
 ## check for lua instead!
@@ -195,3 +200,14 @@ AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([unserding.pc])
 AC_OUTPUT
 
+echo
+echo
+echo "Build summary"
+echo "============="
+echo
+echo "Build server: ${BUILD_SERVER_TRUE:-yes}"
+echo "Build cliapps: ${BUILD_CLIAPPS_TRUE:-yes}"
+echo "Build library: ${BUILD_LIBRARY_TRUE:-yes}"
+echo
+
+dnl configure.ac ends here

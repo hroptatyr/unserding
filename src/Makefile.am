@@ -6,15 +6,25 @@ AM_LDFLAGS = -lpthread
 headerdir = $(includedir)/unserding
 moddir = $(libdir)/unserding
 
-bin_PROGRAMS = unserdingd unsercli ud-instr ud-snap ud-tick
+bin_PROGRAMS =
+if BUILD_SERVER
+bin_PROGRAMS += unserdingd unsercli
 noinst_PROGRAMS = instrumenstruation
+endif
+if BUILD_CLIAPPS
+bin_PROGRAMS += ud-instr ud-snap ud-tick
+endif
+if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
+endif
+
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
 header_HEADERS = unserding.h protocore.h seria.h
 noinst_HEADERS = arrqueue.h dllqueue.h protocore-private.h
 
+if BUILD_SERVER
 ## the main server binary
 unserdingd_SOURCES = unserdingd.c mcast.c
 unserdingd_SOURCES += protocore.c arrqueue.c dllqueue.c seria.c
@@ -73,12 +83,15 @@ endif
 instrumenstruation_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
 instrumenstruation_LDFLAGS = $(LIBPFACK_LDFLAGS)
 instrumenstruation_LDADD = $(LIBPFACK_LIBS) libunserding.la -lpopt
+endif
 
+## fucking automake
+unsercli_YFLAGS = -d -p "cli_yy"
+if BUILD_SERVER
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l
 unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h
 unsercli_LFLAGS = --prefix="cli_yy"
-unsercli_YFLAGS = -d -p "cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS) $(LIBEDIT_CPPFLAGS)
 unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lpopt
 unsercli_LDADD = $(LIBEV_LIBS) $(LIBREADLINE_LIBS) libunserding.la
@@ -108,24 +121,16 @@ unsercli-scanner.h: scanner.l
 #		rm $@.tmp; \
 #		touch $@; \
 #	fi
+endif
 
+if BUILD_LIBRARY
 ## the lib
 libunserding_la_SOURCES = libstuff.c protocore.c libhelpers.c
 libunserding_la_CPPFLAGS = -DUNSERLIB
 libunserding_la_LDFLAGS = $(AM_LDFLAGS)
+endif
 
-## kick
-#libtest_SOURCES = libtest.c
-#libtest_CPPFLAGS = $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS)
-#libtest_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
-#libtest_LDADD = $(LIBEV_LIBS) libunserding.la
-
-## example app to access unserding's E.123 service
-#e123ify_SOURCES = e123ify.c
-#e123ify_CPPFLAGS = $(AM_CPPFLAGS)
-#e123ify_LDFLAGS = $(AM_LDFLAGS)
-#e123ify_LDADD = libunserding.la -lpopt
-
+if BUILD_CLIAPPS
 ud_instr_SOURCES = ud-instr.c
 ud_instr_LDADD = libunserding.la -lpfack
 
@@ -134,6 +139,7 @@ ud_snap_LDADD = libunserding.la
 
 ud_tick_SOURCES = ud-tick.c
 ud_tick_LDADD = libunserding.la
+endif
 
 # 
 # Help the developers get nice post-processed source files

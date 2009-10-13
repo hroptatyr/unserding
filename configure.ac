@@ -187,9 +187,18 @@ AC_SUBST([LIBREADLINE_CPPFLAGS])
 PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
 
 ## just so we know what to build
-AM_CONDITIONAL([BUILD_SERVER], [test "1" = "1"])
-AM_CONDITIONAL([BUILD_CLIAPPS], [test "1" = "1"])
-AM_CONDITIONAL([BUILD_LIBRARY], [test "1" = "1"])
+AC_ARG_ENABLE([server], [
+AS_HELP_STRING([--enable-server], [Build the server component, default: no.])],
+	[enable_server="no"], [enable_server="${ac_enable_arg}"])
+AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
+AC_ARG_ENABLE([cliapps], [
+AS_HELP_STRING([--enable-cliapps], [Build the client apps, default: yes.])],
+	[enable_cliapps="yes"], [enable_cliapps="${ac_enable_arg}"])
+AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
+AC_ARG_ENABLE([library], [
+AS_HELP_STRING([--enable-library], [Build the library component, default: yes.])],
+	[enable_library="yes"], [enable_library="${ac_enable_arg}"])
+AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 
 ## check if we've got libconfig
 dnl PKG_CHECK_MODULES([LIBCONFIG], [libconfig])
@@ -205,9 +214,9 @@ echo
 echo "Build summary"
 echo "============="
 echo
-echo "Build server: ${BUILD_SERVER_TRUE:-yes}"
-echo "Build cliapps: ${BUILD_CLIAPPS_TRUE:-yes}"
-echo "Build library: ${BUILD_LIBRARY_TRUE:-yes}"
+echo "Build server: ${BUILD_SERVER_FALSE:+yes}"
+echo "Build cliapps: ${BUILD_CLIAPPS_TRUE:+yes}"
+echo "Build library: ${BUILD_LIBRARY_TRUE:+yes}"
 echo
 
 dnl configure.ac ends here

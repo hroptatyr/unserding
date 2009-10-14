@@ -161,15 +161,41 @@ parse_tstamp(const char *buf)
 	}
 }
 
+static double
+parse_multiplier(const char *data)
+{
+	if (LIKELY(data != NULL)) {
+		return strtod(data, NULL);
+	}
+	/* what's a good default here? */
+	return 1.0;
+}
+
+static m32_t
+parse_strike(const char *data)
+{
+	if (LIKELY(data != NULL)) {
+		ffff_monetary32_get_s(data);
+	}
+	/* grrr */
+	return 0;
+}
+
+static uint32_t
+parse_undl(const char *data)
+{
+	return strtoul(data, NULL, 10);
+}
+
 static void
 make_option(instr_t in, uint32_t id, void **rows, size_t nflds)
 {
-	uint32_t undl_id = strtoul(rows[OPT_UNDL], NULL, 10);
+	uint32_t undl_id = parse_undl(rows[OPT_UNDL]);
 	const char *cfi = rows[OPT_CFI];
 	char right = cfi[1];
 	char exer = cfi[2];
-	double multpl_dbl = strtod(rows[OPT_MULTPL], NULL);
-	monetary32_t strike = ffff_monetary32_get_s(rows[OPT_STRIKE]);
+	double multpl_dbl = parse_multiplier(rows[OPT_MULTPL]);
+	monetary32_t strike = parse_strike(rows[OPT_STRIKE]);
 	ratio17_t multpl = ffff_ratio17((uint32_t)multpl_dbl, 1);
 	instr_t undl = find_instr_by_gaid(instrs, undl_id);
 

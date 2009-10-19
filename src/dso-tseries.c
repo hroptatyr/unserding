@@ -75,7 +75,7 @@
 
 tscache_t tscache = NULL;
 
-#if defined DEBUG_FLAG || 1
+#if defined DEBUG_FLAG
 # define UD_DEBUG_TSER(args...)			\
 	fprintf(logout, "[unserding/tseries] " args)
 #endif	/* DEBUG_FLAG */

@@ -473,7 +473,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 
 	j->blen = nread;
 
-#if defined DEBUG_FLAG
+#if defined DEBUG_FLAG && defined LOG_RAW
 	/* spit the packet in its raw shape */
 	ud_fprint_pkt_raw(JOB_PACKET(j), logout);
 #endif	/* DEBUG_FLAG */

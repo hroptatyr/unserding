@@ -78,6 +78,11 @@
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
 
+#if defined DEBUG_FLAG
+# define UD_DEBUG_SQL(args...)			\
+	fprintf(logout, "[unserding/tseries] " args)
+#endif	/* DEBUG_FLAG */
+
 /* mysql conn, kept open */
 static void *conn;
 
@@ -153,7 +158,7 @@ fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
 		urn_fld_dbtbl(tser->urn),
 		urn_fld_id(tser->urn), tser->secu->instr,
 		urn_fld_date(tser->urn), begs, ends);
-	UD_DEBUG("querying: %s\n", qry);
+	UD_DEBUG_SQL("querying: %s\n", qry);
 	nres = uddb_qry(conn, qry, len, qry_rowf, pkt);
 	UD_DEBUG("got %lu prices\n", (long unsigned int)nres);
 	return nres;

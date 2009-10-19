@@ -75,6 +75,11 @@
 
 tscache_t tscache = NULL;
 
+#if defined DEBUG_FLAG || 1
+# define UD_DEBUG_TSER(args...)			\
+	fprintf(logout, "[unserding/tseries] " args)
+#endif	/* DEBUG_FLAG */
+
 
 typedef struct spitfire_ctx_s *spitfire_ctx_t;
 typedef enum spitfire_res_e spitfire_res_t;
@@ -312,6 +317,17 @@ defer_frob(oadt_ctx_t octx, tseries_t tser, dse16_t refds)
 	return;
 }
 
+static const char*
+tsbugger(time_t ts)
+{
+	static char buf[32];
+	struct tm tm;
+	memset(&tm, 0, sizeof(tm));
+	(void)gmtime_r(&ts, &tm);
+	(void)strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S %Z", &tm);
+	return buf;
+}
+
 static void
 proc_one(oadt_ctx_t octx, time_t ts)
 {
@@ -326,12 +342,14 @@ proc_one(oadt_ctx_t octx, time_t ts)
 #define TICKS_PER_FORTNIGHT	10
 	if ((idx = index_in_pkt(refts)) >= TICKS_PER_FORTNIGHT) {
 		/* leave a note in the packet? */
-		UD_DEBUG("week end tick (%i)\n", (uint32_t)ts);
+		UD_DEBUG_TSER("week end tick (%i %s)\n",
+			      octx->secu->instr, tsbugger(ts));
 		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_NEXIST);
 
 	} else if ((tser = tscoll_find_series(octx->coll, ts)) == NULL) {
 		/* no way of obtaining ticks */
-		UD_DEBUG("No suitable URN found (%i)\n", (uint32_t)ts);
+		UD_DEBUG_TSER("No suitable URN found (%i %s)\n",
+			      octx->secu->instr, tsbugger(ts));
 		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_NEXIST);
 
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {

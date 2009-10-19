@@ -154,8 +154,13 @@ extern FILE *logout;
 
 extern inline void __attribute__((always_inline, gnu_inline,format(printf,1,0)))
 __ud_log(const char *restrict fmt, ...);
+#if defined DEBUG_FLAG
 # define UD_LOG(args...)	__ud_log("%lu.%09u [unserding] " args)
 # define UD_LOG_MCAST(args...)	__ud_log("%lu.%09u [unserding/mcast] " args)
+#else
+# define UD_LOG(args...)
+# define UD_LOG_MCAST(args...)
+#endif	/* DEBUG_FLAG */
 
 # if __GNUC_PREREQ(4,3)
 /* methinks this is fuck ugly, but kinda cool */

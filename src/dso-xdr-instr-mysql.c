@@ -175,7 +175,7 @@ static m32_t
 parse_strike(const char *data)
 {
 	if (LIKELY(data != NULL)) {
-		ffff_monetary32_get_s(data);
+		return ffff_monetary32_get_s(data);
 	}
 	/* grrr */
 	return 0;

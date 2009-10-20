@@ -54,9 +54,9 @@ dso_xbbdb_la_CPPFLAGS = $(shell pkg-config --cflags libxml-2.0)
 dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
 
 ## the catalogue module
-dso_xdr_instr_la_LDFLAGS = -module $(LIBPFACK_LDFLAGS)
-dso_xdr_instr_la_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
-dso_xdr_instr_la_LIBADD = $(LIBPFACK_LIBS)
+dso_xdr_instr_la_LDFLAGS = -module $(PFACK_LIBS)
+dso_xdr_instr_la_CPPFLAGS = $(PFACK_CFLAGS)
+dso_xdr_instr_la_LIBADD = $(PFACK_LIBS)
 if USE_MYSQL
 dso_xdr_instr_la_CPPFLAGS += $(MYSQL_CPPFLAGS)
 dso_xdr_instr_la_LDFLAGS += $(MYSQL_LDFLAGS) -lmysqlclient
@@ -67,9 +67,9 @@ dso_xdr_instr_la_SOURCES += dso-xdr-instr-mysql.c
 endif
 
 ## the time series module
-dso_tseries_la_LDFLAGS = -module $(LIBPFACK_LDFLAGS)
-dso_tseries_la_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
-dso_tseries_la_LIBADD = $(LIBPFACK_LIBS)
+dso_tseries_la_LDFLAGS = -module $(PFACK_LIBS)
+dso_tseries_la_CPPFLAGS = $(PFACK_CFLAGS)
+dso_tseries_la_LIBADD = $(PFACK_LIBS)
 if USE_MYSQL
 dso_tseries_la_CPPFLAGS += $(MYSQL_CPPFLAGS)
 dso_tseries_la_LDFLAGS += $(MYSQL_LDFLAGS) -lmysqlclient
@@ -81,9 +81,9 @@ dso_tseries_la_SOURCES += dso-tseries-mysql.c
 endif
 
 ## to fiddle with option chains and other instruments
-instrumenstruation_CPPFLAGS = $(LIBPFACK_CPPFLAGS)
-instrumenstruation_LDFLAGS = $(LIBPFACK_LDFLAGS)
-instrumenstruation_LDADD = $(LIBPFACK_LIBS) libunserding.la -lpopt
+instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)
+instrumenstruation_LDFLAGS = $(PFACK_LIBS)
+instrumenstruation_LDADD = $(PFACK_LIBS) libunserding.la -lpopt
 endif  ## BUILD_SERVER
 header_HEADERS += xdr-instr-seria.h tseries.h
 

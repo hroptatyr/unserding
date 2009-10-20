@@ -39,7 +39,7 @@
 #define INCLUDED_tseries_h_
 
 #include <stdbool.h>
-#include <pfack/tick.h>
+#include <pfack/uterus.h>
 #include <time.h>
 #include "unserding.h"
 #include "protocore.h"
@@ -108,6 +108,8 @@
 
 /* migrate to ffff tseries */
 typedef struct tser_pkt_s *tser_pkt_t;
+/* uterus ticks */
+typedef struct tser_utepkt_s *tser_utepkt_t;
 
 typedef struct secu_s *secu_t;
 typedef struct tick_by_ts_hdr_s *tick_by_ts_hdr_t;
@@ -194,6 +196,8 @@ struct sl1t_s {
 struct tser_pkt_s {
 	monetary32_t t[10];
 };
+
+/* packet of 10 uterus BAT-OHLCV-PQS blokes */
 
 union time_dse_u {
 	time_t time;

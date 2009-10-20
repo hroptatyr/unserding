@@ -171,8 +171,7 @@ dnl 	AC_MSG_ERROR([ffff support is mandatory.])
 dnl fi
 
 ## check for libpfack
-AC_CHECK_PFACK
-AC_DEFINE([WITH_PFACK], [1], [Whether libpfack support library is requested.])
+PKG_CHECK_MODULES([PFACK], [libpfack >= 0.0.99], [:], [:])
 
 ## readline and friends
 VL_LIB_READLINE

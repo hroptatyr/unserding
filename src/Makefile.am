@@ -1,3 +1,5 @@
+
+
 ### Makefile.am
 
 AM_CPPFLAGS = -pthread
@@ -125,19 +127,22 @@ endif
 
 if BUILD_LIBRARY
 ## the lib
-libunserding_la_SOURCES = libstuff.c protocore.c libhelpers.c
-libunserding_la_CPPFLAGS = -DUNSERLIB
+libunserding_la_SOURCES = libstuff.c libhelpers.c
+libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS)
 endif
 
 if BUILD_CLIAPPS
 ud_instr_SOURCES = ud-instr.c
-ud_instr_LDADD = libunserding.la -lpfack
+ud_instr_CPPFLAGS = $(PFACK_CFLAGS)
+ud_instr_LDADD = libunserding.la $(PFACK_LIBS)
 
 ud_snap_SOURCES = ud-snap.c
+ud_snap_CPPFLAGS = $(PFACK_CFLAGS)
 ud_snap_LDADD = libunserding.la
 
 ud_tick_SOURCES = ud-tick.c
+ud_tick_CPPFLAGS = $(PFACK_CFLAGS)
 ud_tick_LDADD = libunserding.la
 endif
 

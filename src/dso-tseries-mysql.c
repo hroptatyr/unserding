@@ -297,6 +297,8 @@ urnqry_rowf(void **row, size_t nflds, void *clo)
 		fill_oad_ohlc(urn, row[0]);
 	} else if (urn->type == URN_OAD_OHLCV) {
 		fill_oad_ohlcv(urn, row[0]);
+	} else if (urn->type == URN_UTE_CDL) {
+		fill_oad_ohlcv(urn, row[0]);
 	}
 	return;
 }
@@ -361,6 +363,7 @@ ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 
 	switch (urn_id) {
 	case 1 ... 3:
+	case 8:
 		/* once-a-day, 5-a-week */
 		UD_DEBUG("OAD/5DW tick for %u\n", secu.instr);
 		tsc = find_tscoll_by_secu(tscache, &secu);

@@ -55,6 +55,8 @@ enum urn_type_e {
 	URN_L1_PEG,
 	/* peg snap over all bourses and bid-ask-trade */
 	URN_L1_BATPEG,
+	/* uterus candle */
+	URN_UTE_CDL,
 };
 
 struct urn_unk_s {
@@ -123,6 +125,7 @@ urn_fld_close(const_urn_t urn)
 	case URN_OAD_OHLC:
 		return urn->flds.oad_ohlc.fld_close;
 	case URN_OAD_OHLCV:
+	case URN_UTE_CDL:
 		return urn->flds.oad_ohlcv.fld_close;
 	case URN_UNK:
 	case URN_L1_TICK:

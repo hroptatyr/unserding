@@ -40,7 +40,6 @@
 
 #include <stdbool.h>
 #include <pfack/instruments.h>
-#include <pfack/tick.h>
 #include "catalogue.h"
 #include "protocore.h"
 #include "seria.h"

@@ -53,7 +53,16 @@
 # define UNLIKELY(_x)	__builtin_expect((_x), 0)
 #endif
 
-#define UD_SVC_TIMEOUT		50 /* milliseconds */
+#define UD_SVC_TIMEOUT	50	/* milliseconds */
+/* backoff schema, read from bottom to top */
+static int ud_backoffs[] = {
+	12 * UD_SVC_TIMEOUT,
+	8 * UD_SVC_TIMEOUT,
+	4 * UD_SVC_TIMEOUT,
+	2 * UD_SVC_TIMEOUT,
+	2 * UD_SVC_TIMEOUT,
+};
+#define NRETRIES	(sizeof(ud_backoffs) / sizeof(*ud_backoffs))
 
 size_t
 ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
@@ -89,9 +98,8 @@ ud_find_many_instrs(
 	void(*cb)(const char *tgt, size_t len, void *clo), void *clo,
 	uint32_t cont_id[], size_t len)
 {
-/* fixme, the retry cruft should be a parameter? */
 	index_t rcvd = 0;
-	index_t retry = 4;
+	index_t retry = NRETRIES;
 
 	do {
 		struct udpc_seria_s sctx;
@@ -123,7 +131,7 @@ ud_find_many_instrs(
 		while ((nrd = udpc_seria_des_xdr(&sctx, (void*)&out)) > 0) {
 			cb(out, nrd, clo);
 			rcvd++;
-			retry = 4;
+			retry = NRETRIES;
 		}
 	} while (rcvd < len && retry > 0);
 	return;
@@ -251,9 +259,8 @@ ud_find_ticks_by_ts(
 	secu_t s, size_t slen,
 	uint32_t bs, time_t ts)
 {
-/* fixme, the retry cruft should be a parameter? */
 	index_t rcvd = 0;
-	index_t retry = 4;
+	index_t retry = NRETRIES;
 	struct tick_by_ts_hdr_s hdr = {.ts = ts, .types = bs};
 
 	do {
@@ -292,7 +299,7 @@ ud_find_ticks_by_ts(
 			}
 			/* callback */
 			cb(&t, clo);
-			retry = 4;
+			retry = NRETRIES;
 		}
 	} while (rcvd < slen && retry > 0);
 	return;
@@ -318,8 +325,6 @@ struct ftbi_ctx_s {
 	void(*cb)(sl1oadt_t, void *clo);
 	void *clo;
 };
-
-#define NRETRIES	4
 
 static inline void
 init_bictx(ftbi_ctx_t bictx, ud_handle_t hdl)
@@ -398,13 +403,7 @@ send_stamps(ftbi_ctx_t bictx)
 static void
 recv_ticks(ftbi_ctx_t bc)
 {
-	static int tos[4] = {
-		12 * UD_SVC_TIMEOUT,
-		8 * UD_SVC_TIMEOUT,
-		4 * UD_SVC_TIMEOUT,
-		2 * UD_SVC_TIMEOUT,
-	};
-	int to = bc->retry >= 4 ? UD_SVC_TIMEOUT : tos[bc->retry];
+	int to = bc->retry >= NRETRIES ? UD_SVC_TIMEOUT : tos[bc->retry];
 	bc->pkt.plen = sizeof(bc->buf);
 	ud_recv_convo(bc->hdl, &bc->pkt, to, bc->cno);
 	udpc_seria_init(&bc->sctx, UDPC_PAYLOAD(bc->pkt.pbuf), bc->pkt.plen);

@@ -311,6 +311,25 @@ tsbugger(time_t ts)
 }
 
 static void
+spDute_bang_all(oadt_ctx_t octx, dse16_t refts, tser_pkt_t pkt, uint8_t idx)
+{
+	struct sparse_Dute_s tgt;
+
+	spDute_bang_tser(&tgt, octx->secu, PFTT_BID, refts, pkt, idx);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	spDute_bang_tser(&tgt, octx->secu, PFTT_ASK, refts, pkt, idx);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	spDute_bang_tser(&tgt, octx->secu, PFTT_TRA, refts, pkt, idx);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+
+	spDute_bang_tser(&tgt, octx->secu, PFTT_STL, refts, pkt, idx);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	spDute_bang_tser(&tgt, octx->secu, PFTT_FIX, refts, pkt, idx);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	return;
+}
+
+static void
 proc_one(oadt_ctx_t octx, time_t ts)
 {
 	tseries_t tser;
@@ -341,12 +360,7 @@ proc_one(oadt_ctx_t octx, time_t ts)
 	} else {
 		/* bother the cache */
 		UD_DEBUG("yay, cached\n");
-#if !defined USE_UTERUS
-		m32_t pri = pkt->t[idx];
-		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, pri);
-#else  /* !USE_UTERUS */
-		spDute_bang_tser(&tgt, octx->secu, refts, pkt, idx);
-#endif	/* USE_UTERUS */
+		spDute_bang_all(octx, refts, pkt, idx);
 	}
 	udpc_seria_add_sl1oadt(octx->sctx, &oadt);
 	return;

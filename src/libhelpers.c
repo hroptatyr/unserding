@@ -403,7 +403,8 @@ send_stamps(ftbi_ctx_t bictx)
 static void
 recv_ticks(ftbi_ctx_t bc)
 {
-	int to = bc->retry >= NRETRIES ? UD_SVC_TIMEOUT : tos[bc->retry];
+	int to = bc->retry >= NRETRIES
+		? UD_SVC_TIMEOUT : ud_backoffs[bc->retry];
 	bc->pkt.plen = sizeof(bc->buf);
 	ud_recv_convo(bc->hdl, &bc->pkt, to, bc->cno);
 	udpc_seria_init(&bc->sctx, UDPC_PAYLOAD(bc->pkt.pbuf), bc->pkt.plen);

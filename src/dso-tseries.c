@@ -365,10 +365,13 @@ proc_one(oadt_ctx_t octx, time_t ts)
 
 	} else {
 		/* bother the cache */
-		m32_t pri = pkt->t[idx];
-
 		UD_DEBUG("yay, cached\n");
+#if !defined USE_UTERUS
+		m32_t pri = pkt->t[idx];
 		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, pri);
+#else  /* !USE_UTERUS */
+		spDute_bang_tser(&tgt, octx->secu, refts, pkt, idx);
+#endif	/* USE_UTERUS */
 	}
 	udpc_seria_add_sl1oadt(octx->sctx, &oadt);
 	return;

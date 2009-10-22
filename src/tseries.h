@@ -50,6 +50,9 @@
 # define index_t	size_t
 #endif	/* !index_t */
 
+#define USE_UTERUS	1
+//#undef USE_UTERUS
+
 /**
  * Time series (per instrument) and market snapshots (per point in time)
  * need the best of both worlds, low latency on the one hand and small
@@ -108,8 +111,6 @@
 
 /* migrate to ffff tseries */
 typedef struct tser_pkt_s *tser_pkt_t;
-/* uterus ticks */
-typedef struct tser_utepkt_s *tser_utepkt_t;
 
 typedef struct secu_s *secu_t;
 typedef struct tick_by_ts_hdr_s *tick_by_ts_hdr_t;
@@ -192,12 +193,17 @@ struct sl1t_s {
 	struct l1tick_s tick;
 };
 
+#if !defined USE_UTERUS
 /* packet of 10 ticks, fuck ugly */
 struct tser_pkt_s {
 	monetary32_t t[10];
 };
-
-/* packet of 10 uterus BAT-OHLCV-PQS blokes */
+#else  /* USE_UTERUS */
+/* packet of 10 uterus blocks, still fuck ugly */
+struct tser_pkt_s {
+	uterus_s t[10];
+};
+#endif	/* !USE_UTERUS */
 
 union time_dse_u {
 	time_t time;
@@ -215,6 +221,53 @@ struct sl1oadt_s {
 	dse16_t dse;
 	uint32_t value[252];
 };
+
+#if defined USE_UTERUS
+/* although we have stored uterus blocks in our tseries, the stuff that
+ * gets sent is slightly different.
+ * We send sparsely (ohlcv_p_s + admin) candles where then uterus macros
+ * can be used to bang these into uterus blocks again. */
+typedef struct sparse_Dute_s *sparse_Dute_t;
+#define spDute_t	sparse_Dute_t
+struct sparse_Dute_s {
+	uint32_t instr;
+	uint32_t unit;
+	/** consists of 10 bits for pot, 6 bits for tick type */
+	uint16_t mux;
+	/** the pivot time stamp */
+	uint16_t pivot;
+	struct ohlcv_p_s cdl;
+};
+
+static inline void
+spDute_bang_secu(spDute_t tgt, secu_t s, uint8_t tt, dse16_t pivot)
+{
+	tgt->instr = s->instr;
+	tgt->unit = s->unit;
+	tgt->mux = ((s->pot & 0x3ff) << 6) | (tt & 0x3f);
+	tgt->pivot = pivot;
+	return;
+}
+
+static inline void
+spDute_bang_tser(
+	spDute_t tgt, secu_t s, uint8_t tt,
+	dse16_t t, tser_pkt_t pkt, uint8_t idx)
+{
+	spDute_bang_secu(tgt, s, tt, t);
+	/* pkt should consist of uterus blocks */
+	ute_frob_ohlcv_p(&tgt->cdl, tt, &pkt->t[idx]);
+	return;
+}
+
+static inline void
+spDute_bang_nexist(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
+{
+	spDute_bang_secu(tgt, s, tt, t);
+	ute_fill_ohlcv_p_nexist(&tgt->cdl);
+	return;
+}
+#endif	/* USE_UTERUS */
 
 
 /**

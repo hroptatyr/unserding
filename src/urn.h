@@ -89,11 +89,34 @@ struct urn_oad_ohlcv_s {
 	char *fld_volume;
 };
 
+struct urn_batfx_ohlcv_s {
+	char *fld_id;
+	char *fld_date;
+	char *fld_bo;
+	char *fld_bh;
+	char *fld_bl;
+	char *fld_bc;
+	char *fld_bv;
+	char *fld_ao;
+	char *fld_ah;
+	char *fld_al;
+	char *fld_ac;
+	char *fld_av;
+	char *fld_to;
+	char *fld_th;
+	char *fld_tl;
+	char *fld_tc;
+	char *fld_tv;
+	char *fld_f;
+	char *fld_x;
+};
+
 union fld_names_u {
 	struct urn_unk_s unk;
 	struct urn_oad_c_s oad_c;
 	struct urn_oad_ohlc_s oad_ohlc;
 	struct urn_oad_ohlcv_s oad_ohlcv;
+	struct urn_batfx_ohlcv_s batfx_ohlcv;
 };
 
 struct urn_s {

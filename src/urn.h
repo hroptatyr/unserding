@@ -139,6 +139,7 @@ urn_fld_date(const_urn_t urn)
 	return urn->flds.unk.fld_date;
 }
 
+#pragma GCC diagnostic ignored "-Wswitch-enum"
 static inline const char*
 urn_fld_close(const_urn_t urn)
 {
@@ -148,17 +149,14 @@ urn_fld_close(const_urn_t urn)
 	case URN_OAD_OHLC:
 		return urn->flds.oad_ohlc.fld_close;
 	case URN_OAD_OHLCV:
-	case URN_UTE_CDL:
 		return urn->flds.oad_ohlcv.fld_close;
-	case URN_UNK:
-	case URN_L1_TICK:
-	case URN_L1_BAT:
-	case URN_L1_PEG:
-	case URN_L1_BATPEG:
+	case URN_UTE_CDL:
+		return urn->flds.batfx_ohlcv.fld_tc;
 	default:
 		return NULL;
 	}
 }
+#pragma GCC diagnostic warning "-Wswitch-enum"
 
 static inline const char*
 urn_fld_dbtbl(const_urn_t urn)

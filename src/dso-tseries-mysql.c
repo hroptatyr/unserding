@@ -282,6 +282,37 @@ fill_oad_ohlcv(urn_t urn, const char *r)
 }
 
 static void
+fill_batfx_ohlcv(urn_t urn, const char *r)
+{
+#define APPEND(_urn, _x, _r)						\
+	if (_urn->flds.batfx_ohlcv.fld_##_x == NULL && fld_##_x##_p(_r)) { \
+		_urn->flds.batfx_ohlcv.fld_##_x = strdup(_r);		\
+		return;							\
+	}
+
+	APPEND(urn, bo, r);
+	APPEND(urn, bh, r);
+	APPEND(urn, bl, r);
+	APPEND(urn, bc, r);
+	APPEND(urn, bv, r);
+	APPEND(urn, ao, r);
+	APPEND(urn, ah, r);
+	APPEND(urn, al, r);
+	APPEND(urn, ac, r);
+	APPEND(urn, av, r);
+	APPEND(urn, to, r);
+	APPEND(urn, th, r);
+	APPEND(urn, tl, r);
+	APPEND(urn, tc, r);
+	APPEND(urn, tv, r);
+	APPEND(urn, f, r);
+	APPEND(urn, x, r);
+
+#undef APPEND
+	return;
+}
+
+static void
 urnqry_rowf(void **row, size_t nflds, void *clo)
 {
 	urn_t urn = clo;
@@ -298,7 +329,7 @@ urnqry_rowf(void **row, size_t nflds, void *clo)
 	} else if (urn->type == URN_OAD_OHLCV) {
 		fill_oad_ohlcv(urn, row[0]);
 	} else if (urn->type == URN_UTE_CDL) {
-		fill_oad_ohlcv(urn, row[0]);
+		fill_batfx_ohlcv(urn, row[0]);
 	}
 	return;
 }

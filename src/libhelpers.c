@@ -306,7 +306,7 @@ ud_find_ticks_by_ts(
 }
 
 
-/* by instr aka 4222 */
+/* find ticks by instr aka 4222 */
 typedef struct ftbi_ctx_s *ftbi_ctx_t;
 struct ftbi_ctx_s {
 	ud_handle_t hdl;
@@ -314,7 +314,7 @@ struct ftbi_ctx_s {
 	uint8_t rcvd;
 	ud_convo_t cno;
 	char buf[UDPC_PKTLEN];
-	struct sl1oadt_s oadt;
+	struct sparse_Dute_s Dute;
 	struct udpc_seria_s sctx;
 	secu_t secu;
 	uint32_t types;
@@ -322,7 +322,7 @@ struct ftbi_ctx_s {
 	/* hope this still works on 32b systems
 	 * oh oh, this implicitly encodes NFILL (which is 64 at the mo) */
 	uint64_t seen;
-	void(*cb)(sl1oadt_t, void *clo);
+	void(*cb)(spDute_t, void *clo);
 	void *clo;
 };
 
@@ -337,11 +337,11 @@ init_bictx(ftbi_ctx_t bictx, ud_handle_t hdl)
 }
 
 static index_t
-whereis(sl1oadt_t t, time_t ts[], size_t nts)
+whereis(spDute_t t, time_t ts[], size_t nts)
 {
 /* look if the tick in t has been asked for and return the index */
 	for (index_t i = 0; i < nts; i++) {
-		if (sl1oadt_dse(t) == time_to_dse(ts[i])) {
+		if (t->pivot == time_to_dse(ts[i])) {
 			return i;
 		}
 	}
@@ -357,7 +357,7 @@ new_convo(ftbi_ctx_t bictx)
 
 	bictx->retry--;
 	memset(bictx->buf, 0, sizeof(bictx->buf));
-	memset(&bictx->oadt, 0, sizeof(bictx->oadt));
+	memset(&bictx->Dute, 0, sizeof(bictx->Dute));
 	udpc_make_pkt(bictx->pkt, bictx->cno, 0, UD_SVC_TICK_BY_INSTR);
 	udpc_seria_init(&bictx->sctx, UDPC_PAYLOAD(bictx->buf), UDPC_PLLEN);
 	return;
@@ -414,24 +414,24 @@ recv_ticks(ftbi_ctx_t bc)
 static void
 frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 {
-	while (udpc_seria_des_sl1oadt(&bictx->oadt, &bictx->sctx)) {
+	while (udpc_seria_des_spDute(&bictx->Dute, &bictx->sctx)) {
 		index_t where;
-		if ((where = whereis(&bictx->oadt, ts, nts)) < nts) {
-			if (bictx->oadt.value[0] != OADT_ONHOLD) {
+		if ((where = whereis(&bictx->Dute, ts, nts)) < nts) {
+			if (!ute_ohlcv_p_onhold_p(&bictx->Dute.cdl)) {
 				bictx->rcvd++;
 				/* mark it, use our mark vector */
 				set_seen(bictx, where);
 			}
 		}
 		/* callback */
-		(*bictx->cb)(&bictx->oadt, bictx->clo);
+		(*bictx->cb)(&bictx->Dute, bictx->clo);
 		bictx->retry = NRETRIES;
 	}
 	return;
 }
 
 static inline void
-lodge_closure(ftbi_ctx_t bictx, void(*cb)(sl1oadt_t, void *clo), void *clo)
+lodge_closure(ftbi_ctx_t bictx, void(*cb)(spDute_t, void *clo), void *clo)
 {
 	bictx->cb = cb;
 	bictx->clo = clo;
@@ -449,7 +449,7 @@ lodge_ihdr(ftbi_ctx_t bictx, secu_t secu, uint32_t types)
 void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
-	void(*cb)(sl1oadt_t, void *clo), void *clo,
+	ud_find_ticks_by_instr_cb_f cb, void *clo,
 	secu_t s, uint32_t bs,
 	time_t *ts, size_t tslen)
 {

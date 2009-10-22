@@ -296,13 +296,15 @@ ud_find_ticks_by_ts(
 	secu_t s, size_t slen,
 	uint32_t bs, time_t ts);
 
+typedef void(*ud_find_ticks_by_instr_cb_f)(spDute_t, void *clo);
+
 /**
  * Deliver a packet storm of ticks for S at specified times TS.
  * Call the callback function CB() for every tick in the packet storm. */
 extern void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
-	void(*cb)(sl1oadt_t, void *clo), void *clo,
+	ud_find_ticks_by_instr_cb_f cb, void *clo,
 	secu_t s, uint32_t bs,
 	time_t *ts, size_t tslen);
 
@@ -653,6 +655,21 @@ udpc_seria_des_sl1tick(sl1tick_t t, udpc_seria_t sctx)
 {
 	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
 }
+
+#if defined USE_UTERUS
+static inline void
+udpc_seria_add_spDute(udpc_seria_t sctx, spDute_t t)
+{
+	udpc_seria_add_data(sctx, t, sizeof(*t));
+	return;
+}
+
+static inline bool
+udpc_seria_des_spDute(spDute_t t, udpc_seria_t sctx)
+{
+	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
+}
+#endif	/* USE_UTERUS */
 
 static inline void
 udpc_seria_add_sl1oadt(udpc_seria_t sctx, sl1oadt_t oadt)

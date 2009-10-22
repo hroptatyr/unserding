@@ -184,8 +184,6 @@ instr_tick_by_ts_svc(job_t j)
 }
 
 
-/* define if frobnication shall take place afterwards */
-#define DEFERRED_FROB	1
 /* number of stamps we can process at once */
 #define NFILT	64
 
@@ -247,7 +245,6 @@ snarf_times(udpc_seria_t sctx, time_t ts[], size_t nts)
 	return nfilt;
 }
 
-#if defined DEFERRED_FROB
 static void
 frob_one(tseries_t tser, dse16_t begds)
 {
@@ -262,21 +259,6 @@ frob_one(tseries_t tser, dse16_t begds)
 	tseries_add(tser, begds, endds, &pkt);
 	return;
 }
-#else  /* !DEFERRED_FROB */
-static void
-frob_stuff(tser_pkt_t p, tseries_t tser, dse16_t begds)
-{
-	dse16_t endds = begds + 13;
-
-	if (fetch_ticks_intv_mysql(p, tser, begds, endds) == 0) {
-		/* we should send something like quote invalid or so */
-		return;
-	}
-	/* cache him */
-	tseries_add(tser, begds, endds, p);
-	return;
-}
-#endif	/* DEFERRED_FROB */
 
 static void
 frob_some(oadt_ctx_t octx)
@@ -353,15 +335,8 @@ proc_one(oadt_ctx_t octx, time_t ts)
 		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_NEXIST);
 
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
-#if defined DEFERRED_FROB
 		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_ONHOLD);
 		defer_frob(octx, tser, refts - idx);
-#else
-		/* fetch from data source */
-		struct tser_pkt_s np;
-		frob_stuff(&np, tser, refts - idx);
-		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, np.t[idx]);
-#endif
 
 	} else {
 		/* bother the cache */
@@ -442,10 +417,8 @@ instr_tick_by_instr_svc(job_t j)
 		send_pkt(&rplsctx, &rplj);
 	} while (moarp);
 
-#if defined DEFERRED_FROB
-/* we cater for any frobnication desires now */
+	/* we cater for any frobnication desires now */
 	frob_some(&oadtctx);
-#endif
 	return;
 }
 

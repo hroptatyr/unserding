@@ -68,7 +68,7 @@ main(int argc, const char *argv[])
 	struct secu_s cid;
 	int n = 0;
 	time_t ts[argc-1];
-	uint32_t bs = PFTB_EOD | PFTB_STL;
+	uint32_t bs = PFTB_BID | PFTB_ASK | PFTB_TRA | PFTB_STL | PFTB_FIX;
 
 	if (argc <= 1) {
 		fprintf(stderr, "Usage: ud-tick instr [date] [date] ...\n");

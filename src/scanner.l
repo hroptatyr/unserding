@@ -69,6 +69,10 @@ extern void cli_yyset_column(int, yyscan_t);
 		return _x;			\
 	} while (0)
 
+/* turn off tedious warnings */
+#pragma GCC diagnostic ignored "-Wswitch-default"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 %}
 
 ws		[ \t\f\n\r]+

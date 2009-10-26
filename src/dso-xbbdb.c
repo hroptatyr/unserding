@@ -225,7 +225,7 @@ init_phone(void *ctx)
 	return;
 }
 
-static void
+static __attribute__((unused)) void
 pr_buf(void *ctx, const xmlChar *str, int len)
 {
 	fputs((const char*)str, stdout);

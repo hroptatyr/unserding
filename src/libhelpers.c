@@ -391,7 +391,7 @@ frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 	while (udpc_seria_des_spDute(&bictx->Dute, &bictx->sctx)) {
 		index_t where;
 		if ((where = whereis(&bictx->Dute, ts, nts)) < nts) {
-			if (!ute_ohlcv_p_onhold_p(&bictx->Dute.cdl)) {
+			if (!spDute_onhold_p(&bictx->Dute)) {
 				bictx->rcvd++;
 				/* mark it, use our mark vector */
 				set_seen(bictx, where);

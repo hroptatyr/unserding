@@ -219,8 +219,23 @@ struct sparse_Dute_s {
 	uint16_t mux;
 	/** the pivot time stamp */
 	uint16_t pivot;
-	struct ohlcv_p_s cdl;
+	union {
+		struct ohlcv_p_s ohlcv;
+		m32_t pri;
+	};
 };
+
+static inline pf_tick_type_t
+spDute_tick_type(spDute_t ute)
+{
+	return (pf_tick_type_t)(ute->mux & 0x3f);
+}
+
+static inline uint16_t
+spDute_pot(spDute_t ute)
+{
+	return (uint16_t)(ute->mux >> 6);
+}
 
 static inline void
 spDute_bang_secu(spDute_t tgt, secu_t s, uint8_t tt, dse16_t pivot)
@@ -239,7 +254,21 @@ spDute_bang_tser(
 {
 	spDute_bang_secu(tgt, s, tt, t);
 	/* pkt should consist of uterus blocks */
-	ute_frob_ohlcv_p(&tgt->cdl, tt, &pkt->t[idx]);
+	switch (tt) {
+	case PFTT_BID:
+	case PFTT_ASK:
+	case PFTT_TRA:
+		ute_frob_ohlcv_p(&tgt->ohlcv, tt, &pkt->t[idx]);
+		break;
+	case PFTT_STL:
+		tgt->pri = pkt->t[idx].x.p;
+		break;
+	case PFTT_FIX:
+		tgt->pri = pkt->t[idx].f.p;
+		break;
+	default:
+		break;
+	}
 	return;
 }
 
@@ -247,7 +276,16 @@ static inline void
 spDute_bang_nexist(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
 {
 	spDute_bang_secu(tgt, s, tt, t);
-	ute_fill_ohlcv_p_nexist(&tgt->cdl);
+	switch (tt) {
+	case PFTT_BID:
+	case PFTT_ASK:
+	case PFTT_TRA:
+		ute_fill_ohlcv_p_nexist(&tgt->ohlcv);
+		break;
+	default:
+		tgt->pri = UTE_NEXIST;
+		break;
+	}
 	return;
 }
 
@@ -255,8 +293,43 @@ static inline void
 spDute_bang_onhold(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
 {
 	spDute_bang_secu(tgt, s, tt, t);
-	ute_fill_ohlcv_p_onhold(&tgt->cdl);
+	switch (tt) {
+	case PFTT_BID:
+	case PFTT_ASK:
+	case PFTT_TRA:
+		ute_fill_ohlcv_p_onhold(&tgt->ohlcv);
+		break;
+	default:
+		tgt->pri = UTE_ONHOLD;
+		break;
+	}
 	return;
+}
+
+static inline bool
+spDute_onhold_p(spDute_t ute)
+{
+	switch (spDute_tick_type(ute)) {
+	case PFTT_BID:
+	case PFTT_ASK:
+	case PFTT_TRA:
+		return ute_ohlcv_p_onhold_p(&ute->ohlcv);
+	default:
+		return ute->pri == UTE_ONHOLD;
+	}
+}
+
+static inline bool
+spDute_nexist_p(spDute_t ute)
+{
+	switch (spDute_tick_type(ute)) {
+	case PFTT_BID:
+	case PFTT_ASK:
+	case PFTT_TRA:
+		return ute_ohlcv_p_nexist_p(&ute->ohlcv);
+	default:
+		return ute->pri == UTE_NEXIST;
+	}
 }
 #endif	/* USE_UTERUS */
 

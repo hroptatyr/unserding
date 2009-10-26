@@ -13,47 +13,77 @@ static ud_handle_t hdl = &__hdl;
 static void
 t1(spDute_t t)
 {
-	fprintf(stdout, "  ts:%i o:%2.4f h:%2.4f l:%2.4f c:%2.4f v:%2.4f\n",
-		t->pivot,
-		ffff_monetary32_d(t->cdl.o),
-		ffff_monetary32_d(t->cdl.h),
-		ffff_monetary32_d(t->cdl.l),
-		ffff_monetary32_d(t->cdl.c),
-		ffff_monetary64_d(t->cdl.v));
+	switch (spDute_tick_type(t)) {
+	case PFTT_BID:
+	case PFTT_ASK:
+	case PFTT_TRA:
+		fprintf(stdout,
+			"  o:%2.4f h:%2.4f l:%2.4f c:%2.4f v:%2.4f\n",
+			ffff_monetary32_d(t->ohlcv.o),
+			ffff_monetary32_d(t->ohlcv.h),
+			ffff_monetary32_d(t->ohlcv.l),
+			ffff_monetary32_d(t->ohlcv.c),
+			ffff_monetary64_d(t->ohlcv.v));
+		break;
+	case PFTT_STL:
+		fprintf(stdout, "  x:%2.4f\n", ffff_monetary32_d(t->pri));
+		break;
+	case PFTT_FIX:
+		fprintf(stdout, "  f:%2.4f\n", ffff_monetary32_d(t->pri));
+		break;
+	case PFTT_UNK:
+	default:
+		fputc('\n', stdout);
+		break;
+	}
 	return;
 }
 
 static void
 ne(spDute_t t)
 {
-	fprintf(stdout, "  ts:%i v:does not exist\n", t->pivot);
+	fputs("  v:does not exist\n", stdout);
 	return;
 }
 
 static void
 oh(spDute_t t)
 {
-	fprintf(stdout, "  ts:%i v:deferred\n", t->pivot);
+	fputs("  v:deferred\n", stdout);
 	return;
+}
+
+static char
+ttc(spDute_t t)
+{
+	switch (spDute_tick_type(t)) {
+	case PFTT_BID:
+		return 'b';
+	case PFTT_ASK:
+		return 'a';
+	case PFTT_TRA:
+		return 't';
+	case PFTT_STL:
+		return 'x';
+	case PFTT_FIX:
+		return 'f';
+	default:
+		return 'u';
+	}
 }
 
 static void
 t_cb(spDute_t t, void *clo)
 {
-	fprintf(stdout, "tick storm, ticks:1 ii:%u/%u/%u tt:%i",
-		t->instr, t->unit, (t->mux >> 6)/*getter?*/,
-		(t->mux & 0x3f)/*getter?*/);
+	fprintf(stdout, "tick storm, ticks:1 ii:%u/%u/%u tt:%c  ts:%i",
+		t->instr, t->unit, spDute_pot(t), ttc(t), t->pivot);
 
-	switch (t->cdl.o) {
-	case UTE_NEXIST:
+	if (spDute_nexist_p(t)) {
 		ne(t);
-		break;
-	case UTE_ONHOLD:
+	} else if (spDute_onhold_p(t)) {
 		oh(t);
-		break;
-	default:
+	} else {
 		t1(t);
-		break;
 	}
 	return;
 }

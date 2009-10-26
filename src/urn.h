@@ -64,22 +64,13 @@ struct urn_unk_s {
 	char *fld_date;
 };
 
-struct urn_oad_c_s {
+struct urn_f_c_s {
 	char *fld_id;
 	char *fld_date;
 	char *fld_close;
 };
 
-struct urn_oad_ohlc_s {
-	char *fld_id;
-	char *fld_date;
-	char *fld_open;
-	char *fld_high;
-	char *fld_low;
-	char *fld_close;
-};
-
-struct urn_oad_ohlcv_s {
+struct urn_f_ohlcv_s {
 	char *fld_id;
 	char *fld_date;
 	char *fld_open;
@@ -113,9 +104,8 @@ struct urn_batfx_ohlcv_s {
 
 union fld_names_u {
 	struct urn_unk_s unk;
-	struct urn_oad_c_s oad_c;
-	struct urn_oad_ohlc_s oad_ohlc;
-	struct urn_oad_ohlcv_s oad_ohlcv;
+	struct urn_f_c_s oad_c;
+	struct urn_f_ohlcv_s oad_ohlcv;
 	struct urn_batfx_ohlcv_s batfx_ohlcv;
 };
 
@@ -127,6 +117,12 @@ struct urn_s {
 
 
 /* inlines */
+static inline void
+init_urn(urn_t urn)
+{
+	return;
+}
+
 static inline const char*
 urn_fld_id(const_urn_t urn)
 {
@@ -147,7 +143,6 @@ urn_fld_close(const_urn_t urn)
 	case URN_OAD_C:
 		return urn->flds.oad_c.fld_close;
 	case URN_OAD_OHLC:
-		return urn->flds.oad_ohlc.fld_close;
 	case URN_OAD_OHLCV:
 		return urn->flds.oad_ohlcv.fld_close;
 	case URN_UTE_CDL:

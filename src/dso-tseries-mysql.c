@@ -129,7 +129,7 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	}
 	UD_DEBUG("putting %s %2.4f into slot %d\n",
 		 (char*)row[0], ffff_monetary32_d(p), iip);
-	pkt->t[iip] = p;
+	pkt->t[iip].t.c.p = p;
 	return;
 }
 
@@ -183,39 +183,43 @@ fld_date_p(const char *row_name)
 		strcmp(row_name, "stamp") == 0;
 }
 
-static bool
-fld_open_p(const char *row_name)
-{
-	return (row_name[0] == 't' && row_name[1] == 'o') ||
-		row_name[0] == 'o';
-}
+#define MAKE_PRED(_x, _f1)			\
+	static inline bool			\
+	fld_##_x##_p(const char *r)		\
+	{					\
+		return strcmp(r, #_f1) == 0;	\
+	}
+#define MAKE_PRED2(_x, _f1, _f2)		\
+	static inline bool			\
+	fld_##_x##_p(const char *r)		\
+	{					\
+		return strcmp(r, #_f1) == 0 ||	\
+			strcmp(r, #_f2) == 0;	\
+	}
 
-static bool
-fld_high_p(const char *row_name)
-{
-	return (row_name[0] == 't' && row_name[1] == 'h') ||
-		row_name[0] == 'h';
-}
+MAKE_PRED(bo, "bop");
+MAKE_PRED(bh, "bhp");
+MAKE_PRED(bl, "blp");
+MAKE_PRED(bc, "bcp");
+MAKE_PRED(bv, "bv");
+MAKE_PRED(ao, "aop");
+MAKE_PRED(ah, "ahp");
+MAKE_PRED(al, "alp");
+MAKE_PRED(ac, "acp");
+MAKE_PRED(av, "av");
+MAKE_PRED2(to, "top", "o");
+MAKE_PRED2(th, "thp", "h");
+MAKE_PRED2(tl, "tlp", "l");
+MAKE_PRED2(tc, "tcp", "c");
+MAKE_PRED2(tv, "tv", "v");
+MAKE_PRED2(f, "f", "fix");
+MAKE_PRED2(x, "x", "set");
 
-static bool
-fld_low_p(const char *row_name)
-{
-	return (row_name[0] == 't' && row_name[1] == 'l') ||
-		row_name[0] == 'l';
-}
-
-static bool
-fld_close_p(const char *r)
-{
-	return (r[0] == 't' && r[1] == 'c') ||
-		(r[0] == 'c' && (r[1] == '\0' || r[1] == 'l'));
-}
-
-static bool
-fld_volume_p(const char *row_name)
-{
-	return row_name[0] == 'v';
-}
+#define fld_open_p	fld_to_p
+#define fld_high_p	fld_th_p
+#define fld_low_p	fld_tl_p
+#define fld_close_p	fld_tc_p
+#define fld_volume_p	fld_tv_p
 
 static const_urn_t
 find_urn(urn_type_t type, const char *urn)
@@ -234,7 +238,7 @@ find_urn(urn_type_t type, const char *urn)
 }
 
 static void
-fill_oad_c(urn_t urn, const char *r)
+fill_f_c(urn_t urn, const char *r)
 {
 	if (urn->flds.oad_c.fld_close == NULL && fld_close_p(r)) {
 		urn->flds.oad_c.fld_close = strdup(r);
@@ -243,25 +247,7 @@ fill_oad_c(urn_t urn, const char *r)
 }
 
 static void
-fill_oad_ohlc(urn_t urn, const char *r)
-{
-	if (urn->flds.oad_ohlc.fld_open == NULL && fld_open_p(r)) {
-		urn->flds.oad_ohlc.fld_open = strdup(r);
-
-	} else if (urn->flds.oad_ohlc.fld_high == NULL && fld_high_p(r)) {
-		urn->flds.oad_ohlc.fld_high = strdup(r);
-
-	} else if (urn->flds.oad_ohlc.fld_low == NULL && fld_low_p(r)) {
-		urn->flds.oad_ohlc.fld_low = strdup(r);
-
-	} else if (urn->flds.oad_ohlc.fld_close == NULL && fld_close_p(r)) {
-		urn->flds.oad_ohlc.fld_close = strdup(r);
-	}
-	return;
-}
-
-static void
-fill_oad_ohlcv(urn_t urn, const char *r)
+fill_f_ohlcv(urn_t urn, const char *r)
 {
 	if (urn->flds.oad_ohlcv.fld_open == NULL && fld_open_p(r)) {
 		urn->flds.oad_ohlcv.fld_open = strdup(r);
@@ -323,11 +309,10 @@ urnqry_rowf(void **row, size_t nflds, void *clo)
 	} else if (urn->flds.unk.fld_date == NULL && fld_date_p(row[0])) {
 		urn->flds.unk.fld_date = strdup(row[0]);
 	} else if (urn->type == URN_OAD_C) {
-		fill_oad_c(urn, row[0]);
-	} else if (urn->type == URN_OAD_OHLC) {
-		fill_oad_ohlc(urn, row[0]);
-	} else if (urn->type == URN_OAD_OHLCV) {
-		fill_oad_ohlcv(urn, row[0]);
+		fill_f_c(urn, row[0]);
+	} else if (urn->type == URN_OAD_OHLC ||
+		   urn->type == URN_OAD_OHLCV) {
+		fill_f_ohlcv(urn, row[0]);
 	} else if (urn->type == URN_UTE_CDL) {
 		fill_batfx_ohlcv(urn, row[0]);
 	}

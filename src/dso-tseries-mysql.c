@@ -131,20 +131,60 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	dse16_t ds = time_to_dse(parse_time(row[0]));
 	tser_pkt_t pkt = clo;
 	uint8_t iip = index_in_pkt(ds);
-	m32_t p;
 
-	if (UNLIKELY(row[1] == NULL)) {
-		/* do not cahe NULL prices */
-		return;
-	}
-	p = ffff_monetary32_get_s(row[1]);
 	if (UNLIKELY(iip >= countof(pkt->t))) {
 		/* do not cache weekend `prices' */
 		return;
 	}
-	UD_DEBUG("putting %s %2.4f into slot %d\n",
-		 (char*)row[0], ffff_monetary32_d(p), iip);
-	pkt->t[iip].t.c.p = p;
+	/* brilliantly hard-coded bollocks */
+	if (nflds == 2) {
+		m32_t p = ffff_monetary32_get_s(row[1]);
+		UD_DEBUG("putting %s %2.4f into slot %d\n",
+			 (char*)row[0], ffff_monetary32_d(p), iip);
+		pkt->t[iip].f.p = p;
+
+	} else if (nflds == 5 || nflds == 6) {
+		/* just a spot-OHLCV */
+		struct ohlcv_p_s cdl = {
+			.o = ffff_monetary32_get_s(row[1]),
+			.h = ffff_monetary32_get_s(row[2]),
+			.l = ffff_monetary32_get_s(row[3]),
+			.c = ffff_monetary32_get_s(row[4]),
+		};
+		UD_DEBUG("putting %s OHLC candle into slot %d\n",
+			 (char*)row[0], iip);
+		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_TRA, ds, &cdl);
+	} else {
+		/* full BATOMCFX candles */
+		struct ohlcv_p_s cdl;
+
+		/* bid */
+		cdl.o = ffff_monetary32_get_s(row[1]);
+		cdl.h = ffff_monetary32_get_s(row[2]);
+		cdl.l = ffff_monetary32_get_s(row[3]);
+		cdl.c = ffff_monetary32_get_s(row[4]);
+		UD_DEBUG("putting %s B-OHLC candle into slot %d\n",
+			 (char*)row[0], iip);
+		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_BID, ds, &cdl);
+
+		/* ask */
+		cdl.o = ffff_monetary32_get_s(row[6]);
+		cdl.h = ffff_monetary32_get_s(row[7]);
+		cdl.l = ffff_monetary32_get_s(row[8]);
+		cdl.c = ffff_monetary32_get_s(row[9]);
+		UD_DEBUG("putting %s A-OHLC candle into slot %d\n",
+			 (char*)row[0], iip);
+		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_ASK, ds, &cdl);
+
+		/* tra/spot */
+		cdl.o = ffff_monetary32_get_s(row[11]);
+		cdl.h = ffff_monetary32_get_s(row[12]);
+		cdl.l = ffff_monetary32_get_s(row[13]);
+		cdl.c = ffff_monetary32_get_s(row[14]);
+		UD_DEBUG("putting %s T-OHLC candle into slot %d\n",
+			 (char*)row[0], iip);
+		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_TRA, ds, &cdl);
+	}
 	return;
 }
 

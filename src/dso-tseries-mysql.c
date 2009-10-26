@@ -148,6 +148,79 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	return;
 }
 
+static inline size_t
+print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
+{
+	char begs[16], ends[16];
+
+	print_ds_into(begs, sizeof(begs), dse_to_time(b));
+	print_ds_into(ends, sizeof(ends), dse_to_time(e));
+
+	switch (urn_type(tser->urn)) {
+	case URN_OAD_C:
+	case URN_OAD_OHLC:
+	case URN_OAD_OHLCV:
+		len = snprintf(
+			tgt, len,
+			"SELECT %s, %s, %s, %s, %s, %s "
+			"FROM %s "
+			"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
+			"ORDER BY 1",
+			urn_fld_date(tser->urn),
+			urn_fld_top(tser->urn),
+			urn_fld_thp(tser->urn),
+			urn_fld_tlp(tser->urn),
+			urn_fld_tcp(tser->urn),
+			urn_fld_tv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
+			urn_fld_dbtbl(tser->urn),
+			urn_fld_id(tser->urn), tser->secu->instr,
+			urn_fld_date(tser->urn), begs, ends);
+		break;
+	case URN_UTE_CDL:
+		len = snprintf(
+			tgt, len,
+			"SELECT %s, "
+			"%s, %s, %s, %s, %s, "
+			"%s, %s, %s, %s, %s, "
+			"%s, %s, %s, %s, %s "
+			"FROM %s "
+			"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
+			"ORDER BY 1",
+			urn_fld_date(tser->urn),
+
+			urn_fld_bop(tser->urn),
+			urn_fld_bhp(tser->urn),
+			urn_fld_blp(tser->urn),
+			urn_fld_bcp(tser->urn),
+			urn_fld_bv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
+
+			urn_fld_aop(tser->urn),
+			urn_fld_ahp(tser->urn),
+			urn_fld_alp(tser->urn),
+			urn_fld_acp(tser->urn),
+			urn_fld_av(tser->urn) ? urn_fld_tv(tser->urn) : "0",
+
+			urn_fld_top(tser->urn),
+			urn_fld_thp(tser->urn),
+			urn_fld_tlp(tser->urn),
+			urn_fld_tcp(tser->urn),
+			urn_fld_tv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
+
+			urn_fld_dbtbl(tser->urn),
+			urn_fld_id(tser->urn), tser->secu->instr,
+			urn_fld_date(tser->urn), begs, ends);
+		break;
+
+	case URN_L1_TICK:
+	case URN_L1_BAT:
+	case URN_L1_PEG:
+	case URN_L1_BATPEG:
+	default:
+		len = 0;
+	}
+	return len;
+}
+
 size_t
 fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
 {
@@ -155,29 +228,12 @@ fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
  * i wonder if it's wise to have all the intelligence in here
  * to go through various different tsa's as they are now chained
  * together */
-	char begs[16], ends[16];
-	char qry[224];
+	char qry[480];
 	size_t len;
 	size_t nres;
 
 	memset(pkt, 0, sizeof(*pkt));
-	print_ds_into(begs, sizeof(begs), dse_to_time(beg));
-	print_ds_into(ends, sizeof(ends), dse_to_time(end));
-	len = snprintf(
-		qry, sizeof(qry),
-		"SELECT %s, %s, %s, %s, %s, %s "
-		"FROM %s "
-		"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
-		"ORDER BY 1",
-		urn_fld_date(tser->urn),
-		urn_fld_top(tser->urn),
-		urn_fld_thp(tser->urn),
-		urn_fld_tlp(tser->urn),
-		urn_fld_tcp(tser->urn),
-		urn_fld_tv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
-		urn_fld_dbtbl(tser->urn),
-		urn_fld_id(tser->urn), tser->secu->instr,
-		urn_fld_date(tser->urn), begs, ends);
+	len = print_qry(qry, sizeof(qry), tser, beg, end);
 	UD_DEBUG_SQL("querying: %s\n", qry);
 	nres = uddb_qry(conn, qry, len, qry_rowf, pkt);
 	UD_DEBUG("got %lu prices\n", (long unsigned int)nres);

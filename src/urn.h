@@ -105,6 +105,12 @@ init_urn(urn_t urn)
 	return;
 }
 
+static inline urn_type_t
+urn_type(const_urn_t urn)
+{
+	return urn->type;
+}
+
 static inline const char*
 urn_fld_id(const_urn_t urn)
 {
@@ -117,6 +123,65 @@ urn_fld_date(const_urn_t urn)
 	return urn->flds.unk.fld_date;
 }
 
+static inline const char*
+urn_fld_bop(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_bo;
+}
+
+static inline const char*
+urn_fld_bhp(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_bh;
+}
+
+static inline const char*
+urn_fld_blp(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_bl;
+}
+
+static inline const char*
+urn_fld_bcp(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_bc;
+}
+
+static inline const char*
+urn_fld_bv(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_bv;
+}
+
+static inline const char*
+urn_fld_aop(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_ao;
+}
+
+static inline const char*
+urn_fld_ahp(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_ah;
+}
+
+static inline const char*
+urn_fld_alp(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_al;
+}
+
+static inline const char*
+urn_fld_acp(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_ac;
+}
+
+static inline const char*
+urn_fld_av(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_av;
+}
 
 static inline const char*
 urn_fld_top(const_urn_t urn)

@@ -165,16 +165,16 @@ fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
 	print_ds_into(ends, sizeof(ends), dse_to_time(end));
 	len = snprintf(
 		qry, sizeof(qry),
-		"SELECT `%s`, `%s`, `%s`, `%s`, `%s`, `%s` "
+		"SELECT %s, %s, %s, %s, %s, %s "
 		"FROM %s "
-		"WHERE `%s` = %d AND `%s` BETWEEN '%s' AND '%s' "
+		"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
 		"ORDER BY 1",
 		urn_fld_date(tser->urn),
 		urn_fld_top(tser->urn),
 		urn_fld_thp(tser->urn),
 		urn_fld_tlp(tser->urn),
 		urn_fld_tcp(tser->urn),
-		urn_fld_tv(tser->urn),
+		urn_fld_tv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
 		urn_fld_dbtbl(tser->urn),
 		urn_fld_id(tser->urn), tser->secu->instr,
 		urn_fld_date(tser->urn), begs, ends);

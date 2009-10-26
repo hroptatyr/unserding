@@ -162,7 +162,8 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 	case URN_OAD_OHLCV:
 		len = snprintf(
 			tgt, len,
-			"SELECT %s, %s, %s, %s, %s, %s "
+			"SELECT %s AS `stamp`, "
+			"%s AS `o`, %s AS `h`, %s AS `l`, %s AS `c`, %s AS `v` "
 			"FROM %s "
 			"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
 			"ORDER BY 1",
@@ -179,10 +180,10 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 	case URN_UTE_CDL:
 		len = snprintf(
 			tgt, len,
-			"SELECT %s, "
-			"%s, %s, %s, %s, %s, "
-			"%s, %s, %s, %s, %s, "
-			"%s, %s, %s, %s, %s "
+			"SELECT %s AS `stamp`, "
+			"%s `bo`, %s `bh`, %s `bl`, %s `bc`, %s `bv`, "
+			"%s `ao`, %s `ah`, %s `al`, %s `ac`, %s `av`, "
+			"%s `to`, %s `th`, %s `tl`, %s `tc`, %s `tv`  "
 			"FROM %s "
 			"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
 			"ORDER BY 1",

@@ -11,34 +11,49 @@ static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
 
 static void
-t1(sl1oadt_t t, uint8_t i)
+t1(spDute_t t)
 {
-	fprintf(stdout, "  tick:%i ts:%i v:%2.4f\n",
-		i, sl1oadt_dse(t) + i, ffff_monetary32_d(sl1oadt_value(t, i)));
+	fprintf(stdout, "  ts:%i o:%2.4f h:%2.4f l:%2.4f c:%2.4f v:%2.4f\n",
+		t->pivot,
+		ffff_monetary32_d(t->cdl.o),
+		ffff_monetary32_d(t->cdl.h),
+		ffff_monetary32_d(t->cdl.l),
+		ffff_monetary32_d(t->cdl.c),
+		ffff_monetary64_d(t->cdl.v));
 	return;
 }
 
 static void
-t_cb(sl1oadt_t t, void *clo)
+ne(spDute_t t)
 {
-	fprintf(stdout, "tick storm, ticks:%i ii:%u tt:%i\n",
-		sl1oadt_nticks(t),
-		sl1oadt_instr(t),
-		sl1oadt_tick_type(t));
-	for (uint8_t i = 0; i < sl1oadt_nticks(t); i++) {
-		switch (sl1oadt_value(t, i)) {
-		case OADT_NEXIST:
-			fprintf(stdout, "  tick:%i ts:%i v:does not exist\n",
-				i, sl1oadt_dse(t) + i);
-			break;
-		case OADT_ONHOLD:
-			fprintf(stdout, "  tick:%i ts:%i v:deferred\n",
-				i, sl1oadt_dse(t) + i);
-			break;
-		default:
-			t1(t, i);
-			break;
-		}
+	fprintf(stdout, "  ts:%i v:does not exist\n", t->pivot);
+	return;
+}
+
+static void
+oh(spDute_t t)
+{
+	fprintf(stdout, "  ts:%i v:deferred\n", t->pivot);
+	return;
+}
+
+static void
+t_cb(spDute_t t, void *clo)
+{
+	fprintf(stdout, "tick storm, ticks:1 ii:%u/%u/%u tt:%i",
+		t->instr, t->unit, (t->mux >> 6)/*getter?*/,
+		(t->mux & 0x3f)/*getter?*/);
+
+	switch (t->cdl.o) {
+	case UTE_NEXIST:
+		ne(t);
+		break;
+	case UTE_ONHOLD:
+		oh(t);
+		break;
+	default:
+		t1(t);
+		break;
 	}
 	return;
 }

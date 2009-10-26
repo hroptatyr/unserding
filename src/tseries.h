@@ -267,6 +267,14 @@ spDute_bang_nexist(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
 	ute_fill_ohlcv_p_nexist(&tgt->cdl);
 	return;
 }
+
+static inline void
+spDute_bang_onhold(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
+{
+	spDute_bang_secu(tgt, s, tt, t);
+	ute_fill_ohlcv_p_onhold(&tgt->cdl);
+	return;
+}
 #endif	/* USE_UTERUS */
 
 

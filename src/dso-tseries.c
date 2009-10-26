@@ -330,13 +330,50 @@ spDute_bang_all(oadt_ctx_t octx, dse16_t refts, tser_pkt_t pkt, uint8_t idx)
 }
 
 static void
+spDute_bang_all_nexist(oadt_ctx_t octx, dse16_t refts)
+{
+	struct sparse_Dute_s tgt;
+
+	spDute_bang_nexist(&tgt, octx->secu, PFTT_BID, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	spDute_bang_nexist(&tgt, octx->secu, PFTT_ASK, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	spDute_bang_nexist(&tgt, octx->secu, PFTT_TRA, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+
+	spDute_bang_nexist(&tgt, octx->secu, PFTT_STL, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	spDute_bang_nexist(&tgt, octx->secu, PFTT_FIX, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	return;
+}
+
+static void
+spDute_bang_all_onhold(oadt_ctx_t octx, dse16_t refts)
+{
+	struct sparse_Dute_s tgt;
+
+	spDute_bang_onhold(&tgt, octx->secu, PFTT_BID, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	spDute_bang_onhold(&tgt, octx->secu, PFTT_ASK, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	spDute_bang_onhold(&tgt, octx->secu, PFTT_TRA, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+
+	spDute_bang_onhold(&tgt, octx->secu, PFTT_STL, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	spDute_bang_onhold(&tgt, octx->secu, PFTT_FIX, refts);
+	udpc_seria_add_spDute(octx->sctx, &tgt);
+	return;
+}
+
+static void
 proc_one(oadt_ctx_t octx, time_t ts)
 {
 	tseries_t tser;
 	tser_pkt_t pkt;
 	dse16_t refts = time_to_dse(ts);
 	uint8_t idx;
-	struct sl1oadt_s oadt;
 
 	/* this is the 10-ticks per 2 weeks fragment, so dont bother
 	 * looking up saturdays and sundays */
@@ -345,24 +382,25 @@ proc_one(oadt_ctx_t octx, time_t ts)
 		/* leave a note in the packet? */
 		UD_DEBUG_TSER("week end tick (%i %s)\n",
 			      octx->secu->instr, tsbugger(ts));
-		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_NEXIST);
+		spDute_bang_all_nexist(octx, refts);
 
 	} else if ((tser = tscoll_find_series(octx->coll, ts)) == NULL) {
 		/* no way of obtaining ticks */
 		UD_DEBUG_TSER("No suitable URN found (%i %s)\n",
 			      octx->secu->instr, tsbugger(ts));
-		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_NEXIST);
+		spDute_bang_all_nexist(octx, refts);
 
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
-		fill_sl1oadt_1(&oadt, octx->secu, PFTT_EOD, refts, OADT_ONHOLD);
+		UD_DEBUG_TSER("URN not cached, deferring (%i %s)\n",
+			      octx->secu->instr, tsbugger(ts));
 		defer_frob(octx, tser, refts - idx);
+		spDute_bang_all_onhold(octx, refts);
 
 	} else {
 		/* bother the cache */
 		UD_DEBUG("yay, cached\n");
 		spDute_bang_all(octx, refts, pkt, idx);
 	}
-	udpc_seria_add_sl1oadt(octx->sctx, &oadt);
 	return;
 }
 

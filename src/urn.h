@@ -60,52 +60,34 @@ enum urn_type_e {
 };
 
 struct urn_unk_s {
-	char *fld_id;
-	char *fld_date;
-};
-
-struct urn_f_c_s {
-	char *fld_id;
-	char *fld_date;
-	char *fld_close;
-};
-
-struct urn_f_ohlcv_s {
-	char *fld_id;
-	char *fld_date;
-	char *fld_open;
-	char *fld_high;
-	char *fld_low;
-	char *fld_close;
-	char *fld_volume;
+	const char *fld_id;
+	const char *fld_date;
 };
 
 struct urn_batfx_ohlcv_s {
-	char *fld_id;
-	char *fld_date;
-	char *fld_bo;
-	char *fld_bh;
-	char *fld_bl;
-	char *fld_bc;
-	char *fld_bv;
-	char *fld_ao;
-	char *fld_ah;
-	char *fld_al;
-	char *fld_ac;
-	char *fld_av;
-	char *fld_to;
-	char *fld_th;
-	char *fld_tl;
-	char *fld_tc;
-	char *fld_tv;
-	char *fld_f;
-	char *fld_x;
+	const char *fld_id;
+	const char *fld_date;
+	const char *fld_bo;
+	const char *fld_bh;
+	const char *fld_bl;
+	const char *fld_bc;
+	const char *fld_bv;
+	const char *fld_ao;
+	const char *fld_ah;
+	const char *fld_al;
+	const char *fld_ac;
+	const char *fld_av;
+	const char *fld_to;
+	const char *fld_th;
+	const char *fld_tl;
+	const char *fld_tc;
+	const char *fld_tv;
+	const char *fld_f;
+	const char *fld_x;
 };
 
 union fld_names_u {
 	struct urn_unk_s unk;
-	struct urn_f_c_s oad_c;
-	struct urn_f_ohlcv_s oad_ohlcv;
 	struct urn_batfx_ohlcv_s batfx_ohlcv;
 };
 
@@ -135,23 +117,36 @@ urn_fld_date(const_urn_t urn)
 	return urn->flds.unk.fld_date;
 }
 
-#pragma GCC diagnostic ignored "-Wswitch-enum"
+
 static inline const char*
-urn_fld_close(const_urn_t urn)
+urn_fld_top(const_urn_t urn)
 {
-	switch (urn->type) {
-	case URN_OAD_C:
-		return urn->flds.oad_c.fld_close;
-	case URN_OAD_OHLC:
-	case URN_OAD_OHLCV:
-		return urn->flds.oad_ohlcv.fld_close;
-	case URN_UTE_CDL:
-		return urn->flds.batfx_ohlcv.fld_tc;
-	default:
-		return NULL;
-	}
+	return urn->flds.batfx_ohlcv.fld_to;
 }
-#pragma GCC diagnostic warning "-Wswitch-enum"
+
+static inline const char*
+urn_fld_thp(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_th;
+}
+
+static inline const char*
+urn_fld_tlp(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_tl;
+}
+
+static inline const char*
+urn_fld_tcp(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_tc;
+}
+
+static inline const char*
+urn_fld_tv(const_urn_t urn)
+{
+	return urn->flds.batfx_ohlcv.fld_tv;
+}
 
 static inline const char*
 urn_fld_dbtbl(const_urn_t urn)

@@ -77,6 +77,9 @@
 #if !defined countof
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
+#if !defined xmalloc
+# define xmalloc	malloc
+#endif	/* !xmalloc */
 
 #if defined DEBUG_FLAG
 # define UD_DEBUG_SQL(args...)			\
@@ -107,6 +110,18 @@ parse_time(const char *t)
 	}
 	(void)strptime(on, "%H:%M:%S", &tm);
 	return timegm(&tm);
+}
+
+static const char*
+dupfld(const char *r)
+{
+	size_t len = strlen(r);
+	char *res = xmalloc(len + 2 + 1);
+	res[0] = '`';
+	res[len + 1] = '`';
+	memcpy(res + 1, r, len);
+	res[len + 2] = '\0';
+	return res;
 }
 
 
@@ -150,11 +165,16 @@ fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
 	print_ds_into(ends, sizeof(ends), dse_to_time(end));
 	len = snprintf(
 		qry, sizeof(qry),
-		"SELECT `%s`, `%s` "
+		"SELECT `%s`, `%s`, `%s`, `%s`, `%s`, `%s` "
 		"FROM %s "
 		"WHERE `%s` = %d AND `%s` BETWEEN '%s' AND '%s' "
 		"ORDER BY 1",
-		urn_fld_date(tser->urn), urn_fld_close(tser->urn),
+		urn_fld_date(tser->urn),
+		urn_fld_top(tser->urn),
+		urn_fld_thp(tser->urn),
+		urn_fld_tlp(tser->urn),
+		urn_fld_tcp(tser->urn),
+		urn_fld_tv(tser->urn),
 		urn_fld_dbtbl(tser->urn),
 		urn_fld_id(tser->urn), tser->secu->instr,
 		urn_fld_date(tser->urn), begs, ends);
@@ -183,18 +203,17 @@ fld_date_p(const char *row_name)
 		strcmp(row_name, "stamp") == 0;
 }
 
-#define MAKE_PRED(_x, _f1)			\
-	static inline bool			\
-	fld_##_x##_p(const char *r)		\
-	{					\
-		return strcmp(r, #_f1) == 0;	\
-	}
-#define MAKE_PRED2(_x, _f1, _f2)		\
-	static inline bool			\
-	fld_##_x##_p(const char *r)		\
-	{					\
-		return strcmp(r, #_f1) == 0 ||	\
-			strcmp(r, #_f2) == 0;	\
+#define MAKE_PRED(_x, args...)						\
+	static char *__##_x##_pred[] = {args};				\
+	static inline bool						\
+	fld_##_x##_p(const char *r)					\
+	{								\
+		for (unsigned int i = 0; i < countof(__##_x##_pred); i++) { \
+			if (strcmp(r, __##_x##_pred[i]) == 0) {		\
+				return true;				\
+			}						\
+		}							\
+		return false;						\
 	}
 
 MAKE_PRED(bo, "bop");
@@ -207,13 +226,13 @@ MAKE_PRED(ah, "ahp");
 MAKE_PRED(al, "alp");
 MAKE_PRED(ac, "acp");
 MAKE_PRED(av, "av");
-MAKE_PRED2(to, "top", "o");
-MAKE_PRED2(th, "thp", "h");
-MAKE_PRED2(tl, "tlp", "l");
-MAKE_PRED2(tc, "tcp", "c");
-MAKE_PRED2(tv, "tv", "v");
-MAKE_PRED2(f, "f", "fix");
-MAKE_PRED2(x, "x", "set");
+MAKE_PRED(to, "top", "o", "open");
+MAKE_PRED(th, "thp", "h", "high", "hi");
+MAKE_PRED(tl, "tlp", "l", "low", "lo");
+MAKE_PRED(tc, "tcp", "c", "close");
+MAKE_PRED(tv, "tv", "v", "volume", "volu", "vol");
+MAKE_PRED(f, "f", "fix");
+MAKE_PRED(x, "x", "set");
 
 #define fld_open_p	fld_to_p
 #define fld_high_p	fld_th_p
@@ -238,41 +257,12 @@ find_urn(urn_type_t type, const char *urn)
 }
 
 static void
-fill_f_c(urn_t urn, const char *r)
-{
-	if (urn->flds.oad_c.fld_close == NULL && fld_close_p(r)) {
-		urn->flds.oad_c.fld_close = strdup(r);
-	}
-	return;
-}
-
-static void
-fill_f_ohlcv(urn_t urn, const char *r)
-{
-	if (urn->flds.oad_ohlcv.fld_open == NULL && fld_open_p(r)) {
-		urn->flds.oad_ohlcv.fld_open = strdup(r);
-
-	} else if (urn->flds.oad_ohlcv.fld_high == NULL && fld_high_p(r)) {
-		urn->flds.oad_ohlcv.fld_high = strdup(r);
-
-	} else if (urn->flds.oad_ohlcv.fld_low == NULL && fld_low_p(r)) {
-		urn->flds.oad_ohlcv.fld_low = strdup(r);
-
-	} else if (urn->flds.oad_ohlcv.fld_close == NULL && fld_close_p(r)) {
-		urn->flds.oad_ohlcv.fld_close = strdup(r);
-
-	} else if (urn->flds.oad_ohlcv.fld_volume == NULL && fld_volume_p(r)) {
-		urn->flds.oad_ohlcv.fld_volume = strdup(r);
-	}
-	return;
-}
-
-static void
 fill_batfx_ohlcv(urn_t urn, const char *r)
 {
 #define APPEND(_urn, _x, _r)						\
-	if (_urn->flds.batfx_ohlcv.fld_##_x == NULL && fld_##_x##_p(_r)) { \
-		_urn->flds.batfx_ohlcv.fld_##_x = strdup(_r);		\
+	if (fld_##_x##_p(_r)) {						\
+		UD_DBGCONT("=> " #_x "\n");				\
+		_urn->flds.batfx_ohlcv.fld_##_x = dupfld(_r);		\
 		return;							\
 	}
 
@@ -293,7 +283,7 @@ fill_batfx_ohlcv(urn_t urn, const char *r)
 	APPEND(urn, tv, r);
 	APPEND(urn, f, r);
 	APPEND(urn, x, r);
-
+	UD_DBGCONT("unknown column: \"%s\"\n", r);
 #undef APPEND
 	return;
 }
@@ -303,17 +293,14 @@ urnqry_rowf(void **row, size_t nflds, void *clo)
 {
 	urn_t urn = clo;
 
-	UD_DEBUG("column %s %s\n", urn->dbtbl, (char*)row[0]);
+	UD_DEBUG("column %s %s ... ", urn->dbtbl, (char*)row[0]);
 	if (urn->flds.unk.fld_id == NULL && fld_id_p(row[0])) {
-		urn->flds.unk.fld_id = strdup(row[0]);
+		UD_DBGCONT("=> id\n");
+		urn->flds.unk.fld_id = dupfld(row[0]);
 	} else if (urn->flds.unk.fld_date == NULL && fld_date_p(row[0])) {
-		urn->flds.unk.fld_date = strdup(row[0]);
-	} else if (urn->type == URN_OAD_C) {
-		fill_f_c(urn, row[0]);
-	} else if (urn->type == URN_OAD_OHLC ||
-		   urn->type == URN_OAD_OHLCV) {
-		fill_f_ohlcv(urn, row[0]);
-	} else if (urn->type == URN_UTE_CDL) {
+		UD_DBGCONT("=> stamp\n");
+		urn->flds.unk.fld_date = dupfld(row[0]);
+	} else {
 		fill_batfx_ohlcv(urn, row[0]);
 	}
 	return;

@@ -118,8 +118,6 @@ typedef struct tick_by_instr_hdr_s *tick_by_instr_hdr_t;
 typedef struct sl1tp_s *sl1tp_t;
 typedef struct sl1t_s *sl1t_t;
 
-/** (semi)sparse once-a-day level 1 ticks */
-typedef struct sl1oadt_s *sl1oadt_t;
 /** days since epoch type, goes till ... */
 typedef uint16_t dse16_t;
 
@@ -155,9 +153,6 @@ typedef uint16_t l1t_auxinfo_t;
 #define TICK_NE		((uint16_t)1022)
 #define TICK_OLD	((uint16_t)1021)
 #define TICK_SOON	((uint16_t)1020)
-
-#define OADT_NEXIST	0x80000000
-#define OADT_ONHOLD	0x80000001
 
 
 /**
@@ -208,18 +203,6 @@ struct tser_pkt_s {
 union time_dse_u {
 	time_t time;
 	dse16_t dse16;
-};
-
-struct sl1oadt_s {
-	uint32_t instr;
-	uint32_t unit;
-	/** consists of 10 bits for pot, 6 bits for tt */
-	uint16_t mux;
-	/** number of values in the vector below */
-	uint8_t nticks;
-	/** days since epoch */
-	dse16_t dse;
-	uint32_t value[252];
 };
 
 #if defined USE_UTERUS
@@ -290,9 +273,6 @@ spDute_bang_onhold(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
  **/
 extern size_t
 ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
-
-extern void
-ud_find_1oadt(ud_handle_t hdl, sl1oadt_t tgt, secu_t s, uint32_t bs, time_t ts);
 
 /**
  * Deliver a packet storm of ticks for instruments specified by S at TS.
@@ -485,48 +465,6 @@ dse_to_time(dse16_t ts)
 	return (time_t)(ts * 86400);
 }
 
-static inline uint32_t
-sl1oadt_instr(sl1oadt_t t)
-{
-	return t->instr;
-}
-
-static inline uint32_t
-sl1oadt_unit(sl1oadt_t t)
-{
-	return t->unit;
-}
-
-static inline uint16_t
-sl1oadt_pot(sl1oadt_t t)
-{
-	return (uint16_t)(t->mux >> 6);
-}
-
-static inline uint8_t
-sl1oadt_tick_type(sl1oadt_t t)
-{
-	return (uint8_t)(t->mux & 0x3f);
-}
-
-static inline dse16_t
-sl1oadt_dse(sl1oadt_t t)
-{
-	return t->dse;
-}
-
-static inline uint8_t
-sl1oadt_nticks(sl1oadt_t oadt)
-{
-	return oadt->nticks;
-}
-
-static inline uint32_t
-sl1oadt_value(sl1oadt_t oadt, uint8_t idx)
-{
-	return oadt->value[idx];
-}
-
 static inline uint8_t
 index_in_pkt(dse16_t dse)
 {
@@ -544,52 +482,6 @@ tser_pkt_beg_dse(dse16_t dse)
 {
 	uint8_t sub = index_in_pkt(dse);
 	return dse - sub;
-}
-
-/**
- * Instantiate a sparse level 1 once-a-day tick for HDR. */
-static inline void
-fill_sl1oadt_1(
-	sl1oadt_t oadt, secu_t secu, uint8_t tt, dse16_t dse, uint32_t pri)
-{
-	oadt->instr = secu->instr;
-	oadt->unit = secu->unit;
-	oadt->mux = ((secu->pot & 0x3ff) << 6) | (tt & 0x3f);
-	oadt->dse = dse;
-	oadt->nticks = 1;
-	oadt->value[0] = pri;
-	return;
-}
-
-/**
- * Instantiate a sequence of level 1 once-a-day ticks for HDR. */
-static inline void
-fill_sl1oadt(
-	sl1oadt_t oadt, tick_by_instr_hdr_t hdr,
-	uint8_t tt, dse16_t dse, uint32_t pri[], uint8_t nticks)
-{
-	oadt->instr = hdr->secu.instr;
-	oadt->unit = hdr->secu.unit;
-	oadt->mux = ((hdr->secu.pot & 0x3ff) << 6) | (tt & 0x3f);
-	oadt->dse = dse;
-	oadt->nticks = nticks;
-	for (uint8_t i = 0; i < nticks; i++) {
-		oadt->value[i] = pri[i];
-	}
-	return;
-}
-
-/* cross setters/converters */
-static inline void
-sl1tick_from_oadt(sl1tick_t tgt, sl1oadt_t src)
-{
-	sl1tick_set_instr(tgt, sl1oadt_instr(src));
-	sl1tick_set_unit(tgt, sl1oadt_unit(src));
-	sl1tick_set_pot(tgt, sl1oadt_pot(src));
-	sl1tick_set_tick_type(tgt, sl1oadt_tick_type(src));
-	sl1tick_set_stamp(tgt, dse_to_time(sl1oadt_dse(src)), 0);
-	sl1tick_set_value(tgt, sl1oadt_value(src, 0));
-	return;
 }
 
 
@@ -678,46 +570,5 @@ udpc_seria_des_spDute(spDute_t t, udpc_seria_t sctx)
 	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
 }
 #endif	/* USE_UTERUS */
-
-static inline void
-udpc_seria_add_sl1oadt(udpc_seria_t sctx, sl1oadt_t oadt)
-{
-	/* we send of the first 3 slots, 32b 32b 16b, as secu */
-	udpc_seria_add_ui32(sctx, sl1oadt_instr(oadt));
-	udpc_seria_add_ui32(sctx, sl1oadt_unit(oadt));
-	udpc_seria_add_ui16(sctx, oadt->mux);
-	/* now comes the semi-sparse entry */
-	udpc_seria_add_byte(sctx, oadt->nticks);
-	udpc_seria_add_ui16(sctx, oadt->dse);
-	/* and the vector */
-	for (uint8_t i = 0; i < oadt->nticks; i++) {
-		udpc_seria_add_ui32(sctx, oadt->value[i]);
-	}
-	return;
-}
-
-static inline size_t
-udpc_seria_des_sl1oadt(sl1oadt_t oadt, udpc_seria_t sctx)
-{
-	/* we send of the first 3 slots, 32b 32b 16b, as secu */
-	if ((oadt->instr = udpc_seria_des_ui32(sctx)) == 0) {
-		/* cunt off right away */
-		oadt->unit = 0;
-		oadt->mux = 0;
-		oadt->nticks = 0;
-		oadt->dse = 0;
-		return 0;
-	}
-	oadt->unit = udpc_seria_des_ui32(sctx);
-	oadt->mux = udpc_seria_des_ui16(sctx);
-	/* now comes the semi-sparse entry */
-	oadt->nticks = udpc_seria_des_byte(sctx);
-	oadt->dse = udpc_seria_des_ui16(sctx);
-	/* and the vector */
-	for (uint8_t i = 0; i < oadt->nticks; i++) {
-		oadt->value[i] = udpc_seria_des_ui32(sctx);
-	}
-	return oadt->nticks;
-}
 
 #endif	/* INCLUDED_tseries_h_ */

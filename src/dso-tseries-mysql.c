@@ -124,6 +124,15 @@ dupfld(const char *r)
 	return res;
 }
 
+static m32_t
+get_m32(const char *s)
+{
+	if (UNLIKELY(s == NULL)) {
+		return UTE_NEXIST;
+	}
+	return ffff_monetary32_get_s(s);
+}
+
 
 static void
 qry_rowf(void **row, size_t nflds, void *clo)
@@ -138,7 +147,7 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	}
 	/* brilliantly hard-coded bollocks */
 	if (nflds == 2) {
-		m32_t p = ffff_monetary32_get_s(row[1]);
+		m32_t p = get_m32(row[1]);
 		UD_DEBUG("putting %s %2.4f into slot %d\n",
 			 (char*)row[0], ffff_monetary32_d(p), iip);
 		pkt->t[iip].f.p = p;
@@ -146,10 +155,10 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	} else if (nflds == 5 || nflds == 6) {
 		/* just a spot-OHLCV */
 		struct ohlcv_p_s cdl = {
-			.o = ffff_monetary32_get_s(row[1]),
-			.h = ffff_monetary32_get_s(row[2]),
-			.l = ffff_monetary32_get_s(row[3]),
-			.c = ffff_monetary32_get_s(row[4]),
+			.o = get_m32(row[1]),
+			.h = get_m32(row[2]),
+			.l = get_m32(row[3]),
+			.c = get_m32(row[4]),
 		};
 		UD_DEBUG("putting %s OHLC candle into slot %d\n",
 			 (char*)row[0], iip);
@@ -159,28 +168,28 @@ qry_rowf(void **row, size_t nflds, void *clo)
 		struct ohlcv_p_s cdl;
 
 		/* bid */
-		cdl.o = ffff_monetary32_get_s(row[1]);
-		cdl.h = ffff_monetary32_get_s(row[2]);
-		cdl.l = ffff_monetary32_get_s(row[3]);
-		cdl.c = ffff_monetary32_get_s(row[4]);
+		cdl.o = get_m32(row[1]);
+		cdl.h = get_m32(row[2]);
+		cdl.l = get_m32(row[3]);
+		cdl.c = get_m32(row[4]);
 		UD_DEBUG("putting %s B-OHLC candle into slot %d\n",
 			 (char*)row[0], iip);
 		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_BID, ds, &cdl);
 
 		/* ask */
-		cdl.o = ffff_monetary32_get_s(row[6]);
-		cdl.h = ffff_monetary32_get_s(row[7]);
-		cdl.l = ffff_monetary32_get_s(row[8]);
-		cdl.c = ffff_monetary32_get_s(row[9]);
+		cdl.o = get_m32(row[6]);
+		cdl.h = get_m32(row[7]);
+		cdl.l = get_m32(row[8]);
+		cdl.c = get_m32(row[9]);
 		UD_DEBUG("putting %s A-OHLC candle into slot %d\n",
 			 (char*)row[0], iip);
 		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_ASK, ds, &cdl);
 
 		/* tra/spot */
-		cdl.o = ffff_monetary32_get_s(row[11]);
-		cdl.h = ffff_monetary32_get_s(row[12]);
-		cdl.l = ffff_monetary32_get_s(row[13]);
-		cdl.c = ffff_monetary32_get_s(row[14]);
+		cdl.o = get_m32(row[11]);
+		cdl.h = get_m32(row[12]);
+		cdl.l = get_m32(row[13]);
+		cdl.c = get_m32(row[14]);
 		UD_DEBUG("putting %s T-OHLC candle into slot %d\n",
 			 (char*)row[0], iip);
 		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_TRA, ds, &cdl);

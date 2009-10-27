@@ -210,6 +210,8 @@ union time_dse_u {
  * gets sent is slightly different.
  * We send sparsely (ohlcv_p_s + admin) candles where then uterus macros
  * can be used to bang these into uterus blocks again. */
+#if !defined spDute_t
+/* sometimes the uterus header already defines this */
 typedef struct sparse_Dute_s *sparse_Dute_t;
 #define spDute_t	sparse_Dute_t
 struct sparse_Dute_s {
@@ -236,6 +238,7 @@ spDute_pot(spDute_t ute)
 {
 	return (uint16_t)(ute->mux >> 6);
 }
+#endif	/* !spDute */
 
 static inline void
 spDute_bang_secu(spDute_t tgt, secu_t s, uint8_t tt, dse16_t pivot)

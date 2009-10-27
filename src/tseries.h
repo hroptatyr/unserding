@@ -238,6 +238,32 @@ spDute_pot(spDute_t ute)
 {
 	return (uint16_t)(ute->mux >> 6);
 }
+
+static inline bool
+spDute_onhold_p(spDute_t ute)
+{
+	switch (spDute_tick_type(ute)) {
+	case PFTT_BID:
+	case PFTT_ASK:
+	case PFTT_TRA:
+		return ute_ohlcv_p_onhold_p(&ute->ohlcv);
+	default:
+		return ute->pri == UTE_ONHOLD;
+	}
+}
+
+static inline bool
+spDute_nexist_p(spDute_t ute)
+{
+	switch (spDute_tick_type(ute)) {
+	case PFTT_BID:
+	case PFTT_ASK:
+	case PFTT_TRA:
+		return ute_ohlcv_p_nexist_p(&ute->ohlcv);
+	default:
+		return ute->pri == UTE_NEXIST;
+	}
+}
 #endif	/* !spDute */
 
 static inline void
@@ -307,32 +333,6 @@ spDute_bang_onhold(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
 		break;
 	}
 	return;
-}
-
-static inline bool
-spDute_onhold_p(spDute_t ute)
-{
-	switch (spDute_tick_type(ute)) {
-	case PFTT_BID:
-	case PFTT_ASK:
-	case PFTT_TRA:
-		return ute_ohlcv_p_onhold_p(&ute->ohlcv);
-	default:
-		return ute->pri == UTE_ONHOLD;
-	}
-}
-
-static inline bool
-spDute_nexist_p(spDute_t ute)
-{
-	switch (spDute_tick_type(ute)) {
-	case PFTT_BID:
-	case PFTT_ASK:
-	case PFTT_TRA:
-		return ute_ohlcv_p_nexist_p(&ute->ohlcv);
-	default:
-		return ute->pri == UTE_NEXIST;
-	}
 }
 #endif	/* USE_UTERUS */
 

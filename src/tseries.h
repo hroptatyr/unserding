@@ -118,10 +118,6 @@ typedef struct tick_by_instr_hdr_s *tick_by_instr_hdr_t;
 typedef struct sl1tp_s *sl1tp_t;
 typedef struct sl1t_s *sl1t_t;
 
-/** days since epoch type, goes till ... */
-typedef uint16_t dse16_t;
-
-typedef union time_dse_u udate_t;
 typedef uint32_t date_t;
 
 /**
@@ -200,11 +196,6 @@ struct tser_pkt_s {
 };
 #endif	/* !USE_UTERUS */
 
-union time_dse_u {
-	time_t time;
-	dse16_t dse16;
-};
-
 #if defined USE_UTERUS
 /* although we have stored uterus blocks in our tseries, the stuff that
  * gets sent is slightly different.
@@ -213,6 +204,10 @@ union time_dse_u {
 #if !defined spDute_t
 /* sometimes the uterus header already defines this */
 typedef struct sparse_Dute_s *sparse_Dute_t;
+
+/** days since epoch type, goes till ... */
+typedef uint16_t dse16_t;
+
 #define spDute_t	sparse_Dute_t
 struct sparse_Dute_s {
 	uint32_t instr;
@@ -263,6 +258,18 @@ spDute_nexist_p(spDute_t ute)
 	default:
 		return ute->pri == UTE_NEXIST;
 	}
+}
+
+static inline dse16_t
+time_to_dse(time_t ts)
+{
+	return (dse16_t)(ts / 86400);
+}
+
+static inline time_t
+dse_to_time(dse16_t ts)
+{
+	return (time_t)(ts * 86400);
 }
 #endif	/* !spDute */
 
@@ -526,19 +533,6 @@ fill_sl1t_tick(sl1t_t l1t, time_t ts, uint16_t msec, uint8_t tt, uint32_t v)
 	l1t->tick.tt = tt;
 	l1t->tick.value = v;
 	return;
-}
-
-/* sl1oadt accessors */
-static inline dse16_t
-time_to_dse(time_t ts)
-{
-	return (dse16_t)(ts / 86400);
-}
-
-static inline time_t
-dse_to_time(dse16_t ts)
-{
-	return (time_t)(ts * 86400);
 }
 
 static inline uint8_t

@@ -174,10 +174,12 @@ dnl fi
 PKG_CHECK_MODULES([PFACK], [libpfack >= 0.0.99], [:], [:])
 
 ## readline and friends
+SXE_DUMP_LIBS
 VL_LIB_READLINE
 if test "${vl_cv_lib_readline}" != "no"; then
 	LIBREADLINE_LIBS=${vl_cv_lib_readline}
 fi
+SXE_RESTORE_LIBS
 AC_SUBST([LIBREADLINE_LIBS])
 AC_SUBST([LIBREADLINE_LDFLAGS])
 AC_SUBST([LIBREADLINE_CPPFLAGS])

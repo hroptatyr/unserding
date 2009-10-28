@@ -140,6 +140,10 @@ extern FILE *logout;
 
 
 #if defined UNSERSRV
+# if !defined __USE_POSIX199309
+/* for CLOCK_REALTIME and friends */
+#  define __USE_POSIX199309
+# endif	 /* !__USE_POSIX199309 */
 # if defined TIME_WITH_SYS_TIME
 #  include <sys/time.h>
 #  include <time.h>
@@ -152,19 +156,16 @@ extern FILE *logout;
 #  endif
 # endif
 
-extern inline void __attribute__((always_inline, gnu_inline,format(printf,1,0)))
-__ud_log(const char *restrict fmt, ...);
-#if defined DEBUG_FLAG
-# define UD_LOG(args...)	__ud_log("%lu.%09u [unserding] " args)
-# define UD_LOG_MCAST(args...)	__ud_log("%lu.%09u [unserding/mcast] " args)
-#else
+#if !defined DEBUG_FLAG
 # define UD_LOG(args...)
 # define UD_LOG_MCAST(args...)
-#endif	/* DEBUG_FLAG */
 
-# if __GNUC_PREREQ(4,3)
+#else  /* DEBUG_FLAG */
+# if __GNUC_PREREQ(4,3) && !defined __INTEL_COMPILER
+#  define UD_LOG(args...)	__ud_log("%lu.%09u [unserding] " args)
+#  define UD_LOG_MCAST(args...)	__ud_log("%lu.%09u [unserding/mcast] " args)
 /* methinks this is fuck ugly, but kinda cool */
-extern inline void __attribute__((always_inline, gnu_inline,format(printf,1,0)))
+static inline void __attribute__((always_inline, format(printf,1,0)))
 __ud_log(const char *restrict fmt, ...)
 {
 #  if defined HAVE_CLOCK_GETTIME || 1 /* check for me */
@@ -178,10 +179,39 @@ __ud_log(const char *restrict fmt, ...)
 	fflush(logout);
 	return;
 }
+
+# elif defined __INTEL_COMPILER
+#  define UD_LOG(args...)				\
+	do {						\
+		__ud_log();				\
+		fprintf(logout, "[unserding] " args);	\
+	} while (0)
+#  define UD_LOG_MCAST(args...)			\
+	do {					\
+		__ud_log();			\
+		fprintf(logout, "[unserding/mcast] " args);	\
+	} while (0)
+/* bit slower than the builtin_va_arg_pack, bite me */
+static inline void __attribute__((always_inline, format(printf,1,0)))
+__ud_log(void)
+{
+#  if defined HAVE_CLOCK_GETTIME || 1 /* check for me */
+	struct timespec n;
+#  else	 /* !HAVE_CLOCK_GETTIME */
+#   error "WTF?!"
+#  endif  /* HAVE_CLOCK_GETTIME */
+	clock_gettime(CLOCK_REALTIME, &n);
+	/* there must be %lu.%09u in the format string */
+	fprintf(logout, "%lu.%09u ", n.tv_sec, n.tv_nsec);
+	return;
+}
+
 # else	/* !4.3 */
 #  error "Use gcc 4.3 or give me va_arg_pack() implementation!"
 # endif	 /* >= 4.3 */
-#else
+#endif	/* DEBUG_FLAG */
+
+#else  /* !UNSERSRV */
 # define UD_LOG(args...)
 # define UD_LOG_MCAST(args...)
 #endif	/* UNSERSRV */

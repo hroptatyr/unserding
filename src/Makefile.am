@@ -30,7 +30,8 @@ if BUILD_SERVER
 ## the main server binary
 unserdingd_SOURCES = unserdingd.c mcast.c
 unserdingd_SOURCES += protocore.c arrqueue.c dllqueue.c seria.c
-unserdingd_SOURCES += module.c
+unserdingd_SOURCES += module.h module.c
+unserdingd_SOURCES += wpool.h wpool.c
 unserdingd_SOURCES += lua-config.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
 unserdingd_CPPFLAGS += $(LIBEV_CPPFLAGS)

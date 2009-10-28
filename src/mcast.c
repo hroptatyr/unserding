@@ -444,7 +444,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 		UD_CRITICAL("no job slots ... leaping\n");
 		/* just read the packet off of the wire */
 		(void)recv(w->fd, scratch_buf, UDPC_PKTLEN, 0);
-		trigger_job_queue();
+		wpool_trigger(gpool);
 		return;
 	}
 
@@ -479,10 +479,8 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 #endif	/* DEBUG_FLAG */
 
 	/* enqueue t3h job and copy the input buffer over to
-	 * the job's work space */
-	enqueue_job(glob_jq, j);
-	/* now notify the slaves */
-	trigger_job_queue();
+	 * the job's work space, also trigger the lazy bastards */
+	wpool_enq(glob_jq, j, true);
 	return;
 }
 

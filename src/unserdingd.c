@@ -225,11 +225,12 @@ static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
 
 /* worker magic */
-#define NWORKERS		1
+#define MAX_WORKERS	16
+static int nworkers = 1;
 /* round robin var */
 static index_t rr_wrk = 0;
 /* the workers array */
-static struct ud_worker_s __attribute__((aligned(16))) workers[NWORKERS];
+static struct ud_worker_s __attribute__((aligned(16))) workers[MAX_WORKERS];
 
 static struct ev_loop *secl;
 /* a watcher for worker jobs */
@@ -440,12 +441,15 @@ hlp(poptContext con, UNUSED(enum poptCallbackReason foo),
 }
 
 static struct poptOption srv_opts[] = {
-	{ "prefer-ipv6", '6', POPT_ARG_NONE,
-	  &prefer6p, 0,
-	  "Prefer ipv6 traffic to ipv4 if applicable..", NULL },
-	{ "daemon", 'd', POPT_ARG_NONE,
-	  &daemonisep, 0,
-	  "Detach from tty and run as daemon.", NULL },
+	{"prefer-ipv6", '6', POPT_ARG_NONE,
+	 &prefer6p, 0,
+	 "Prefer ipv6 traffic to ipv4 if applicable..", NULL},
+	{"daemon", 'd', POPT_ARG_NONE,
+	 &daemonisep, 0,
+	 "Detach from tty and run as daemon.", NULL},
+	{"workers", 'w', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT,
+	 &nworkers, 0,
+	 "Number of concurrent worker threads.", NULL},
         POPT_TABLEEND
 };
 
@@ -458,8 +462,8 @@ static struct poptOption help_opts[] = {
 };
 
 static const struct poptOption const ud_opts[] = {
-        { NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
-          "Server Options", NULL },
+        {NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
+	 "Server Options", NULL},
 	{NULL, '\0', POPT_ARG_INCLUDE_TABLE, help_opts, 0,
 	 "Help options", NULL},
         POPT_TABLEEND
@@ -589,6 +593,10 @@ main(int argc, const char *argv[])
 	if (daemonisep) {
 		daemonise();
 	}
+	/* check if nworkers is not too large */
+	if (nworkers > MAX_WORKERS) {
+		nworkers = MAX_WORKERS;
+	}
 	/* initialise the main loop */
 	loop = ev_default_loop(0);
 	__ctx.mainloop = loop;
@@ -636,7 +644,7 @@ main(int argc, const char *argv[])
 		ev_async_start(secl, eva);
 	}
 	/* set up the worker threads along with their secondary loops */
-	for (index_t i = 0; i < NWORKERS; i++) {
+	for (int i = 0; i < nworkers; i++) {
 		add_worker(secl);
 	}
 
@@ -658,16 +666,11 @@ main(int argc, const char *argv[])
 	ud_detach_mcast(EV_A);
 
 	/* kill the workers along with their secondary loops */
-	for (index_t i = NWORKERS; i > 0; i--) {
+	for (int i = nworkers; i > 0; i--) {
 		UD_DEBUG("killing worker %lu\n", (long unsigned int)i - 1);
 		kill_worker(&workers[i-1]);
 	}
-	for (index_t i = NWORKERS; i > 0; i--) {
-		UD_DEBUG("killing worker %lu\n", (long unsigned int)i - 1);
-		kill_worker(&workers[i-1]);
-		usleep(10000);
-	}
-	for (index_t i = NWORKERS; i > 0; i--) {
+	for (int i = nworkers; i > 0; i--) {
 		UD_DEBUG("gathering worker %lu\n", (long unsigned int)i - 1);
 		pthread_join(workers[i-1].thread, NULL);
 	}

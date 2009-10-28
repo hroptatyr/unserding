@@ -38,7 +38,10 @@
 #include <pthread.h>
 #include "unserding-nifty.h"
 #include "wpool.h"
+
+/* our queuing backend */
 #include "arrqueue.h"
+#include "arrqueue.c"
 
 typedef struct __worker_s *__worker_t;
 
@@ -61,6 +64,12 @@ static struct __worker_s __attribute__((aligned(16))) workers[MAX_WORKERS];
 
 
 /* the gory stuff */
+static inline wpjob_t
+wpool_deq(wpool_t p)
+{
+	return arrpq_dequeue(AS_WPOOL(p)->wq);
+}
+
 static void*
 worker(void *wk)
 {

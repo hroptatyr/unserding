@@ -29,7 +29,7 @@ noinst_HEADERS = arrqueue.h dllqueue.h protocore-private.h
 if BUILD_SERVER
 ## the main server binary
 unserdingd_SOURCES = unserdingd.c mcast.c
-unserdingd_SOURCES += protocore.c arrqueue.c dllqueue.c seria.c
+unserdingd_SOURCES += protocore.c seria.c
 unserdingd_SOURCES += module.h module.c
 unserdingd_SOURCES += wpool.h wpool.c
 unserdingd_SOURCES += lua-config.c

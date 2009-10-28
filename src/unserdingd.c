@@ -87,6 +87,8 @@
 /* module handling */
 #include "module.h"
 
+#define UD_VERSION		"v0.2"
+
 FILE *logout;
 
 
@@ -417,6 +419,26 @@ daemonise(void)
 
 
 /* the popt helper */
+static void
+hlp(poptContext con, UNUSED(enum poptCallbackReason foo),
+    struct poptOption *key, UNUSED(const char *arg), UNUSED(void *data))
+{
+	if (key->shortName == 'h') {
+		poptPrintHelp(con, stdout, 0);
+	} else if (key->shortName == 'V') {
+		fprintf(stdout, "unserdingd " UD_VERSION "\n");
+	} else {
+		poptPrintUsage(con, stdout, 0);
+	}
+
+#if !defined(__LCLINT__)
+        /* XXX keep both splint & valgrind happy */
+	con = poptFreeContext(con);
+#endif
+	exit(0);
+	return;
+}
+
 static struct poptOption srv_opts[] = {
 	{ "prefer-ipv6", '6', POPT_ARG_NONE,
 	  &prefer6p, 0,
@@ -427,12 +449,19 @@ static struct poptOption srv_opts[] = {
         POPT_TABLEEND
 };
 
+static struct poptOption help_opts[] = {
+	{NULL, '\0', POPT_ARG_CALLBACK, (void*)hlp, 0, NULL, NULL},
+	{"help", 'h', 0, NULL, '?', "Show this help message", NULL},
+	{"version", 'V', 0, NULL, 'V', "Print version string and exit.", NULL},
+	{"usage", '\0', 0, NULL, 'u', "Display brief usage message", NULL},
+	POPT_TABLEEND
+};
+
 static const struct poptOption const ud_opts[] = {
-#if 1
         { NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
           "Server Options", NULL },
-#endif
-        POPT_AUTOHELP
+	{NULL, '\0', POPT_ARG_INCLUDE_TABLE, help_opts, 0,
+	 "Help options", NULL},
         POPT_TABLEEND
 };
 

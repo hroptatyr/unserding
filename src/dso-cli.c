@@ -40,6 +40,7 @@
 #include "unserding.h"
 #define UNSERSRV
 #include "unserding-dbg.h"
+#include "unserding-nifty.h"
 
 #include "protocore.h"
 
@@ -65,7 +66,7 @@ cli_hy(job_t j)
 }
 
 static void
-cli_hy_rpl(job_t j)
+cli_hy_rpl(job_t UNUSED(j))
 {
 	UD_DEBUG("mod/cli: ->%s HY\n", hn);
 	return;
@@ -95,7 +96,7 @@ cli_ls(job_t j)
 }
 
 static void
-cli_ls_rpl(job_t j)
+cli_ls_rpl(job_t UNUSED(j))
 {
 	UD_DEBUG("mod/cli: ->%s HY\n", hn);
 	return;
@@ -103,7 +104,7 @@ cli_ls_rpl(job_t j)
 
 
 void
-init(void *clo)
+init(void UNUSED(*clo))
 {
 	UD_DEBUG("mod/cli: loading ...");
 
@@ -121,7 +122,7 @@ init(void *clo)
 }
 
 void
-reinit(void *clo)
+reinit(void UNUSED(*clo))
 {
 	UD_DEBUG("mod/cli: reloading ...");
 	UD_DBGCONT("done\n");
@@ -129,7 +130,7 @@ reinit(void *clo)
 }
 
 void
-deinit(void *clo)
+deinit(void UNUSED(*clo))
 {
 	UD_DEBUG("mod/cli: unloading ...");
 	UD_DBGCONT("done\n");

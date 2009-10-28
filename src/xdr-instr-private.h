@@ -61,7 +61,7 @@
 # define UNLIKELY(_x)	__builtin_expect((_x), 0)
 #endif
 #if !defined UNUSED
-# define UNUSED(_x)	__attribute__((unused)) _x
+# define UNUSED(_x)	_x __attribute__((unused))
 #endif	/* !UNUSED */
 #if !defined ALGN16
 # define ALGN16(_x)	__attribute__((aligned(16))) _x

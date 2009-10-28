@@ -133,7 +133,7 @@ static char ackmsg[4096];
 //static const char ackmsg[] = "                   \n<?scscp ack ?>\n<?scscp start ?><OMOBJ/><?scscp end ?>\n\n                                                                                                                                                                                                                                                                                                                                                                                                       \n";
 
 static void
-inco_cb(EV_P_ ev_io *w, int revents)
+inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	ev_timer *wtimer = &__wtimer;
 	char buf[4096];
@@ -164,7 +164,7 @@ inco_cb(EV_P_ ev_io *w, int revents)
 }
 
 static void
-ack_cb(EV_P_ ev_timer *w, int revents)
+ack_cb(EV_P_ ev_timer *UNUSED(w), int UNUSED(revents))
 {
 	UD_DEBUG("writing\n");
 	if (sock_i >= 0) {
@@ -232,14 +232,14 @@ init(void *clo)
 }
 
 void
-reinit(void *clo)
+reinit(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/scscp: reloading ...done\n");
 	return;
 }
 
 void
-deinit(void *clo)
+deinit(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/scscp: unloading ...");
 	close(sock_i);
@@ -250,4 +250,4 @@ deinit(void *clo)
 	return;
 }
 
-/* dso-cli.c ends here */
+/* dso-scscp.c ends here */

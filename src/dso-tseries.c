@@ -533,7 +533,7 @@ load_ticks_fetcher(void *clo, void *spec)
 }
 
 static void
-unload_ticks_fetcher(void *clo)
+unload_ticks_fetcher(void *UNUSED(clo))
 {
 #if defined HAVE_MYSQL
 	/* fetch some instruments by sql */

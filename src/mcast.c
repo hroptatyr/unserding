@@ -427,7 +427,7 @@ static char scratch_buf[UDPC_PKTLEN];
 
 /* this callback is called when data is readable on the main server socket */
 static void
-mcast_inco_cb(EV_P_ ev_io *w, int revents)
+mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	ssize_t nread;
 	char buf[INET6_ADDRSTRLEN];

@@ -41,6 +41,7 @@
 #include <time.h>
 #include <pfack/uterus.h>
 #include "unserding.h"
+#include "unserding-nifty.h"
 #include "protocore.h"
 #include "tseries.h"
 
@@ -77,14 +78,14 @@ t1(spDute_t t)
 }
 
 static void
-ne(spDute_t t)
+ne(spDute_t UNUSED(t))
 {
 	fputs("  v:does not exist\n", stdout);
 	return;
 }
 
 static void
-oh(spDute_t t)
+oh(spDute_t UNUSED(t))
 {
 	fputs("  v:deferred\n", stdout);
 	return;
@@ -110,7 +111,7 @@ ttc(spDute_t t)
 }
 
 static void
-t_cb(spDute_t t, void *clo)
+t_cb(spDute_t t, void *UNUSED(clo))
 {
 	fprintf(stdout, "tick storm, ticks:1 ii:%u/%u/%u tt:%c  ts:%i",
 		t->instr, t->unit, spDute_pot(t), ttc(t), t->pivot);

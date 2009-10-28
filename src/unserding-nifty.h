@@ -48,15 +48,21 @@ typedef size_t index_t;
 #if !defined UNLIKELY
 # define UNLIKELY(_x)	__builtin_expect((_x), 0)
 #endif
-#define UNUSED(_x)	__attribute__((unused)) _x
+#if !defined UNUSED
+# define UNUSED(_x)	_x __attribute__((unused))
+#endif	/* !UNUSED */
 #define ALGN16(_x)	__attribute__((aligned(16))) _x
 
 #define countof(x)		(sizeof(x) / sizeof(*x))
 #define countof_m1(x)		(countof(x) - 1)
 
 /* The encoded parameter sizes will be rounded up to match pointer alignment. */
-#define ROUND(s, a)		(a * ((s + a - 1) / a))
-#define aligned_sizeof(t)	ROUND(sizeof(t), __alignof(void*))
+#if !defined ROUND
+# define ROUND(s, a)		(a * ((s + a - 1) / a))
+#endif	/* !ROUND */
+#if !defined aligned_sizeof
+# define aligned_sizeof(t)	ROUND(sizeof(t), __alignof(void*))
+#endif	/* !aligned_sizeof */
 
 #if !defined xnew
 # define xnew(_a)	(malloc(sizeof(_a)))

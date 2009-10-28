@@ -47,6 +47,7 @@
 #include "unserding.h"
 #define UNSERSRV
 #include "unserding-dbg.h"
+#include "unserding-nifty.h"
 #include <sys/param.h>
 
 #include "protocore.h"
@@ -54,10 +55,6 @@
 #include <libxml/parser.h>
 
 #include "bbdb-mulvalbuf.h"
-
-#define xnew(_x)	malloc(sizeof(_x))
-
-typedef size_t index_t;
 
 typedef void *bbdb_t;
 typedef struct entry_s *entry_t;
@@ -144,7 +141,7 @@ init_stbuf(void)
 }
 
 static void
-stuff_buf(void *ctx, const xmlChar *ch, int len)
+stuff_buf(void UNUSED(*ctx), const xmlChar *ch, int len)
 {
 	strncpy(&stbuf[stblen], (const char*)ch, len);
 	stblen += len;
@@ -226,7 +223,7 @@ init_phone(void *ctx)
 }
 
 static __attribute__((unused)) void
-pr_buf(void *ctx, const xmlChar *str, int len)
+pr_buf(void UNUSED(*ctx), const xmlChar *str, int UNUSED(len))
 {
 	fputs((const char*)str, stdout);
 	return;
@@ -247,7 +244,7 @@ copy_street(void *ctx)
 
 
 static void
-sta(void *ctx, const xmlChar *name, const xmlChar **attrs)
+sta(void *ctx, const xmlChar *name, const xmlChar UNUSED(**attrs))
 {
 	if (strcmp((const char*)name, "entry") == 0) {
 		init_new_entry(ctx);
@@ -502,7 +499,7 @@ bbdb_search(job_t j)
 
 
 void
-init(void *clo)
+init(void UNUSED(*clo))
 {
 	UD_DEBUG("mod/bbdb: loading ...");
 
@@ -518,7 +515,7 @@ init(void *clo)
 }
 
 void
-reinit(void *clo)
+reinit(void UNUSED(*clo))
 {
 	UD_DEBUG("mod/bbdb: reloading ...");
 
@@ -534,7 +531,7 @@ reinit(void *clo)
 }
 
 void
-deinit(void *clo)
+deinit(void *clo __attribute__((unused)))
 {
 	UD_DEBUG("mod/bbdb: unloading ...");
 	/* clearing bbdb search service */

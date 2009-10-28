@@ -684,6 +684,10 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 			warnflags="$warnflags -Wunused-function"])
 		SXE_CHECK_COMPILER_FLAGS([-Wunused-variable], [
 			warnflags="$warnflags -Wunused-variable"])
+		SXE_CHECK_COMPILER_FLAGS([-Wunused-parameter], [
+			warnflags="$warnflags -Wunused-parameter"])
+		SXE_CHECK_COMPILER_FLAGS([-Wunused-value], [
+			warnflags="$warnflags -Wunused-value"])
 		SXE_CHECK_COMPILER_FLAGS([-Wunused], [
 			warnflags="$warnflags -Wunused"])
 

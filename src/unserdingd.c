@@ -102,6 +102,7 @@ struct ud_ev_async_s {
 
 struct ud_worker_s {
 	pthread_t ALGN16(thread);
+	struct ev_loop *loop;
 } __attribute__((aligned(16)));
 
 
@@ -232,7 +233,6 @@ static index_t rr_wrk = 0;
 /* the workers array */
 static struct ud_worker_s __attribute__((aligned(16))) workers[MAX_WORKERS];
 
-static struct ev_loop *secl;
 /* a watcher for worker jobs */
 struct ev_async ALGN16(work_watcher);
 /* a watcher for harakiri orders */
@@ -241,7 +241,7 @@ struct ev_async ALGN16(kill_watcher);
 static inline struct ev_loop __attribute__((always_inline, gnu_inline)) *
 worker_loop(ud_worker_t wk)
 {
-	return secl;
+	return wk->loop;
 }
 
 static inline struct ev_async __attribute__((always_inline, gnu_inline)) *
@@ -261,6 +261,8 @@ static struct job_queue_s __glob_jq;
 job_queue_t glob_jq;
 
 
+/* holds the secondary loop for access from within the main thread */
+static void *secl;
 inline void __attribute__((always_inline, gnu_inline))
 trigger_job_queue(void)
 {
@@ -358,6 +360,8 @@ add_worker(struct ev_loop *loop)
 	pthread_attr_t attr;
 	ud_worker_t wk = &workers[rr_wrk++];
 
+	/* load off our loop */
+	wk->loop = loop;
 	/* initialise thread attributes */
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -376,6 +380,20 @@ kill_worker(ud_worker_t wk)
 	/* send a lethal signal to the workers and detach */
 	ev_async_send(worker_loop(wk), worker_killw(wk));
 	return;
+}
+
+static void*
+init_secondary(void)
+{
+	ev_async *evw = &work_watcher;
+	ev_async *evk = &kill_watcher;
+	struct ev_loop *res = ev_loop_new(EVFLAG_AUTO);
+
+	ev_async_init(evw, worker_cb);
+	ev_async_start(res, evw);
+	ev_async_init(evk, kill_cb);
+	ev_async_start(res, evk);
+	return res;
 }
 
 
@@ -598,7 +616,7 @@ main(int argc, const char *argv[])
 		nworkers = MAX_WORKERS;
 	}
 	/* initialise the main loop */
-	loop = ev_default_loop(0);
+	loop = ev_default_loop(EVFLAG_AUTO);
 	__ctx.mainloop = loop;
 
 	/* initialise global job q */
@@ -632,17 +650,7 @@ main(int argc, const char *argv[])
 	ev_async_start(EV_A_ glob_notify);
 
 	/* create one loop for all threads */
-	secl = ev_loop_new(0);
-	{
-		ev_async *eva = &work_watcher;
-		ev_async_init(eva, worker_cb);
-		ev_async_start(secl, eva);
-	}
-	{
-		ev_async *eva = &kill_watcher;
-		ev_async_init(eva, kill_cb);
-		ev_async_start(secl, eva);
-	}
+	secl = init_secondary();
 	/* set up the worker threads along with their secondary loops */
 	for (int i = 0; i < nworkers; i++) {
 		add_worker(secl);

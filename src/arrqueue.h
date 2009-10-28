@@ -73,27 +73,10 @@
 /* since we need it so bad we provide an array based queue with fixed size
  * slots, thread-safe of course. */
 
-/* fixed-size AoS queue, data inside. */
-typedef struct fsarrq_s *fsarrq_t;
 /* ordinary doubly-linked queue with data from an array */
 typedef struct dlarrq_s *dlarrq_t;
 /* ordinary pointer based queue with data from an array */
 typedef struct arrpq_s *arrpq_t;
-
-struct fsarrq_s {
-	/* queue head */
-	short unsigned int head;
-	/* queue tail */
-	short unsigned int tail;
-	/* en/de-queuing mutex */
-	pthread_mutex_t mtx;
-	/* slot size */
-	unsigned int slsz;
-	/* queue size */
-	unsigned int qsz;
-	/* data vector */
-	char ALGN16(data[]);
-};
 
 struct arrpq_s {
 	/* queue head */

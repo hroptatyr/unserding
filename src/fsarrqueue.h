@@ -94,8 +94,6 @@ struct fsarrpq_s {
 	unsigned int csz;
 	/* queue size */
 	unsigned int qsz;
-	/* alloc size */
-	unsigned int asz;
 	/* data vector */
 	char ALGN16(data[]);
 };
@@ -109,7 +107,6 @@ make_fsarrpq(size_t queue_size, size_t cell_size)
 	res->head = res->tail = NULL;
 	res->csz = cell_size;
 	res->qsz = 0;
-	res->asz = queue_size;
 	pthread_mutex_init(&res->mtx, NULL);
 	/* initialise the free queue */
 	for (size_t i = 1; i < queue_size; i++) {
@@ -134,14 +131,6 @@ free_fsarrpq(fsarrpq_t q)
 	pthread_mutex_destroy(&q->mtx);
 	xfree(q);
 	return;
-}
-
-/**
- * Return the allocated size of the queue Q. */
-static inline size_t
-fsarrpq_alloc_size(fsarrpq_t q)
-{
-	return q->asz;
 }
 
 /**

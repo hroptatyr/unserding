@@ -44,18 +44,13 @@
 #define MAX_WORKERS	16
 
 typedef void *wpool_t;
-typedef struct wpjob_s *wpjob_t;
-
-struct wpjob_s {
-	void(*work_f)(void *closure);
-	void *closure;
-};
+typedef void(*wpool_work_f)(void *closure);
 
 
 extern wpool_t make_wpool(int nworkers, int njobs);
 extern void kill_wpool(wpool_t p);
 
-extern void wpool_enq(wpool_t, wpjob_t, bool triggerp);
+extern bool wpool_enq(wpool_t, wpool_work_f cb, void *clo, bool triggerp);
 extern void wpool_trigger(wpool_t);
 
 #endif	/* INCLUDED_wpool_h_ */

@@ -35,76 +35,115 @@
  *
  ***/
 
+#include <stdio.h>
 #include <pthread.h>
 #include "unserding-nifty.h"
 #include "wpool.h"
+#if !defined UD_DEBUG
+# define UD_DEBUG(args...)
+#endif	/* UNSERSRV */
 
 /* our queuing backend */
-#include "arrqueue.h"
-#include "arrqueue.c"
+#include "fsarrqueue.h"
 
+typedef struct __wpool_s *__wpool_t;
 typedef struct __worker_s *__worker_t;
+typedef struct wpjob_s *wpjob_t;
+
+struct wpjob_s {
+	wpool_work_f cb;
+	void *clo;
+};
 
 struct __worker_s {
 	pthread_t ALGN16(thread);
-	/** the loop we're talking */
-	struct ev_loop *loop;
+	wpool_t pool;
 } __attribute__((aligned(16)));
 
 struct __wpool_s {
-	/* the queue for the workers */
-	arrpq_t wq;
+	/* our job queue */
+	fsarrpq_t q;
+	/* worker signal */
+	pthread_mutex_t mtx;
+	pthread_cond_t sem;
+	/* workers array */
+	int nworkers;
+	struct __worker_s __attribute__((aligned(16))) workers[];
 };
 #define AS_WPOOL(_x)	((struct __wpool_s*)(_x))
 
-/* round robin var */
-static index_t rr_wrk = 0;
-/* the workers array */
-static struct __worker_s __attribute__((aligned(16))) workers[MAX_WORKERS];
+
+/* queue handling */
+static inline bool
+wpool_deq(wpjob_t j, wpool_t p)
+{
+	return fsarrpq_deq(AS_WPOOL(p)->q, j);
+}
+
+bool
+wpool_enq(wpool_t p, wpool_work_f cb, void *clo, bool triggerp)
+{
+	struct wpjob_s j = {.cb = cb, .clo = clo};
+	bool res;
+
+	res = fsarrpq_enq(AS_WPOOL(p)->q, &j);
+	if (triggerp || !res) {
+		wpool_trigger(p);
+	}
+	return res;
+}
+
+void
+wpool_trigger(wpool_t p)
+{
+	pthread_mutex_lock(&AS_WPOOL(p)->mtx);
+	pthread_cond_signal(&AS_WPOOL(p)->sem);
+	pthread_mutex_unlock(&AS_WPOOL(p)->mtx);
+	return;
+}
 
 
 /* the gory stuff */
-static inline wpjob_t
-wpool_deq(wpool_t p)
-{
-	return arrpq_dequeue(AS_WPOOL(p)->wq);
-}
-
 static void*
-worker(void *wk)
+worker(void *clo)
 {
 	long int UNUSED(self) = pthread_self();
-#if 0
-	void *loop = worker_loop(wk);
-	size_t iter = 0;
+	__worker_t wk = clo;
+	__wpool_t wp = wk->pool;
 
-	lolo_lock(EV_A);
-	UD_DEBUG("starting worker thread %lx, loop %p\n", self, loop);
-	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, 0);
-	ev_loop(EV_A_ 0);
-	UD_DEBUG("quitting worker thread %lx, loop %p\n", self, loop);
-	lolo_unlock(EV_A);
-#endif
-#if 0
-	wpjob_t j = wpool_deq();
-	j->workf(j->closure);
-#endif
-	return NULL;
+	UD_DEBUG("starting worker thread %lx %p\n", self, clo);
+	while (true) {
+		struct wpjob_s wpj;
+		pthread_cond_wait(&wp->sem, &wp->mtx);
+		UD_DEBUG("working %lx %p\n", self, clo);
+		while (wpool_deq(&wpj, wp)) {
+			if (wpj.cb == NULL && wpj.clo == (void*)0xdead) {
+				/* we were ordered to die */
+				goto bingo;
+			}
+			/* otherwise call the callback */
+			wpj.cb(wpj.clo);
+		}
+		UD_DEBUG("work finished %lx %p\n", self, clo);
+	}
+bingo:
+	UD_DEBUG("quitting worker thread %lx %p\n", self, clo);
+	pthread_mutex_unlock(&wp->mtx);
+	pthread_exit(NULL);
 }
 
 
 static void
-add_worker(struct ev_loop *loop)
+add_worker(wpool_t wp, __worker_t wk)
 {
 	pthread_attr_t attr;
-	__worker_t wk = &workers[rr_wrk++];
 
-	/* load off our loop */
-	wk->loop = loop;
 	/* initialise thread attributes */
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
+	/* let the worker now about the pool */
+	wk->pool = wp;
 	/* start the thread now */
 	pthread_create(&wk->thread, &attr, worker, wk);
 
@@ -114,10 +153,10 @@ add_worker(struct ev_loop *loop)
 }
 
 static void
-kill_worker(__worker_t wk)
+kill_worker(wpool_t wp, __worker_t __attribute__((unused)) wk)
 {
 	/* send a lethal signal to the workers and detach */
-	ev_async_send(worker_loop(wk), worker_killw(wk));
+	wpool_enq(wp, NULL, (void*)0xdead, true);
 	return;
 }
 
@@ -126,76 +165,41 @@ kill_worker(__worker_t wk)
 wpool_t
 make_wpool(int nworkers, int njobs)
 {
-	//AS_WPOOL(res)->wq = make_arrpq(njobs);
-	return NULL;
+	size_t asz = nworkers * sizeof(struct __worker_s);
+	wpool_t res = malloc(sizeof(struct __wpool_s) + asz);
+
+	AS_WPOOL(res)->nworkers = nworkers;
+	AS_WPOOL(res)->q = make_fsarrpq(njobs, sizeof(struct wpjob_s));
+
+	pthread_mutex_init(&AS_WPOOL(res)->mtx, 0);
+	pthread_cond_init(&AS_WPOOL(res)->sem, 0);
+	for (int i = 0; i < nworkers; i++) {
+		__worker_t wk = &AS_WPOOL(res)->workers[i];
+		add_worker(res, wk);
+	}
+	return res;
 }
 
 void
 kill_wpool(wpool_t p)
 {
-	return;
-}
-
-
-/* queue handling */
-void
-wpool_enq(wpool_t p, wpjob_t j, bool triggerp)
-{
-	/* enqueue in the worker queue */
-	arrpq_enqueue(AS_WPOOL(p)->wq, j);
-	return;
-}
-
-void
-wpool_trigger(wpool_t p)
-{
-	return;
-}
-
-#if 0
-static void*
-init_secondary(void)
-{
-	ev_async *evw = &work_watcher;
-	ev_async *evk = &kill_watcher;
-	struct ev_loop *res = ev_loop_new(EVFLAG_AUTO);
-	static struct ud_loopclo_s clo;
-
-	/* prepare the closure */
-	pthread_mutex_init(&clo.lolo, 0);
-	pthread_cond_init(&clo.loco, 0);
-	/* announce our cruft */
-	ev_set_userdata(res, &clo);
-	ev_set_loop_release_cb(res, lolo_unlock, lolo_lock);
-	//ev_set_invoke_pending_cb(res, worker_invoke);
-	/* prepare watchers */
-#if 0
-	ev_async_init(evw, worker_cb);
-	ev_async_start(res, evw);
-#endif
-	ev_async_init(evk, kill_cb);
-	ev_async_start(res, evk);
-	return res;
-}
-
-for (int i = 0; i < nworkers; i++) {
-		UD_DEBUG("killing worker %lu\n", (long unsigned int)i - 1);
-		add_worker(&workers[i-1]);
-	}
-
-
 	/* kill the workers along with their secondary loops */
-	for (int i = nworkers; i > 0; i--) {
-		UD_DEBUG("killing worker %lu\n", (long unsigned int)i - 1);
-		kill_worker(&workers[i-1]);
+	for (int i = 0; i < AS_WPOOL(p)->nworkers; i++) {
+		UD_DEBUG("killing worker %d\n", i);
+		kill_worker(p, &AS_WPOOL(p)->workers[i]);
 	}
-	for (int i = nworkers; i > 0; i--) {
-		UD_DEBUG("gathering worker %lu\n", (long unsigned int)i - 1);
-		pthread_join(workers[i-1].thread, NULL);
+	for (int i = 0; i < AS_WPOOL(p)->nworkers; i++) {
+		UD_DEBUG("gathering worker %d\n", i);
+		pthread_join(AS_WPOOL(p)->workers[i].thread, NULL);
 	}
-	/* destroy the secondary loop */
-	ev_loop_destroy(secl);
-
-#endif
+	/* destroy mutex and semaphore */
+	pthread_mutex_lock(&AS_WPOOL(p)->mtx);
+	pthread_mutex_unlock(&AS_WPOOL(p)->mtx);
+	pthread_cond_destroy(&AS_WPOOL(p)->sem);
+	pthread_mutex_destroy(&AS_WPOOL(p)->mtx);
+	/* free our event queue */
+	free_fsarrpq(AS_WPOOL(p)->q);
+	return;
+}
 
 /* wpool.c ends here */

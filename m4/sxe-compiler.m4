@@ -680,6 +680,13 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 		SXE_CHECK_COMPILER_FLAGS([-Wswitch-enum], [
 			warnflags="$warnflags -Wswitch-enum"])
 
+		SXE_CHECK_COMPILER_FLAGS([-Wunused-function], [
+			warnflags="$warnflags -Wunused-function"])
+		SXE_CHECK_COMPILER_FLAGS([-Wunused-variable], [
+			warnflags="$warnflags -Wunused-variable"])
+		SXE_CHECK_COMPILER_FLAGS([-Wunused], [
+			warnflags="$warnflags -Wunused"])
+
 		if test "$sxe_cv_c_flags__save_temps" = "yes"; then
 			: ##warnflags="$warnflags -save-temps"
 		fi

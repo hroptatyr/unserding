@@ -125,7 +125,7 @@ static inline bool
 udpc_pkt_valid_p(const ud_packet_t pkt)
 {
 	/* be trivial for now */
-	return pkt.plen >= 0;
+	return pkt.plen > 0;
 }
 
 static inline udpc_pktstorminess_t

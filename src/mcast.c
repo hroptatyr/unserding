@@ -439,7 +439,6 @@ mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	job_t j;
 	socklen_t lsa = sizeof(j->sa);
 
-	UD_DEBUG_MCAST("incoming connexion\n");
 	if (UNLIKELY((j = jpool_acquire(gjpool)) == NULL)) {
 		UD_CRITICAL("no job slots ... leaping\n");
 		/* just read the packet off of the wire */
@@ -454,9 +453,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	a = inet_ntop(ud_sockaddr_fam(&j->sa),
 		      ud_sockaddr_addr(&j->sa), buf, sizeof(buf));
 	p = ud_sockaddr_port(&j->sa);
-	UD_DEBUG_MCAST("sock %d connect from host %s port %d\n", w->fd, a, p);
-	UD_LOG_MCAST(":sock %d connect :from [%s]:%d\n"
-		     "                                         "
+	UD_LOG_MCAST(":sock %d connect :from [%s]:%d  "
 		     ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
 		     w->fd, a, p,
 		     (unsigned int)nread,

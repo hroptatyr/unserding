@@ -113,7 +113,9 @@ worker(void *clo)
 	UD_DEBUG("starting worker thread %lx %p\n", self, clo);
 	while (true) {
 		struct wpjob_s wpj;
+		pthread_mutex_lock(&wp->mtx);
 		pthread_cond_wait(&wp->sem, &wp->mtx);
+		pthread_mutex_unlock(&wp->mtx);
 		UD_DEBUG("working %lx %p\n", self, clo);
 		while (wpool_deq(&wpj, wp)) {
 			if (wpj.cb == NULL && wpj.clo == (void*)0xdead) {
@@ -127,7 +129,6 @@ worker(void *clo)
 	}
 bingo:
 	UD_DEBUG("quitting worker thread %lx %p\n", self, clo);
-	pthread_mutex_unlock(&wp->mtx);
 	pthread_exit(NULL);
 }
 

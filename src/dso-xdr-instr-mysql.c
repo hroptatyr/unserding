@@ -130,7 +130,7 @@ static const char iqry[] =
 	"FROM `freundt`.`ud_instr_unrolled` AS uiu";
 
 static void
-make_currency(instr_t in, uint32_t id, void **rows, size_t nflds)
+make_currency(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
 	uint16_t co = strtoul(rows[CCY_CODE], NULL, 10);
 	make_tcnxxx_into(in, id, co);
@@ -139,7 +139,7 @@ make_currency(instr_t in, uint32_t id, void **rows, size_t nflds)
 }
 
 static void
-make_index(instr_t in, uint32_t id, void **rows, size_t nflds)
+make_index(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
 	make_tixxxx_into(in, id, rows[IDENT_GA]);
 	UD_DEBUG("made index %s (%u)\n", instr_name(in), id);
@@ -188,7 +188,7 @@ parse_undl(const char *data)
 }
 
 static void
-make_option(instr_t in, uint32_t id, void **rows, size_t nflds)
+make_option(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
 	uint32_t undl_id = parse_undl(rows[OPT_UNDL]);
 	const char *cfi = rows[OPT_CFI];
@@ -257,7 +257,7 @@ get_annu(const char *val)
 }
 
 static void
-make_interest_rate(instr_t in, uint32_t id, void **rows, size_t nflds)
+make_interest_rate(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
 	uint16_t mmat = get_mmat(rows[FRA_MMAT]);
 	uint16_t annu = get_annu(rows[FRA_ANNU]);

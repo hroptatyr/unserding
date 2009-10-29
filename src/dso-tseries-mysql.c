@@ -395,7 +395,7 @@ fill_batfx_ohlcv(urn_t urn, const char *r)
 }
 
 static void
-urnqry_rowf(void **row, size_t nflds, void *clo)
+urnqry_rowf(void **row, size_t UNUSED(nflds), void *clo)
 {
 	urn_t urn = clo;
 
@@ -458,7 +458,7 @@ static const char ovqry[] =
 #define TBS_5DW		0x02
 
 static void
-ovqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
+ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 {
 	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
 	struct secu_s secu;
@@ -524,7 +524,7 @@ dso_tseries_mysql_LTX_init(void *clo)
 }
 
 void
-dso_tseries_mysql_LTX_deinit(void *clo)
+dso_tseries_mysql_LTX_deinit(void *UNUSED(clo))
 {
 	uddb_disconnect(conn);
 	return;

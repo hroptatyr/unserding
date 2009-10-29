@@ -440,11 +440,11 @@ mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	socklen_t lsa = sizeof(j->sa);
 
 	UD_DEBUG_MCAST("incoming connexion\n");
-	if (UNLIKELY((j = make_job()) == NULL)) {
+	if (UNLIKELY((j = jpool_acquire(gjpool)) == NULL)) {
 		UD_CRITICAL("no job slots ... leaping\n");
 		/* just read the packet off of the wire */
 		(void)recv(w->fd, scratch_buf, UDPC_PKTLEN, 0);
-		wpool_trigger(gpool);
+		wpool_trigger(gwpool);
 		return;
 	}
 
@@ -480,7 +480,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space, also trigger the lazy bastards */
-	wpool_enq(glob_jq, j, true);
+	wpool_enq(gwpool, NULL, NULL, true);
 	return;
 }
 

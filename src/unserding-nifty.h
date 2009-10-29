@@ -64,8 +64,14 @@ typedef size_t index_t;
 # define aligned_sizeof(t)	ROUND(sizeof(t), __alignof(void*))
 #endif	/* !aligned_sizeof */
 
+#if !defined xmalloc
+# define xmalloc(_x)	malloc(_x)
+#endif	/* !xmalloc */
 #if !defined xnew
-# define xnew(_a)	(malloc(sizeof(_a)))
+# define xnew(_a)	xmalloc(sizeof(_a))
 #endif	/* !xnew */
+#if !defined xfree
+# define xfree(_x)	free(_x)
+#endif	/* !xfree */
 
 #endif	/* INCLUDED_unserding_nifty_h_ */

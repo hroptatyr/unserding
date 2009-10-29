@@ -48,7 +48,7 @@
 typedef void *jpool_t;
 
 
-extern jpool_t make_wpool(int njobs, int job_size);
+extern jpool_t make_jpool(int njobs, int job_size);
 extern void free_jpool(jpool_t p);
 
 extern job_t jpool_acquire(jpool_t);

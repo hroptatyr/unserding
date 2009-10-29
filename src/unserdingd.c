@@ -232,12 +232,9 @@ ev_async *glob_notify;
 static int nworkers = 1;
 
 /* the global job queue */
-static struct job_queue_s __glob_jq;
-job_queue_t glob_jq;
-
-
+jpool_t gjpool;
 /* holds worker pool */
-wpool_t gpool;
+wpool_t gwpool;
 
 static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
 
@@ -280,82 +277,12 @@ triv_cb(EV_P_ ev_async *w, int revents)
 }
 
 static void
-kill_cb(EV_P_ ev_async *w, int revents)
+worker_cb(void *clo)
 {
-	long int UNUSED(self) = (long int)pthread_self();
-	UD_DEBUG("SIGQUIT caught in %lx\n", self);
-	ev_unloop(EV_A_ EVUNLOOP_ALL);
-	return;
-}
+	job_t j = clo;
 
-static void
-worker_cb(EV_P_ ev_async *w, int revents)
-{
-	long int UNUSED(self) = (long int)pthread_self();
-#if 0
-	job_t j;
-
-	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
-		UD_DEBUG("thread/loop %lx/%p doing work %p\n", self, loop, j);
-		ud_proto_parse(j);
-#if 0
-/* we took precautions to send off the packet that's now in j
- * based on the transmission flags, however, that's additional bollocks
- * atm so we let the proto funs deal with that themselves */
-		send_cl(j);
-#endif
-		free_job(j);
-	}
-
-	UD_DEBUG("no more jobs %lx/%p\n", self, loop);
-#endif
-	return;
-}
-
-static void
-lolo_lock(EV_P)
-{
-	long int UNUSED(self) = pthread_self();
-	struct ud_loopclo_s *clo = ev_userdata(EV_A);
-	UD_DEBUG("%lx locking loop %p\n", self, EV_A);
-	pthread_mutex_lock(&clo->lolo);
-	return;
-}
-
-static void
-lolo_unlock(EV_P)
-{
-	long int UNUSED(self) = pthread_self();
-	struct ud_loopclo_s *clo = ev_userdata(EV_A);
-	UD_DEBUG("%lx unlocking loop %p\n", self, EV_A);
-	pthread_mutex_unlock(&clo->lolo);
-	return;
-}
-
-static void
-worker_invoke(EV_P)
-{
-	long int UNUSED(self) = pthread_self();
-	struct ud_loopclo_s *clo = ev_userdata(EV_A);
-
-	while (ev_pending_count(EV_A)) {
-		UD_DEBUG("worker %lx invoked, loop %p\n", self, EV_A);
-		pthread_cond_wait(&clo->loco, &clo->lolo);
-	}
-	return;
-}
-
-static void
-real_invoke_pending(EV_P)
-{
-	long int UNUSED(self) = pthread_self();
-	struct ud_loopclo_s *clo = ev_userdata(EV_A);
-
-	UD_DEBUG("real invoke pending %lx, loop %p\n", self, EV_A);
-	pthread_mutex_lock(&clo->lolo);
-	ev_invoke_pending(EV_A);
-	pthread_cond_signal(&clo->loco);
-	pthread_mutex_unlock(&clo->lolo);
+	ud_proto_parse(j);
+	jpool_release(j);
 	return;
 }
 
@@ -582,8 +509,8 @@ main(int argc, const char *argv[])
 	loop = ev_default_loop(EVFLAG_AUTO);
 	__ctx.mainloop = loop;
 
-	/* initialise global job q */
-	init_glob_jq(&__glob_jq);
+	/* create the job pool, here because we may want to offload stuff */
+	make_jpool(NJOBS, sizeof(struct job_s));
 
 	/* initialise the proto core (no-op at the mo) */
 	init_proto();
@@ -613,7 +540,7 @@ main(int argc, const char *argv[])
 	ev_async_start(EV_A_ glob_notify);
 
 	/* create the worker pool */
-	gpool = make_wpool(nworkers, NJOBS);
+	gwpool = make_wpool(nworkers, NJOBS);
 
 	/* attach a multicast listener
 	 * we add this quite late so that it's unlikely that a plethora of
@@ -631,7 +558,7 @@ main(int argc, const char *argv[])
 	ud_detach_mcast(EV_A);
 
 	/* kill our slaves */
-	kill_wpool(gpool);
+	kill_wpool(gwpool);
 
 	/* destroy the default evloop */
 	ev_default_destroy();

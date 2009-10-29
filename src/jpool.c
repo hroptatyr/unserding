@@ -35,9 +35,15 @@
  *
  ***/
 
+#include <stddef.h>
+#include <stdlib.h>
 #include <pthread.h>
+#include <string.h>
 #include "unserding-nifty.h"
-#include "wpool.h"
+/* because we assume this to be defined in the header */
+typedef void *job_t;
+#include "jpool.h"
+
 #if !defined UD_DEBUG
 # define UD_DEBUG(args...)
 #endif	/* UNSERSRV */
@@ -64,6 +70,8 @@ struct __jpool_s {
 	char ALGN16(data[]);
 };
 
+#define AS_JPOOL(_x)	((struct __jpool_s*)(_x))
+
 /* super hack */
 static inline jpi_t
 jpi_from_job(job_t j)
@@ -88,9 +96,9 @@ make_jpool(int njobs, int job_size)
 	res->csz = job_size;
 	pthread_mutex_init(&res->mtx, NULL);
 	/* initialise the free queue */
-	for (size_t i = 1; i < njobs; i++) {
+	for (int i = 1; i < njobs; i++) {
 		jpi_t qi = (void*)(res->data + nav_size * (i - 1));
-		jqi_t qn = (void*)(res->data + nav_size * i);
+		jpi_t qn = (void*)(res->data + nav_size * i);
 		qi->pool = res;
 		qi->next = qn;
 	}
@@ -117,7 +125,7 @@ free_jpool(jpool_t q)
 
 /**
  * Acquire a job from our pool. */
-static job_t
+job_t
 jpool_acquire(jpool_t jp)
 {
 	__jpool_t q = jp;

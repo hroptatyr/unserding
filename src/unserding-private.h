@@ -66,8 +66,7 @@
 #include "unserding.h"
 #include "protocore.h"
 #include "wpool.h"
-/* for jobs */
-#include "arrqueue.h"
+#include "jpool.h"
 
 #include "unserding-nifty.h"
 #include "unserding-dbg.h"
@@ -77,9 +76,7 @@
 /* we use a fairly simplistic approach: one vector with two index pointers */
 /* number of simultaneous jobs */
 #define NJOBS		256
-#define NO_JOB		((job_t)0)
 
-typedef struct job_queue_s *job_queue_t;
 /**
  * Type for work functions inside jobs. */
 typedef void(*ud_work_f)(job_t);
@@ -89,13 +86,6 @@ typedef ud_work_f ud_free_f;
 /**
  * Type for print functions inside jobs. */
 typedef ud_work_f ud_prnt_f;
-
-struct job_queue_s {
-	/* the queue for free jobs */
-	arrpq_t fq;
-	/* the jobs vector */
-	struct job_s jobs[NJOBS] __attribute__((aligned(16)));
-};
 
 static inline uint8_t __attribute__((always_inline, gnu_inline))
 __job_ready_bits(job_t j)
@@ -143,39 +133,11 @@ __job_set_trans(job_t j)
 
 /**
  * Global job queue. */
-extern job_queue_t glob_jq;
+extern jpool_t gjpool;
 
 /**
  * Global worker pool, contains the job queue. */
-extern wpool_t gpool;
-
-static inline job_t __attribute__((always_inline, gnu_inline))
-make_job(void)
-{
-	/* dequeue from the free queue */
-	return arrpq_dequeue(glob_jq->fq);
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-free_job(job_t j)
-{
-	/* enqueue in the free queue */
-	memset(j, 0, SIZEOF_JOB_S);
-	arrpq_enqueue(glob_jq->fq, j);
-	return;
-}
-
-static void __attribute__((unused))
-init_glob_jq(job_queue_t q)
-{
-	glob_jq = q;
-	glob_jq->fq = make_arrpq(NJOBS);
-	/* enqueue all jobs in the free queue */
-	for (int i = 0; i < NJOBS; i++) {
-		arrpq_enqueue(glob_jq->fq, &glob_jq->jobs[i]);
-	}
-	return;
-}
+extern wpool_t gwpool;
 
 /**
  * Job that looks up the parser routine in ud_parsef(). */

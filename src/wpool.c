@@ -35,7 +35,6 @@
  *
  ***/
 
-#include <stdio.h>
 #include <pthread.h>
 #include "unserding-nifty.h"
 #include "wpool.h"

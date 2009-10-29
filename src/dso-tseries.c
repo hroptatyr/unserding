@@ -193,10 +193,7 @@ struct oadt_ctx_s {
 	secu_t secu;
 	tscoll_t coll;
 	time_t filt[NFILT];
-	tseries_t frob[NFILT];
-	dse16_t refds[NFILT];
 	size_t nfilt;
-	size_t nfrob;
 };
 
 /* we sort the list of requested time stamps to collapse contiguous ones */
@@ -243,21 +240,6 @@ snarf_times(udpc_seria_t sctx, time_t ts[], size_t nts)
 		selsort_in_situ(ts, nfilt);
 	}
 	return nfilt;
-}
-
-static void
-frob_one(tseries_t tser, dse16_t begds)
-{
-	struct tser_pkt_s pkt;
-	dse16_t endds = begds + 13;
-
-	if (fetch_ticks_intv_mysql(&pkt, tser, begds, endds) == 0) {
-		/* we should send something like quote invalid or so */
-		return;
-	}
-	/* cache him */
-	tseries_add(tser, begds, endds, &pkt);
-	return;
 }
 
 static const char*
@@ -418,7 +400,6 @@ instr_tick_by_instr_svc(job_t j)
 	oadtctx.secu = &hdr.secu;
 	oadtctx.coll = tsc;
 	oadtctx.nfilt = nfilt;
-	oadtctx.nfrob = 0;
 
 	for (index_t i = 0; moarp;) {
 		/* prepare the reply packet ... */

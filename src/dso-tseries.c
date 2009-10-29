@@ -355,13 +355,13 @@ one_moar_p(oadt_ctx_t octx)
 	return cur + add < UDPC_PLLEN;
 }
 
-static bool
+static index_t
 proc_some(oadt_ctx_t octx, index_t i)
 {
 	for (; i < octx->nfilt && one_moar_p(octx); i++) {
 		proc_one(octx, octx->filt[i]);
 	}
-	return i < octx->nfilt;
+	return i;
 }
 
 static void
@@ -408,7 +408,7 @@ instr_tick_by_instr_svc(job_t j)
 		copy_pkt(&rplj, j);
 		clear_pkt(&rplsctx, &rplj);
 		/* process some time stamps, this fills the packet */
-		moarp = proc_some(&oadtctx, i);
+		moarp = (i = proc_some(&oadtctx, i)) < oadtctx.nfilt;
 		/* send what we've got so far */
 		send_pkt(&rplsctx, &rplj);
 	} while (moarp);

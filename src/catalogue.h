@@ -95,24 +95,6 @@ extern size_t cat_size(cat_t cat);
  * If known replace the existing instrument in CAT by I. */
 extern instr_t cat_bang_instr(cat_t cat, instr_t i);
 
-/**
- * Annotate I.
- * I is assumed to stem from within the catalogue structure as data
- * is appended beyond its natural extent. */
-static inline void
-cat_annotate_instr(cat_t c, instr_t i, const char *tbl, time_t from, time_t to)
-{
-	return;
-}
-
-/**
- * Return the annotation of an instrument I from within the catalogue. */
-static inline cat_anno_t
-cat_instr_annotation(instr_t i)
-{
-	return &(((anno_instr_t)(void*)i)->anno);
-}
-
 extern instr_t find_instr_by_gaid(cat_t cat, gaid_t gaid);
 extern instr_t find_instr_by_name(cat_t cat, const char *name);
 

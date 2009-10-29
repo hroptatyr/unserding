@@ -260,45 +260,6 @@ frob_one(tseries_t tser, dse16_t begds)
 	return;
 }
 
-static void
-frob_some(oadt_ctx_t octx)
-{
-	for (index_t i = 0; i < octx->nfrob; i++) {
-		frob_one(octx->frob[i], octx->refds[i]);
-	}
-	return;
-}
-
-static inline bool
-frob_seen_p(oadt_ctx_t octx, index_t i, tseries_t tser, dse16_t refds)
-{
-	return octx->frob[i] == tser && octx->refds[i] == refds;
-}
-
-static inline index_t
-find_frob_slot(oadt_ctx_t octx, tseries_t tser, dse16_t refds)
-{
-	for (index_t i = 0; i < octx->nfrob; i++) {
-		if (frob_seen_p(octx, i, tser, refds)) {
-			return i;
-		}
-	}
-	return octx->nfrob++;
-}
-
-static void
-defer_frob(oadt_ctx_t octx, tseries_t tser, dse16_t refds)
-{
-	index_t slot;
-	if (octx->nfrob > (slot = find_frob_slot(octx, tser, refds))) {
-		/* already known */
-		return;
-	}
-	octx->frob[slot] = tser;
-	octx->refds[slot] = refds;
-	return;
-}
-
 static const char*
 tsbugger(time_t ts)
 {
@@ -393,7 +354,7 @@ proc_one(oadt_ctx_t octx, time_t ts)
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
 		UD_DEBUG_TSER("URN not cached, deferring (%i %s)\n",
 			      octx->secu->instr, tsbugger(ts));
-		defer_frob(octx, tser, refts - idx);
+		defer_frob(tser, refts - idx, false);
 		spDute_bang_all_onhold(octx, refts);
 
 	} else {
@@ -470,7 +431,7 @@ instr_tick_by_instr_svc(job_t j)
 	} while (moarp);
 
 	/* we cater for any frobnication desires now */
-	frob_some(&oadtctx);
+	frobnicate();
 	return;
 }
 
@@ -525,6 +486,9 @@ load_ticks_fetcher(void *clo, void *spec)
 		/* do fuckall */
 		break;
 	}
+
+	/* also load the frobber in this case */
+	dso_tseries_frobq_LTX_init(clo);
 
 	/* clean up */
 	udctx_set_setting(clo, NULL);

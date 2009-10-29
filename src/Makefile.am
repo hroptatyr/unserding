@@ -80,6 +80,7 @@ dso_tseries_la_SOURCES = dso-tseries.c
 dso_tseries_la_SOURCES += intvtree.c tscache.c tscoll.c tseries.c
 if USE_MYSQL
 dso_tseries_la_SOURCES += dso-tseries-mysql.c
+dso_tseries_la_SOURCES += dso-tseries-frobq.c
 endif
 
 ## to fiddle with option chains and other instruments

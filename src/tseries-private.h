@@ -48,4 +48,18 @@ extern tscache_t tscache;
 extern size_t
 fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t b, dse16_t e);
 
+
+/* module like helpers */
+extern void dso_tseries_LTX_init(void*);
+extern void dso_tseries_LTX_deinit(void*);
+extern void dso_tseries_mysql_LTX_init(void*);
+extern void dso_tseries_mysql_LTX_deinit(void*);
+extern void dso_tseries_frobq_LTX_init(void*);
+extern void dso_tseries_frobq_LTX_deinit(void*);
+
+
+/* frob queue mumbo jumbo */
+extern void defer_frob(tseries_t tser, dse16_t refds, bool immediatep);
+extern void frobnicate(void);
+
 #endif	/* INCLUDED_tseries_private_h_ */

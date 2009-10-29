@@ -500,7 +500,7 @@ main(int argc, const char *argv[])
 	__ctx.mainloop = loop;
 
 	/* create the job pool, here because we may want to offload stuff */
-	make_jpool(NJOBS, sizeof(struct job_s));
+	gjpool = make_jpool(NJOBS, sizeof(struct job_s));
 
 	/* initialise the proto core (no-op at the mo) */
 	init_proto();

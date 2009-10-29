@@ -421,6 +421,15 @@ AC_DEFUN([SXE_DO_CC_HACKS], [dnl
 	if test "$CC" = "g++" -o "$SXE_CC" = "g++" ; then
 		SXE_DIE("Building with g++ is not supported")
 	fi
+
+	if test "${__ICC}" = "yes"; then
+		## it's fucking annoying but libtool removes -static-intel
+		## if specified as `ordinary' compiler flag
+		SXE_CHECK_COMPILER_FLAGS([-static-intel], [
+			CC="${CC} -static-intel"])
+		SXE_CHECK_COMPILER_FLAGS([-static-libgcc], [
+			CC="${CC} -static-libgcc"])
+	fi
 ])dnl SXE_DO_CC_HACKS
 
 AC_DEFUN([SXE_CHECK_CC_NESTED_FUNS], [dnl
@@ -793,6 +802,12 @@ AC_DEFUN([SXE_FEATFLAGS], [dnl
 	if test "$sxe_cv_c_flags__fnested_functions" = "yes"; then
 		featflags="$featflags -fnested-functions"
 	fi
+
+	dnl specifically for the icc here
+	SXE_CHECK_COMPILER_FLAGS([-gcc-version=430], [
+		featflags="${featflags} -gcc-version=430"], [
+		SXE_CHECK_COMPILER_FLAGS([-gcc-version=420], [
+			featflags="${featflags} -gcc-version=420"])])
 ])dnl SXE_FEATFLAGS
 
 
@@ -873,7 +888,8 @@ AC_DEFUN([SXE_CC_MAXOPT_IBM], [dnl
 ])dnl SXE_CC_MAXOPT_IBM
 
 AC_DEFUN([SXE_CC_MAXOPT_INTEL], [dnl
-	optiflags="-O3 -ansi_alias"
+	optiflags="-O3"
+
 	if test "$acx_maxopt_portable" = "no"; then
 		icc_archflag=unknown
 		icc_flags=""
@@ -1066,6 +1082,7 @@ dnl 	fi
 ##### http://autoconf-archive.cryp.to/ax_check_compiler_flags.html
 ## renamed the prefix to SXE_
 AC_DEFUN([SXE_CHECK_COMPILER_FLAGS], [dnl
+dnl SXE_CHECK_COMPILER_FLAGS([flag], [do-if-works], [do-if-not-works])
 	AC_MSG_CHECKING([whether _AC_LANG compiler accepts $1])
 
 	dnl Some hackery here since AC_CACHE_VAL can't handle a non-literal varname:
@@ -1640,6 +1657,9 @@ AC_DEFUN([SXE_CHECK_CC], [dnl
 	SXE_CHECK_CC_HACKS
 	SXE_CHECK_CC_CHAR
 	SXE_CHECK_CC_NESTED_FUNS
+
+	## miscellaneous compiler hacks
+	SXE_DO_CC_HACKS
 
 	## Canonicalize the configuration name.
 	## Commented out, lets see if anything breaks. --SY.

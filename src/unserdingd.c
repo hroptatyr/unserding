@@ -317,6 +317,32 @@ daemonise(void)
 }
 
 
+/* helper function for the worker pool */
+static int
+get_num_proc(void)
+{
+#if defined HAVE_PTHREAD_AFFINITY_NP
+	long int self = pthread_self();
+	cpu_set_t cpuset;
+
+	if (pthread_getaffinity_np(self, sizeof(cpuset), &cpuset) == 0) {
+		int ret = cpuset_popcount(&cpuset);
+		if (ret > 0) {
+			return ret;
+		} else {
+			return 1;
+		}
+	}
+#endif	/* HAVE_PTHREAD_AFFINITY_NP */
+#if defined _SC_NPROCESSORS_ONLN
+	return sysconf(_SC_NPROCESSORS_ONLN);
+#else  /* !_SC_NPROCESSORS_ONLN */
+/* any ideas? */
+	return 1;
+#endif	/* _SC_NPROCESSORS_ONLN */
+}
+
+
 /* the popt helper */
 static void
 hlp(poptContext con, UNUSED(enum poptCallbackReason foo),
@@ -474,9 +500,10 @@ main(int argc, const char *argv[])
 
 	/* whither to log */
 	logout = stderr;
-
 	/* wipe stack pollution */
 	memset(&__ctx, 0, sizeof(__ctx));
+	/* obtain the number of cpus */
+	nworkers = get_num_proc();
 
 	/* parse the command line */
 	rest = ud_parse_cl(argc, argv);
@@ -567,4 +594,3 @@ main(int argc, const char *argv[])
 }
 
 /* unserdingd.c ends here */
- 

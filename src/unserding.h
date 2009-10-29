@@ -62,7 +62,7 @@ union ud_sockaddr_u {
 		struct sockaddr sa;
 		struct sockaddr_in sa4;
 		struct sockaddr_in6 sa6;
-} __attribute__((transparent_union));
+};
 
 /**
  * Flags. */
@@ -115,6 +115,9 @@ struct ud_handle_s {
 };
 
 
+#if defined __INTEL_COMPILER
+#pragma warning (disable:2259)
+#endif	/* __INTEL_COMPILER */
 /* sockaddr stuff */
 static inline short unsigned int __attribute__((always_inline))
 ud_sockaddr_fam(const ud_sockaddr_t *sa)
@@ -197,23 +200,19 @@ ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int timeout, ud_convo_t cno);
 extern void
 ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int timeout,
 		ud_pred_f predf, void *clo);
-/**
- * Return the current conversation id of HDL. */
-extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
-ud_handle_convo(ud_handle_t hdl);
-/**
- * Return the connexion socket stored inside HDL. */
-extern inline int __attribute__((always_inline, gnu_inline))
-ud_handle_sock(ud_handle_t hdl);
 
 /* inlines */
-extern inline ud_convo_t __attribute__((always_inline, gnu_inline))
+/**
+ * Return the current conversation id of HDL. */
+static inline ud_convo_t __attribute__((always_inline))
 ud_handle_convo(ud_handle_t hdl)
 {
 	return hdl->convo;
 }	
 
-extern inline int __attribute__((always_inline, gnu_inline))
+/**
+ * Return the connexion socket stored inside HDL. */
+static inline int __attribute__((always_inline))
 ud_handle_sock(ud_handle_t hdl)
 {
 	return hdl->sock;

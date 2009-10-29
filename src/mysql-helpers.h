@@ -49,11 +49,31 @@
 #  include <mysql.h>
 # endif
 #endif	/* HAVE_MYSQL */
+/* for malloc and friends */
+#include <stdlib.h>
+/* for the connexion mutex */
+#include <pthread.h>
 /* for the config stuff and the context */
 #include "unserding-ctx.h"
+#include "unserding-nifty.h"
 
-typedef void *ud_conn_t;
+typedef struct ud_conn_s *ud_conn_t;
 typedef void(*ud_row_f)(void**, size_t, void *clo);
+
+struct ud_conn_s {
+	/** the actual connection */
+	void *conn;
+	pthread_mutex_t cmtx;
+};
+
+static ud_conn_t
+wrap(void *conn)
+{
+	ud_conn_t res = xnew(*res);
+	res->conn = conn;
+	pthread_mutex_init(&res->cmtx, 0);
+	return res;
+}
 
 static ud_conn_t __attribute__((unused))
 uddb_connect(ud_ctx_t ctx, ud_cfgset_t spec)
@@ -84,13 +104,18 @@ uddb_connect(ud_ctx_t ctx, ud_cfgset_t spec)
 		mysql_close(res);
 		return NULL;
 	}
-	return res;
+	return wrap(res);
 }
 
 static void __attribute__((unused))
 uddb_disconnect(ud_conn_t conn)
 {
-	(void)mysql_close(conn);
+	pthread_mutex_lock(&conn->cmtx);
+	(void)mysql_close(conn->conn);
+	conn->conn = NULL;
+	pthread_mutex_unlock(&conn->cmtx);
+	pthread_mutex_destroy(&conn->cmtx);
+	xfree(conn);
 	return;
 }
 
@@ -101,14 +126,15 @@ uddb_qry(ud_conn_t conn, const char *qry, size_t len, ud_row_f cb, void *clo)
 	size_t nres = 0;
 
 	/* off we go */
-	if (mysql_real_query(conn, qry, len) != 0) {
+	pthread_mutex_lock(&conn->cmtx);
+	if (mysql_real_query(conn->conn, qry, len) != 0) {
 		/* dont know */
-		return 0;
+		goto out;
 	}
 	/* otherwise fetch the result */
-	if ((res = mysql_store_result(conn)) == NULL) {
+	if ((res = mysql_store_result(conn->conn)) == NULL) {
 		/* bummer */
-		return 0;
+		goto out;
 	}
 	/* process him */
 	{
@@ -123,6 +149,8 @@ uddb_qry(ud_conn_t conn, const char *qry, size_t len, ud_row_f cb, void *clo)
 
 	/* and free the result object */
 	mysql_free_result(res);
+out:
+	pthread_mutex_unlock(&conn->cmtx);
 	return nres;
 }
 

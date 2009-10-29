@@ -44,6 +44,8 @@
 #include <string.h>
 #include "unserding-nifty.h"
 #include "intvtree.h"
+/* for thread-safe intvtrees */
+#include <pthread.h>
 
 #define MIN_KEY		0
 #define MAX_KEY		-1U
@@ -67,6 +69,7 @@ struct it_node_s {
 
 struct itree_s {
 	struct it_node_s root;
+	pthread_mutex_t mtx;
 	char satellite[] __attribute__((aligned(__alignof(void*))));
 };
 
@@ -175,6 +178,7 @@ init_itree(itree_t it)
 {
 	init_node(itree_root_node(it), MAX_KEY, MAX_KEY, NULL);
 	itree_root_node(it)->redp = false;
+	pthread_mutex_init(&it->mtx, NULL);
 	return;
 }
 
@@ -198,8 +202,10 @@ make_itree_sat(void *sat, size_t sat_size)
 void
 free_itree(itree_t it)
 {
-	it_node_t x = itree_left_root(it);
+	it_node_t x;
 
+	pthread_mutex_lock(&it->mtx);
+	x = itree_left_root(it);
 	if (!nil_node_p(x)) {
 #if 0
 /* implement me */
@@ -223,6 +229,8 @@ free_itree(itree_t it)
 #endif
 	}
 	memset(itree_root_node(it), 0, sizeof(struct it_node_s));
+	pthread_mutex_unlock(&it->mtx);
+	pthread_mutex_destroy(&it->mtx);
 	return;
 }
 
@@ -325,6 +333,7 @@ itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data)
 	it_node_t x, y, res;
 
 	x = res = make_node(lo, hi, data);
+	pthread_mutex_lock(&it->mtx);
 	itree_ins_help(it, x);
 	itree_fixup_max_high(it, x->parent);
 	x->redp = true;
@@ -370,6 +379,7 @@ itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data)
 	if (!nil_node_p(x = itree_left_root(it))) {
 		x->redp = false;
 	}
+	pthread_mutex_unlock(&it->mtx);
 	return res;
 }
 
@@ -378,12 +388,13 @@ itree_succ_of(itree_t it, it_node_t x)
 { 
 	it_node_t y;
 
+	pthread_mutex_lock(&it->mtx);
 	if (!nil_node_p((y = x->right))) {
 		/* get the minimum of the right subtree of x */
 		while (!nil_node_p(y->left)) {
 			y = y->left;
 		}
-		return y;
+		goto out;
 	} else {
 		y = x->parent;
 		while (x == y->right) {
@@ -391,10 +402,14 @@ itree_succ_of(itree_t it, it_node_t x)
 			y = y->parent;
 		}
 		if (y == itree_root_node(it)) {
-			return nil_node();
+			y = nil_node();
+			goto out;
 		}
-		return y;
+		goto out;
 	}
+out:
+	pthread_mutex_unlock(&it->mtx);
+	return y;
 }
 
 it_node_t
@@ -402,30 +417,37 @@ itree_pred_of(itree_t it, it_node_t x)
 {
 	it_node_t y;
 
+	pthread_mutex_lock(&it->mtx);
 	if (!nil_node_p((y = x->left))) {
 		while (!nil_node_p(y->right)) {
 			/* returns the maximum of the left subtree of x */
 			y = y->right;
 		}
-		return y;
+		goto out;
 	} else {
 		y = x->parent;
 		while (x == y->left) { 
 			if (y == itree_root_node(it)) {
-				return nil_node();
+				y = nil_node();
+				goto out;
 			}
 			x = y;
 			y = y->parent;
 		}
-		return y;
+		goto out;
 	}
+out:
+	pthread_mutex_unlock(&it->mtx);
+	return y;
 }
 
 static void
 itree_del_fixup(itree_t it, it_node_t x)
 {
-	it_node_t rl = itree_left_root(it);
+	it_node_t rl;
 
+	pthread_mutex_lock(&it->mtx);
+	rl = itree_left_root(it);
 	while ((!x->redp) && (rl != x)) {
 		it_node_t w;
 		if (x == x->parent->left) {
@@ -481,6 +503,7 @@ itree_del_fixup(itree_t it, it_node_t x)
 		}
 	}
 	x->redp = false;
+	pthread_mutex_unlock(&it->mtx);
 	return;
 }
 
@@ -490,6 +513,7 @@ itree_del_node(itree_t it, it_node_t z)
 	it_node_t y, x;
 	void *res = z->data;
 
+	pthread_mutex_lock(&it->mtx);
 	if (!inner_node_p(z)) {
 		y = z;
 	} else {
@@ -539,6 +563,7 @@ itree_del_node(itree_t it, it_node_t z)
 		}
 		free_node(y);
 	}
+	pthread_mutex_unlock(&it->mtx);
 	return res;
 }
 
@@ -547,24 +572,24 @@ itree_del_node(itree_t it, it_node_t z)
 static void __attribute__((noinline))
 it_node_print(itree_t it, it_node_t in)
 {
-	printf("k=%i, h=%i, mh=%i", in->key, in->high, in->max_high);
+	printf("k=%u, h=%u, mh=%u", in->key, in->high, in->max_high);
 	fputs("  l->key=", stdout);
 	if (nil_node_p(in->left)) {
 		fputs("NULL", stdout);
 	} else {
-		printf("%i", in->left->key);
+		printf("%u", in->left->key);
 	}
 	fputs("  r->key=", stdout);
 	if (nil_node_p(in->right)) {
 		fputs("NULL", stdout);
 	} else {
-		printf("%i", in->right->key);
+		printf("%u", in->right->key);
 	}
 	fputs("  p->key=", stdout);
 	if (in->parent == itree_root_node(it)) {
 		fputs("NULL", stdout);
 	} else {
-		printf("%i", in->parent->key);
+		printf("%u", in->parent->key);
 	}
 	printf("  red=%i\n", in->redp);
 	return;
@@ -627,33 +652,6 @@ stack_size(it_ndstk_t stk)
 	return stk->idx;
 }
 
-#if 0
-static void
-__itree_trav_in_order(itree_t it, it_trav_f cb, void *clo, it_node_t me)
-{
-	if (!nil_node_p(me->left)) {
-		__itree_trav_in_order(it, cb, clo, me->left);
-	}
-	if (!itree_root_node_p(it, me)) {
-		cb(me->key, me->high, me->data, clo);
-	}
-	if (!nil_node_p(me->right)) {
-		__itree_trav_in_order(it, cb, clo, me->right);
-	}
-	return;
-}
-
-/* travel IT in order and call CB on each node. */
-void
-itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
-{
-	/* left child, me, right child */
-	it_node_t me = itree_root_node(it);
-	__itree_trav_in_order(it, cb, clo, me);
-	return;
-}
-#endif
-
 static void __attribute__((unused))
 __itree_trav_pre_order(
 	itree_t UNUSED(it), it_trav_f cb, void *clo, it_ndstk_t stk)
@@ -676,7 +674,7 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 {
 /* left child, me, right child */
 	/* root node has no right child, proceed with the left one */
-	it_node_t curr = itree_left_root(it);
+	it_node_t curr;
 	it_node_t ____stk[128];
 	struct it_ndstk_s __stk = {.idx = 0, .stk = ____stk}, *stk = &__stk;
 
@@ -688,6 +686,8 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 		}						\
 	} while (0)
 
+	pthread_mutex_lock(&it->mtx);
+	curr = itree_left_root(it);
 	while (!nil_node_p(curr)) {
 		if (inner_node_p(curr)) {
 			stack_push(stk, curr->right);
@@ -710,6 +710,7 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 		}
 	}
 #undef proc
+	pthread_mutex_unlock(&it->mtx);
 	return;
 }
 
@@ -744,7 +745,7 @@ itree_find_point_cb(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 {
 /* left child, me, right child */
 	/* root node has no right child, proceed with the left one */
-	it_node_t curr = itree_left_root(it);
+	it_node_t curr;
 	it_node_t ____stk[128];
 	struct it_ndstk_s __stk = {.idx = 0, .stk = ____stk}, *stk = &__stk;
 
@@ -757,6 +758,8 @@ itree_find_point_cb(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 		}						\
 	} while (0)
 
+	pthread_mutex_lock(&it->mtx);
+	curr = itree_left_root(it);
 	while (!nil_node_p(curr)) {
 		switch (tree_pivot_rel(curr, p)) {
 		case -1:
@@ -801,6 +804,7 @@ itree_find_point_cb(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 		}
 	}
 #undef proc
+	pthread_mutex_unlock(&it->mtx);
 	return;
 }
 
@@ -810,7 +814,7 @@ itree_find_point_cb1(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 /* like itree_find_point() but stop after one occurrence,
  * prefer the right branch for nebulous reasons */
 	/* root node has no right child, proceed with the left one */
-	it_node_t curr = itree_left_root(it);
+	it_node_t curr;
 
 #define proc(_x)						\
 	do {							\
@@ -818,6 +822,8 @@ itree_find_point_cb1(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 		cb(_y->key, _y->high, _y->data, clo);		\
 	} while (0)
 
+	pthread_mutex_lock(&it->mtx);
+	curr = itree_left_root(it);
 	while (!nil_node_p(curr)) {
 		switch (tree_pivot_rel(curr, p)) {
 		case -1:
@@ -826,7 +832,7 @@ itree_find_point_cb1(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 			continue;
 		case 1:
 			/* pivot is beyond the scope, return */
-			return;
+			goto out;
 		case 0:
 		default:
 			break;
@@ -835,7 +841,7 @@ itree_find_point_cb1(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 		if (node_pivot_rel(curr, p) == 0) {
 			/* bingo, mother load */
 			proc(curr);
-			return;
+			goto out;
 		} else {
 			/* this means the above was 1, -1 isn't possible here
 			 * unless the machine is retarded */
@@ -843,6 +849,8 @@ itree_find_point_cb1(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 		}
 	}
 #undef proc
+out:
+	pthread_mutex_unlock(&it->mtx);
 	return;
 }
 
@@ -852,8 +860,11 @@ itree_find_point(itree_t it, uint32_t p)
 /* like itree_find_point() but stop after one occurrence,
  * prefer the right branch for nebulous reasons */
 	/* root node has no right child, proceed with the left one */
-	it_node_t curr = itree_left_root(it);
+	it_node_t curr;
+	void *data = NULL;
 
+	pthread_mutex_lock(&it->mtx);
+	curr = itree_left_root(it);
 	while (!nil_node_p(curr)) {
 		switch (tree_pivot_rel(curr, p)) {
 		case -1:
@@ -862,7 +873,7 @@ itree_find_point(itree_t it, uint32_t p)
 			continue;
 		case 1:
 			/* pivot is beyond the scope, return */
-			return NULL;
+			goto out;
 		case 0:
 		default:
 			break;
@@ -870,14 +881,17 @@ itree_find_point(itree_t it, uint32_t p)
 
 		if (node_pivot_rel(curr, p) == 0) {
 			/* bingo, mother load */
-			return curr->data;
+			data = curr->data;
+			goto out;
 		} else {
 			/* this means the above was 1, -1 isn't possible here
 			 * unless the machine is retarded */
 			curr = curr->right;
 		}
 	}
-	return NULL;
+out:
+	pthread_mutex_unlock(&it->mtx);
+	return data;
 }
 
 /* intvtree.c ends here */

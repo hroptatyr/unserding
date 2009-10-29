@@ -259,7 +259,6 @@ instr_dump_all(job_t j)
 /* fuck ugly, mutex'd iterators are a pita */
 #define CAT	((struct cat_s*)instrs)
 	pthread_mutex_lock(&CAT->mtx);
-	UD_DEBUG("dumping %u instruments ...", (unsigned int)CAT->ninstrs);
 
 	do {
 		char *enc = &j->buf[UDPC_HDRLEN];
@@ -319,10 +318,8 @@ instr_dump_gaid(udpc_seria_t sctx, gaid_t gaid)
 {
 	instr_t in = find_instr_by_gaid(instrs, gaid);
 
-	UD_DEBUG("dumping %p ...", in);
 	/* serialise what we've got */
 	__seria_instr(sctx, in);
-	UD_DBGCONT("done\n");
 	return;
 }
 
@@ -381,11 +378,9 @@ deferred_dl(BLA *w, int revents)
 	struct job_s j;
 	ud_packet_t __pkt = {.pbuf = j.buf};
 
-	UD_DEBUG("downloading instrs ...");
 	udpc_make_pkt(__pkt, 0, 0, UD_SVC_INSTR_BY_ATTR);
 	j.blen = UDPC_HDRLEN;
 	send_m46(&j);
-	UD_DBGCONT("done\n");
 #endif
 
 

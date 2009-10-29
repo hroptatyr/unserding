@@ -193,10 +193,7 @@ struct oadt_ctx_s {
 	secu_t secu;
 	tscoll_t coll;
 	time_t filt[NFILT];
-	tseries_t frob[NFILT];
-	dse16_t refds[NFILT];
 	size_t nfilt;
-	size_t nfrob;
 };
 
 /* we sort the list of requested time stamps to collapse contiguous ones */
@@ -243,60 +240,6 @@ snarf_times(udpc_seria_t sctx, time_t ts[], size_t nts)
 		selsort_in_situ(ts, nfilt);
 	}
 	return nfilt;
-}
-
-static void
-frob_one(tseries_t tser, dse16_t begds)
-{
-	struct tser_pkt_s pkt;
-	dse16_t endds = begds + 13;
-
-	if (fetch_ticks_intv_mysql(&pkt, tser, begds, endds) == 0) {
-		/* we should send something like quote invalid or so */
-		return;
-	}
-	/* cache him */
-	tseries_add(tser, begds, endds, &pkt);
-	return;
-}
-
-static void
-frob_some(oadt_ctx_t octx)
-{
-	for (index_t i = 0; i < octx->nfrob; i++) {
-		frob_one(octx->frob[i], octx->refds[i]);
-	}
-	return;
-}
-
-static inline bool
-frob_seen_p(oadt_ctx_t octx, index_t i, tseries_t tser, dse16_t refds)
-{
-	return octx->frob[i] == tser && octx->refds[i] == refds;
-}
-
-static inline index_t
-find_frob_slot(oadt_ctx_t octx, tseries_t tser, dse16_t refds)
-{
-	for (index_t i = 0; i < octx->nfrob; i++) {
-		if (frob_seen_p(octx, i, tser, refds)) {
-			return i;
-		}
-	}
-	return octx->nfrob++;
-}
-
-static void
-defer_frob(oadt_ctx_t octx, tseries_t tser, dse16_t refds)
-{
-	index_t slot;
-	if (octx->nfrob > (slot = find_frob_slot(octx, tser, refds))) {
-		/* already known */
-		return;
-	}
-	octx->frob[slot] = tser;
-	octx->refds[slot] = refds;
-	return;
 }
 
 static const char*
@@ -393,7 +336,7 @@ proc_one(oadt_ctx_t octx, time_t ts)
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
 		UD_DEBUG_TSER("URN not cached, deferring (%i %s)\n",
 			      octx->secu->instr, tsbugger(ts));
-		defer_frob(octx, tser, refts - idx);
+		defer_frob(tser, refts - idx, false);
 		spDute_bang_all_onhold(octx, refts);
 
 	} else {
@@ -407,16 +350,18 @@ proc_one(oadt_ctx_t octx, time_t ts)
 static inline bool
 one_moar_p(oadt_ctx_t octx)
 {
-	return udpc_seria_msglen(octx->sctx) < UDPC_PLLEN - 8;
+	size_t cur = udpc_seria_msglen(octx->sctx);
+	size_t add = (sizeof(struct sparse_Dute_s) + 2) * 5;
+	return cur + add < UDPC_PLLEN;
 }
 
-static bool
+static index_t
 proc_some(oadt_ctx_t octx, index_t i)
 {
 	for (; i < octx->nfilt && one_moar_p(octx); i++) {
 		proc_one(octx, octx->filt[i]);
 	}
-	return i < octx->nfilt;
+	return i;
 }
 
 static void
@@ -457,20 +402,19 @@ instr_tick_by_instr_svc(job_t j)
 	oadtctx.secu = &hdr.secu;
 	oadtctx.coll = tsc;
 	oadtctx.nfilt = nfilt;
-	oadtctx.nfrob = 0;
 
 	for (index_t i = 0; moarp;) {
 		/* prepare the reply packet ... */
 		copy_pkt(&rplj, j);
 		clear_pkt(&rplsctx, &rplj);
 		/* process some time stamps, this fills the packet */
-		moarp = proc_some(&oadtctx, i);
+		moarp = (i = proc_some(&oadtctx, i)) < oadtctx.nfilt;
 		/* send what we've got so far */
 		send_pkt(&rplsctx, &rplj);
 	} while (moarp);
 
 	/* we cater for any frobnication desires now */
-	frob_some(&oadtctx);
+	frobnicate();
 	return;
 }
 
@@ -525,6 +469,9 @@ load_ticks_fetcher(void *clo, void *spec)
 		/* do fuckall */
 		break;
 	}
+
+	/* also load the frobber in this case */
+	dso_tseries_frobq_LTX_init(clo);
 
 	/* clean up */
 	udctx_set_setting(clo, NULL);

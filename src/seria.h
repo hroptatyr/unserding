@@ -177,23 +177,6 @@ udpc_seria_des_seq##_na(udpc_seria_t sctx, const _ty **s)		\
 	*s = (_ty*)&sctx->msg[off];					\
 	sctx->msgoff = off + sizeof(_ty) * len;				\
 	return len;							\
-}									\
-									\
-static inline size_t							\
-udpc_seria_des_seq##_na##_copy(_ty **out, udpc_seria_t sctx)		\
-{									\
-	uint16_t off = ROUND(sctx->msgoff + 2, __alignof__(*out));	\
-	size_t len;							\
-									\
-	if (udpc_seria_tag(sctx) != UDPC_SEQOF(_NA)) {			\
-		*out = NULL;						\
-		return 0;						\
-	}								\
-	len = (size_t)(uint8_t)sctx->msg[sctx->msgoff+1];		\
-	*out = malloc(sizeof(_ty) * len);				\
-	memcpy(*out, (_ty*)&sctx->msg[off], sizeof(_ty) * len);		\
-	sctx->msgoff = off + sizeof(_ty) * len;				\
-	return len;							\
 }
 
 static inline uint8_t
@@ -205,6 +188,10 @@ udpc_seria_tag(udpc_seria_t sctx)
 	return UDPC_TYPE_UNK;
 }
 
+#if defined __INTEL_COMPILER
+/* we know there's a orphan ; wandering around when using NEW_SERIA */
+#pragma warning (disable:424)
+#endif	/* __INTEL_COMPILER */
 
 UDPC_NEW_SERIA(byte, BYTE, uint8_t);
 UDPC_NEW_SERIA(ui16, UI16, uint16_t);
@@ -216,6 +203,11 @@ UDPC_NEW_SERIA(si64, SI64, int64_t);
 /* floats */
 UDPC_NEW_SERIA(flts, FLTS, float);
 UDPC_NEW_SERIA(fltd, FLTD, double);
+
+#if defined __INTEL_COMPILER
+/* we know there's a orphan ; wandering around when using NEW_SERIA */
+#pragma warning (default:424)
+#endif	/* __INTEL_COMPILER */
 
 /* seqof(byte) */
 static inline void

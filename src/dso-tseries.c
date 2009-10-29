@@ -350,7 +350,9 @@ proc_one(oadt_ctx_t octx, time_t ts)
 static inline bool
 one_moar_p(oadt_ctx_t octx)
 {
-	return udpc_seria_msglen(octx->sctx) < UDPC_PLLEN - 8;
+	size_t cur = udpc_seria_msglen(octx->sctx);
+	size_t add = (sizeof(struct sparse_Dute_s) + 2) * 5;
+	return cur + add < UDPC_PLLEN;
 }
 
 static bool

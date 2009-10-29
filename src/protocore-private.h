@@ -60,6 +60,10 @@ extern size_t ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt);
 
 
 /* inlines */
+#if defined __INTEL_COMPILER
+/* args are eval'd in unspecified order */
+#pragma warning (disable:981)
+#endif	/* __INTEL_COMPILER */
 /**
  * Print the packet header. temporary. */
 static inline void __attribute__((always_inline))

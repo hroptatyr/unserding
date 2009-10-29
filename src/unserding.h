@@ -62,7 +62,7 @@ union ud_sockaddr_u {
 		struct sockaddr sa;
 		struct sockaddr_in sa4;
 		struct sockaddr_in6 sa6;
-} __attribute__((transparent_union));
+};
 
 /**
  * Flags. */

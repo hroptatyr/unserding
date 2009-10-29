@@ -480,7 +480,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space, also trigger the lazy bastards */
-	wpool_enq(gwpool, NULL, NULL, true);
+	wpool_enq(gwpool, ud_proto_parse_j, j, true);
 	return;
 }
 

@@ -41,10 +41,6 @@
 #include <stdio.h>
 #include "protocore.h"
 
-/**
- * Call the worker after finding out what job J is. */
-extern void ud_proto_parse(job_t j);
-
 static inline void __attribute__((always_inline))
 ud_fputs(uint8_t len, const char *s, FILE *f)
 {

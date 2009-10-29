@@ -276,16 +276,6 @@ triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
 	return;
 }
 
-static void
-worker_cb(void *clo)
-{
-	job_t j = clo;
-
-	ud_proto_parse(j);
-	jpool_release(j);
-	return;
-}
-
 
 /* helper for daemon mode */
 static bool daemonisep = 0;

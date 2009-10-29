@@ -68,7 +68,7 @@
 static ud_pktwrk_f ud_services[65536];
 
 
-void
+static void
 ud_proto_parse(job_t j)
 {
 	ud_pkt_cmd_t cmd = udpc_pkt_cmd((ud_packet_t){0, j->buf});
@@ -80,6 +80,17 @@ ud_proto_parse(job_t j)
 	}
 	/* otherwise, just do what's in there */
 	wf(j);
+	return;
+}
+
+/* to switch thread contexts */
+void
+ud_proto_parse_j(void *clo)
+{
+	job_t j = clo;
+
+	ud_proto_parse(j);
+	jpool_release(j);
 	return;
 }
 

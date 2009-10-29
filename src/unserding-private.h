@@ -141,10 +141,6 @@ extern jpool_t gjpool;
  * Global worker pool, contains the job queue. */
 extern wpool_t gwpool;
 
-/**
- * Job that looks up the parser routine in ud_parsef(). */
-extern void ud_proto_parse(job_t);
-
 /* jobs */
 extern void ud_hyrpl_job(job_t);
 

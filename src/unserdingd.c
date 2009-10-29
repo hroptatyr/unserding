@@ -120,7 +120,7 @@ struct ev_cb_clo_s {
 };
 
 static void
-std_idle_cb(EV_P_ ev_idle *ie, int revents)
+std_idle_cb(EV_P_ ev_idle *ie, int UNUSED(revents))
 {
 	struct ev_cb_clo_s *clo = (void*)ie;
 
@@ -136,7 +136,7 @@ std_idle_cb(EV_P_ ev_idle *ie, int revents)
 }
 
 static void
-std_timer_once_cb(EV_P_ ev_timer *te, int revents)
+std_timer_once_cb(EV_P_ ev_timer *te, int UNUSED(revents))
 {
 	struct ev_cb_clo_s *clo = (void*)te;
 
@@ -152,7 +152,7 @@ std_timer_once_cb(EV_P_ ev_timer *te, int revents)
 }
 
 static void
-std_timer_every_cb(EV_P_ ev_timer *te, int revents)
+std_timer_every_cb(EV_P_ ev_timer *te, int UNUSED(revents))
 {
 	struct ev_cb_clo_s *clo = (void*)te;
 
@@ -239,7 +239,7 @@ wpool_t gwpool;
 static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
 
 static void
-sigint_cb(EV_P_ ev_signal *w, int revents)
+sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	UD_DEBUG("C-c caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
@@ -247,14 +247,14 @@ sigint_cb(EV_P_ ev_signal *w, int revents)
 }
 
 static void
-sigpipe_cb(EV_P_ ev_signal *w, int revents)
+sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	UD_DEBUG("SIGPIPE caught, doing nothing\n");
 	return;
 }
 
 static void
-sighup_cb(EV_P_ ev_signal *w, int revents)
+sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	UD_DEBUG("SIGHUP caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
@@ -262,7 +262,7 @@ sighup_cb(EV_P_ ev_signal *w, int revents)
 }
 
 static void
-sigusr2_cb(EV_P_ ev_signal *w, int revents)
+sigusr2_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	open_aux("dso-cli", NULL);
 	ud_mod_dump(logout);
@@ -271,7 +271,7 @@ sigusr2_cb(EV_P_ ev_signal *w, int revents)
 
 
 static void
-triv_cb(EV_P_ ev_async *w, int revents)
+triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
 {
 	return;
 }

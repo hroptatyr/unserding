@@ -59,6 +59,8 @@
 
 #if defined HAVE_EV_H
 # include <ev.h>
+# undef EV_P
+# define EV_P	struct ev_loop *loop __attribute__((unused))
 #else  /* !HAVE_EV_H */
 # error "We need an event loop, give us one."
 #endif	/* HAVE_EV_H */

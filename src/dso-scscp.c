@@ -55,6 +55,8 @@
 #include "unserding-ctx.h"
 
 #include <ev.h>
+#undef EV_P
+#define EV_P	struct ev_loop *loop __attribute__((unused))
 
 static int sock_i, sock_s;
 static struct sockaddr_storage srv;

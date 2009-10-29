@@ -141,7 +141,7 @@ extern void cli_yyerror(void *scanner, ud_handle_t hdl, char const *errmsg);
 
 
 void
-cli_yyerror(void *scanner, ud_handle_t hdl, char const *s)
+cli_yyerror(void *UNUSED(s), ud_handle_t UNUSED(hdl), char const *UNUSED(t))
 {
 	fputs("syntax error\n", logout);
 	return;
@@ -381,7 +381,7 @@ out:
 }
 
 static int32_t
-parse_int(const char *tok, size_t len)
+parse_int(const char *tok, size_t UNUSED(len))
 {
 	long int res;
 	char *on;
@@ -546,14 +546,14 @@ TOK_UINT {
 
 
 static void
-sigint_cb(EV_P_ ev_signal *w, int revents)
+sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	ud_reset_stdin(EV_A);
 	return;
 }
 
 static void
-sigpipe_cb(EV_P_ ev_signal *w, int revents)
+sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	return;
 }
@@ -593,7 +593,7 @@ rplpkt_pr_src(char *restrict outbuf, const ud_sockaddr_t *sa)
 }
 
 static void
-rplpkt_cb(EV_P_ ev_io *w, int revents)
+rplpkt_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	ssize_t nread;
 	ud_sockaddr_t sa;
@@ -679,7 +679,7 @@ init_cmd_list(void)
 
 
 static void
-ud_parse(const char *line, size_t len)
+ud_parse(const char *line, size_t UNUSED(len))
 {
         yyscan_t scanner;
         YY_BUFFER_STATE buf;

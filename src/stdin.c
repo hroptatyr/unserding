@@ -146,7 +146,7 @@ extern char *cmd_generator(const char *text, int state);
    contents of rl_line_buffer in case we want to do some simple
    parsing.  Return the array of matches, or NULL if there aren't any. */
 static char**
-udcli_comp(const char *text, int start, int end)
+udcli_comp(const char *text, int start, int UNUSED(end))
 {
 	char **matches;
 
@@ -229,7 +229,7 @@ stdin_listener_deinit(EV_P_ int sock)
 
 /* this callback is called when data is readable on one of the polled socks */
 static void
-stdin_traf_rcb(EV_P_ ev_io *w, int revents)
+stdin_traf_rcb(EV_P_ ev_io *UNUSED(w), int UNUSED(revents))
 {
 	rl_callback_read_char();
 	return;

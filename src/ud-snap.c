@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <pfack/uterus.h>
 #include "unserding.h"
+#include "unserding-nifty.h"
 #include "protocore.h"
 #include "tseries.h"
 
@@ -10,7 +11,7 @@ static ud_handle_t hdl = &__hdl;
 static bool xmlp;
 
 static void
-t_cb(sl1tick_t t, void *clo)
+t_cb(sl1tick_t t, void *UNUSED(clo))
 {
 	fprintf(stdout, "ii:%u  tt:%d ts:%ld.%03d v:%2.4f\n",
 		sl1tick_instr(t),

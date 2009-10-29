@@ -40,6 +40,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
+#if !defined __USE_MISC
+/* for struct ifreq and friends */
+# define __USE_MISC
+#endif	/* !__USE_MISC */
 #include <net/if.h>
 #include <arpa/inet.h>
 
@@ -183,7 +187,7 @@ scscp_connect(sock_ctx_t ctx)
 }
 
 static void
-inco_cb(EV_P_ ev_io *w, int revents)
+inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	sock_ctx_t ctx = sock_ctx_from_evio(w);
 	char buf[4096];
@@ -214,7 +218,7 @@ inco_cb(EV_P_ ev_io *w, int revents)
 }
 
 static void
-ack_cb(EV_P_ ev_timer *w, int revents)
+ack_cb(EV_P_ ev_timer *w, int UNUSED(revents))
 {
 	sock_ctx_t ctx = sock_ctx_from_evtimer(w);
 
@@ -292,7 +296,7 @@ init(void *clo)
 }
 
 void
-reinit(void *clo)
+reinit(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/scscp: reloading ...done\n");
 	return;
@@ -310,4 +314,4 @@ deinit(void *clo)
 	return;
 }
 
-/* dso-cli.c ends here */
+/* dso-scscp2.c ends here */

@@ -126,26 +126,9 @@ find_instr(instr_t i)
  * Merge SRC into TGT if of the same kind, return TRUE if no
  * conflicts occurred. */
 static bool
-merge_instr(instr_t tgt, instr_t src)
+merge_instr(instr_t UNUSED(tgt), instr_t UNUSED(src))
 {
 	return true;
-}
-
-/* cunting hack, remove me ASAP */
-static void
-auto_annotate(instr_t i)
-{
-	if (instr_type(i) == PFIT_OPTION &&
-	    instr_const_option(i)->underlyer == 5) {
-		/* DJX */
-		static const char eod_name[] = "MDX.DJX_eod_tmp";
-		cat_annotate_instr(instrs, i, eod_name, 0, -1UL);
-	} else if (instr_type(i) == PFIT_IRATE) {
-		/* all kinds of interest rates */
-		static const char eod_name[] = "GAT_static.eod_interest_rates2";
-		cat_annotate_instr(instrs, i, eod_name, 0, -1UL);
-	}
-	return;
 }
 
 static void
@@ -158,7 +141,6 @@ copyadd_instr(instr_t i)
 		merge_instr(resi, i);
 	} else {
 		i = cat_bang_instr(instrs, i);
-		auto_annotate(i);
 	}
 	return;
 }
@@ -385,7 +367,7 @@ out:
 }
 
 static void
-instr_dump_to_file_svc(job_t j)
+instr_dump_to_file_svc(job_t UNUSED(j))
 {
 	return;
 }
@@ -510,7 +492,7 @@ load_instr_fetcher(void *clo, void *spec)
 }
 
 static void
-unload_instr_fetcher(void *clo)
+unload_instr_fetcher(void *UNUSED(clo))
 {
 	return;
 }

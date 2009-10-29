@@ -125,7 +125,7 @@ static inline bool
 udpc_pkt_valid_p(const ud_packet_t pkt)
 {
 	/* be trivial for now */
-	return true;
+	return pkt.plen >= 0;
 }
 
 static inline udpc_pktstorminess_t
@@ -214,6 +214,10 @@ typedef void(*ud_pktwrk_f)(job_t);
 /**
  * Type for families. */
 typedef ud_pktwrk_f *ud_pktfam_t;
+
+/**
+ * Very prominent job that gets executed in one of the worker threads. */
+extern void ud_proto_parse_j(void *clo);
 
 
 extern void init_proto(void);

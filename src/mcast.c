@@ -427,7 +427,7 @@ static char scratch_buf[UDPC_PKTLEN];
 
 /* this callback is called when data is readable on the main server socket */
 static void
-mcast_inco_cb(EV_P_ ev_io *w, int revents)
+mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	ssize_t nread;
 	char buf[INET6_ADDRSTRLEN];
@@ -440,11 +440,11 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 	socklen_t lsa = sizeof(j->sa);
 
 	UD_DEBUG_MCAST("incoming connexion\n");
-	if (UNLIKELY((j = make_job()) == NULL)) {
+	if (UNLIKELY((j = jpool_acquire(gjpool)) == NULL)) {
 		UD_CRITICAL("no job slots ... leaping\n");
 		/* just read the packet off of the wire */
 		(void)recv(w->fd, scratch_buf, UDPC_PKTLEN, 0);
-		trigger_job_queue();
+		wpool_trigger(gwpool);
 		return;
 	}
 
@@ -479,10 +479,8 @@ mcast_inco_cb(EV_P_ ev_io *w, int revents)
 #endif	/* DEBUG_FLAG */
 
 	/* enqueue t3h job and copy the input buffer over to
-	 * the job's work space */
-	enqueue_job(glob_jq, j);
-	/* now notify the slaves */
-	trigger_job_queue();
+	 * the job's work space, also trigger the lazy bastards */
+	wpool_enq(gwpool, ud_proto_parse_j, j, true);
 	return;
 }
 

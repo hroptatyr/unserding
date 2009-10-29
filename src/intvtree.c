@@ -234,7 +234,7 @@ itree_satellite(itree_t it)
 
 /* opers */
 static void
-itree_rot_left(itree_t it, it_node_t p)
+itree_rot_left(itree_t UNUSED(it), it_node_t p)
 {
 	it_node_t y = p->right;
 
@@ -259,7 +259,7 @@ itree_rot_left(itree_t it, it_node_t p)
 }
 
 static void
-itree_rot_right(itree_t it, it_node_t p)
+itree_rot_right(itree_t UNUSED(it), it_node_t p)
 {
 	it_node_t x = p->left;
 
@@ -655,7 +655,8 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 #endif
 
 static void __attribute__((unused))
-__itree_trav_pre_order(itree_t it, it_trav_f cb, void *clo, it_ndstk_t stk)
+__itree_trav_pre_order(
+	itree_t UNUSED(it), it_trav_f cb, void *clo, it_ndstk_t stk)
 {
 	while (stack_size(stk)) {
 		it_node_t top = stack_pop(stk);

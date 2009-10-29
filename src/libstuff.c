@@ -113,7 +113,7 @@ __set_nonblck(int sock)
 }
 
 static void
-fiddle_with_mtu(int s)
+fiddle_with_mtu(int __attribute__((unused)) s)
 {
 #if defined IPV6_PATHMTU
 	struct ip6_mtuinfo mtui;

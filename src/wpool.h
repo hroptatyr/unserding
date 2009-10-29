@@ -1,6 +1,6 @@
-/*** protocore.h -- unserding protocol guts
+/*** wpool.h -- unserding worker pool
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008, 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
@@ -35,41 +35,22 @@
  *
  ***/
 
-#if !defined INCLUDED_protocore_private_h_
-#define INCLUDED_protocore_private_h_
+#if !defined INCLUDED_wpool_h_
+#define INCLUDED_wpool_h_
 
-#include <stdio.h>
-#include "protocore.h"
+#include <stdbool.h>
 
-static inline void __attribute__((always_inline))
-ud_fputs(uint8_t len, const char *s, FILE *f)
-{
-	for (uint8_t i = 0; i < len; i++) {
-		putc_unlocked(s[i], f);
-	}
-	return;
-}
+#define MIN_WORKERS	1
+#define MAX_WORKERS	16
 
-extern void ud_fprint_pkthdr(ud_packet_t pkt, FILE *fp);
-extern void ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp);
-extern void ud_fprint_pkt_pretty(ud_packet_t pkt, FILE *fp);
-
-extern size_t ud_sprint_pkthdr(char *restrict buf, ud_packet_t pkt);
-extern size_t ud_sprint_pkt_raw(char *restrict buf, ud_packet_t pkt);
-extern size_t ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt);
+typedef void *wpool_t;
+typedef void(*wpool_work_f)(void *closure);
 
 
-/* inlines */
-/**
- * Print the packet header. temporary. */
-static inline void __attribute__((always_inline))
-udpc_print_pkt(const ud_packet_t pkt)
-{
-	printf(":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-	       (unsigned int)pkt.plen,
-	       udpc_pkt_cno(pkt), udpc_pkt_pno(pkt), udpc_pkt_cmd(pkt),
-	       ntohs(((const uint16_t*)pkt.pbuf)[3]));
-	return;
-}
+extern wpool_t make_wpool(int nworkers, int njobs);
+extern void kill_wpool(wpool_t p);
 
-#endif	/* INCLUDED_protocore_private_h_ */
+extern bool wpool_enq(wpool_t, wpool_work_f cb, void *clo, bool triggerp);
+extern void wpool_trigger(wpool_t);
+
+#endif	/* INCLUDED_wpool_h_ */

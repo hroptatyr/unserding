@@ -1,6 +1,6 @@
-/*** protocore.h -- unserding protocol guts
+/*** jpool.h -- unserding job pool
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008, 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
@@ -33,43 +33,25 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
+ ***
+ * Commentary:
+ * We assume that struct job_s and job_t is defined
  ***/
 
-#if !defined INCLUDED_protocore_private_h_
-#define INCLUDED_protocore_private_h_
+#if !defined INCLUDED_jpool_h_
+#define INCLUDED_jpool_h_
 
-#include <stdio.h>
-#include "protocore.h"
+#include <stdbool.h>
 
-static inline void __attribute__((always_inline))
-ud_fputs(uint8_t len, const char *s, FILE *f)
-{
-	for (uint8_t i = 0; i < len; i++) {
-		putc_unlocked(s[i], f);
-	}
-	return;
-}
+#define NO_JOB		((job_t)0)
 
-extern void ud_fprint_pkthdr(ud_packet_t pkt, FILE *fp);
-extern void ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp);
-extern void ud_fprint_pkt_pretty(ud_packet_t pkt, FILE *fp);
-
-extern size_t ud_sprint_pkthdr(char *restrict buf, ud_packet_t pkt);
-extern size_t ud_sprint_pkt_raw(char *restrict buf, ud_packet_t pkt);
-extern size_t ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt);
+typedef void *jpool_t;
 
 
-/* inlines */
-/**
- * Print the packet header. temporary. */
-static inline void __attribute__((always_inline))
-udpc_print_pkt(const ud_packet_t pkt)
-{
-	printf(":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-	       (unsigned int)pkt.plen,
-	       udpc_pkt_cno(pkt), udpc_pkt_pno(pkt), udpc_pkt_cmd(pkt),
-	       ntohs(((const uint16_t*)pkt.pbuf)[3]));
-	return;
-}
+extern jpool_t make_jpool(int njobs, int job_size);
+extern void free_jpool(jpool_t p);
 
-#endif	/* INCLUDED_protocore_private_h_ */
+extern job_t jpool_acquire(jpool_t);
+extern void jpool_release(job_t);
+
+#endif	/* INCLUDED_jpool_h_ */

@@ -100,7 +100,7 @@ struct urn_s {
 
 /* inlines */
 static inline void
-init_urn(urn_t urn)
+init_urn(urn_t __attribute__((unused)) urn)
 {
 	return;
 }

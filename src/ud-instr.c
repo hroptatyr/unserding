@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <pfack/instruments.h>
 #include "unserding.h"
+#include "unserding-nifty.h"
 #include "protocore.h"
 #include "xdr-instr-seria.h"
 
@@ -10,7 +11,7 @@ static ud_handle_t hdl = &__hdl;
 static bool xmlp;
 
 static void
-in_cb(const char *buf, size_t len, void *clo)
+in_cb(const char *buf, size_t len, void *UNUSED(clo))
 {
 	struct instr_s in;
 

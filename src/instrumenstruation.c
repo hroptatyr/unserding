@@ -46,6 +46,7 @@
 #include <time.h>
 #include <popt.h>
 #include "unserding.h"
+#include "unserding-nifty.h"
 #include <ffff/monetary.h>
 #include <pfack/instruments.h>
 #include "protocore.h"
@@ -303,13 +304,13 @@ prepare_dump(ictx_t ctx)
 }
 
 static void
-finish_dump(ictx_t unused)
+finish_dump(ictx_t UNUSED(unused))
 {
 	return;
 }
 
 static void
-instrumentify(ictx_t ctx, const char *buf, size_t bsz)
+instrumentify(ictx_t ctx, const char *buf, size_t UNUSED(bsz))
 {
 /* format goes cid - specid - strike - right - expiry */
 	struct ga_spec_s sp;

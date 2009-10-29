@@ -44,13 +44,10 @@
 #include "unserding.h"
 #define UNSERSRV
 #include "unserding-dbg.h"
+#include "unserding-nifty.h"
 #include <sys/param.h>
 
 #include "protocore.h"
-
-#define xnew(_x)	malloc(sizeof(_x))
-
-typedef size_t index_t;
 
 struct bbdb_ol_s {
 	/* offset+length */
@@ -291,7 +288,7 @@ bbdb_search_tagged(job_t j)
 
 
 void
-init(void *clo)
+init(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/bbdb: loading ...");
 
@@ -307,7 +304,7 @@ init(void *clo)
 }
 
 void
-reinit(void *clo)
+reinit(void UNUSED(*clo))
 {
 	UD_DEBUG("mod/bbdb: reloading ...");
 
@@ -323,7 +320,7 @@ reinit(void *clo)
 }
 
 void
-deinit(void *clo)
+deinit(void UNUSED(*clo))
 {
 	UD_DEBUG("mod/bbdb: unloading ...");
 	/* clearing bbdb search service */

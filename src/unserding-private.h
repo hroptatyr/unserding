@@ -59,35 +59,26 @@
 
 #if defined HAVE_EV_H
 # include <ev.h>
+# undef EV_P
+# define EV_P	struct ev_loop *loop __attribute__((unused))
 #else  /* !HAVE_EV_H */
 # error "We need an event loop, give us one."
 #endif	/* HAVE_EV_H */
 
 #include "unserding.h"
 #include "protocore.h"
+#include "wpool.h"
+#include "jpool.h"
 
-
 #include "unserding-nifty.h"
-
-
 #include "unserding-dbg.h"
 
 
-#define USE_ARRPQ	1
-
-#if USE_ARRPQ
-# include "arrqueue.h"
-#else
-# include "dllqueue.h"
-#endif
-
 /* job queue magic */
 /* we use a fairly simplistic approach: one vector with two index pointers */
 /* number of simultaneous jobs */
 #define NJOBS		256
-#define NO_JOB		((job_t)0)
 
-typedef struct job_queue_s *job_queue_t;
 /**
  * Type for work functions inside jobs. */
 typedef void(*ud_work_f)(job_t);
@@ -97,22 +88,6 @@ typedef ud_work_f ud_free_f;
 /**
  * Type for print functions inside jobs. */
 typedef ud_work_f ud_prnt_f;
-
-struct job_queue_s {
-#if USE_ARRPQ
-	/* the queue for the workers */
-	arrpq_t wq;
-	/* the queue for free jobs */
-	arrpq_t fq;
-#else  /* !USE_ARRPQ */
-	/* the queue for the workers */
-	dllpq_t wq;
-	/* the queue for free jobs */
-	dllpq_t fq;
-#endif	/* USE_ARRPQ */
-	/* the jobs vector */
-	struct job_s jobs[NJOBS] __attribute__((aligned(16)));
-};
 
 static inline uint8_t __attribute__((always_inline, gnu_inline))
 __job_ready_bits(job_t j)
@@ -160,80 +135,11 @@ __job_set_trans(job_t j)
 
 /**
  * Global job queue. */
-extern job_queue_t glob_jq;
-
-static inline job_t __attribute__((always_inline, gnu_inline))
-make_job(void)
-{
-	/* dequeue from the free queue */
-#if USE_ARRPQ
-	return arrpq_dequeue(glob_jq->fq);
-#else
-	return dllpq_dequeue(glob_jq->fq);
-#endif
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-free_job(job_t j)
-{
-	/* enqueue in the free queue */
-	memset(j, 0, SIZEOF_JOB_S);
-#if USE_ARRPQ
-	arrpq_enqueue(glob_jq->fq, j);
-#else
-	dllpq_enqueue(glob_jq->fq, j);
-#endif
-	return;
-}
-
-static inline void __attribute__((always_inline, gnu_inline))
-enqueue_job(job_queue_t jq, job_t j)
-{
-	/* enqueue in the worker queue */
-#if USE_ARRPQ
-	arrpq_enqueue(jq->wq, j);
-#else
-	dllpq_enqueue(jq->wq, j);
-#endif
-	return;
-}
-
-static inline job_t __attribute__((always_inline, gnu_inline))
-dequeue_job(job_queue_t jq)
-{
-	/* dequeue from the worker queue */
-#if USE_ARRPQ
-	return arrpq_dequeue(jq->wq);
-#else
-	return dllpq_dequeue(jq->wq);
-#endif
-}
-
-static void __attribute__((unused))
-init_glob_jq(job_queue_t q)
-{
-	glob_jq = q;
-#if USE_ARRPQ
-	glob_jq->wq = make_arrpq(NJOBS);
-	glob_jq->fq = make_arrpq(NJOBS);
-#else
-	glob_jq->wq = make_dllpq(NJOBS);
-	glob_jq->fq = make_dllpq(NJOBS);
-#endif
-	/* enqueue all jobs in the free queue */
-	for (int i = 0; i < NJOBS; i++) {
-#if USE_ARRPQ
-		arrpq_enqueue(glob_jq->fq, &glob_jq->jobs[i]);
-#else
-		dllpq_enqueue(glob_jq->fq, &glob_jq->jobs[i]);
-#endif
-	}
-	return;
-}
+extern jpool_t gjpool;
 
 /**
- * Job that looks up the parser routine in ud_parsef(). */
-extern void ud_proto_parse(job_t);
+ * Global worker pool, contains the job queue. */
+extern wpool_t gwpool;
 
 /* jobs */
 extern void ud_hyrpl_job(job_t);
@@ -245,22 +151,6 @@ extern bool cli_waiting_p;
 /* more socket goodness, defined in mcast4.c */
 extern int ud_attach_mcast(EV_P_ bool prefer_ipv6_p);
 extern int ud_detach_mcast(EV_P);
-
-
-/* worker magic */
-/* think we keep this private */
-extern void trigger_job_queue(void);
-/* global notification signal */
-extern ev_async *glob_notify;
-/* notify the global event loop */
-extern inline void __attribute__((gnu_inline)) trigger_evloop(EV_P);
-
-extern inline void __attribute__((always_inline, gnu_inline))
-trigger_evloop(EV_P)
-{
-	ev_async_send(EV_A_ glob_notify);
-	return;
-}
 
 /* more mainloop magic */
 extern void

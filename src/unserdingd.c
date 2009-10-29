@@ -86,11 +86,14 @@
 #include "protocore.h"
 /* module handling */
 #include "module.h"
+/* worker pool */
+#include "wpool.h"
+
+#define UD_VERSION		"v0.2"
 
 FILE *logout;
 
 
-typedef struct ud_worker_s *ud_worker_t;
 typedef struct ud_ev_async_s ud_ev_async;
 
 /* our version of the async event, cdr-coding */
@@ -98,9 +101,12 @@ struct ud_ev_async_s {
 	struct ev_async super;
 };
 
-struct ud_worker_s {
-	pthread_t ALGN16(thread);
-} __attribute__((aligned(16)));
+struct ud_loopclo_s {
+	/** loop lock */
+	pthread_mutex_t lolo;
+	/** just a cond */
+	pthread_cond_t loco;
+};
 
 
 /* module services */
@@ -114,7 +120,7 @@ struct ev_cb_clo_s {
 };
 
 static void
-std_idle_cb(EV_P_ ev_idle *ie, int revents)
+std_idle_cb(EV_P_ ev_idle *ie, int UNUSED(revents))
 {
 	struct ev_cb_clo_s *clo = (void*)ie;
 
@@ -130,7 +136,7 @@ std_idle_cb(EV_P_ ev_idle *ie, int revents)
 }
 
 static void
-std_timer_once_cb(EV_P_ ev_timer *te, int revents)
+std_timer_once_cb(EV_P_ ev_timer *te, int UNUSED(revents))
 {
 	struct ev_cb_clo_s *clo = (void*)te;
 
@@ -146,7 +152,7 @@ std_timer_once_cb(EV_P_ ev_timer *te, int revents)
 }
 
 static void
-std_timer_every_cb(EV_P_ ev_timer *te, int revents)
+std_timer_every_cb(EV_P_ ev_timer *te, int UNUSED(revents))
 {
 	struct ev_cb_clo_s *clo = (void*)te;
 
@@ -223,54 +229,17 @@ static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
 
 /* worker magic */
-#define NWORKERS		1
-/* round robin var */
-static index_t rr_wrk = 0;
-/* the workers array */
-static struct ud_worker_s __attribute__((aligned(16))) workers[NWORKERS];
-
-static struct ev_loop *secl;
-/* a watcher for worker jobs */
-struct ev_async ALGN16(work_watcher);
-/* a watcher for harakiri orders */
-struct ev_async ALGN16(kill_watcher);
-
-static inline struct ev_loop __attribute__((always_inline, gnu_inline)) *
-worker_loop(ud_worker_t wk)
-{
-	return secl;
-}
-
-static inline struct ev_async __attribute__((always_inline, gnu_inline)) *
-worker_workw(ud_worker_t wk)
-{
-	return &work_watcher;
-}
-
-static inline struct ev_async __attribute__((always_inline, gnu_inline)) *
-worker_killw(ud_worker_t wk)
-{
-	return &kill_watcher;
-}
+static int nworkers = 1;
 
 /* the global job queue */
-static struct job_queue_s __glob_jq;
-job_queue_t glob_jq;
-
-
-inline void __attribute__((always_inline, gnu_inline))
-trigger_job_queue(void)
-{
-	/* look what we can do */
-	/* easy */
-	ev_async_send(secl, &work_watcher);
-	return;
-}
+jpool_t gjpool;
+/* holds worker pool */
+wpool_t gwpool;
 
 static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
 
 static void
-sigint_cb(EV_P_ ev_signal *w, int revents)
+sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	UD_DEBUG("C-c caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
@@ -278,14 +247,14 @@ sigint_cb(EV_P_ ev_signal *w, int revents)
 }
 
 static void
-sigpipe_cb(EV_P_ ev_signal *w, int revents)
+sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	UD_DEBUG("SIGPIPE caught, doing nothing\n");
 	return;
 }
 
 static void
-sighup_cb(EV_P_ ev_signal *w, int revents)
+sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	UD_DEBUG("SIGHUP caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
@@ -293,7 +262,7 @@ sighup_cb(EV_P_ ev_signal *w, int revents)
 }
 
 static void
-sigusr2_cb(EV_P_ ev_signal *w, int revents)
+sigusr2_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	open_aux("dso-cli", NULL);
 	ud_mod_dump(logout);
@@ -302,76 +271,8 @@ sigusr2_cb(EV_P_ ev_signal *w, int revents)
 
 
 static void
-triv_cb(EV_P_ ev_async *w, int revents)
+triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
 {
-	return;
-}
-
-static void
-kill_cb(EV_P_ ev_async *w, int revents)
-{
-	long int UNUSED(self) = (long int)pthread_self();
-	UD_DEBUG("SIGQUIT caught in %lx\n", self);
-	ev_unloop(EV_A_ EVUNLOOP_ALL);
-	return;
-}
-
-static void
-worker_cb(EV_P_ ev_async *w, int revents)
-{
-	long int UNUSED(self) = (long int)pthread_self();
-	job_t j;
-
-	while ((j = dequeue_job(glob_jq)) != NO_JOB) {
-		UD_DEBUG("thread/loop %lx/%p doing work %p\n", self, loop, j);
-		ud_proto_parse(j);
-#if 0
-/* we took precautions to send off the packet that's now in j
- * based on the transmission flags, however, that's additional bollocks
- * atm so we let the proto funs deal with that themselves */
-		send_cl(j);
-#endif
-		free_job(j);
-	}
-
-	UD_DEBUG("no more jobs %lx/%p\n", self, loop);
-	return;
-}
-
-static void*
-worker(void *wk)
-{
-	long int UNUSED(self) = pthread_self();
-	void *loop = worker_loop(wk);
-	UD_DEBUG("starting worker thread %lx, loop %p\n", self, loop);
-	ev_loop(EV_A_ 0);
-	UD_DEBUG("quitting worker thread %lx, loop %p\n", self, loop);
-	return NULL;
-}
-
-static void
-add_worker(struct ev_loop *loop)
-{
-	pthread_attr_t attr;
-	ud_worker_t wk = &workers[rr_wrk++];
-
-	/* initialise thread attributes */
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-	/* start the thread now */
-	pthread_create(&wk->thread, &attr, worker, wk);
-
-	/* destroy locals */
-	pthread_attr_destroy(&attr);
-	return;
-}
-
-static void
-kill_worker(ud_worker_t wk)
-{
-	/* send a lethal signal to the workers and detach */
-	ev_async_send(worker_loop(wk), worker_killw(wk));
 	return;
 }
 
@@ -417,22 +318,52 @@ daemonise(void)
 
 
 /* the popt helper */
+static void
+hlp(poptContext con, UNUSED(enum poptCallbackReason foo),
+    struct poptOption *key, UNUSED(const char *arg), UNUSED(void *data))
+{
+	if (key->shortName == 'h') {
+		poptPrintHelp(con, stdout, 0);
+	} else if (key->shortName == 'V') {
+		fprintf(stdout, "unserdingd " UD_VERSION "\n");
+	} else {
+		poptPrintUsage(con, stdout, 0);
+	}
+
+#if !defined(__LCLINT__)
+        /* XXX keep both splint & valgrind happy */
+	con = poptFreeContext(con);
+#endif
+	exit(0);
+	return;
+}
+
 static struct poptOption srv_opts[] = {
-	{ "prefer-ipv6", '6', POPT_ARG_NONE,
-	  &prefer6p, 0,
-	  "Prefer ipv6 traffic to ipv4 if applicable..", NULL },
-	{ "daemon", 'd', POPT_ARG_NONE,
-	  &daemonisep, 0,
-	  "Detach from tty and run as daemon.", NULL },
+	{"prefer-ipv6", '6', POPT_ARG_NONE,
+	 &prefer6p, 0,
+	 "Prefer ipv6 traffic to ipv4 if applicable..", NULL},
+	{"daemon", 'd', POPT_ARG_NONE,
+	 &daemonisep, 0,
+	 "Detach from tty and run as daemon.", NULL},
+	{"workers", 'w', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT,
+	 &nworkers, 0,
+	 "Number of concurrent worker threads.", NULL},
         POPT_TABLEEND
 };
 
+static struct poptOption help_opts[] = {
+	{NULL, '\0', POPT_ARG_CALLBACK, (void*)hlp, 0, NULL, NULL},
+	{"help", 'h', 0, NULL, '?', "Show this help message", NULL},
+	{"version", 'V', 0, NULL, 'V', "Print version string and exit.", NULL},
+	{"usage", '\0', 0, NULL, 'u', "Display brief usage message", NULL},
+	POPT_TABLEEND
+};
+
 static const struct poptOption const ud_opts[] = {
-#if 1
-        { NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
-          "Server Options", NULL },
-#endif
-        POPT_AUTOHELP
+        {NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
+	 "Server Options", NULL},
+	{NULL, '\0', POPT_ARG_INCLUDE_TABLE, help_opts, 0,
+	 "Help options", NULL},
         POPT_TABLEEND
 };
 
@@ -560,12 +491,16 @@ main(int argc, const char *argv[])
 	if (daemonisep) {
 		daemonise();
 	}
+	/* check if nworkers is not too large */
+	if (nworkers > MAX_WORKERS) {
+		nworkers = MAX_WORKERS;
+	}
 	/* initialise the main loop */
-	loop = ev_default_loop(0);
+	loop = ev_default_loop(EVFLAG_AUTO);
 	__ctx.mainloop = loop;
 
-	/* initialise global job q */
-	init_glob_jq(&__glob_jq);
+	/* create the job pool, here because we may want to offload stuff */
+	gjpool = make_jpool(NJOBS, sizeof(struct job_s));
 
 	/* initialise the proto core (no-op at the mo) */
 	init_proto();
@@ -594,22 +529,8 @@ main(int argc, const char *argv[])
 	ev_async_init(glob_notify, triv_cb);
 	ev_async_start(EV_A_ glob_notify);
 
-	/* create one loop for all threads */
-	secl = ev_loop_new(0);
-	{
-		ev_async *eva = &work_watcher;
-		ev_async_init(eva, worker_cb);
-		ev_async_start(secl, eva);
-	}
-	{
-		ev_async *eva = &kill_watcher;
-		ev_async_init(eva, kill_cb);
-		ev_async_start(secl, eva);
-	}
-	/* set up the worker threads along with their secondary loops */
-	for (index_t i = 0; i < NWORKERS; i++) {
-		add_worker(secl);
-	}
+	/* create the worker pool */
+	gwpool = make_wpool(nworkers, NJOBS);
 
 	/* attach a multicast listener
 	 * we add this quite late so that it's unlikely that a plethora of
@@ -617,8 +538,6 @@ main(int argc, const char *argv[])
 	 * causing the libev main loop to crash. */
 	ud_attach_mcast(EV_A_ prefer6p);
 
-	/* reset the round robin var */
-	rr_wrk = 0;
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
@@ -628,22 +547,8 @@ main(int argc, const char *argv[])
 	/* close the socket */
 	ud_detach_mcast(EV_A);
 
-	/* kill the workers along with their secondary loops */
-	for (index_t i = NWORKERS; i > 0; i--) {
-		UD_DEBUG("killing worker %lu\n", (long unsigned int)i - 1);
-		kill_worker(&workers[i-1]);
-	}
-	for (index_t i = NWORKERS; i > 0; i--) {
-		UD_DEBUG("killing worker %lu\n", (long unsigned int)i - 1);
-		kill_worker(&workers[i-1]);
-		usleep(10000);
-	}
-	for (index_t i = NWORKERS; i > 0; i--) {
-		UD_DEBUG("gathering worker %lu\n", (long unsigned int)i - 1);
-		pthread_join(workers[i-1].thread, NULL);
-	}
-	/* destroy the secondary loop */
-	ev_loop_destroy(secl);
+	/* kill our slaves */
+	kill_wpool(gwpool);
 
 	/* destroy the default evloop */
 	ev_default_destroy();

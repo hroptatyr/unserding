@@ -45,6 +45,13 @@
 #define UDPC_TYPE_SEQ	'a'
 #define UDPC_TYPE_VAR	'v'
 
+#if defined __INTEL_COMPILER
+/* icc remark #2259 is:
+ * non-pointer conversion from "unsigned int" to
+ * "uint16_t={unsigned short}" may lose significant bits */
+# pragma warning	(disable:2259)
+#endif	/* __INTEL_COMPILER */
+
 
 /* one byte sequences */
 #define UDPC_TYPE_UNK	0x00

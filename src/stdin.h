@@ -43,6 +43,8 @@
 #else  /* !HAVE_EV_H */
 # error "We need an event loop, give us one."
 #endif	/* HAVE_EV_H */
+#undef EV_P
+#define EV_P	struct ev_loop *loop __attribute__((unused))
 
 /* readline goodness, defined in stdin.c */
 extern int ud_attach_stdin(EV_P_ void(*hcb)(const char*, size_t));

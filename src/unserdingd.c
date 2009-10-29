@@ -503,7 +503,6 @@ main(int argc, const char *argv[])
 	 * the name job pool is misleading, it's a bucket pool with
 	 * equally sized buckets of memory */
 	gjpool = make_jpool(NJOBS, sizeof(struct job_s));
-
 	/* create the worker pool */
 	gwpool = make_wpool(nworkers, NJOBS);
 
@@ -554,6 +553,8 @@ main(int argc, const char *argv[])
 
 	/* kill our slaves */
 	kill_wpool(gwpool);
+	/* kill our buckets */
+	free_jpool(gjpool);
 
 	/* kick the config context */
 	ud_free_config(&__ctx);
@@ -566,3 +567,4 @@ main(int argc, const char *argv[])
 }
 
 /* unserdingd.c ends here */
+ 

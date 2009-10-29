@@ -317,6 +317,32 @@ daemonise(void)
 }
 
 
+/* helper function for the worker pool */
+static int
+get_num_proc(void)
+{
+#if defined HAVE_PTHREAD_AFFINITY_NP
+	long int self = pthread_self();
+	cpu_set_t cpuset;
+
+	if (pthread_getaffinity_np(self, sizeof(cpuset), &cpuset) == 0) {
+		int ret = cpuset_popcount(&cpuset);
+		if (ret > 0) {
+			return ret;
+		} else {
+			return 1;
+		}
+	}
+#endif	/* HAVE_PTHREAD_AFFINITY_NP */
+#if defined _SC_NPROCESSORS_ONLN
+	return sysconf(_SC_NPROCESSORS_ONLN);
+#else  /* !_SC_NPROCESSORS_ONLN */
+/* any ideas? */
+	return 1;
+#endif	/* _SC_NPROCESSORS_ONLN */
+}
+
+
 /* the popt helper */
 static void
 hlp(poptContext con, UNUSED(enum poptCallbackReason foo),
@@ -474,9 +500,10 @@ main(int argc, const char *argv[])
 
 	/* whither to log */
 	logout = stderr;
-
 	/* wipe stack pollution */
 	memset(&__ctx, 0, sizeof(__ctx));
+	/* obtain the number of cpus */
+	nworkers = get_num_proc();
 
 	/* parse the command line */
 	rest = ud_parse_cl(argc, argv);
@@ -499,8 +526,12 @@ main(int argc, const char *argv[])
 	loop = ev_default_loop(EVFLAG_AUTO);
 	__ctx.mainloop = loop;
 
-	/* create the job pool, here because we may want to offload stuff */
+	/* create the job pool, here because we may want to offload stuff
+	 * the name job pool is misleading, it's a bucket pool with
+	 * equally sized buckets of memory */
 	gjpool = make_jpool(NJOBS, sizeof(struct job_s));
+	/* create the worker pool */
+	gwpool = make_wpool(nworkers, NJOBS);
 
 	/* initialise the proto core (no-op at the mo) */
 	init_proto();
@@ -529,9 +560,6 @@ main(int argc, const char *argv[])
 	ev_async_init(glob_notify, triv_cb);
 	ev_async_start(EV_A_ glob_notify);
 
-	/* create the worker pool */
-	gwpool = make_wpool(nworkers, NJOBS);
-
 	/* attach a multicast listener
 	 * we add this quite late so that it's unlikely that a plethora of
 	 * events has already been injected into our precious queue
@@ -547,11 +575,13 @@ main(int argc, const char *argv[])
 	/* close the socket */
 	ud_detach_mcast(EV_A);
 
-	/* kill our slaves */
-	kill_wpool(gwpool);
-
 	/* destroy the default evloop */
 	ev_default_destroy();
+
+	/* kill our slaves */
+	kill_wpool(gwpool);
+	/* kill our buckets */
+	free_jpool(gjpool);
 
 	/* kick the config context */
 	ud_free_config(&__ctx);

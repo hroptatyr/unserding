@@ -24,7 +24,7 @@ BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
 header_HEADERS = unserding.h protocore.h seria.h
-noinst_HEADERS = arrqueue.h dllqueue.h protocore-private.h
+noinst_HEADERS = protocore-private.h
 
 if BUILD_SERVER
 ## the main server binary

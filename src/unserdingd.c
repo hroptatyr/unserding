@@ -499,8 +499,13 @@ main(int argc, const char *argv[])
 	loop = ev_default_loop(EVFLAG_AUTO);
 	__ctx.mainloop = loop;
 
-	/* create the job pool, here because we may want to offload stuff */
+	/* create the job pool, here because we may want to offload stuff
+	 * the name job pool is misleading, it's a bucket pool with
+	 * equally sized buckets of memory */
 	gjpool = make_jpool(NJOBS, sizeof(struct job_s));
+
+	/* create the worker pool */
+	gwpool = make_wpool(nworkers, NJOBS);
 
 	/* initialise the proto core (no-op at the mo) */
 	init_proto();
@@ -529,9 +534,6 @@ main(int argc, const char *argv[])
 	ev_async_init(glob_notify, triv_cb);
 	ev_async_start(EV_A_ glob_notify);
 
-	/* create the worker pool */
-	gwpool = make_wpool(nworkers, NJOBS);
-
 	/* attach a multicast listener
 	 * we add this quite late so that it's unlikely that a plethora of
 	 * events has already been injected into our precious queue
@@ -547,11 +549,11 @@ main(int argc, const char *argv[])
 	/* close the socket */
 	ud_detach_mcast(EV_A);
 
-	/* kill our slaves */
-	kill_wpool(gwpool);
-
 	/* destroy the default evloop */
 	ev_default_destroy();
+
+	/* kill our slaves */
+	kill_wpool(gwpool);
 
 	/* kick the config context */
 	ud_free_config(&__ctx);

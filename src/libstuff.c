@@ -229,7 +229,12 @@ init_epoll_guts(ud_handle_t hdl)
 	struct epoll_event *ev = ud_handle_epev(hdl);
 
 	/* obtain an epoll handle and make it non-blocking*/
+#if 0
+/* too new, needs >= 2.6.30 */
 	hdl->epfd = epoll_create1(0);
+#else
+	hdl->epfd = epoll_create(1);
+#endif
 	__set_nonblck(hdl->epfd);
 
 	/* register for input, oob, error and hangups */

@@ -153,7 +153,7 @@ ud_tick_LDADD = libunserding.la
 
 ud_ping_SOURCES = ud-ping.c
 ud_ping_CPPFLAGS =
-ud_ping_LDADD = libunserding.la
+ud_ping_LDADD = libunserding.la -lrt
 endif
 
 # 

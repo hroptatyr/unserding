@@ -44,20 +44,84 @@
 #include "protocore.h"
 #include "seria.h"
 
+#define MAX_TIMEOUT	500
+
+/* this is a bunch of time stamps */
+typedef struct clks_s {
+	struct timespec rt;
+	struct timespec pt;
+} *clks_t;
+
 static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
 
-static bool
-cb(ud_packet_t pkt, void *UNUSED(clo))
+static void
+__stamp(clockid_t cid, struct timespec *tgt)
 {
-	fprintf(stderr, "called, pkt.plen %u\n", pkt.plen);
-	return pkt.plen != 0;
+	clock_gettime(cid, tgt);
+	return;
+}
+
+static void
+__diff(struct timespec *tgt, struct timespec *beg, struct timespec *end)
+{
+	if ((end->tv_nsec - beg->tv_nsec) < 0) {
+		tgt->tv_sec = end->tv_sec - beg->tv_sec - 1;
+		tgt->tv_nsec = 1000000000 + end->tv_nsec - beg->tv_nsec;
+	} else {
+		tgt->tv_sec = end->tv_sec - beg->tv_sec;
+		tgt->tv_nsec = end->tv_nsec - beg->tv_nsec;
+	}
+	return;
+}
+
+static float
+__as_f(struct timespec *src)
+{
+/* return time as float in milliseconds */
+	return src->tv_sec * 1000.f + src->tv_nsec / 1000000.f;
+}
+
+/* higher level clock stuff */
+static void
+hrclock_stamp(clks_t tgt)
+{
+	__stamp(CLOCK_REALTIME, &tgt->rt);
+	__stamp(CLOCK_PROCESS_CPUTIME_ID, &tgt->pt);
+	return;
+}
+
+static void
+hrclock_diff(clks_t tgt, clks_t beg, clks_t end)
+{
+	__diff(&tgt->rt, &beg->rt, &end->rt);
+	__diff(&tgt->pt, &beg->pt, &end->pt);
+	return;
+}
+
+
+static bool
+cb(ud_packet_t pkt, void *clo)
+{
+	clks_t then = clo;
+	struct clks_s now;
+
+	if (pkt.plen == 0) {
+		return false;
+	}
+	/* otherwise the packet is meaningful */
+	hrclock_stamp(&now);
+	hrclock_diff(&now, then, &now);
+	printf("%2.6f ms-rt  %2.6f ms-pt\n", __as_f(&now.rt), __as_f(&now.pt));
+	return true;
 }
 
 int
 main(int argc, const char *UNUSED(argv[]))
 {
 	ud_convo_t cno;
+	/* referential stamp */
+	struct clks_s clks;
 
 	if (argc <= 0) {
 		fprintf(stderr, "Usage: ud-ping\n");
@@ -66,10 +130,12 @@ main(int argc, const char *UNUSED(argv[]))
 
 	/* obtain a new handle */
 	init_unserding_handle(hdl, PF_INET6);
-	/* init the seria */
+	/* record the current time */
+	hrclock_stamp(&clks);
+	/* send off the bugger */
 	cno = ud_send_simple(hdl, 0x0004);
 	/* wait */
-	ud_subscr_raw(hdl, 2000, cb, NULL);
+	ud_subscr_raw(hdl, MAX_TIMEOUT, cb, &clks);
 	/* and lose the handle again */
 	free_unserding_handle(&__hdl);
 	return 0;

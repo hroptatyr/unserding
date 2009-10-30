@@ -240,22 +240,29 @@ free_epoll_guts(ud_handle_t hdl)
 	return;
 }
 
-static int
-ud_ep_wait(ud_handle_t hdl, int timeout)
+static void
+ud_ep_prep(ud_handle_t hdl)
 {
 	int s = ud_handle_sock(hdl);
 	int epfd = ud_handle_epfd(hdl);
 	struct epoll_event *ev = ud_handle_epev(hdl);
-	struct epoll_event *events = NULL;
 
 	/* add S to the epoll descriptor EPFD */
 	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, ev);
-	/* now wait */
+	return;
+}
+
+static int
+ud_ep_wait(ud_handle_t hdl, int timeout)
+{
+	int epfd = ud_handle_epfd(hdl);
+	struct epoll_event *events = NULL;
+	/* wait and return */
 	return epoll_wait(epfd, events, 1, timeout);
 }
 
 static void
-ud_ep_unwait(ud_handle_t hdl)
+ud_ep_fini(ud_handle_t hdl)
 {
 	int s = ud_handle_sock(hdl);
 	int epfd = ud_handle_epfd(hdl);
@@ -295,6 +302,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	}
 
 	/* wait for events */
+	ud_ep_prep(hdl);
 	nfds = ud_ep_wait(hdl, timeout);
 	/* no need to loop atm, nfds can be 0 or 1 */
 	if (UNLIKELY(nfds == 0)) {
@@ -308,7 +316,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	udpc_print_pkt(BUF_PACKET(buf));
 #endif	/* DEBUG_PKTTRAF_FLAG */
 out:
-	ud_ep_unwait(hdl);
+	ud_ep_fini(hdl);
 	return;
 }
 
@@ -329,8 +337,10 @@ ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_pred_f pf, void *clo)
 	char buf[UDPC_PKTLEN];
 	ud_packet_t tmp = BUF_PACKET(buf);
 
-	/* now wait */
+	/* prepare ... */
+	ud_ep_prep(hdl);
 wait:
+	/* ... and wait */
 	nfds = ud_ep_wait(hdl, to);
 	UD_DEBUG_SENDRECV("received %d events on socket %d\n", nfds, s);
 
@@ -364,7 +374,36 @@ wait:
 		pkt->plen = 0;
 	}
 out:
-	ud_ep_unwait(hdl);
+	ud_ep_fini(hdl);
+	return;
+}
+
+/* subscriptions, basically receivers with callbacks */
+void
+ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo)
+{
+	int s = ud_handle_sock(hdl);
+	int nfds;
+	ssize_t nread;
+	static __thread char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = BUF_PACKET(buf);
+
+	/* wait for events */
+	ud_ep_prep(hdl);
+	do {
+		nfds = ud_ep_wait(hdl, timeout);
+		/* no need to loop atm, nfds can be 0 or 1 */
+		if (UNLIKELY(nfds == 0)) {
+			/* nothing received */
+			memset(buf, 0, sizeof(buf));
+			pkt.plen = 0;
+		} else {
+			/* otherwise NFDS was 1 and it MUST be our socket */
+			nread = recvfrom(s, buf, sizeof(buf), 0, NULL, 0);
+			pkt.plen = nread;
+		}
+	} while ((*cb)(pkt, clo));
+	ud_ep_fini(hdl);
 	return;
 }
 

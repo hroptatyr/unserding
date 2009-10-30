@@ -100,6 +100,9 @@ typedef uint32_t ud_pkt_no_t;
 /**
  * Predicate function for packets. */
 typedef bool(*ud_pred_f)(const ud_packet_t pkt, void* clo);
+/**
+ * Callback function for subscriptions. */
+typedef bool(*ud_subscr_f)(ud_packet_t pkt, void *clo);
 
 /**
  * Struct to handle conversations. */
@@ -184,7 +187,9 @@ extern void ud_send_raw(ud_handle_t hdl, ud_packet_t pkt);
  * Send a CMD-packet through the handle HDL. */
 extern ud_convo_t ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd);
 /**
- * Wait (read block) until packets or TIMEOUT millisecs have passed. */
+ * Wait (read block) until packets arrive or TIMEOUT millisecs have passed.
+ * If packets were found this routine returns exactly one packet and
+ * their content is copied into PKT. */
 extern void
 ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout);
 /**
@@ -202,6 +207,16 @@ ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int timeout, ud_convo_t cno);
 extern void
 ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int timeout,
 		ud_pred_f predf, void *clo);
+
+/**
+ * Subscribe to all traffic.
+ * For each packet on the network call CB with the packet's buffer in PKT
+ * and a user closure CLO.  After TIMEOUT milliseconds the callback is
+ * called with an empty PACKET.  The function CB should return `true' if
+ * it wishes to continue receiving packets, and should return `false' if
+ * the subscription is annulled. */
+extern void
+ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo);
 
 /* inlines */
 /**

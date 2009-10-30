@@ -47,11 +47,16 @@
 static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
 
-int
-main(int argc, const char *argv[])
+static bool
+cb(ud_packet_t pkt, void *UNUSED(clo))
 {
-	static char buf[UDPC_PKTLEN];
-	ud_packet_t p = BUF_PACKET(buf);
+	fprintf(stderr, "called, pkt.plen %u\n", pkt.plen);
+	return pkt.plen != 0;
+}
+
+int
+main(int argc, const char *UNUSED(argv[]))
+{
 	ud_convo_t cno;
 
 	if (argc <= 0) {
@@ -64,7 +69,7 @@ main(int argc, const char *argv[])
 	/* init the seria */
 	cno = ud_send_simple(hdl, 0x0004);
 	/* wait */
-	ud_recv_convo(hdl, &p, 2000, cno);
+	ud_subscr_raw(hdl, 2000, cb, NULL);
 	/* and lose the handle again */
 	free_unserding_handle(&__hdl);
 	return 0;

@@ -14,7 +14,7 @@ bin_PROGRAMS += unserdingd unsercli
 noinst_PROGRAMS = instrumenstruation
 endif
 if BUILD_CLIAPPS
-bin_PROGRAMS += ud-instr ud-snap ud-tick
+bin_PROGRAMS += ud-instr ud-snap ud-tick ud-ping
 endif
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
@@ -150,6 +150,10 @@ ud_snap_LDADD = libunserding.la
 ud_tick_SOURCES = ud-tick.c
 ud_tick_CPPFLAGS = $(PFACK_CFLAGS)
 ud_tick_LDADD = libunserding.la
+
+ud_ping_SOURCES = ud-ping.c
+ud_ping_CPPFLAGS =
+ud_ping_LDADD = libunserding.la
 endif
 
 # 

@@ -485,7 +485,20 @@ ud_free_config(ud_ctx_t ctx)
 #endif
 
 
-#include "dso-pong.c"
+/* static module loader */
+static void
+ud_init_statmods(void *clo)
+{
+	dso_pong_LTX_init(clo);
+	return;
+}
+
+static void
+ud_deinit_statmods(void *clo)
+{
+	dso_pong_LTX_deinit(clo);
+	return;
+}
 
 
 int
@@ -569,8 +582,8 @@ main(int argc, const char *argv[])
 	 * causing the libev main loop to crash. */
 	ud_attach_mcast(EV_A_ prefer6p);
 
-	/* pong service */
-	dso_pong_LTX_init(&__ctx);
+	/* static modules */
+	ud_init_statmods(&__ctx);
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
@@ -579,7 +592,7 @@ main(int argc, const char *argv[])
 	ud_deinit_modules(&__ctx);
 
 	/* pong service */
-	dso_pong_LTX_deinit(&__ctx);
+	ud_deinit_statmods(&__ctx);
 
 	/* close the socket */
 	ud_detach_mcast(EV_A);

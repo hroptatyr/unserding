@@ -41,7 +41,10 @@ unserdingd_LDFLAGS += $(shell pkg-config --libs libxml-2.0)
 unserdingd_LDFLAGS += -llua ## check for me
 unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL)
 
-## server modules
+## server static modules
+unserdingd_SOURCES += dso-pong.c
+
+## server dynamic modules
 mod_LTLIBRARIES =
 mod_LTLIBRARIES += dso-cli.la dso-scscp.la dso-scscp2.la dso-bbdb.la dso-xbbdb.la
 #mod_LTLIBRARIES += dso-instr.la

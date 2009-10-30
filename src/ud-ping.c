@@ -52,8 +52,9 @@ typedef struct clks_s {
 	struct timespec pt;
 } *clks_t;
 
-static size_t cnt = -1UL;
-static long unsigned int timeout = 1000;
+static size_t cnt;
+static long unsigned int timeout;
+static void(*mode)(ud_handle_t);
 
 
 static void
@@ -122,7 +123,7 @@ cb(ud_packet_t pkt, void *clo)
 	struct udpc_seria_s sctx;
 	static char hnname[16];
 
-	if (cnt == 0 || pkt.plen == 0 || pkt.plen == -1UL) {
+	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
 		return false;
 	}
 	/* otherwise the packet is meaningful */
@@ -164,26 +165,86 @@ ping1(ud_handle_t hdl)
 	return 0;
 }
 
-int
-main(int argc, const char *UNUSED(argv[]))
+/* modes we can do */
+static void
+classic_mode(ud_handle_t hdl)
 {
-	static struct ud_handle_s __hdl;
-
-	if (argc <= 0) {
-		fprintf(stderr, "Usage: ud-ping\n");
-		exit(1);
-	}
-
-	/* obtain a new handle */
-	init_unserding_handle(&__hdl, PF_INET6);
 	/* install sig handler */
 	(void)signal(SIGINT, handle_sigint);
 	/* to mimic ping(8) even more */
 	puts("ud-ping " UD_MCAST6_ADDR " (" UD_MCAST6_ADDR ") 8 bytes of data");
 	/* enter the `main loop' */
 	while (cnt-- > 0) {
-		ping1(&__hdl);
+		ping1(hdl);
 	}
+	return;
+}
+
+static void
+nego_mode(ud_handle_t UNUSED(hdl))
+{
+	return;
+}
+
+
+static void __attribute__((noreturn))
+usage(void)
+{
+	fprintf(stderr, "\
+Usage: ud-ping [-c count] [-n|--negotiation] [-i interval]\n");
+	exit(1);
+}
+
+static void
+parse_args(int argc, const char *argv[])
+{
+	/* set some defaults */
+	timeout = 1000;
+	cnt = -1UL;
+	mode = &classic_mode;
+
+	if (argc <= 0) {
+		usage();
+	}
+	for (int i = 1; i < argc; i++) {
+		if (argv[i][0] != '-') {
+			usage();
+		}
+		switch (argv[i][1]) {
+		case 'n':
+			mode = nego_mode;
+			break;
+		case 'i':
+			if (argv[i+1]) {
+				timeout = strtol(argv[i+1], NULL, 10);
+			}
+			i++;
+			break;
+		case 'c':
+			if (argv[i+1]) {
+				cnt = strtol(argv[i+1], NULL, 10);
+			}
+			i++;
+			break;
+		default:
+			usage();
+			break;
+		}
+	}
+	return;
+}
+
+int
+main(int argc, const char *argv[])
+{
+	static struct ud_handle_s __hdl;
+
+	/* look what the luser wants */
+	parse_args(argc, argv);
+	/* obtain a new handle */
+	init_unserding_handle(&__hdl, PF_INET6);
+	/* call the mode function */
+	(void)(*mode)(&__hdl);
 	/* and lose the handle again */
 	free_unserding_handle(&__hdl);
 	return 0;

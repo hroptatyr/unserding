@@ -341,7 +341,7 @@ ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd)
 {
 	ud_convo_t cno = ud_handle_convo(hdl);
 	char buf[UDPC_PKTLEN];
-	ud_packet_t pkt = {.plen = countof(buf), .pbuf = buf};
+	ud_packet_t pkt = BUF_PACKET(buf);
 
 	udpc_make_pkt(pkt, cno, /*pno*/0, cmd);
 	ud_send_raw(hdl, pkt);

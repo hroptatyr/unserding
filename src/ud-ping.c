@@ -39,12 +39,12 @@
 #include <stdbool.h>
 #define __USE_XOPEN
 #include <time.h>
+#include <signal.h>
+#include <errno.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "protocore.h"
 #include "seria.h"
-
-#define MAX_TIMEOUT	500
 
 /* this is a bunch of time stamps */
 typedef struct clks_s {
@@ -52,9 +52,10 @@ typedef struct clks_s {
 	struct timespec pt;
 } *clks_t;
 
-static struct ud_handle_s __hdl;
-static ud_handle_t hdl = &__hdl;
+static size_t cnt = -1UL;
+static long unsigned int timeout = 1000;
 
+
 static void
 __stamp(clockid_t cid, struct timespec *tgt)
 {
@@ -100,28 +101,73 @@ hrclock_diff(clks_t tgt, clks_t beg, clks_t end)
 }
 
 
+/* field retrievers */
+static void
+fetch_hnname(udpc_seria_t sctx, char *buf, size_t bsz)
+{
+	const char *p;
+	size_t s;
+	memset(buf, 0, bsz);
+	s = udpc_seria_des_str(sctx, &p);
+	memcpy(buf, p, s);
+	return;
+}
+
+
 static bool
 cb(ud_packet_t pkt, void *clo)
 {
 	clks_t then = clo;
 	struct clks_s now;
+	struct udpc_seria_s sctx;
+	static char hnname[16];
 
-	if (pkt.plen == 0) {
+	if (cnt == 0 || pkt.plen == 0 || pkt.plen == -1UL) {
 		return false;
 	}
 	/* otherwise the packet is meaningful */
 	hrclock_stamp(&now);
 	hrclock_diff(&now, then, &now);
-	printf("%2.6f ms-rt  %2.6f ms-pt\n", __as_f(&now.rt), __as_f(&now.pt));
+
+	/* fetch fields */
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	/* fetch the host name */
+	fetch_hnname(&sctx, hnname, sizeof(hnname));
+	/* print */
+	printf("%zu bytes from %s (...): "
+	       "convo=%i time=%2.3f ms\n",
+	       pkt.plen, hnname, udpc_pkt_cno(pkt), __as_f(&now.rt));
 	return true;
+}
+
+static void
+handle_sigint(int UNUSED(signum))
+{
+	/* just set cnt to naught and we will exit the main loop */
+	cnt = 0;
+	return;
+}
+
+static int
+ping1(ud_handle_t hdl)
+{
+	ud_convo_t cno;
+	/* referential stamp */
+	struct clks_s clks;
+
+	/* record the current time */
+	hrclock_stamp(&clks);
+	/* send off the bugger */
+	cno = ud_send_simple(hdl, 0x0004);
+	/* wait for replies */
+	ud_subscr_raw(hdl, timeout, cb, &clks);
+	return 0;
 }
 
 int
 main(int argc, const char *UNUSED(argv[]))
 {
-	ud_convo_t cno;
-	/* referential stamp */
-	struct clks_s clks;
+	static struct ud_handle_s __hdl;
 
 	if (argc <= 0) {
 		fprintf(stderr, "Usage: ud-ping\n");
@@ -129,13 +175,15 @@ main(int argc, const char *UNUSED(argv[]))
 	}
 
 	/* obtain a new handle */
-	init_unserding_handle(hdl, PF_INET6);
-	/* record the current time */
-	hrclock_stamp(&clks);
-	/* send off the bugger */
-	cno = ud_send_simple(hdl, 0x0004);
-	/* wait */
-	ud_subscr_raw(hdl, MAX_TIMEOUT, cb, &clks);
+	init_unserding_handle(&__hdl, PF_INET6);
+	/* install sig handler */
+	(void)signal(SIGINT, handle_sigint);
+	/* to mimic ping(8) even more */
+	puts("ud-ping " UD_MCAST6_ADDR " (" UD_MCAST6_ADDR ") 8 bytes of data");
+	/* enter the `main loop' */
+	while (cnt-- > 0) {
+		ping1(&__hdl);
+	}
 	/* and lose the handle again */
 	free_unserding_handle(&__hdl);
 	return 0;

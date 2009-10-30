@@ -115,6 +115,7 @@ fetch_hnname(udpc_seria_t sctx, char *buf, size_t bsz)
 }
 
 
+/* modes we can do, classic mode */
 static bool
 cb(ud_packet_t pkt, void *clo)
 {
@@ -165,7 +166,6 @@ ping1(ud_handle_t hdl)
 	return 0;
 }
 
-/* modes we can do */
 static void
 classic_mode(ud_handle_t hdl)
 {
@@ -180,9 +180,62 @@ classic_mode(ud_handle_t hdl)
 	return;
 }
 
+
+/* another mode, negotiation mode, this will go to libunserding one day */
+static bool
+ncb(ud_packet_t pkt, void *clo)
+{
+	clks_t then = clo;
+	struct udpc_seria_s sctx;
+	static char hnname[16];
+	struct timespec now, us, em;
+	uint8_t score;
+
+	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
+		return false;
+	}
+	/* otherwise the packet is meaningful */
+	__stamp(CLOCK_REALTIME, &now);
+	__diff(&us, &then->rt, &now);
+
+	/* fetch fields */
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	/* fetch the host name */
+	fetch_hnname(&sctx, hnname, sizeof(hnname));
+	em.tv_sec = udpc_seria_des_ui32(&sctx);
+	em.tv_nsec = udpc_seria_des_ui32(&sctx);
+	score = udpc_seria_des_byte(&sctx);
+	/* compute their stamp */
+	__diff(&em, &then->rt, &em);
+	/* print */
+	printf("name %s  theirs %2.3f ms  ours %2.3f ms  score %u\n",
+	       hnname, __as_f(&us), __as_f(&em), score);
+	return true;
+}
+
+static int
+nego1(ud_handle_t hdl)
+{
+	ud_convo_t cno;
+	/* referential stamp */
+	struct clks_s clks;
+
+	/* record the current time */
+	hrclock_stamp(&clks);
+	/* send off the bugger */
+	cno = ud_send_simple(hdl, 0x0004);
+	/* wait for replies */
+	ud_subscr_raw(hdl, timeout, ncb, &clks);
+	return 0;
+}
+
 static void
 nego_mode(ud_handle_t UNUSED(hdl))
 {
+	/* to mimic ping(8) even more */
+	puts("ud-ping negotiating in " UD_MCAST6_ADDR);
+	/* enter the `main loop' */
+	nego1(hdl);
 	return;
 }
 
@@ -212,6 +265,7 @@ parse_args(int argc, const char *argv[])
 		}
 		switch (argv[i][1]) {
 		case 'n':
+			timeout = 250;
 			mode = nego_mode;
 			break;
 		case 'i':

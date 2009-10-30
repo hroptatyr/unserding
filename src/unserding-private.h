@@ -141,9 +141,6 @@ extern jpool_t gjpool;
  * Global worker pool, contains the job queue. */
 extern wpool_t gwpool;
 
-/* jobs */
-extern void ud_hyrpl_job(job_t);
-
 #if defined UNSERCLI
 extern bool cli_waiting_p;
 #endif	/* UNSERCLI */

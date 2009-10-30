@@ -485,6 +485,9 @@ ud_free_config(ud_ctx_t ctx)
 #endif
 
 
+#include "dso-pong.c"
+
+
 int
 main(int argc, const char *argv[])
 {
@@ -566,11 +569,17 @@ main(int argc, const char *argv[])
 	 * causing the libev main loop to crash. */
 	ud_attach_mcast(EV_A_ prefer6p);
 
+	/* pong service */
+	dso_pong_LTX_init(&__ctx);
+
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
 	/* deinitialise modules */
 	ud_deinit_modules(&__ctx);
+
+	/* pong service */
+	dso_pong_LTX_deinit(&__ctx);
 
 	/* close the socket */
 	ud_detach_mcast(EV_A);

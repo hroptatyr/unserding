@@ -266,4 +266,11 @@ ud_handle_set_4svc(ud_handle_t hdl)
 	return;
 }
 
+
+/* specific services */
+/**
+ * Service 0004:
+ * Ping/pong service to determine neighbours. */
+#define UD_SVC_PING	0x0004
+
 #endif	/* INCLUDED_unserding_h_ */

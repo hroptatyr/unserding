@@ -162,4 +162,9 @@ schedule_timer_every(void *ctx, void(*cb)(void *clo), void *clo, double every);
 extern void
 unsched_timer(void *ctx, void *timer);
 
+
+/* specific services */
+extern void dso_pong_LTX_init(void*);
+extern void dso_pong_LTX_deinit(void*);
+
 #endif	/* INCLUDED_unserding_private_h_ */

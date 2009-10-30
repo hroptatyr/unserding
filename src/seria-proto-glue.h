@@ -72,6 +72,7 @@ send_pkt(udpc_seria_t sctx, job_t j)
 {
 	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
 	send_cl(j);
+#if defined UD_LOG
 	UD_LOG("xdr-instr reply  "
 	       ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
 	       (unsigned int)j->blen,
@@ -79,6 +80,7 @@ send_pkt(udpc_seria_t sctx, job_t j)
 	       udpc_pkt_pno(JOB_PACKET(j)),
 	       udpc_pkt_cmd(JOB_PACKET(j)),
 	       ntohs(((const uint16_t*)j->buf)[3]));
+#endif	/* UD_LOG */
 	return;
 }
 

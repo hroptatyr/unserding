@@ -98,11 +98,8 @@ typedef uint16_t ud_pkt_cmd_t;
  * Packet number. */
 typedef uint32_t ud_pkt_no_t;
 /**
- * Predicate function for packets. */
-typedef bool(*ud_pred_f)(const ud_packet_t pkt, void* clo);
-/**
  * Callback function for subscriptions. */
-typedef bool(*ud_subscr_f)(ud_packet_t pkt, void *clo);
+typedef bool(*ud_subscr_f)(const ud_packet_t pkt, void *clo);
 
 /**
  * Struct to handle conversations. */
@@ -196,17 +193,6 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout);
  * Like ud_recv_raw() but only receive packets that belong to convo CNO. */
 extern void
 ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int timeout, ud_convo_t cno);
-/**
- * Like ud_recv_raw() but only receive packets that fulfill PREDF.
- * When a packet comes in it is read off of the wire and applied against
- * PREDF to determine if it is the one desired.  Before calling PREDF the
- * packet is checked for general validity, i.e. if all magic numbers are
- * in place, then PREDF is called like PREDF(*PKT, CLO).
- * PREDF is meant to return `true' if the packet is to be delivered and
- * `false' otherwise.  Outsorted packets cannot be retained. */
-extern void
-ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int timeout,
-		ud_pred_f predf, void *clo);
 
 /**
  * Subscribe to all traffic.

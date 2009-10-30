@@ -201,11 +201,25 @@ ud_handle_epev(ud_handle_t hdl)
 	return (struct epoll_event*)&hdl->data;
 }
 
+typedef struct __convo_flt_s {
+	ud_packet_t *pkt;
+	ud_convo_t cno;
+} *__convo_flt_t;
+
 static bool
 __pkt_our_convo_p(const ud_packet_t pkt, void *clo)
 {
-	ud_convo_t cno = (long unsigned int)clo;
-	return udpc_pkt_cno(pkt) == cno;
+	__convo_flt_t flt = clo;
+	if (pkt.plen == 0) {
+		return false;
+	} else if (udpc_pkt_cno(pkt) == flt->cno) {
+		size_t sz = pkt.plen < flt->pkt->plen
+			? pkt.plen
+			: flt->pkt->plen;
+		memcpy(flt->pkt->pbuf, pkt.pbuf, sz);
+		return false;
+	}
+	return true;
 }
 
 /* epoll guts */
@@ -323,58 +337,8 @@ out:
 void
 ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_convo_t cno)
 {
-	void *clo = (void*)(long unsigned int)cno;
-	ud_recv_pred(hdl, pkt, to, __pkt_our_convo_p, clo);
-	return;
-}
-
-void
-ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_pred_f pf, void *clo)
-{
-	int s = ud_handle_sock(hdl);
-	int nfds;
-	ssize_t nread;
-	char buf[UDPC_PKTLEN];
-	ud_packet_t tmp = BUF_PACKET(buf);
-
-	/* prepare ... */
-	ud_ep_prep(hdl);
-wait:
-	/* ... and wait */
-	nfds = ud_ep_wait(hdl, to);
-	UD_DEBUG_SENDRECV("received %d events on socket %d\n", nfds, s);
-
-	/* no need to loop atm, nfds can be 0 or 1 */
-	if (UNLIKELY(nfds == 0 || nfds == -1)) {
-		/* nothing received */
-		pkt->plen = 0;
-		goto out;
-	}
-	/* otherwise NFDS was 1 and it MUST be our socket */
-	do {
-		if ((nread = recv(s, buf, countof(buf), 0)) < 0) {
-			/* batshit! start over
-			 * we could assert(errno == EAGAIN); */
-			UD_DEBUG_SENDRECV("read failed ... starting over\n");
-			goto wait;
-		}
-		UD_DEBUG_SENDRECV("read %ld bytes\n", (long int)nread);
-		tmp.plen = nread;
-#if defined DEBUG_PKTTRAF_FLAG
-		ud_fprint_pkt_raw(tmp, stderr);
-#endif	/* DEBUG_PKTTRAF_FLAG */
-	} while (!udpc_pkt_valid_p(tmp) || !pf(tmp, clo));
-
-	if (LIKELY(nread > 0)) {
-		if (LIKELY((size_t)nread < pkt->plen)) {
-			pkt->plen = nread;
-		}
-		memcpy(pkt->pbuf, buf, pkt->plen);
-	} else {
-		pkt->plen = 0;
-	}
-out:
-	ud_ep_fini(hdl);
+	struct __convo_flt_s flt = {.pkt = pkt, .cno = cno};
+	ud_subscr_raw(hdl, to, __pkt_our_convo_p, &flt);
 	return;
 }
 

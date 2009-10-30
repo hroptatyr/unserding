@@ -112,6 +112,8 @@ struct ud_handle_s {
 	ud_pktchn_t pktchn;
 	/* our connexion later on */
 	ud_sockaddr_t sa;
+	/* our epoll event, very rudely opaquified */
+	void *data[2];
 };
 
 

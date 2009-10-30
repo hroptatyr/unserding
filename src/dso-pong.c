@@ -42,16 +42,45 @@
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "unserding-private.h"
+#include "seria-proto-glue.h"
+#include <time.h>
+
+#define TRUNC_HOST_NAME_LEN	16
+
+static uint8_t my_score = 255;
+static size_t my_hnmlen;
+static char my_hname[TRUNC_HOST_NAME_LEN];
 
 static void
-ping(job_t j)
+hrclock_stamp(struct timespec *ts)
 {
+	clock_gettime(CLOCK_REALTIME, ts);
 	return;
 }
 
 static void
-pong(job_t j)
+ping(job_t j)
 {
+	struct udpc_seria_s sctx;
+	struct timespec ts;
+
+	/* clear out the packet */
+	clear_pkt(&sctx, j);
+	/* escrow hostname, mac-addr, score and time */
+	hrclock_stamp(&ts);
+	udpc_seria_add_str(&sctx, my_hname, my_hnmlen);
+	udpc_seria_add_ui32(&sctx, ts.tv_sec);
+	udpc_seria_add_ui32(&sctx, ts.tv_nsec);
+	udpc_seria_add_byte(&sctx, my_score);
+	/* off we go */
+	send_pkt(&sctx, j);
+	return;
+}
+
+static void
+pong(job_t UNUSED(j))
+{
+	UD_DEBUG("spurious pong caught\n");
 	return;
 }
 
@@ -59,6 +88,9 @@ pong(job_t j)
 void
 dso_pong_LTX_init(void *UNUSED(clo))
 {
+	/* obtain our host name */
+	(void)gethostname(my_hname, sizeof(my_hname));
+	my_hnmlen = strlen(my_hname);
 	/* tick service */
 	ud_set_service(UD_SVC_PING, ping, pong);
 	return;

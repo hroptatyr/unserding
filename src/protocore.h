@@ -166,7 +166,7 @@ udpc_pktsched(ud_packet_t p)
 #define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
 
 /* helper macro to use a char buffer as packet */
-#define BUF_PACKET(b)	((ud_packet_t){.plen = countof(b), .pbuf = b})
+#define BUF_PACKET(b)	((ud_packet_t){.plen = sizeof(b), .pbuf = b})
 #define PACKET(a, b)	((ud_packet_t){.plen = a, .pbuf = b})
 
 

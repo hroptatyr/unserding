@@ -1,4 +1,4 @@
-/*** seria-proto-glue.h -- useful stuff
+/*** ud-ping.c -- ping/pong utility
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,53 +35,44 @@
  *
  ***/
 
-#if !defined INCLUDED_seria_proto_glue_h_
-#define INCLUDED_seria_proto_glue_h_
-
+#include <stdio.h>
+#include <stdbool.h>
+#define __USE_XOPEN
+#include <time.h>
+#include "unserding.h"
+#include "unserding-nifty.h"
 #include "protocore.h"
 #include "seria.h"
 
-
-/* higher level packet voodoo */
-static inline void
-clear_pkt(udpc_seria_t sctx, job_t rplj)
+static struct ud_handle_s __hdl;
+static ud_handle_t hdl = &__hdl;
+
+static bool
+cb(ud_packet_t pkt, void *UNUSED(clo))
 {
-	memset(UDPC_PAYLOAD(rplj->buf), 0, UDPC_PLLEN);
-	udpc_make_rpl_pkt(JOB_PACKET(rplj));
-	udpc_seria_init(sctx, UDPC_PAYLOAD(rplj->buf), UDPC_PLLEN);
-	return;
+	fprintf(stderr, "called, pkt.plen %u\n", pkt.plen);
+	return pkt.plen != 0;
 }
 
-static inline void
-copy_pkt(job_t tgtj, job_t srcj)
+int
+main(int argc, const char *UNUSED(argv[]))
 {
-	memcpy(tgtj, srcj, sizeof(*tgtj));
-	return;
+	ud_convo_t cno;
+
+	if (argc <= 0) {
+		fprintf(stderr, "Usage: ud-ping\n");
+		exit(1);
+	}
+
+	/* obtain a new handle */
+	init_unserding_handle(hdl, PF_INET6);
+	/* init the seria */
+	cno = ud_send_simple(hdl, 0x0004);
+	/* wait */
+	ud_subscr_raw(hdl, 2000, cb, NULL);
+	/* and lose the handle again */
+	free_unserding_handle(&__hdl);
+	return 0;
 }
 
-static inline void
-prep_pkt(udpc_seria_t sctx, job_t rplj, job_t srcj)
-{
-	copy_pkt(rplj, srcj);
-	clear_pkt(sctx, rplj);
-	return;
-}
-
-static inline void
-send_pkt(udpc_seria_t sctx, job_t j)
-{
-	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
-	send_cl(j);
-#if defined UD_LOG
-	UD_LOG("xdr-instr reply  "
-	       ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-	       (unsigned int)j->blen,
-	       udpc_pkt_cno(JOB_PACKET(j)),
-	       udpc_pkt_pno(JOB_PACKET(j)),
-	       udpc_pkt_cmd(JOB_PACKET(j)),
-	       ntohs(((const uint16_t*)j->buf)[3]));
-#endif	/* UD_LOG */
-	return;
-}
-
-#endif	/* INCLUDED_seria_proto_glue_h_ */
+/* ud-tick.c ends here */

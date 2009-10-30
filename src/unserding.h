@@ -98,8 +98,8 @@ typedef uint16_t ud_pkt_cmd_t;
  * Packet number. */
 typedef uint32_t ud_pkt_no_t;
 /**
- * Predicate function for packets. */
-typedef bool(*ud_pred_f)(const ud_packet_t pkt, void* clo);
+ * Callback function for subscriptions. */
+typedef bool(*ud_subscr_f)(const ud_packet_t pkt, void *clo);
 
 /**
  * Struct to handle conversations. */
@@ -112,6 +112,8 @@ struct ud_handle_s {
 	ud_pktchn_t pktchn;
 	/* our connexion later on */
 	ud_sockaddr_t sa;
+	/* our epoll event, very rudely opaquified */
+	void *data[2];
 };
 
 
@@ -182,24 +184,25 @@ extern void ud_send_raw(ud_handle_t hdl, ud_packet_t pkt);
  * Send a CMD-packet through the handle HDL. */
 extern ud_convo_t ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd);
 /**
- * Wait (read block) until packets or TIMEOUT millisecs have passed. */
+ * Wait (read block) until packets arrive or TIMEOUT millisecs have passed.
+ * If packets were found this routine returns exactly one packet and
+ * their content is copied into PKT. */
 extern void
 ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout);
 /**
  * Like ud_recv_raw() but only receive packets that belong to convo CNO. */
 extern void
 ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int timeout, ud_convo_t cno);
+
 /**
- * Like ud_recv_raw() but only receive packets that fulfill PREDF.
- * When a packet comes in it is read off of the wire and applied against
- * PREDF to determine if it is the one desired.  Before calling PREDF the
- * packet is checked for general validity, i.e. if all magic numbers are
- * in place, then PREDF is called like PREDF(*PKT, CLO).
- * PREDF is meant to return `true' if the packet is to be delivered and
- * `false' otherwise.  Outsorted packets cannot be retained. */
+ * Subscribe to all traffic.
+ * For each packet on the network call CB with the packet's buffer in PKT
+ * and a user closure CLO.  After TIMEOUT milliseconds the callback is
+ * called with an empty PACKET.  The function CB should return `true' if
+ * it wishes to continue receiving packets, and should return `false' if
+ * the subscription is annulled. */
 extern void
-ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int timeout,
-		ud_pred_f predf, void *clo);
+ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo);
 
 /* inlines */
 /**

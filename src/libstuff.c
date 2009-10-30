@@ -189,22 +189,102 @@ mcast4_init(ud_handle_t hdl)
 	return s;
 }
 
-static inline int __attribute__((always_inline, gnu_inline))
+static inline int
 ud_handle_epfd(ud_handle_t hdl)
 {
-	if (UNLIKELY(hdl->epfd < 0)) {
-		hdl->epfd = epoll_create(4);
-		/* set non-blocking */
-		(void)fcntl(hdl->epfd, F_SETFL, O_NONBLOCK);
-	}
 	return hdl->epfd;
 }
+
+static inline struct epoll_event*
+ud_handle_epev(ud_handle_t hdl)
+{
+	return (struct epoll_event*)&hdl->data;
+}
+
+typedef struct __convo_flt_s {
+	ud_packet_t *pkt;
+	ud_convo_t cno;
+} *__convo_flt_t;
 
 static bool
 __pkt_our_convo_p(const ud_packet_t pkt, void *clo)
 {
-	ud_convo_t cno = (long unsigned int)clo;
-	return udpc_pkt_cno(pkt) == cno;
+	__convo_flt_t flt = clo;
+	if (pkt.plen == 0) {
+		return false;
+	} else if (udpc_pkt_cno(pkt) == flt->cno) {
+		size_t sz = pkt.plen < flt->pkt->plen
+			? pkt.plen
+			: flt->pkt->plen;
+		memcpy(flt->pkt->pbuf, pkt.pbuf, sz);
+		return false;
+	}
+	return true;
+}
+
+/* epoll guts */
+static void
+init_epoll_guts(ud_handle_t hdl)
+{
+	struct epoll_event *ev = ud_handle_epev(hdl);
+
+	/* obtain an epoll handle and make it non-blocking*/
+	hdl->epfd = epoll_create1(0);
+	__set_nonblck(hdl->epfd);
+
+	/* register for input, oob, error and hangups */
+	ev->events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
+	/* register our data */
+	ev->data.ptr = hdl;
+	return;
+}
+
+static void
+free_epoll_guts(ud_handle_t hdl)
+{
+	if (LIKELY(hdl->epfd >= 0)) {
+		/* close the epoll socket */
+		close(hdl->epfd);
+		/* wipe */
+		hdl->epfd = -1;
+		/* ah well */
+		hdl->data[0] = 0;
+		hdl->data[1] = 0;
+	}
+	return;
+}
+
+static void
+ud_ep_prep(ud_handle_t hdl)
+{
+	int s = ud_handle_sock(hdl);
+	int epfd = ud_handle_epfd(hdl);
+	struct epoll_event *ev = ud_handle_epev(hdl);
+
+	/* add S to the epoll descriptor EPFD */
+	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, ev);
+	return;
+}
+
+static int
+ud_ep_wait(ud_handle_t hdl, int timeout)
+{
+	int epfd = ud_handle_epfd(hdl);
+	struct epoll_event *events = NULL;
+	/* wait and return */
+	return epoll_wait(epfd, events, 1, timeout);
+}
+
+static void
+ud_ep_fini(ud_handle_t hdl)
+{
+	int s = ud_handle_sock(hdl);
+	int epfd = ud_handle_epfd(hdl);
+	struct epoll_event *ev = ud_handle_epev(hdl);
+
+	/* remove S from the epoll descriptor EPFD */
+	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, ev);
+	return;
 }
 
 
@@ -227,27 +307,17 @@ void
 ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 {
 	int s = ud_handle_sock(hdl);
-	int epfd = ud_handle_epfd(hdl);
 	int nfds;
 	ssize_t nread;
-	struct epoll_event ev, *events = NULL;
 	char buf[UDPC_PKTLEN];
-#if defined DEBUG_PKTTRAF_FLAG
-	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
-#endif	/* DEBUG_PKTTRAF_FLAG */
 
 	if (UNLIKELY(pkt.plen == 0)) {
 		return;
 	}
 
-	/* register for input, oob, error and hangups */
-	ev.events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
-	/* register our data */
-	ev.data.ptr = hdl;
-	/* add S to the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ev);
-	/* now wait */
-	nfds = epoll_wait(epfd, events, 1, timeout);
+	/* wait for events */
+	ud_ep_prep(hdl);
+	nfds = ud_ep_wait(hdl, timeout);
 	/* no need to loop atm, nfds can be 0 or 1 */
 	if (UNLIKELY(nfds == 0)) {
 		/* nothing received */
@@ -257,80 +327,47 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	/* otherwise NFDS was 1 and it MUST be our socket */
 	nread = recvfrom(s, buf, countof(buf), 0, NULL, 0);
 #if defined DEBUG_PKTTRAF_FLAG
-	udpc_print_pkt(tmp);
+	udpc_print_pkt(BUF_PACKET(buf));
 #endif	/* DEBUG_PKTTRAF_FLAG */
 out:
-	/* remove S from the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, &ev);
+	ud_ep_fini(hdl);
 	return;
 }
 
 void
 ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_convo_t cno)
 {
-	void *clo = (void*)(long unsigned int)cno;
-	ud_recv_pred(hdl, pkt, to, __pkt_our_convo_p, clo);
+	struct __convo_flt_s flt = {.pkt = pkt, .cno = cno};
+	ud_subscr_raw(hdl, to, __pkt_our_convo_p, &flt);
 	return;
 }
 
-#define MAX_EVENTS	4
-static struct epoll_event evbuf[MAX_EVENTS];
-
+/* subscriptions, basically receivers with callbacks */
 void
-ud_recv_pred(ud_handle_t hdl, ud_packet_t *pkt, int to, ud_pred_f pf, void *clo)
+ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo)
 {
 	int s = ud_handle_sock(hdl);
-	int epfd = ud_handle_epfd(hdl);
 	int nfds;
 	ssize_t nread;
-	struct epoll_event ev, *events = evbuf;
-	char buf[UDPC_PKTLEN];
-	ud_packet_t tmp = {.plen = countof(buf), .pbuf = buf};
+	static __thread char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = BUF_PACKET(buf);
 
-	/* register for input, oob, error and hangups */
-	ev.events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP | EPOLLET;
-	/* register our data */
-	ev.data.ptr = hdl;
-	/* add S to the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ev);
-	/* now wait */
-wait:
-	memset(events, 0, sizeof(evbuf));
-	nfds = epoll_wait(epfd, events, MAX_EVENTS, to);
-	UD_DEBUG_SENDRECV("received %d events on socket %d\n", nfds, s);
-
-	/* no need to loop atm, nfds can be 0 or 1 */
-	if (UNLIKELY(nfds == 0 || nfds == -1)) {
-		/* nothing received */
-		pkt->plen = 0;
-		goto out;
-	}
-	/* otherwise NFDS was 1 and it MUST be our socket */
+	/* wait for events */
+	ud_ep_prep(hdl);
 	do {
-		if ((nread = recv(s, buf, countof(buf), 0)) < 0) {
-			/* batshit! start over
-			 * we could assert(errno == EAGAIN); */
-			UD_DEBUG_SENDRECV("read failed ... starting over\n");
-			goto wait;
+		nfds = ud_ep_wait(hdl, timeout);
+		/* no need to loop atm, nfds can be 0 or 1 */
+		if (UNLIKELY(nfds == 0)) {
+			/* nothing received */
+			memset(buf, 0, sizeof(buf));
+			pkt.plen = 0;
+		} else {
+			/* otherwise NFDS was 1 and it MUST be our socket */
+			nread = recvfrom(s, buf, sizeof(buf), 0, NULL, 0);
+			pkt.plen = nread;
 		}
-		UD_DEBUG_SENDRECV("read %ld bytes\n", (long int)nread);
-		tmp.plen = nread;
-#if defined DEBUG_PKTTRAF_FLAG
-		ud_fprint_pkt_raw(tmp, stderr);
-#endif	/* DEBUG_PKTTRAF_FLAG */
-	} while (!udpc_pkt_valid_p(tmp) || !pf(tmp, clo));
-
-	if (LIKELY(nread > 0)) {
-		if (LIKELY((size_t)nread < pkt->plen)) {
-			pkt->plen = nread;
-		}
-		memcpy(pkt->pbuf, buf, pkt->plen);
-	} else {
-		pkt->plen = 0;
-	}
-out:
-	/* remove S from the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, &ev);
+	} while ((*cb)(pkt, clo));
+	ud_ep_fini(hdl);
 	return;
 }
 
@@ -341,7 +378,7 @@ ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd)
 {
 	ud_convo_t cno = ud_handle_convo(hdl);
 	char buf[UDPC_PKTLEN];
-	ud_packet_t pkt = {.plen = countof(buf), .pbuf = buf};
+	ud_packet_t pkt = BUF_PACKET(buf);
 
 	udpc_make_pkt(pkt, cno, /*pno*/0, cmd);
 	ud_send_raw(hdl, pkt);
@@ -371,6 +408,8 @@ init_unserding_handle(ud_handle_t hdl, int pref_fam)
 	}
 	/* operate in non-blocking mode */
 	__set_nonblck(hdl->sock);
+	/* initialise the epoll backend */
+	init_epoll_guts(hdl);
 	return;
 }
 
@@ -379,18 +418,14 @@ free_unserding_handle(ud_handle_t hdl)
 {
 	int s = ud_handle_sock(hdl);
 
-	if (LIKELY(hdl->epfd >= 0)) {
-		/* close the epoll socket */
-		close(hdl->epfd);
-		/* wipe */
-		hdl->epfd = -1;
-	}
 	if (LIKELY(s != SOCK_INVALID)) {
 		/* and kick the socket */
 		shutdown(s, SHUT_RDWR);
 		close(s);
 		hdl->sock = SOCK_INVALID;
 	}
+	/* also free the epoll cruft */
+	free_epoll_guts(hdl);
 	return;
 }
 

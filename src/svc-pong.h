@@ -1,4 +1,4 @@
-/*** dso-pong.c -- pong service
+/*** svc-pong.h -- pong service goodies
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,73 +35,66 @@
  *
  ***/
 
-#if defined HAVE_CONFIG_H
-# include "config.h"
-#endif	/* HAVE_CONFIG_H */
-#include <pthread.h>
-#include <time.h>
-#include "unserding.h"
-#include "unserding-nifty.h"
-#include "unserding-private.h"
-#include "seria-proto-glue.h"
-#include "svc-pong.h"
+#if !defined INCLUDED_svc_pong_h_
+#define INCLUDED_svc_pong_h_
 
-#define TRUNC_HOST_NAME_LEN	16
+#include <stdbool.h>
+#include <stdint.h>
 
-static ud_pong_score_t my_score = UD_LOW_SCORE;
-static size_t my_hnmlen;
-static char my_hname[TRUNC_HOST_NAME_LEN];
+/**
+ * Bitset of server scores.  This is a generalisation of the
+ * master/slave concept. */
+typedef uint32_t ud_pong_set_t;
 
-static void
-hrclock_stamp(struct timespec *ts)
+/**
+ * Type for server scores. */
+typedef uint8_t ud_pong_score_t;
+
+/**
+ * Maximum number of concurrent servers on the network.
+ * We use 32 so we can keep track of server scores in a uint32_t value. */
+#define UD_MAX_CONCUR	(sizeof(ud_pong_set_t) * 8)
+#define UD_LOW_SCORE	((ud_pong_set_t)(UD_MAX_CONCUR - 1))
+
+static inline ud_pong_set_t
+ud_empty_pong_set(void)
 {
-	clock_gettime(CLOCK_REALTIME, ts);
-	return;
+	return (uint32_t)0;
 }
 
-static void
-ping(job_t j)
+static inline ud_pong_set_t
+ud_pong_set(ud_pong_set_t ps, ud_pong_score_t s)
 {
-	struct udpc_seria_s sctx;
-	struct timespec ts;
-
-	/* clear out the packet */
-	clear_pkt(&sctx, j);
-	/* escrow hostname, mac-addr, score and time */
-	hrclock_stamp(&ts);
-	udpc_seria_add_str(&sctx, my_hname, my_hnmlen);
-	udpc_seria_add_ui32(&sctx, ts.tv_sec);
-	udpc_seria_add_ui32(&sctx, ts.tv_nsec);
-	udpc_seria_add_byte(&sctx, my_score);
-	/* off we go */
-	send_pkt(&sctx, j);
-	return;
+	return ps | (1 << (s & UD_LOW_SCORE));
 }
 
-static void
-pong(job_t UNUSED(j))
+static inline ud_pong_set_t
+ud_pong_unset(ud_pong_set_t ps, ud_pong_score_t s)
 {
-	UD_DEBUG("spurious pong caught\n");
-	return;
+	return ps & ~(1 << (s & UD_LOW_SCORE));
 }
 
-
-void
-dso_pong_LTX_init(void *UNUSED(clo))
+static inline uint8_t
+__nright_zeroes(uint32_t x)
 {
-	/* obtain our host name */
-	(void)gethostname(my_hname, sizeof(my_hname));
-	my_hnmlen = strlen(my_hname);
-	/* tick service */
-	ud_set_service(UD_SVC_PING, ping, pong);
-	return;
+/* reiser's method, map a bit value mod 37 to its position
+ * returns the bit-position of the first 1, or alternatively speaking
+ * the number of zero bits on the right */
+	static const uint8_t tbl[] = {
+		32, 0, 1, 26, 2, 23, 27, 0, 3,
+		16, 24, 30, 28, 11, 0, 13, 4,
+		7, 17, 0, 25, 22, 31, 15, 29,
+		10, 12, 6, 0, 21, 14, 9, 5,
+		20, 8, 19, 18
+	};
+	return tbl[(-x & x) % 37];
 }
 
-void
-dso_pong_LTX_deinit(void *UNUSED(clo))
+static inline ud_pong_score_t
+ud_find_score(ud_pong_set_t ps)
 {
-	ud_set_service(UD_SVC_PING, NULL, NULL);
-	return;
+/* find ourselves a score that would suit us */
+	return __nright_zeroes(~ps);
 }
 
-/* dso-pong.c ends here */
+#endif	/* INCLUDED_svc_pong_h_ */

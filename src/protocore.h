@@ -73,8 +73,9 @@
 /* should be computed somehow using the (p)mtu of the nic */
 #define UDPC_PKTLEN		1280
 #define UDPC_HDRLEN		0x08
-#define UDPC_PAYLOAD(_x)	(&(_x)[UDPC_HDRLEN])
 #define UDPC_PLLEN		(UDPC_PKTLEN - UDPC_HDRLEN)
+#define UDPC_PAYLOAD(_x)	(&(_x)[UDPC_HDRLEN])
+#define UDPC_PAYLLEN(_x)	((_x) - UDPC_HDRLEN)
 
 typedef uint8_t udpc_type_t;
 

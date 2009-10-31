@@ -39,7 +39,7 @@ unserdingd_CPPFLAGS += $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt
 unserdingd_LDFLAGS += $(shell pkg-config --libs libxml-2.0)
 unserdingd_LDFLAGS += -llua ## check for me
-unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL)
+unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL) -lunserding
 
 ## server static modules
 unserdingd_SOURCES += dso-pong.c
@@ -134,6 +134,7 @@ endif
 if BUILD_LIBRARY
 ## the lib
 libunserding_la_SOURCES = libstuff.c libhelpers.c
+libunserding_la_SOURCES += svc-pong.c
 libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS)
 endif

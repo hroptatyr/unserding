@@ -243,12 +243,22 @@ nego1(ud_handle_t hdl)
 }
 
 static void
-nego_mode(ud_handle_t UNUSED(hdl))
+nego_mode(ud_handle_t hdl)
 {
-	/* to mimic ping(8) even more */
 	puts("ud-ping negotiating in " UD_MCAST6_ADDR);
 	/* enter the `main loop' */
 	nego1(hdl);
+	return;
+}
+
+
+static void
+libnego_mode(ud_handle_t hdl)
+{
+	ud_pong_score_t s;
+	puts("ud-ping negotiating in " UD_MCAST6_ADDR);
+	s = ud_svc_nego_score(hdl, timeout);
+	printf("lib nego'd %d\n", s);
 	return;
 }
 
@@ -280,6 +290,11 @@ parse_args(int argc, const char *argv[])
 		case 'n':
 			timeout = 250;
 			mode = nego_mode;
+			break;
+		case 'l':
+			/* secret switch */
+			timeout = 250;
+			mode = libnego_mode;
 			break;
 		case 'i':
 			if (argv[i+1]) {

@@ -513,6 +513,7 @@ main(int argc, const char *argv[])
 	ev_signal *sigusr2_watcher = &__sigusr2_watcher;
 	const char *const *rest;
 	struct ud_ctx_s __ctx;
+	struct ud_handle_s __hdl;
 
 	/* whither to log */
 	logout = stderr;
@@ -551,6 +552,9 @@ main(int argc, const char *argv[])
 
 	/* initialise the proto core (no-op at the mo) */
 	init_proto();
+	/* initialise the lib handle */
+	init_unserding_handle(&__hdl, PF_INET6);
+	__ctx.hdl = &__hdl;
 
 	/* initialise modules */
 	ud_init_modules(rest, &__ctx);

@@ -1,4 +1,4 @@
-/*** dso-pong.c -- pong service
+/*** svc-pong.c -- pong service goodies
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,90 +35,69 @@
  *
  ***/
 
-#if defined HAVE_CONFIG_H
-# include "config.h"
-#endif	/* HAVE_CONFIG_H */
-#include <pthread.h>
-#include <time.h>
 #include "unserding.h"
-#include "unserding-ctx.h"
-#include "unserding-nifty.h"
-#include "unserding-private.h"
-#include "seria-proto-glue.h"
 #include "svc-pong.h"
+#include "seria-proto-glue.h"
 
-#define TRUNC_HOST_NAME_LEN	16
-
-static ud_pong_score_t my_score = UD_LOW_SCORE;
-static size_t my_hnmlen;
-static char my_hname[TRUNC_HOST_NAME_LEN];
+typedef struct __clo_s {
+	ud_pong_set_t seen;
+	ud_convo_t cno;
+} *__clo_t;
 
 static void
-hrclock_stamp(struct timespec *ts)
+seria_skip_str(udpc_seria_t sctx)
 {
-	clock_gettime(CLOCK_REALTIME, ts);
+	const char *p;
+	(void)udpc_seria_des_str(sctx, &p);
 	return;
 }
 
 static void
-ping(job_t j)
+seria_skip_ui32(udpc_seria_t sctx)
 {
+	(void)udpc_seria_des_ui32(sctx);
+	return;
+}
+
+/* conforms to ud_subscr_f */
+static bool
+cb(ud_packet_t pkt, void *clo)
+{
+	__clo_t nclo = clo;
 	struct udpc_seria_s sctx;
-	struct timespec ts;
+	uint8_t score;
 
-	/* clear out the packet */
-	clear_pkt(&sctx, j);
-	/* escrow hostname, mac-addr, score and time */
-	hrclock_stamp(&ts);
-	udpc_seria_add_str(&sctx, my_hname, my_hnmlen);
-	udpc_seria_add_ui32(&sctx, ts.tv_sec);
-	udpc_seria_add_ui32(&sctx, ts.tv_nsec);
-	udpc_seria_add_byte(&sctx, my_score);
-	/* off we go */
-	send_pkt(&sctx, j);
-	return;
+	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
+		/* means we've seen a timeout or a signal */
+		return false;
+	}
+	/* otherwise the packet is meaningful */
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	/* first thing is a string which contains the hostname, just skip it */
+	seria_skip_str(&sctx);
+	/* next is a remote time stamp, skip it too */
+	seria_skip_ui32(&sctx);
+	seria_skip_ui32(&sctx);
+	/* finally! */
+	score = udpc_seria_des_byte(&sctx);
+	/* keep track of seen scores */
+	nclo->seen = ud_pong_set(nclo->seen, score);
+	return true;
 }
 
-static void
-pong(job_t UNUSED(j))
+ud_pong_score_t
+ud_svc_nego_score(ud_handle_t hdl, int timeout)
 {
-	UD_DEBUG("spurious pong caught\n");
-	return;
+	struct __clo_s clo;
+
+	/* fill in the closure */
+	clo.seen = ud_empty_pong_set();
+	/* send off the bugger */
+	clo.cno = ud_send_simple(hdl, UD_SVC_PING);
+	/* wait for replies */
+	ud_subscr_raw(hdl, timeout, cb, &clo);
+	/* after they're all through, try and get a proper score */
+	return ud_find_score(clo.seen);
 }
 
-static inline ud_pong_score_t
-udctx_score(ud_ctx_t ctx)
-{
-	ud_pong_score_t *sco = ctx->priv_svc_pong;
-	return *sco;
-}
-
-
-void
-dso_pong_LTX_init(void *clo)
-{
-	ud_ctx_t ctx = clo;
-
-	/* obtain our host name */
-	(void)gethostname(my_hname, sizeof(my_hname));
-	my_hnmlen = strlen(my_hname);
-	/* tick service */
-	ud_set_service(UD_SVC_PING, ping, pong);
-
-	/* get us a nice score on the network */
-	my_score = ud_svc_nego_score(ctx->hdl, 100);
-	UD_DEBUG("dso-pong: nego'd me a score of %d\n", my_score);
-	ctx->priv_svc_pong = &my_score;
-	return;
-}
-
-void
-dso_pong_LTX_deinit(void *clo)
-{
-	ud_ctx_t ctx = clo;
-	ud_set_service(UD_SVC_PING, NULL, NULL);
-	ctx->priv_svc_pong = NULL;
-	return;
-}
-
-/* dso-pong.c ends here */
+/* svc-pong.c ends here */

@@ -97,4 +97,9 @@ ud_find_score(ud_pong_set_t ps)
 	return __nright_zeroes(~ps);
 }
 
+
+/* exports, will be in libunserding */
+extern ud_pong_score_t
+ud_svc_nego_score(ud_handle_t hdl, int timeout);
+
 #endif	/* INCLUDED_svc_pong_h_ */

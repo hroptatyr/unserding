@@ -93,7 +93,7 @@ fsarrpq_enq_ifnot(fsarrpq_t q, void *data)
 	}
 	/* have a glance at the queue so far, befriend with memcmp() */
 	for (qi = q->head; qi; qi = qi->next) {
-		if (memcmp(q->data, data, q->csz) == 0) {
+		if (memcmp(qi->data, data, q->csz) == 0) {
 			pthread_mutex_unlock(&q->mtx);
 			return false;
 		}

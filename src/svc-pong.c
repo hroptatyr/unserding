@@ -1,4 +1,4 @@
-/*** svc-pong.h -- pong service goodies
+/*** svc-pong.c -- pong service goodies
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,71 +35,69 @@
  *
  ***/
 
-#if !defined INCLUDED_svc_pong_h_
-#define INCLUDED_svc_pong_h_
+#include "unserding.h"
+#include "svc-pong.h"
+#include "seria-proto-glue.h"
 
-#include <stdbool.h>
-#include <stdint.h>
+typedef struct __clo_s {
+	ud_pong_set_t seen;
+	ud_convo_t cno;
+} *__clo_t;
 
-/**
- * Bitset of server scores.  This is a generalisation of the
- * master/slave concept. */
-typedef uint32_t ud_pong_set_t;
-
-/**
- * Type for server scores. */
-typedef uint8_t ud_pong_score_t;
-
-/**
- * Maximum number of concurrent servers on the network.
- * We use 32 so we can keep track of server scores in a uint32_t value. */
-#define UD_MAX_CONCUR	(sizeof(ud_pong_set_t) * 8)
-#define UD_LOW_SCORE	((ud_pong_set_t)(UD_MAX_CONCUR - 1))
-
-static inline ud_pong_set_t
-ud_empty_pong_set(void)
+static void
+seria_skip_str(udpc_seria_t sctx)
 {
-	return (uint32_t)0;
+	const char *p;
+	(void)udpc_seria_des_str(sctx, &p);
+	return;
 }
 
-static inline ud_pong_set_t
-ud_pong_set(ud_pong_set_t ps, ud_pong_score_t s)
+static void
+seria_skip_ui32(udpc_seria_t sctx)
 {
-	return ps | (1 << (s & UD_LOW_SCORE));
+	(void)udpc_seria_des_ui32(sctx);
+	return;
 }
 
-static inline ud_pong_set_t
-ud_pong_unset(ud_pong_set_t ps, ud_pong_score_t s)
+/* conforms to ud_subscr_f */
+static bool
+cb(ud_packet_t pkt, void *clo)
 {
-	return ps & ~(1 << (s & UD_LOW_SCORE));
+	__clo_t nclo = clo;
+	struct udpc_seria_s sctx;
+	uint8_t score;
+
+	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
+		/* means we've seen a timeout or a signal */
+		return false;
+	}
+	/* otherwise the packet is meaningful */
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	/* first thing is a string which contains the hostname, just skip it */
+	seria_skip_str(&sctx);
+	/* next is a remote time stamp, skip it too */
+	seria_skip_ui32(&sctx);
+	seria_skip_ui32(&sctx);
+	/* finally! */
+	score = udpc_seria_des_byte(&sctx);
+	/* keep track of seen scores */
+	nclo->seen = ud_pong_set(nclo->seen, score);
+	return true;
 }
 
-static inline uint8_t
-__nright_zeroes(uint32_t x)
+ud_pong_score_t
+ud_svc_nego_score(ud_handle_t hdl, int timeout)
 {
-/* reiser's method, map a bit value mod 37 to its position
- * returns the bit-position of the first 1, or alternatively speaking
- * the number of zero bits on the right */
-	static const uint8_t tbl[] = {
-		32, 0, 1, 26, 2, 23, 27, 0, 3,
-		16, 24, 30, 28, 11, 0, 13, 4,
-		7, 17, 0, 25, 22, 31, 15, 29,
-		10, 12, 6, 0, 21, 14, 9, 5,
-		20, 8, 19, 18
-	};
-	return tbl[(-x & x) % 37];
+	struct __clo_s clo;
+
+	/* fill in the closure */
+	clo.seen = ud_empty_pong_set();
+	/* send off the bugger */
+	clo.cno = ud_send_simple(hdl, UD_SVC_PING);
+	/* wait for replies */
+	ud_subscr_raw(hdl, timeout, cb, &clo);
+	/* after they're all through, try and get a proper score */
+	return ud_find_score(clo.seen);
 }
 
-static inline ud_pong_score_t
-ud_find_score(ud_pong_set_t ps)
-{
-/* find ourselves a score that would suit us */
-	return __nright_zeroes(~ps);
-}
-
-
-/* exports, will be in libunserding */
-extern ud_pong_score_t
-ud_svc_nego_score(ud_handle_t hdl, int timeout);
-
-#endif	/* INCLUDED_svc_pong_h_ */
+/* svc-pong.c ends here */

@@ -61,6 +61,8 @@ struct ud_ctx_s {
 	void *cfgctx;
 #endif	/* USE_LUA */
 	ud_cfgset_t curr_cfgset;
+	ud_handle_t hdl;
+	void *priv_svc_pong;
 };
 
 /* only used during the module load stage, could be a separate arg one day */

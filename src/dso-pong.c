@@ -41,6 +41,7 @@
 #include <pthread.h>
 #include <time.h>
 #include "unserding.h"
+#include "unserding-ctx.h"
 #include "unserding-nifty.h"
 #include "unserding-private.h"
 #include "seria-proto-glue.h"
@@ -85,22 +86,38 @@ pong(job_t UNUSED(j))
 	return;
 }
 
+static inline ud_pong_score_t
+udctx_score(ud_ctx_t ctx)
+{
+	ud_pong_score_t *sco = ctx->priv_svc_pong;
+	return *sco;
+}
+
 
 void
-dso_pong_LTX_init(void *UNUSED(clo))
+dso_pong_LTX_init(void *clo)
 {
+	ud_ctx_t ctx = clo;
+
 	/* obtain our host name */
 	(void)gethostname(my_hname, sizeof(my_hname));
 	my_hnmlen = strlen(my_hname);
 	/* tick service */
 	ud_set_service(UD_SVC_PING, ping, pong);
+
+	/* get us a nice score on the network */
+	my_score = ud_svc_nego_score(ctx->hdl, 100);
+	UD_DEBUG("dso-pong: nego'd me a score of %d\n", my_score);
+	ctx->priv_svc_pong = &my_score;
 	return;
 }
 
 void
-dso_pong_LTX_deinit(void *UNUSED(clo))
+dso_pong_LTX_deinit(void *clo)
 {
+	ud_ctx_t ctx = clo;
 	ud_set_service(UD_SVC_PING, NULL, NULL);
+	ctx->priv_svc_pong = NULL;
 	return;
 }
 

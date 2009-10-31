@@ -141,9 +141,6 @@ extern jpool_t gjpool;
  * Global worker pool, contains the job queue. */
 extern wpool_t gwpool;
 
-/* jobs */
-extern void ud_hyrpl_job(job_t);
-
 #if defined UNSERCLI
 extern bool cli_waiting_p;
 #endif	/* UNSERCLI */
@@ -161,5 +158,10 @@ extern void*
 schedule_timer_every(void *ctx, void(*cb)(void *clo), void *clo, double every);
 extern void
 unsched_timer(void *ctx, void *timer);
+
+
+/* specific services */
+extern void dso_pong_LTX_init(void*);
+extern void dso_pong_LTX_deinit(void*);
 
 #endif	/* INCLUDED_unserding_private_h_ */

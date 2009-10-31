@@ -73,8 +73,9 @@
 /* should be computed somehow using the (p)mtu of the nic */
 #define UDPC_PKTLEN		1280
 #define UDPC_HDRLEN		0x08
-#define UDPC_PAYLOAD(_x)	(&(_x)[UDPC_HDRLEN])
 #define UDPC_PLLEN		(UDPC_PKTLEN - UDPC_HDRLEN)
+#define UDPC_PAYLOAD(_x)	(&(_x)[UDPC_HDRLEN])
+#define UDPC_PAYLLEN(_x)	((_x) - UDPC_HDRLEN)
 
 typedef uint8_t udpc_type_t;
 
@@ -166,7 +167,7 @@ udpc_pktsched(ud_packet_t p)
 #define UDPC_PKT_RPL(_x)	(ud_pkt_cmd_t)((_x) | 1)
 
 /* helper macro to use a char buffer as packet */
-#define BUF_PACKET(b)	((ud_packet_t){.plen = countof(b), .pbuf = b})
+#define BUF_PACKET(b)	((ud_packet_t){.plen = sizeof(b), .pbuf = b})
 #define PACKET(a, b)	((ud_packet_t){.plen = a, .pbuf = b})
 
 

@@ -485,6 +485,22 @@ ud_free_config(ud_ctx_t ctx)
 #endif
 
 
+/* static module loader */
+static void
+ud_init_statmods(void *clo)
+{
+	dso_pong_LTX_init(clo);
+	return;
+}
+
+static void
+ud_deinit_statmods(void *clo)
+{
+	dso_pong_LTX_deinit(clo);
+	return;
+}
+
+
 int
 main(int argc, const char *argv[])
 {
@@ -497,6 +513,7 @@ main(int argc, const char *argv[])
 	ev_signal *sigusr2_watcher = &__sigusr2_watcher;
 	const char *const *rest;
 	struct ud_ctx_s __ctx;
+	struct ud_handle_s __hdl;
 
 	/* whither to log */
 	logout = stderr;
@@ -535,6 +552,9 @@ main(int argc, const char *argv[])
 
 	/* initialise the proto core (no-op at the mo) */
 	init_proto();
+	/* initialise the lib handle */
+	init_unserding_handle(&__hdl, PF_INET6);
+	__ctx.hdl = &__hdl;
 
 	/* initialise modules */
 	ud_init_modules(rest, &__ctx);
@@ -566,11 +586,17 @@ main(int argc, const char *argv[])
 	 * causing the libev main loop to crash. */
 	ud_attach_mcast(EV_A_ prefer6p);
 
+	/* static modules */
+	ud_init_statmods(&__ctx);
+
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
 	/* deinitialise modules */
 	ud_deinit_modules(&__ctx);
+
+	/* pong service */
+	ud_deinit_statmods(&__ctx);
 
 	/* close the socket */
 	ud_detach_mcast(EV_A);

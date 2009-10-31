@@ -43,6 +43,7 @@
 #include "catalogue.h"
 #include "protocore.h"
 #include "seria.h"
+#include "seria-proto-glue.h"
 
 /* wise? it's just for the mysql tick fetcher */
 #include "xdr-instr-seria.h"
@@ -83,45 +84,6 @@ extern void dso_xdr_instr_mysql_LTX_deinit(void*);
 
 
 /* inlines */
-static inline void
-clear_pkt(udpc_seria_t sctx, job_t rplj)
-{
-	memset(UDPC_PAYLOAD(rplj->buf), 0, UDPC_PLLEN);
-	udpc_make_rpl_pkt(JOB_PACKET(rplj));
-	udpc_seria_init(sctx, UDPC_PAYLOAD(rplj->buf), UDPC_PLLEN);
-	return;
-}
-
-static inline void
-copy_pkt(job_t tgtj, job_t srcj)
-{
-	memcpy(tgtj, srcj, sizeof(*tgtj));
-	return;
-}
-
-static inline void
-prep_pkt(udpc_seria_t sctx, job_t rplj, job_t srcj)
-{
-	copy_pkt(rplj, srcj);
-	clear_pkt(sctx, rplj);
-	return;
-}
-
-static inline void
-send_pkt(udpc_seria_t sctx, job_t j)
-{
-	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
-	send_cl(j);
-	UD_LOG("xdr-instr reply  "
-	       ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-	       (unsigned int)j->blen,
-	       udpc_pkt_cno(JOB_PACKET(j)),
-	       udpc_pkt_pno(JOB_PACKET(j)),
-	       udpc_pkt_cmd(JOB_PACKET(j)),
-	       ntohs(((const uint16_t*)j->buf)[3]));
-	return;
-}
-
 static inline void
 hrclock_print(void)
 {

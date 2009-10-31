@@ -1,4 +1,4 @@
-/*** unserding-ctx.h -- unserding context
+/*** seria-proto-glue.h -- useful stuff
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,83 +35,53 @@
  *
  ***/
 
-#if !defined INCLUDED_unserding_ctx_h_
-#define INCLUDED_unserding_ctx_h_
+#if !defined INCLUDED_seria_proto_glue_h_
+#define INCLUDED_seria_proto_glue_h_
 
-#define USE_LUA
-#include "unserding.h"
-#if defined USE_LUA
-# include "lua-config.h"
-#endif	/* USE_LUA */
+#include "protocore.h"
+#include "seria.h"
 
-/**
- * Unserding context structure, passed along to submods. */
-typedef struct ud_ctx_s *ud_ctx_t;
-
-/**
- * Opaque data type for settings tables whither configuration goes. */
-typedef void *ud_cfgset_t;
-
-/**
- * Guts of the unserding context struct. */
-struct ud_ctx_s {
-	/** libev's mainloop */
-	void *mainloop;
-#if defined USE_LUA
-	void *cfgctx;
-#endif	/* USE_LUA */
-	ud_cfgset_t curr_cfgset;
-	ud_handle_t hdl;
-	void *priv_svc_pong;
-};
-
-/* only used during the module load stage, could be a separate arg one day */
+
+/* higher level packet voodoo */
 static inline void
-udctx_set_setting(ud_ctx_t ctx, ud_cfgset_t setting)
+clear_pkt(udpc_seria_t sctx, job_t rplj)
 {
-	ctx->curr_cfgset = setting;
+	memset(UDPC_PAYLOAD(rplj->buf), 0, UDPC_PLLEN);
+	udpc_make_rpl_pkt(JOB_PACKET(rplj));
+	udpc_seria_init(sctx, UDPC_PAYLOAD(rplj->buf), UDPC_PLLEN);
 	return;
 }
 
-static inline ud_cfgset_t
-udctx_get_setting(ud_ctx_t ctx)
-{
-	void *res = ctx->curr_cfgset;
-	return res;
-}
-
-/* config mumbojumbo, just redirs to the lua cruft */
-#if defined USE_LUA
-static inline ud_cfgset_t
-udcfg_tbl_lookup(ud_ctx_t ctx, ud_cfgset_t s, const char *name)
-{
-	return lc_cfgtbl_lookup(ctx->cfgctx, s, name);
-}
-
 static inline void
-udcfg_tbl_free(ud_ctx_t ctx, ud_cfgset_t s)
+copy_pkt(job_t tgtj, job_t srcj)
 {
-	lc_cfgtbl_free(ctx->cfgctx, s);
+	memcpy(tgtj, srcj, sizeof(*tgtj));
 	return;
 }
 
-static inline size_t
-udcfg_tbl_lookup_s(const char **t, ud_ctx_t c, ud_cfgset_t s, const char *n)
+static inline void
+prep_pkt(udpc_seria_t sctx, job_t rplj, job_t srcj)
 {
-	return lc_cfgtbl_lookup_s(t, c->cfgctx, s, n);
+	copy_pkt(rplj, srcj);
+	clear_pkt(sctx, rplj);
+	return;
 }
 
-static inline size_t
-udcfg_glob_lookup_s(const char **t, ud_ctx_t c, const char *n)
+static inline void
+send_pkt(udpc_seria_t sctx, job_t j)
 {
-	return lc_globcfg_lookup_s(t, c->cfgctx, n);
+	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
+	send_cl(j);
+#if defined UD_LOG
+	UD_LOG("xdr-instr reply  "
+	       ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+	       (unsigned int)j->blen,
+	       udpc_pkt_cno(JOB_PACKET(j)),
+	       udpc_pkt_pno(JOB_PACKET(j)),
+	       udpc_pkt_cmd(JOB_PACKET(j)),
+	       ntohs(((const uint16_t*)j->buf)[3]));
+#endif	/* UD_LOG */
+	return;
 }
 
-static inline bool
-udcfg_glob_lookup_b(ud_ctx_t ctx, const char *name)
-{
-	return lc_globcfg_lookup_b(ctx->cfgctx, name);
-}
-#endif	/* USE_LUA */
-
-#endif	/* INCLUDED_unserding_ctx_h_ */
+#endif	/* INCLUDED_seria_proto_glue_h_ */

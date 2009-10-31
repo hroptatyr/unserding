@@ -1,4 +1,4 @@
-/*** unserding-ctx.h -- unserding context
+/*** dso-pong.c -- pong service
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,83 +35,90 @@
  *
  ***/
 
-#if !defined INCLUDED_unserding_ctx_h_
-#define INCLUDED_unserding_ctx_h_
-
-#define USE_LUA
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
+#include <pthread.h>
+#include <time.h>
 #include "unserding.h"
-#if defined USE_LUA
-# include "lua-config.h"
-#endif	/* USE_LUA */
+#include "unserding-ctx.h"
+#include "unserding-nifty.h"
+#include "unserding-private.h"
+#include "seria-proto-glue.h"
+#include "svc-pong.h"
 
-/**
- * Unserding context structure, passed along to submods. */
-typedef struct ud_ctx_s *ud_ctx_t;
+#define TRUNC_HOST_NAME_LEN	16
 
-/**
- * Opaque data type for settings tables whither configuration goes. */
-typedef void *ud_cfgset_t;
+static ud_pong_score_t my_score = UD_LOW_SCORE;
+static size_t my_hnmlen;
+static char my_hname[TRUNC_HOST_NAME_LEN];
 
-/**
- * Guts of the unserding context struct. */
-struct ud_ctx_s {
-	/** libev's mainloop */
-	void *mainloop;
-#if defined USE_LUA
-	void *cfgctx;
-#endif	/* USE_LUA */
-	ud_cfgset_t curr_cfgset;
-	ud_handle_t hdl;
-	void *priv_svc_pong;
-};
-
-/* only used during the module load stage, could be a separate arg one day */
-static inline void
-udctx_set_setting(ud_ctx_t ctx, ud_cfgset_t setting)
+static void
+hrclock_stamp(struct timespec *ts)
 {
-	ctx->curr_cfgset = setting;
+	clock_gettime(CLOCK_REALTIME, ts);
 	return;
 }
 
-static inline ud_cfgset_t
-udctx_get_setting(ud_ctx_t ctx)
+static void
+ping(job_t j)
 {
-	void *res = ctx->curr_cfgset;
-	return res;
-}
+	struct udpc_seria_s sctx;
+	struct timespec ts;
 
-/* config mumbojumbo, just redirs to the lua cruft */
-#if defined USE_LUA
-static inline ud_cfgset_t
-udcfg_tbl_lookup(ud_ctx_t ctx, ud_cfgset_t s, const char *name)
-{
-	return lc_cfgtbl_lookup(ctx->cfgctx, s, name);
-}
-
-static inline void
-udcfg_tbl_free(ud_ctx_t ctx, ud_cfgset_t s)
-{
-	lc_cfgtbl_free(ctx->cfgctx, s);
+	/* clear out the packet */
+	clear_pkt(&sctx, j);
+	/* escrow hostname, mac-addr, score and time */
+	hrclock_stamp(&ts);
+	udpc_seria_add_str(&sctx, my_hname, my_hnmlen);
+	udpc_seria_add_ui32(&sctx, ts.tv_sec);
+	udpc_seria_add_ui32(&sctx, ts.tv_nsec);
+	udpc_seria_add_byte(&sctx, my_score);
+	/* off we go */
+	send_pkt(&sctx, j);
 	return;
 }
 
-static inline size_t
-udcfg_tbl_lookup_s(const char **t, ud_ctx_t c, ud_cfgset_t s, const char *n)
+static void
+pong(job_t UNUSED(j))
 {
-	return lc_cfgtbl_lookup_s(t, c->cfgctx, s, n);
+	UD_DEBUG("spurious pong caught\n");
+	return;
 }
 
-static inline size_t
-udcfg_glob_lookup_s(const char **t, ud_ctx_t c, const char *n)
+static inline ud_pong_score_t
+udctx_score(ud_ctx_t ctx)
 {
-	return lc_globcfg_lookup_s(t, c->cfgctx, n);
+	ud_pong_score_t *sco = ctx->priv_svc_pong;
+	return *sco;
 }
 
-static inline bool
-udcfg_glob_lookup_b(ud_ctx_t ctx, const char *name)
+
+void
+dso_pong_LTX_init(void *clo)
 {
-	return lc_globcfg_lookup_b(ctx->cfgctx, name);
-}
-#endif	/* USE_LUA */
+	ud_ctx_t ctx = clo;
 
-#endif	/* INCLUDED_unserding_ctx_h_ */
+	/* obtain our host name */
+	(void)gethostname(my_hname, sizeof(my_hname));
+	my_hnmlen = strlen(my_hname);
+	/* tick service */
+	ud_set_service(UD_SVC_PING, ping, pong);
+
+	/* get us a nice score on the network */
+	my_score = ud_svc_nego_score(ctx->hdl, 100);
+	UD_DEBUG("dso-pong: nego'd me a score of %d\n", my_score);
+	ctx->priv_svc_pong = &my_score;
+	return;
+}
+
+void
+dso_pong_LTX_deinit(void *clo)
+{
+	ud_ctx_t ctx = clo;
+	ud_set_service(UD_SVC_PING, NULL, NULL);
+	ctx->priv_svc_pong = NULL;
+	return;
+}
+
+/* dso-pong.c ends here */

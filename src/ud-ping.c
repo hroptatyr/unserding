@@ -45,6 +45,7 @@
 #include "unserding-nifty.h"
 #include "protocore.h"
 #include "seria.h"
+#include "svc-pong.h"
 
 /* this is a bunch of time stamps */
 typedef struct clks_s {
@@ -182,10 +183,15 @@ classic_mode(ud_handle_t hdl)
 
 
 /* another mode, negotiation mode, this will go to libunserding one day */
+typedef struct nego_clo_s {
+	struct timespec rt;
+	ud_pong_set_t seen;
+} *nego_clo_t;
+
 static bool
 ncb(ud_packet_t pkt, void *clo)
 {
-	clks_t then = clo;
+	nego_clo_t nclo = clo;
 	struct udpc_seria_s sctx;
 	static char hnname[16];
 	struct timespec now, us, em;
@@ -196,7 +202,7 @@ ncb(ud_packet_t pkt, void *clo)
 	}
 	/* otherwise the packet is meaningful */
 	__stamp(CLOCK_REALTIME, &now);
-	__diff(&us, &then->rt, &now);
+	__diff(&us, &nclo->rt, &now);
 
 	/* fetch fields */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
@@ -206,9 +212,11 @@ ncb(ud_packet_t pkt, void *clo)
 	em.tv_nsec = udpc_seria_des_ui32(&sctx);
 	score = udpc_seria_des_byte(&sctx);
 	/* compute their stamp */
-	__diff(&em, &then->rt, &em);
+	__diff(&em, &nclo->rt, &em);
+	/* keep track of their score */
+	nclo->seen = ud_pong_set(nclo->seen, score);
 	/* print */
-	printf("name %s  theirs %2.3f ms  ours %2.3f ms  score %u\n",
+	printf("name %s  roundtrip %2.3f ms  clkskew %2.3f ms  score %u\n",
 	       hnname, __as_f(&us), __as_f(&em), score);
 	return true;
 }
@@ -218,14 +226,19 @@ nego1(ud_handle_t hdl)
 {
 	ud_convo_t cno;
 	/* referential stamp */
-	struct clks_s clks;
+	struct nego_clo_s nclo;
+	ud_pong_score_t s;
 
-	/* record the current time */
-	hrclock_stamp(&clks);
+	/* record the current time, set wipe `seen' bitset */
+	__stamp(CLOCK_REALTIME, &nclo.rt);
+	nclo.seen = ud_empty_pong_set();
 	/* send off the bugger */
 	cno = ud_send_simple(hdl, 0x0004);
 	/* wait for replies */
-	ud_subscr_raw(hdl, timeout, ncb, &clks);
+	ud_subscr_raw(hdl, timeout, ncb, &nclo);
+	/* after they're all through, try and get a proper score */
+	s = ud_find_score(nclo.seen);
+	printf("score would be %d\n", s);
 	return 0;
 }
 

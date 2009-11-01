@@ -98,8 +98,6 @@
 #define UDP_MULTICAST_TTL	16
 #define SOCK_INVALID		(int)0xffffff
 
-#define PKT_INVALID_P(_x)	((_x).plen == 0 || (_x).plen > UDPC_PKTLEN)
-
 
 static void
 __set_nonblck(int sock)
@@ -214,7 +212,7 @@ static bool
 __pkt_our_convo_p(const ud_packet_t pkt, void *clo)
 {
 	__convo_flt_t flt = clo;
-	if (PKT_INVALID_P(pkt)) {
+	if (UDPC_PKT_INVALID_P(pkt)) {
 		return false;
 	} else if (udpc_pkt_cno(pkt) == flt->cno) {
 		size_t sz = pkt.plen < flt->pkt->plen
@@ -329,7 +327,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	ssize_t nread;
 	char buf[UDPC_PKTLEN];
 
-	if (UNLIKELY(PKT_INVALID_P(pkt))) {
+	if (UNLIKELY(UDPC_PKT_INVALID_P(pkt))) {
 		return;
 	}
 

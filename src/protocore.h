@@ -77,6 +77,8 @@
 #define UDPC_PAYLOAD(_x)	(&(_x)[UDPC_HDRLEN])
 #define UDPC_PAYLLEN(_x)	((_x) - UDPC_HDRLEN)
 
+#define UDPC_PKT_INVALID_P(_x)	((_x).plen == 0 || (_x).plen > UDPC_PKTLEN)
+
 typedef uint8_t udpc_type_t;
 
 

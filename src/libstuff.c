@@ -212,7 +212,7 @@ static bool
 __pkt_our_convo_p(const ud_packet_t pkt, void *clo)
 {
 	__convo_flt_t flt = clo;
-	if (pkt.plen == 0) {
+	if (UDPC_PKT_INVALID_P(pkt)) {
 		return false;
 	} else if (udpc_pkt_cno(pkt) == flt->cno) {
 		size_t sz = pkt.plen < flt->pkt->plen
@@ -327,7 +327,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	ssize_t nread;
 	char buf[UDPC_PKTLEN];
 
-	if (UNLIKELY(pkt.plen == 0)) {
+	if (UNLIKELY(UDPC_PKT_INVALID_P(pkt))) {
 		return;
 	}
 

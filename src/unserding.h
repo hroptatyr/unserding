@@ -116,6 +116,8 @@ struct ud_handle_s {
 	void *data[2];
 	/* moving average roundtrip time (in nano seconds) */
 	int mart;
+	/* system score */
+	int score;
 };
 
 

@@ -764,9 +764,9 @@ main(int argc, const char *argv[])
 
 	/* get us some nice handle */
 	if (!prefer4) {
-		init_unserding_handle(&__hdl, PF_UNSPEC);
+		init_unserding_handle(&__hdl, PF_UNSPEC, false);
 	} else {
-		init_unserding_handle(&__hdl, PF_INET);
+		init_unserding_handle(&__hdl, PF_INET, false);
 	}
 	if (port != UD_NETWORK_SERVICE) {
 		ud_handle_set_port(&__hdl, port);

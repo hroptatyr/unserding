@@ -38,7 +38,9 @@
 #if !defined INCLUDED_svc_pong_h_
 #define INCLUDED_svc_pong_h_
 
-#define __USE_XOPEN
+#if !defined __USE_XOPEN
+# define __USE_XOPEN
+#endif	/* !__USE_XOPEN */
 #include <time.h>
 #include <stdbool.h>
 #include <stdint.h>

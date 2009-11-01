@@ -124,7 +124,7 @@ ud_svc_update_mart(ud_handle_t hdl, struct timespec then)
 		return;
 	}
 	/* update hdl->mart */
-	hdl->mart = (hdl->mart + rtts.tv_nsec) / 2;
+	hdl->mart = 1 + (hdl->mart + rtts.tv_nsec / 1000000) / 2;
 	return;
 }
 

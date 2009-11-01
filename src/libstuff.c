@@ -71,6 +71,8 @@
 #include "protocore.h"
 #include "protocore-private.h"
 
+#include "svc-pong.h"
+
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
 #endif
@@ -91,7 +93,7 @@
 #endif	/* DEBUG_FLAG */
 
 /**
- * Timeout in seconds. */
+ * Timeout in milliseconds. */
 #define UD_SENDRECV_TIMEOUT	10
 #define UDP_MULTICAST_TTL	16
 #define SOCK_INVALID		(int)0xffffff
@@ -292,6 +294,15 @@ ud_ep_fini(ud_handle_t hdl)
 	return;
 }
 
+static int
+fiddle_with_timeout(ud_handle_t hdl, int timeout)
+{
+	if (timeout > 0) {
+		return timeout;
+	}
+	return hdl->mart;
+}
+
 
 /* public funs */
 void
@@ -322,6 +333,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 
 	/* wait for events */
 	ud_ep_prep(hdl);
+	timeout = fiddle_with_timeout(hdl, timeout);
 	nfds = ud_ep_wait(hdl, timeout);
 	/* no need to loop atm, nfds can be 0 or 1 */
 	if (UNLIKELY(nfds == 0)) {
@@ -359,6 +371,7 @@ ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo)
 
 	/* wait for events */
 	ud_ep_prep(hdl);
+	timeout = fiddle_with_timeout(hdl, timeout);
 	do {
 		nfds = ud_ep_wait(hdl, timeout);
 		/* no need to loop atm, nfds can be 0 or 1 */
@@ -393,7 +406,7 @@ ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd)
 
 
 void
-init_unserding_handle(ud_handle_t hdl, int pref_fam)
+init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop)
 {
 	hdl->convo = 0;
 	hdl->epfd = -1;
@@ -415,6 +428,13 @@ init_unserding_handle(ud_handle_t hdl, int pref_fam)
 	__set_nonblck(hdl->sock);
 	/* initialise the epoll backend */
 	init_epoll_guts(hdl);
+	if (negop) {
+		/* fiddle with the mart slot */
+		hdl->mart = UD_SENDRECV_TIMEOUT;
+		ud_svc_nego_score(hdl, UD_SENDRECV_TIMEOUT);
+	} else {
+		hdl->mart = UD_SENDRECV_TIMEOUT;
+	}
 	return;
 }
 

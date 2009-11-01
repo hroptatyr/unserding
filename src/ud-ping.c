@@ -259,6 +259,7 @@ libnego_mode(ud_handle_t hdl)
 	puts("ud-ping negotiating in " UD_MCAST6_ADDR);
 	s = ud_svc_nego_score(hdl, timeout);
 	printf("lib nego'd %d\n", s);
+	printf("mart %d\n", hdl->mart);
 	return;
 }
 
@@ -324,7 +325,7 @@ main(int argc, const char *argv[])
 	/* look what the luser wants */
 	parse_args(argc, argv);
 	/* obtain a new handle */
-	init_unserding_handle(&__hdl, PF_INET6);
+	init_unserding_handle(&__hdl, PF_INET6, false);
 	/* call the mode function */
 	(void)(*mode)(&__hdl);
 	/* and lose the handle again */

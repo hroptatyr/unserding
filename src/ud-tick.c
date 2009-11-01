@@ -175,7 +175,7 @@ main(int argc, const char *argv[])
 		n++;
 	}
 	/* obtain us a new handle */
-	init_unserding_handle(hdl, PF_INET6);
+	init_unserding_handle(hdl, PF_INET6, true);
 	/* now kick off the finder */
 	ud_find_ticks_by_instr(hdl, t_cb, NULL, &cid, bs, ts, n);
 	/* and lose the handle again */

@@ -124,6 +124,7 @@ cb(ud_packet_t pkt, void *clo)
 	struct clks_s now;
 	struct udpc_seria_s sctx;
 	static char hnname[16];
+	ud_pong_score_t score;
 
 	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
 		return false;
@@ -136,10 +137,14 @@ cb(ud_packet_t pkt, void *clo)
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
 	/* fetch the host name */
 	fetch_hnname(&sctx, hnname, sizeof(hnname));
+	/* skip the next two */
+	(void)udpc_seria_des_ui32(&sctx);
+	(void)udpc_seria_des_ui32(&sctx);
+	score = udpc_seria_des_byte(&sctx);
 	/* print */
 	printf("%zu bytes from %s (...): "
-	       "convo=%i time=%2.3f ms\n",
-	       pkt.plen, hnname, udpc_pkt_cno(pkt), __as_f(&now.rt));
+	       "convo=%i score=%i time=%2.3f ms\n",
+	       pkt.plen, hnname, udpc_pkt_cno(pkt), score, __as_f(&now.rt));
 	return true;
 }
 

@@ -100,6 +100,7 @@ dso_pong_LTX_init(void *clo)
 
 	/* obtain our host name */
 	(void)gethostname(my_hname, sizeof(my_hname));
+	my_hname[sizeof(my_hname)-1] = '\0';
 	my_hnmlen = strlen(my_hname);
 	/* tick service */
 	ud_set_service(UD_SVC_PING, ping, pong);

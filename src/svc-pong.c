@@ -142,7 +142,7 @@ ud_svc_nego_score(ud_handle_t hdl, int timeout)
 	/* wait for replies */
 	ud_subscr_raw(hdl, timeout, cb, &clo);
 	/* after they're all through, try and get a proper score */
-	return ud_find_score(clo.seen);
+	return hdl->score = ud_find_score(clo.seen);
 }
 
 /* svc-pong.c ends here */

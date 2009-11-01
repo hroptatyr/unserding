@@ -89,8 +89,7 @@ pong(job_t UNUSED(j))
 static inline ud_pong_score_t
 udctx_score(ud_ctx_t ctx)
 {
-	ud_pong_score_t *sco = ctx->priv_svc_pong;
-	return *sco;
+	return ctx->hdl->score;
 }
 
 
@@ -105,19 +104,15 @@ dso_pong_LTX_init(void *clo)
 	/* tick service */
 	ud_set_service(UD_SVC_PING, ping, pong);
 
-	/* get us a nice score on the network */
-	my_score = ud_svc_nego_score(ctx->hdl, 100);
-	UD_DEBUG("dso-pong: nego'd me a score of %d\n", my_score);
-	ctx->priv_svc_pong = &my_score;
+	/* score has been obtained in init_*_handle() already */
+	UD_DEBUG("dso-pong: nego'd me a score of %d\n", ctx->hdl->score);
 	return;
 }
 
 void
-dso_pong_LTX_deinit(void *clo)
+dso_pong_LTX_deinit(void *UNUSED(clo))
 {
-	ud_ctx_t ctx = clo;
 	ud_set_service(UD_SVC_PING, NULL, NULL);
-	ctx->priv_svc_pong = NULL;
 	return;
 }
 

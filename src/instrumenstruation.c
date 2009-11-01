@@ -430,7 +430,7 @@ static void
 init_udnet(ictx_t ctx)
 {
 	ctx->outfd = -1;
-	init_unserding_handle(&ctx->hdl, PF_INET6);
+	init_unserding_handle(&ctx->hdl, PF_INET6, false);
 	ctx->wrf = unserding_write;
 	return;
 }

@@ -49,7 +49,7 @@
 
 #define TRUNC_HOST_NAME_LEN	16
 
-static ud_pong_score_t my_score = UD_LOW_SCORE;
+static ud_handle_t my_hdl;
 static size_t my_hnmlen;
 static char my_hname[TRUNC_HOST_NAME_LEN];
 
@@ -73,7 +73,7 @@ ping(job_t j)
 	udpc_seria_add_str(&sctx, my_hname, my_hnmlen);
 	udpc_seria_add_ui32(&sctx, ts.tv_sec);
 	udpc_seria_add_ui32(&sctx, ts.tv_nsec);
-	udpc_seria_add_byte(&sctx, my_score);
+	udpc_seria_add_byte(&sctx, (ud_pong_score_t)my_hdl->score);
 	/* off we go */
 	send_pkt(&sctx, j);
 	return;
@@ -106,7 +106,8 @@ dso_pong_LTX_init(void *clo)
 	ud_set_service(UD_SVC_PING, ping, pong);
 
 	/* score has been obtained in init_*_handle() already */
-	UD_DEBUG("dso-pong: nego'd me a score of %d\n", ctx->hdl->score);
+	my_hdl = ctx->hdl;
+	UD_DEBUG("dso-pong: nego'd me a score of %d\n", my_hdl->score);
 	return;
 }
 

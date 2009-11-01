@@ -553,7 +553,7 @@ main(int argc, const char *argv[])
 	/* initialise the proto core (no-op at the mo) */
 	init_proto();
 	/* initialise the lib handle */
-	init_unserding_handle(&__hdl, PF_INET6, false);
+	init_unserding_handle(&__hdl, PF_INET6, true);
 	__ctx.hdl = &__hdl;
 
 	/* initialise modules */

@@ -114,6 +114,8 @@ struct ud_handle_s {
 	ud_sockaddr_t sa;
 	/* our epoll event, very rudely opaquified */
 	void *data[2];
+	/* moving average roundtrip time (in nano seconds) */
+	long int mart;
 };
 
 

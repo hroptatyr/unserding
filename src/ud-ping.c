@@ -259,6 +259,7 @@ libnego_mode(ud_handle_t hdl)
 	puts("ud-ping negotiating in " UD_MCAST6_ADDR);
 	s = ud_svc_nego_score(hdl, timeout);
 	printf("lib nego'd %d\n", s);
+	printf("mart %ld\n", hdl->mart);
 	return;
 }
 

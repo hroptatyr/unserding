@@ -38,6 +38,8 @@
 #if !defined INCLUDED_svc_pong_h_
 #define INCLUDED_svc_pong_h_
 
+#define __USE_XOPEN
+#include <time.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -101,5 +103,7 @@ ud_find_score(ud_pong_set_t ps)
 /* exports, will be in libunserding */
 extern ud_pong_score_t
 ud_svc_nego_score(ud_handle_t hdl, int timeout);
+extern void
+ud_svc_update_mart(ud_handle_t hdl, struct timespec then);
 
 #endif	/* INCLUDED_svc_pong_h_ */

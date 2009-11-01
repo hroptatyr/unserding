@@ -415,6 +415,8 @@ init_unserding_handle(ud_handle_t hdl, int pref_fam)
 	__set_nonblck(hdl->sock);
 	/* initialise the epoll backend */
 	init_epoll_guts(hdl);
+	/* fiddle with the mart slot */
+	hdl->mart = 0;
 	return;
 }
 

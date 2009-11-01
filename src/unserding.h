@@ -114,6 +114,8 @@ struct ud_handle_s {
 	ud_sockaddr_t sa;
 	/* our epoll event, very rudely opaquified */
 	void *data[2];
+	/* moving average roundtrip time (in nano seconds) */
+	int mart;
 };
 
 
@@ -172,7 +174,7 @@ ud_sockaddr_set_port(ud_sockaddr_t *sa, uint16_t port)
 /* connexion stuff */
 /**
  * Initialise a handle into what's behind HDL. */
-extern void init_unserding_handle(ud_handle_t hdl, int pref_fam);
+extern void init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop);
 /**
  * Free a handle and all resources. */
 extern void free_unserding_handle(ud_handle_t);

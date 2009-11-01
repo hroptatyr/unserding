@@ -44,7 +44,7 @@ main(int argc, const char *argv[])
 		return 0;
 	}
 	/* obtain us a new handle */
-	init_unserding_handle(hdl, PF_INET6);
+	init_unserding_handle(hdl, PF_INET6, true);
 	/* now kick off the finder */
 	ud_find_ticks_by_ts(hdl, t_cb, NULL, cid, n, bs, ts);
 	/* and lose the handle again */

@@ -35,14 +35,42 @@
  *
  ***/
 
+#include <time.h>
 #include "unserding.h"
 #include "svc-pong.h"
 #include "seria-proto-glue.h"
 
 typedef struct __clo_s {
+	ud_handle_t hdl;
 	ud_pong_set_t seen;
 	ud_convo_t cno;
+	struct timespec rtref;
 } *__clo_t;
+
+/* returns the current CLOCK_REALTIME time stamp */
+static struct timespec
+__stamp(void)
+{
+	struct timespec res;
+	clock_gettime(CLOCK_REALTIME, &res);
+	return res;
+}
+
+/* given a stamp THEN, returns the difference between __stamp() and THEN. */
+static struct timespec
+__lapse(struct timespec then)
+{
+	struct timespec now, res;
+	clock_gettime(CLOCK_REALTIME, &now);
+	if (now.tv_nsec < then.tv_nsec) {
+		res.tv_sec = now.tv_sec - then.tv_sec - 1;
+		res.tv_nsec = 1000000000 + now.tv_nsec - then.tv_nsec;
+	} else {
+		res.tv_sec = now.tv_sec - then.tv_sec;
+		res.tv_nsec = now.tv_nsec - then.tv_nsec;
+	}
+	return res;
+}
 
 static void
 seria_skip_str(udpc_seria_t sctx)
@@ -72,6 +100,8 @@ cb(ud_packet_t pkt, void *clo)
 		return false;
 	}
 	/* otherwise the packet is meaningful */
+	ud_svc_update_mart(nclo->hdl, nclo->rtref);
+	/* fetch fields */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
 	/* first thing is a string which contains the hostname, just skip it */
 	seria_skip_str(&sctx);
@@ -85,6 +115,19 @@ cb(ud_packet_t pkt, void *clo)
 	return true;
 }
 
+void
+ud_svc_update_mart(ud_handle_t hdl, struct timespec then)
+{
+	struct timespec rtts = __lapse(then);
+	if (rtts.tv_sec != 0) {
+		/* more than a second difference?! ignore */
+		return;
+	}
+	/* update hdl->mart */
+	hdl->mart = 1 + (hdl->mart + rtts.tv_nsec / 1000000) / 2;
+	return;
+}
+
 ud_pong_score_t
 ud_svc_nego_score(ud_handle_t hdl, int timeout)
 {
@@ -92,6 +135,8 @@ ud_svc_nego_score(ud_handle_t hdl, int timeout)
 
 	/* fill in the closure */
 	clo.seen = ud_empty_pong_set();
+	clo.rtref = __stamp();
+	clo.hdl = hdl;
 	/* send off the bugger */
 	clo.cno = ud_send_simple(hdl, UD_SVC_PING);
 	/* wait for replies */

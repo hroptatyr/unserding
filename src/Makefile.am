@@ -136,7 +136,7 @@ if BUILD_LIBRARY
 libunserding_la_SOURCES = libstuff.c libhelpers.c
 libunserding_la_SOURCES += svc-pong.c
 libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS)
-libunserding_la_LDFLAGS = $(AM_LDFLAGS)
+libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
 endif
 
 if BUILD_CLIAPPS

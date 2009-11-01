@@ -53,16 +53,7 @@
 # define UNLIKELY(_x)	__builtin_expect((_x), 0)
 #endif
 
-#define UD_SVC_TIMEOUT	50	/* milliseconds */
-/* backoff schema, read from bottom to top */
-static int ud_backoffs[] = {
-	12 * UD_SVC_TIMEOUT,
-	8 * UD_SVC_TIMEOUT,
-	4 * UD_SVC_TIMEOUT,
-	2 * UD_SVC_TIMEOUT,
-	2 * UD_SVC_TIMEOUT,
-};
-#define NRETRIES	(sizeof(ud_backoffs) / sizeof(*ud_backoffs))
+#define NRETRIES	2
 
 size_t
 ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
@@ -82,8 +73,9 @@ ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
 	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 	ud_send_raw(hdl, pkt);
 
+	/* use timeout of 0, letting the mart system decide */
 	pkt.plen = sizeof(buf);
-	ud_recv_convo(hdl, &pkt, UD_SVC_TIMEOUT, cno);
+	ud_recv_convo(hdl, &pkt, 0, cno);
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
 	if ((len = udpc_seria_des_xdr(&sctx, (void*)&out)) > 0) {
 		memcpy(tgt, out, len);
@@ -122,8 +114,9 @@ ud_find_many_instrs(
 		pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 		ud_send_raw(hdl, pkt);
 
+		/* let the mart system decide, or use backoffs? */
 		pkt.plen = sizeof(buf);
-		ud_recv_convo(hdl, &pkt, (5 - retry) * UD_SVC_TIMEOUT, cno);
+		ud_recv_convo(hdl, &pkt, 0, cno);
 		udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
 
 		/* we assume that instrs are sent in the same order as
@@ -192,8 +185,9 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 	ud_send_raw(hdl, pkt);
 
+	/* let the mart system decide */
 	pkt.plen = sizeof(buf);
-	ud_recv_convo(hdl, &pkt, UD_SVC_TIMEOUT, cno);
+	ud_recv_convo(hdl, &pkt, 0, cno);
 	if (UNLIKELY((len = pkt.plen) == 0)) {
 		return 0;
 	}
@@ -260,8 +254,9 @@ ud_find_ticks_by_ts(
 		pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 		ud_send_raw(hdl, pkt);
 
+		/* let the mart system decide */
 		pkt.plen = sizeof(buf);
-		ud_recv_convo(hdl, &pkt, (5 - retry) * UD_SVC_TIMEOUT, cno);
+		ud_recv_convo(hdl, &pkt, 0, cno);
 		udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
 
 		/* we assume that instrs are sent in the same order as
@@ -377,10 +372,9 @@ send_stamps(ftbi_ctx_t bictx)
 static void
 recv_ticks(ftbi_ctx_t bc)
 {
-	int to = bc->retry >= NRETRIES
-		? UD_SVC_TIMEOUT : ud_backoffs[bc->retry];
+	/* we use a timeout of 0 to let the mart thingie decide */
 	bc->pkt.plen = sizeof(bc->buf);
-	ud_recv_convo(bc->hdl, &bc->pkt, to, bc->cno);
+	ud_recv_convo(bc->hdl, &bc->pkt, 0, bc->cno);
 	udpc_seria_init(&bc->sctx, UDPC_PAYLOAD(bc->pkt.pbuf), bc->pkt.plen);
 	return;
 }

@@ -98,7 +98,7 @@
 #define UDP_MULTICAST_TTL	16
 #define SOCK_INVALID		(int)0xffffff
 
-#define PKT_INVALID_P(_x)	((_x).plen == 0 || (_x).plen > UDPC_PKTLEN))
+#define PKT_INVALID_P(_x)	((_x).plen == 0 || (_x).plen > UDPC_PKTLEN)
 
 
 static void

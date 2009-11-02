@@ -421,14 +421,20 @@ instr_tick_by_instr_svc(job_t j)
 
 /* urn getter */
 static void
+get_urn_cb(uint32_t lo, uint32_t hi, void *data, void *clo)
+{
+	UD_DEBUG("found %u..%u %p %p\n", lo, hi, data, clo);
+	return;
+}
+
+static void
 instr_urn_svc(job_t j)
 {
 	struct udpc_seria_s sctx;
-	struct udpc_seria_s rplsctx;
-	struct job_s rplj;
 	/* in args */
 	struct secu_s secu;
 	tscoll_t tsc;
+	tseries_t ts;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -445,26 +451,11 @@ instr_urn_svc(job_t j)
 		return;
 	}
 	UD_DEBUG("found %p\n", tsc);
-#if 0
-	/* initialise our context */
-	oadtctx.sctx = &rplsctx;
-	oadtctx.secu = &hdr.secu;
-	oadtctx.coll = tsc;
-	oadtctx.nfilt = nfilt;
-
-	for (index_t i = 0; moarp;) {
-		/* prepare the reply packet ... */
-		copy_pkt(&rplj, j);
-		clear_pkt(&rplsctx, &rplj);
-		/* process some time stamps, this fills the packet */
-		moarp = (i = proc_some(&oadtctx, i)) < oadtctx.nfilt;
-		/* send what we've got so far */
-		send_pkt(&rplsctx, &rplj);
-	} while (moarp);
-
-	/* we cater for any frobnication desires now */
-	frobnicate();
-#endif
+	/* reuse buf and sctx */
+	clear_pkt(&sctx, j);
+	tscoll_trav_series(tsc, get_urn_cb, &sctx);
+	//udpc_seria_add_data(&sctx, tsc, sizeof(*tsc));
+	send_pkt(&sctx, j);
 	return;
 }
 

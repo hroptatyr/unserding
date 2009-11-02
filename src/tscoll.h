@@ -53,6 +53,8 @@
 
 typedef void *tscoll_t;
 typedef struct tseries_s *tseries_t;
+/* for traversal */
+typedef void(*tscoll_trav_f)(uint32_t lo, uint32_t hi, void *data, void *clo);
 
 struct tseries_s {
 	const_urn_t urn;
@@ -75,5 +77,7 @@ extern tseries_t tscoll_find_series(tscoll_t tsc, time_t ts);
 /* move to tseries.[ch]? */
 extern tser_pkt_t tseries_find_pkt(tseries_t tsc, time_t ts);
 extern void tseries_add(tseries_t tsc, dse16_t beg, dse16_t end, tser_pkt_t p);
+
+extern void tscoll_trav_series(tscoll_t tsc, tscoll_trav_f cb, void *clo);
 
 #endif	/* INCLUDED_tscoll_h_ */

@@ -743,7 +743,7 @@ tree_pivot_rel(it_node_t n, uint32_t p)
 void
 itree_find_point_cb(itree_t it, uint32_t p, it_trav_f cb, void *clo)
 {
-/* left child, me, right child */
+/* Find all nodes that contain P.  Call cb() for each of them. */
 	/* root node has no right child, proceed with the left one */
 	it_node_t curr;
 	it_node_t ____stk[128];
@@ -873,6 +873,7 @@ itree_find_point(itree_t it, uint32_t p)
 			continue;
 		case 1:
 			/* pivot is beyond the scope, return */
+			/* i wonder if we have to reset data here? */
 			goto out;
 		case 0:
 		default:

@@ -423,7 +423,13 @@ instr_tick_by_instr_svc(job_t j)
 static void
 get_urn_cb(uint32_t lo, uint32_t hi, void *data, void *clo)
 {
-	UD_DEBUG("found %u..%u %p %p\n", lo, hi, data, clo);
+	tseries_t tser = data;
+	char los[32], his[32];
+	/* debugging mumbo jumbo */
+	print_ts_into(los, sizeof(los), lo);
+	print_ts_into(his, sizeof(his), hi);
+	UD_DEBUG("found %s..%s %p %p\n", los, his, tser, clo);
+	udpc_seria_add_data(clo, tser, sizeof(*tser));
 	return;
 }
 
@@ -434,7 +440,6 @@ instr_urn_svc(job_t j)
 	/* in args */
 	struct secu_s secu;
 	tscoll_t tsc;
-	tseries_t ts;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -450,11 +455,9 @@ instr_urn_svc(job_t j)
 		UD_DEBUG("No way of fetching stuff\n");
 		return;
 	}
-	UD_DEBUG("found %p\n", tsc);
-	/* reuse buf and sctx */
+	/* reuse buf and sctx, just traverse tscoll and send off the bugger */
 	clear_pkt(&sctx, j);
 	tscoll_trav_series(tsc, get_urn_cb, &sctx);
-	//udpc_seria_add_data(&sctx, tsc, sizeof(*tsc));
 	send_pkt(&sctx, j);
 	return;
 }

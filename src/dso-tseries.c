@@ -419,6 +419,56 @@ instr_tick_by_instr_svc(job_t j)
 }
 
 
+/* urn getter */
+static void
+instr_urn_svc(job_t j)
+{
+	struct udpc_seria_s sctx;
+	struct udpc_seria_s rplsctx;
+	struct job_s rplj;
+	/* in args */
+	struct secu_s secu;
+	tscoll_t tsc;
+
+	/* prepare the iterator for the incoming packet */
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	/* read the header off of the wire */
+	udpc_seria_des_secu(&secu, &sctx);
+	UD_DEBUG("0x%04x (UD_SVC_GET_URN): %u/%u@%u\n",
+		 UD_SVC_GET_URN, secu.instr, secu.unit, secu.pot);
+
+	/* get us the tseries we're talking about */
+	if ((tsc = find_tscoll_by_secu(tscache, &secu)) == NULL) {
+		/* means we have no means of fetching */
+		/* we could issue a packet saying so */
+		UD_DEBUG("No way of fetching stuff\n");
+		return;
+	}
+	UD_DEBUG("found %p\n", tsc);
+#if 0
+	/* initialise our context */
+	oadtctx.sctx = &rplsctx;
+	oadtctx.secu = &hdr.secu;
+	oadtctx.coll = tsc;
+	oadtctx.nfilt = nfilt;
+
+	for (index_t i = 0; moarp;) {
+		/* prepare the reply packet ... */
+		copy_pkt(&rplj, j);
+		clear_pkt(&rplsctx, &rplj);
+		/* process some time stamps, this fills the packet */
+		moarp = (i = proc_some(&oadtctx, i)) < oadtctx.nfilt;
+		/* send what we've got so far */
+		send_pkt(&rplsctx, &rplj);
+	} while (moarp);
+
+	/* we cater for any frobnication desires now */
+	frobnicate();
+#endif
+	return;
+}
+
+
 static void*
 cfgspec_get_source(void *ctx, void *spec)
 {
@@ -502,6 +552,7 @@ dso_tseries_LTX_init(void *clo)
 	/* tick service */
 	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
+	ud_set_service(UD_SVC_GET_URN, instr_urn_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	if ((settings = udctx_get_setting(ctx)) != NULL) {

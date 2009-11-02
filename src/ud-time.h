@@ -45,9 +45,6 @@
 #if !defined __USE_POSIX
 # define __USE_POSIX
 #endif	/* !__USE_POSIX */
-#if !defined __USE_MISC
-# define __USE_MISC
-#endif	/* !__USE_MISC */
 #if !defined __USE_POSIX199309
 # define __USE_POSIX199309
 #endif	/* !__USE_POSIX199309 */

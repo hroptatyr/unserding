@@ -247,7 +247,23 @@ tscache_size(tscache_t tsc)
 tscoll_t
 find_tscoll_by_secu(tscache_t tsc, secu_t secu)
 {
-	tscoll_t res;
+	tscoll_t res = NULL;
+	_tscache_t c = tsc;
+	uint32_t ks;
+
+	pthread_mutex_lock(&c->mtx);
+	ks = slot(c->tbl, c->alloc_sz, secukey_from_secu(secu));
+	if (LIKELY(ks != SLOTS_FULL && secukey_valid_p(c->tbl[ks].key))) {
+		res = c->tbl[ks].val;
+	}
+	pthread_mutex_unlock(&c->mtx);
+	return res;
+}
+
+tscoll_t
+find_tscoll_by_secu_crea(tscache_t tsc, secu_t secu)
+{
+	tscoll_t res = NULL;
 	_tscache_t c = tsc;
 	uint32_t ks;
 

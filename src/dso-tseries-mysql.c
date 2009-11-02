@@ -475,7 +475,7 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 	case 8:
 		/* once-a-day, 5-a-week */
 		UD_DEBUG("OAD/5DW tick for %u\n", secu.instr);
-		tsc = find_tscoll_by_secu(tscache, &secu);
+		tsc = find_tscoll_by_secu_crea(tscache, &secu);
 
 		tser.urn = find_urn(urn_id, row[URN]);
 		if (UNLIKELY(row[MIN_DT] == NULL)) {

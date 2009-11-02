@@ -114,4 +114,12 @@ tseries_add(tseries_t tser, dse16_t beg, dse16_t end, tser_pkt_t pkt)
 	return;
 }
 
+/* iterators */
+void
+tscoll_trav_series(tscoll_t tsc, tscoll_trav_f cb, void *clo)
+{
+	itree_trav_in_order(tsc, cb, clo);
+	return;
+}
+
 /* tscoll.c ends here */

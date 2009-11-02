@@ -419,6 +419,50 @@ instr_tick_by_instr_svc(job_t j)
 }
 
 
+/* urn getter */
+static void
+get_urn_cb(uint32_t lo, uint32_t hi, void *data, void *clo)
+{
+	tseries_t tser = data;
+	char los[32], his[32];
+	/* debugging mumbo jumbo */
+	print_ts_into(los, sizeof(los), lo);
+	print_ts_into(his, sizeof(his), hi);
+	UD_DEBUG("found %s..%s %p %p\n", los, his, tser, clo);
+	udpc_seria_add_data(clo, tser, sizeof(*tser));
+	return;
+}
+
+static void
+instr_urn_svc(job_t j)
+{
+	struct udpc_seria_s sctx;
+	/* in args */
+	struct secu_s secu;
+	tscoll_t tsc;
+
+	/* prepare the iterator for the incoming packet */
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	/* read the header off of the wire */
+	udpc_seria_des_secu(&secu, &sctx);
+	UD_DEBUG("0x%04x (UD_SVC_GET_URN): %u/%u@%u\n",
+		 UD_SVC_GET_URN, secu.instr, secu.unit, secu.pot);
+
+	/* get us the tseries we're talking about */
+	if ((tsc = find_tscoll_by_secu(tscache, &secu)) == NULL) {
+		/* means we have no means of fetching */
+		/* we could issue a packet saying so */
+		UD_DEBUG("No way of fetching stuff\n");
+		return;
+	}
+	/* reuse buf and sctx, just traverse tscoll and send off the bugger */
+	clear_pkt(&sctx, j);
+	tscoll_trav_series(tsc, get_urn_cb, &sctx);
+	send_pkt(&sctx, j);
+	return;
+}
+
+
 static void*
 cfgspec_get_source(void *ctx, void *spec)
 {
@@ -502,6 +546,7 @@ dso_tseries_LTX_init(void *clo)
 	/* tick service */
 	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
+	ud_set_service(UD_SVC_GET_URN, instr_urn_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	if ((settings = udctx_get_setting(ctx)) != NULL) {

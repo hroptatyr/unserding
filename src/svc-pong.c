@@ -35,20 +35,6 @@
  *
  ***/
 
-/* allow for the intel compiler to use time.h features we need */
-#if !defined __USE_MISC
-# define __USE_MISC
-#endif	/* !__USE_MISC */
-#if !defined __USE_POSIX199309
-# define __USE_POSIX199309
-#endif	/* !__USE_POSIX199309 */
-#if !defined __USE_XOPEN
-# define __USE_XOPEN
-#endif	/* !__USE_XOPEN */
-#if !defined __need_timespec
-# define __need_timespec
-#endif	/* !__need_timespec */
-
 #include "unserding.h"
 #include "svc-pong.h"
 #include "seria-proto-glue.h"

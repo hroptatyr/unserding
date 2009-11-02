@@ -37,8 +37,6 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-#define __USE_XOPEN
-#include <time.h>
 #include <signal.h>
 #include <errno.h>
 #include "unserding.h"

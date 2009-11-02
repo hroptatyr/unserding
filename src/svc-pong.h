@@ -38,9 +38,9 @@
 #if !defined INCLUDED_svc_pong_h_
 #define INCLUDED_svc_pong_h_
 
-#include <time.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include "ud-time.h"
 
 /**
  * Bitset of server scores.  This is a generalisation of the

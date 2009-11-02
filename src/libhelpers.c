@@ -54,7 +54,7 @@
 #endif
 
 #define NRETRIES	2
-#define USE_SUBSCR
+//#define USE_SUBSCR
 
 size_t
 ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)

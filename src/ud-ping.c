@@ -53,7 +53,8 @@ typedef struct clks_s {
 /* this is the callback closure for the classic mode */
 typedef struct ccb_clo_s {
 	struct clks_s clks;
-	long int cnt;
+	long int seen;
+	ud_convo_t cno;
 } *ccb_clo_t;
 
 static size_t cnt;
@@ -85,11 +86,17 @@ cb(ud_packet_t pkt, void *clo)
 	ud_pong_score_t score;
 
 	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
+		if (ccb->seen == 0) {
+			printf("From " UD_MCAST6_ADDR "  convo=%i  "
+			       "no servers on the network\n",
+			       ccb->cno);
+		}
 		return false;
 	}
 	/* otherwise the packet is meaningful */
 	lap = __lapse(ccb->clks.rt);
-
+	/* count this response */
+	ccb->seen++;
 	/* fetch fields */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
 	/* fetch the host name */
@@ -124,8 +131,10 @@ ping1(ud_handle_t hdl)
 
 	/* record the current time */
 	clo.clks.rt = __stamp();
+	/* and we've seen noone yet */
+	clo.seen = 0;
 	/* send off the bugger */
-	(void)ud_send_simple(hdl, 0x0004);
+	clo.cno = ud_send_simple(hdl, 0x0004);
 	/* wait for replies */
 	ud_subscr_raw(hdl, timeout, cb, &clo);
 	return 0;

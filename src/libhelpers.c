@@ -54,6 +54,7 @@
 #endif
 
 #define NRETRIES	2
+//#define USE_SUBSCR
 
 size_t
 ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
@@ -293,6 +294,10 @@ struct ftbi_ctx_s {
 	uint64_t seen;
 	void(*cb)(spDute_t, void *clo);
 	void *clo;
+#if defined USE_SUBSCR
+	time_t *ts;
+	size_t nts;
+#endif	/* USE_SUBSCR */
 };
 
 static inline void
@@ -358,6 +363,10 @@ feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 		}
 	}
 #undef FILL
+#if defined USE_SUBSCR
+	bictx->ts = ts;
+	bictx->nts = nts;
+#endif	/* USE_SUBSCR */
 	return;
 }
 
@@ -369,6 +378,50 @@ send_stamps(ftbi_ctx_t bictx)
 	return;
 }
 
+#if defined USE_SUBSCR
+/* we combine recv_ticks() and frob_ticks() in here */
+static bool
+__recv_tick_cb(const ud_packet_t pkt, void *clo)
+{
+	ftbi_ctx_t bc = clo;
+
+	if (UDPC_PKT_INVALID_P(pkt)) {
+		return false;
+	} else if (udpc_pkt_cno(pkt) != bc->cno) {
+		/* we better ask for another packet */
+		return true;
+	}
+	udpc_seria_init(
+		&bc->sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	while (udpc_seria_des_spDute(&bc->Dute, &bc->sctx)) {
+		index_t where;
+		if ((where = whereis(&bc->Dute, bc->ts, bc->nts)) < bc->nts) {
+			if (!spDute_onhold_p(&bc->Dute)) {
+				bc->rcvd++;
+				/* mark it, use our mark vector */
+				set_seen(bc, where);
+			}
+		}
+		/* callback */
+		(*bc->cb)(&bc->Dute, bc->clo);
+		bc->retry = NRETRIES;
+	}
+	/* ask for more */
+	return true;
+}
+
+static void
+recv_ticks(ftbi_ctx_t bc)
+{
+	/* we use a timeout of 0 to let the mart thingie decide */
+	bc->pkt.plen = sizeof(bc->buf);
+	ud_subscr_raw(bc->hdl, 0, __recv_tick_cb, bc);
+	return;
+}
+
+#else  /* !USE_SUBSCR */
+/* the old system, we receive exactly one packet of our convo, then call
+ * frob_ticks() */
 static void
 recv_ticks(ftbi_ctx_t bc)
 {
@@ -397,6 +450,7 @@ frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 	}
 	return;
 }
+#endif	/* USE_SUBSCR */
 
 static inline void
 lodge_closure(ftbi_ctx_t bictx, void(*cb)(spDute_t, void *clo), void *clo)
@@ -438,8 +492,10 @@ ud_find_ticks_by_instr(
 
 		/* receive one answer, linear back off */
 		recv_ticks(bictx);
+#if !defined USE_SUBSCR
 		/* eval, possibly marking them */
 		frob_ticks(bictx, ts, tslen);
+#endif	/* !USE_SUBSCR */
 	} while (bictx->rcvd < tslen && bictx->retry > 0);
 	return;
 }

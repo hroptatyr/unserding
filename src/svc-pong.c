@@ -35,7 +35,6 @@
  *
  ***/
 
-#include <time.h>
 #include "unserding.h"
 #include "svc-pong.h"
 #include "seria-proto-glue.h"
@@ -46,31 +45,6 @@ typedef struct __clo_s {
 	ud_convo_t cno;
 	struct timespec rtref;
 } *__clo_t;
-
-/* returns the current CLOCK_REALTIME time stamp */
-static struct timespec
-__stamp(void)
-{
-	struct timespec res;
-	clock_gettime(CLOCK_REALTIME, &res);
-	return res;
-}
-
-/* given a stamp THEN, returns the difference between __stamp() and THEN. */
-static struct timespec
-__lapse(struct timespec then)
-{
-	struct timespec now, res;
-	clock_gettime(CLOCK_REALTIME, &now);
-	if (now.tv_nsec < then.tv_nsec) {
-		res.tv_sec = now.tv_sec - then.tv_sec - 1;
-		res.tv_nsec = 1000000000 + now.tv_nsec - then.tv_nsec;
-	} else {
-		res.tv_sec = now.tv_sec - then.tv_sec;
-		res.tv_nsec = now.tv_nsec - then.tv_nsec;
-	}
-	return res;
-}
 
 static void
 seria_skip_str(udpc_seria_t sctx)

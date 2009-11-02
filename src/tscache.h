@@ -59,5 +59,6 @@ extern size_t tscache_size(tscache_t tsc);
 
 extern tscoll_t add_tscoll_for_secu(tscache_t tsc, secu_t s);
 extern tscoll_t find_tscoll_by_secu(tscache_t tsc, secu_t s);
+extern tscoll_t find_tscoll_by_secu_crea(tscache_t tsc, secu_t secu);
 
 #endif	/* INCLUDED_tscache_h_ */

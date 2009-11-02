@@ -90,6 +90,19 @@
  * because several optimisation strategies apply. */
 #define UD_SVC_TICK_BY_INSTR	0x4222
 
+/**
+ * Service 4224:
+ * Get URNs by secu.
+ *
+ * sig: 4224(ui32 secu, ui32 fund, ui32 exch)
+ *   As a wildcard for all funds or all exchanges 0x00000000 can be used.
+ *
+ * The answer will be a rpl4224_s object, which is a tseries_s in disguise. */
+#define UD_SVC_GET_URN		0x4224
+/* just a convenience thingie */
+#define rpl4224_t	tseries_t
+#define rpl4224_s	tseries_s
+
 /* points to the tick-type of the day */
 #define sl1tick_s		sl1tp_s
 #define sl1tick_t		sl1tp_t

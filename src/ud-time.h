@@ -1,4 +1,4 @@
-/*** tscoll.c -- collections of time series
+/*** ud-time.h -- time and clock goodness
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,91 +35,55 @@
  *
  ***/
 
-#include <stdbool.h>
+#if !defined INCLUDED_ud_time_h_
+#define INCLUDED_ud_time_h_
+
+/* this is just a convenience header to overcome differences between the
+ * intel and the gcc compiler */
+
+/* allow for the intel compiler to use time.h features we need */
+#if !defined __USE_POSIX
+# define __USE_POSIX
+#endif	/* !__USE_POSIX */
+#if !defined __USE_POSIX199309
+# define __USE_POSIX199309
+#endif	/* !__USE_POSIX199309 */
+#if !defined __USE_XOPEN
+# define __USE_XOPEN
+#endif	/* !__USE_XOPEN */
+
 #include <time.h>
-#include "unserding.h"
-#include "protocore.h"
-#include "seria.h"
-#include "urn.h"
-#include "tscoll.h"
-#include "intvtree.h"
-#include "unserding-nifty.h"
 
-tscoll_t
-make_tscoll(secu_t s)
+/* returns the current CLOCK_REALTIME time stamp */
+static inline struct timespec
+__stamp(void)
 {
-	return make_itree_sat(s, sizeof(*s));
+	struct timespec res;
+	clock_gettime(CLOCK_REALTIME, &res);
+	return res;
 }
 
-void
-free_tscoll(tscoll_t tsc)
+/* given a stamp THEN, returns the difference between __stamp() and THEN. */
+static inline struct timespec
+__lapse(struct timespec then)
 {
-	free_itree(tsc);
-	return;
+	struct timespec now, res;
+	clock_gettime(CLOCK_REALTIME, &now);
+	if (now.tv_nsec < then.tv_nsec) {
+		res.tv_sec = now.tv_sec - then.tv_sec - 1;
+		res.tv_nsec = 1000000000 + now.tv_nsec - then.tv_nsec;
+	} else {
+		res.tv_sec = now.tv_sec - then.tv_sec;
+		res.tv_nsec = now.tv_nsec - then.tv_nsec;
+	}
+	return res;
 }
 
-secu_t
-tscoll_secu(tscoll_t tsc)
+static inline double
+__as_f(struct timespec src)
 {
-	return itree_satellite(tsc);
+/* return time as float in milliseconds */
+	return src.tv_sec * 1000.f + src.tv_nsec / 1000000.f;
 }
 
-void
-tscoll_add(tscoll_t tsc, tseries_t sp)
-{
-	tseries_t copy_sp = xnew(*sp);
-	time_t from = sp->from;
-	time_t to = sp->to;
-
-	memcpy(copy_sp, sp, sizeof(*sp));
-	copy_sp->secu = tscoll_secu(tsc);
-	copy_sp->private = make_itree();
-	itree_add(tsc, from, to, copy_sp);
-	return;
-}
-
-tseries_t
-tscoll_add2(tscoll_t tsc, const_urn_t urn, time_t from, time_t to, uint32_t ty)
-{
-	tseries_t sp = xnew(*sp);
-
-	sp->urn = urn;
-	sp->from = from;
-	sp->to = to;
-	sp->types = ty;
-	sp->secu = tscoll_secu(tsc);
-	sp->private = make_itree();
-	itree_add(tsc, from, to, sp);
-	return sp;
-}
-
-tseries_t
-tscoll_find_series(tscoll_t tsc, time_t ts)
-{
-	return itree_find_point(tsc, ts);
-}
-
-tser_pkt_t
-tseries_find_pkt(tseries_t tser, time_t ts)
-{
-	return itree_find_point(tser->private, ts);
-}
-
-void
-tseries_add(tseries_t tser, dse16_t beg, dse16_t end, tser_pkt_t pkt)
-{
-	tser_pkt_t p = xnew(*p);
-	memcpy(p, pkt, sizeof(*p));
-	itree_add(tser->private, beg, end, p);
-	return;
-}
-
-/* iterators */
-void
-tscoll_trav_series(tscoll_t tsc, tscoll_trav_f cb, void *clo)
-{
-	itree_trav_in_order(tsc, cb, clo);
-	return;
-}
-
-/* tscoll.c ends here */
+#endif	/* INCLUDED_ud_time_h_ */

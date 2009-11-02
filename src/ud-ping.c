@@ -37,8 +37,6 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-#define __USE_XOPEN
-#include <time.h>
 #include <signal.h>
 #include <errno.h>
 #include "unserding.h"
@@ -47,60 +45,21 @@
 #include "seria.h"
 #include "svc-pong.h"
 
-/* this is a bunch of time stamps */
 typedef struct clks_s {
 	struct timespec rt;
 	struct timespec pt;
 } *clks_t;
 
+/* this is the callback closure for the classic mode */
+typedef struct ccb_clo_s {
+	struct clks_s clks;
+	long int seen;
+	ud_convo_t cno;
+} *ccb_clo_t;
+
 static size_t cnt;
 static long unsigned int timeout;
 static void(*mode)(ud_handle_t);
-
-
-static void
-__stamp(clockid_t cid, struct timespec *tgt)
-{
-	clock_gettime(cid, tgt);
-	return;
-}
-
-static void
-__diff(struct timespec *tgt, struct timespec *beg, struct timespec *end)
-{
-	if ((end->tv_nsec - beg->tv_nsec) < 0) {
-		tgt->tv_sec = end->tv_sec - beg->tv_sec - 1;
-		tgt->tv_nsec = 1000000000 + end->tv_nsec - beg->tv_nsec;
-	} else {
-		tgt->tv_sec = end->tv_sec - beg->tv_sec;
-		tgt->tv_nsec = end->tv_nsec - beg->tv_nsec;
-	}
-	return;
-}
-
-static float
-__as_f(struct timespec *src)
-{
-/* return time as float in milliseconds */
-	return src->tv_sec * 1000.f + src->tv_nsec / 1000000.f;
-}
-
-/* higher level clock stuff */
-static void
-hrclock_stamp(clks_t tgt)
-{
-	__stamp(CLOCK_REALTIME, &tgt->rt);
-	__stamp(CLOCK_PROCESS_CPUTIME_ID, &tgt->pt);
-	return;
-}
-
-static void
-hrclock_diff(clks_t tgt, clks_t beg, clks_t end)
-{
-	__diff(&tgt->rt, &beg->rt, &end->rt);
-	__diff(&tgt->pt, &beg->pt, &end->pt);
-	return;
-}
 
 
 /* field retrievers */
@@ -120,19 +79,24 @@ fetch_hnname(udpc_seria_t sctx, char *buf, size_t bsz)
 static bool
 cb(ud_packet_t pkt, void *clo)
 {
-	clks_t then = clo;
-	struct clks_s now;
+	ccb_clo_t ccb = clo;
+	struct timespec lap;
 	struct udpc_seria_s sctx;
 	static char hnname[16];
 	ud_pong_score_t score;
 
 	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
+		if (ccb->seen == 0) {
+			printf("From " UD_MCAST6_ADDR "  convo=%i  "
+			       "no servers on the network\n",
+			       ccb->cno);
+		}
 		return false;
 	}
 	/* otherwise the packet is meaningful */
-	hrclock_stamp(&now);
-	hrclock_diff(&now, then, &now);
-
+	lap = __lapse(ccb->clks.rt);
+	/* count this response */
+	ccb->seen++;
 	/* fetch fields */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
 	/* fetch the host name */
@@ -142,9 +106,12 @@ cb(ud_packet_t pkt, void *clo)
 	(void)udpc_seria_des_ui32(&sctx);
 	score = udpc_seria_des_byte(&sctx);
 	/* print */
-	printf("%zu bytes from %s (...): "
-	       "convo=%i score=%i time=%2.3f ms\n",
-	       pkt.plen, hnname, udpc_pkt_cno(pkt), score, __as_f(&now.rt));
+	{
+		double lapf = __as_f(lap);
+		printf("%zu bytes from %s (...): "
+		       "convo=%i score=%i time=%2.3f ms\n",
+		       pkt.plen, hnname, udpc_pkt_cno(pkt), score, lapf);
+	}
 	return true;
 }
 
@@ -159,16 +126,17 @@ handle_sigint(int UNUSED(signum))
 static int
 ping1(ud_handle_t hdl)
 {
-	ud_convo_t cno;
 	/* referential stamp */
-	struct clks_s clks;
+	struct ccb_clo_s clo;
 
 	/* record the current time */
-	hrclock_stamp(&clks);
+	clo.clks.rt = __stamp();
+	/* and we've seen noone yet */
+	clo.seen = 0;
 	/* send off the bugger */
-	cno = ud_send_simple(hdl, 0x0004);
+	clo.cno = ud_send_simple(hdl, 0x0004);
 	/* wait for replies */
-	ud_subscr_raw(hdl, timeout, cb, &clks);
+	ud_subscr_raw(hdl, timeout, cb, &clo);
 	return 0;
 }
 
@@ -199,15 +167,14 @@ ncb(ud_packet_t pkt, void *clo)
 	nego_clo_t nclo = clo;
 	struct udpc_seria_s sctx;
 	static char hnname[16];
-	struct timespec now, us, em;
+	struct timespec us, em;
 	uint8_t score;
 
 	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
 		return false;
 	}
 	/* otherwise the packet is meaningful */
-	__stamp(CLOCK_REALTIME, &now);
-	__diff(&us, &nclo->rt, &now);
+	us = __lapse(nclo->rt);
 
 	/* fetch fields */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
@@ -217,28 +184,32 @@ ncb(ud_packet_t pkt, void *clo)
 	em.tv_nsec = udpc_seria_des_ui32(&sctx);
 	score = udpc_seria_des_byte(&sctx);
 	/* compute their stamp */
-	__diff(&em, &nclo->rt, &em);
+	em = __lapse(em);
 	/* keep track of their score */
 	nclo->seen = ud_pong_set(nclo->seen, score);
 	/* print */
-	printf("name %s  roundtrip %2.3f ms  clkskew %2.3f ms  score %u\n",
-	       hnname, __as_f(&us), __as_f(&em), score);
+	{
+		double usf = __as_f(us);
+		double emf = __as_f(em);
+		printf("name %s  roundtrip %2.3f ms  clkskew %2.3f ms  "
+		       "score %u\n",
+		       hnname, usf, emf, (unsigned int)score);
+	}
 	return true;
 }
 
 static int
 nego1(ud_handle_t hdl)
 {
-	ud_convo_t cno;
 	/* referential stamp */
 	struct nego_clo_s nclo;
 	ud_pong_score_t s;
 
 	/* record the current time, set wipe `seen' bitset */
-	__stamp(CLOCK_REALTIME, &nclo.rt);
+	nclo.rt = __stamp();
 	nclo.seen = ud_empty_pong_set();
 	/* send off the bugger */
-	cno = ud_send_simple(hdl, 0x0004);
+	(void)ud_send_simple(hdl, 0x0004);
 	/* wait for replies */
 	ud_subscr_raw(hdl, timeout, ncb, &nclo);
 	/* after they're all through, try and get a proper score */

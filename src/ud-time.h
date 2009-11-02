@@ -57,4 +57,36 @@
 
 #include <time.h>
 
+/* returns the current CLOCK_REALTIME time stamp */
+static inline struct timespec
+__stamp(void)
+{
+	struct timespec res;
+	clock_gettime(CLOCK_REALTIME, &res);
+	return res;
+}
+
+/* given a stamp THEN, returns the difference between __stamp() and THEN. */
+static inline struct timespec
+__lapse(struct timespec then)
+{
+	struct timespec now, res;
+	clock_gettime(CLOCK_REALTIME, &now);
+	if (now.tv_nsec < then.tv_nsec) {
+		res.tv_sec = now.tv_sec - then.tv_sec - 1;
+		res.tv_nsec = 1000000000 + now.tv_nsec - then.tv_nsec;
+	} else {
+		res.tv_sec = now.tv_sec - then.tv_sec;
+		res.tv_nsec = now.tv_nsec - then.tv_nsec;
+	}
+	return res;
+}
+
+static inline double
+__as_f(struct timespec src)
+{
+/* return time as float in milliseconds */
+	return src.tv_sec * 1000.f + src.tv_nsec / 1000000.f;
+}
+
 #endif	/* INCLUDED_ud_time_h_ */

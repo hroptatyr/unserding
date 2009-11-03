@@ -52,6 +52,7 @@
 #endif
 /* posix? */
 #include <inttypes.h>
+#include <pthread.h>
 
 /* our master include */
 #include "unserding.h"
@@ -66,6 +67,7 @@
  * used to raise questions to the service and the next odd one will be
  * the reply. */
 static ud_pktwrk_f ud_services[65536];
+static pthread_mutex_t ud_svc_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 
 static void
@@ -102,9 +104,11 @@ ud_proto_parse_j(void *clo)
 void
 ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl)
 {
+	pthread_mutex_lock(&ud_svc_mtx);
 	cmd &= ~1;
 	ud_services[cmd | 0] = fun;
 	ud_services[cmd | 1] = rpl;
+	pthread_mutex_unlock(&ud_svc_mtx);
 	return;
 }
 

@@ -60,14 +60,28 @@
  * Deliver the guts of the instrument specified by CONT_ID via XDR.
  * \param hdl the unserding handle to use
  * \param tgt a pointer which will point to a buffer where the XDR
- *   encoded instrument can be unbanged from,
+ *   encoded instrument can be unbanged from
  * \param inst_id the GA instrument identifier
- * \return the number of bytes copied into TGT.
+ * \return the length of the XDR encoding in TGT
  * The instrument is delivered in encoded form and can be decoded
  * with libpfack's deser_instrument().
  **/
 extern size_t
 ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t inst_id);
+
+/**
+ * Deliver a list of tslabs known to the network for the instrument
+ * specified by CONT_ID.
+ * \param hdl the unserding handle to use
+ * \param tgt a pointer which will point to a tseries_s object.
+ *   Do not dereference pointers from this structure.
+ * \param inst_id the GA instrument identifier
+ * \return the length of the tseries buffer.
+ * The instrument is delivered in encoded form and can be decoded
+ * with libpfack's deser_instrument().
+ **/
+extern size_t
+ud_find_one_tslab(ud_handle_t hdl, const void **tgt, uint32_t inst_id);
 
 /**
  * Query a bunch of instruments at once, calling CB() on each result. */

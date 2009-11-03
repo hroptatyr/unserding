@@ -45,9 +45,21 @@
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "protocore.h"
+#include "ud-time.h"
+#include "tscoll.h"
 
 static bool xmlp;
 static bool tslabp;
+
+static inline size_t
+print_ts_into(char *restrict tgt, size_t len, time_t ts)
+{
+	struct tm tm;
+
+	memset(&tm, 0, sizeof(tm));
+	(void)gmtime_r(&ts, &tm);
+	return strftime(tgt, len, "%Y-%m-%d %H:%M:%S", &tm);
+}
 
 static void
 find_them_instrs(ud_handle_t hdl, const char *const *insv)
@@ -59,17 +71,32 @@ find_them_instrs(ud_handle_t hdl, const char *const *insv)
 	/* read the UII's from the command line */
 	for (const char *const *uii = insv; *uii; uii++) {
 		uint32_t cid = strtol(*uii, NULL, 10);
-		const void *xdr;
+		const void *data;
 		size_t len;
 
 		if (cid == 0) {
 			continue;
 		}
-		if ((len = ud_find_one_instr(hdl, &xdr, cid)) > 0) {
+		if ((len = ud_find_one_instr(hdl, &data, cid)) > 0) {
 			struct instr_s in;
-			deser_instrument_into(&in, xdr, len);
+			/* data here points to an xdr-encoded instr */
+			deser_instrument_into(&in, data, len);
 			print_instr(stdout, &in);
 			fputc('\n', stdout);
+		} else {
+			fprintf(stdout, "%u unknown\n", cid);
+		}
+		if ((len = ud_find_one_tslab(hdl, &data, cid)) > 0) {
+			/* data hereby points to a tseries object */
+			const struct tseries_s *p = data;
+			char los[32], his[32];
+			/* debugging mumbo jumbo */
+			print_ts_into(los, sizeof(los), p->from);
+			print_ts_into(his, sizeof(his), p->to);
+			fprintf(stdout, "  tslab %d %s..%s\n",
+				p->types, los, his);
+		} else {
+			fputs("  no tslabs yet\n", stdout);
 		}
 	}
 	return;

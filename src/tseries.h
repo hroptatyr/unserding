@@ -103,6 +103,12 @@
 #define rpl4224_t	tseries_t
 #define rpl4224_s	tseries_s
 
+/**
+ * Service 4226:
+ * Refetch URNs. */
+#define UD_SVC_FETCH_URN	0x4226
+
+
 /* points to the tick-type of the day */
 #define sl1tick_s		sl1tp_s
 #define sl1tick_t		sl1tp_t

@@ -463,6 +463,16 @@ instr_urn_svc(job_t j)
 }
 
 
+/* fetch urn svc */
+static void
+fetch_urn_svc(job_t j)
+{
+	UD_DEBUG("0x%04x (UD_SVC_FETCH_URN)\n", UD_SVC_FETCH_URN);
+	fetch_urn_mysql();
+	return;
+}
+
+
 static void*
 cfgspec_get_source(void *ctx, void *spec)
 {
@@ -547,6 +557,7 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	ud_set_service(UD_SVC_GET_URN, instr_urn_svc, NULL);
+	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	if ((settings = udctx_get_setting(ctx)) != NULL) {

@@ -500,6 +500,20 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 	return;
 }
 
+void
+fetch_urn_mysql(void)
+{
+/* make me thread-safe and declare me */
+	UD_DEBUG("leeching overview ...");
+	uddb_qry(conn, ovqry, sizeof(ovqry)-1, ovqry_rowf, NULL);
+	UD_DBGCONT("done\n");
+
+	UD_DEBUG("inspecting URNs ...");
+	fill_urns();
+	UD_DBGCONT("done\n");
+	return;
+}
+
 /* initialiser code */
 void
 dso_tseries_mysql_LTX_init(void *clo)
@@ -511,14 +525,6 @@ dso_tseries_mysql_LTX_init(void *clo)
 		UD_DBGCONT("failed\n");
 		return;
 	}
-	UD_DBGCONT("done\n");
-
-	UD_DEBUG("leeching overview ...");
-	uddb_qry(conn, ovqry, sizeof(ovqry)-1, ovqry_rowf, NULL);
-	UD_DBGCONT("done\n");
-
-	UD_DEBUG("inspecting URNs ...");
-	fill_urns();
 	UD_DBGCONT("done\n");
 	return;
 }

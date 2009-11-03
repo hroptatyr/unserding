@@ -77,7 +77,7 @@ fetch_hnname(udpc_seria_t sctx, char *buf, size_t bsz)
 
 /* modes we can do, classic mode */
 static bool
-cb(ud_packet_t pkt, void *clo)
+cb(ud_packet_t pkt, ud_const_sockaddr_t sa, void *clo)
 {
 	ccb_clo_t ccb = clo;
 	struct timespec lap;
@@ -162,7 +162,7 @@ typedef struct nego_clo_s {
 } *nego_clo_t;
 
 static bool
-ncb(ud_packet_t pkt, void *clo)
+ncb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 {
 	nego_clo_t nclo = clo;
 	struct udpc_seria_s sctx;

@@ -206,6 +206,7 @@ dnl PKG_CHECK_MODULES([LIBCONFIG], [libconfig])
 ## check for lua instead!
 
 AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([unserding.pc])
 AC_OUTPUT

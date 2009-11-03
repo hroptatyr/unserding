@@ -108,9 +108,12 @@ cb(ud_packet_t pkt, ud_const_sockaddr_t sa, void *clo)
 	/* print */
 	{
 		double lapf = __as_f(lap);
-		printf("%zu bytes from %s (...): "
+		char psa[INET6_ADDRSTRLEN];
+
+		ud_sockaddr_ntop(psa, sizeof(psa), sa);
+		printf("%zu bytes from %s (%s): "
 		       "convo=%i score=%i time=%2.3f ms\n",
-		       pkt.plen, hnname, udpc_pkt_cno(pkt), score, lapf);
+		       pkt.plen, hnname, psa, udpc_pkt_cno(pkt), score, lapf);
 	}
 	return true;
 }

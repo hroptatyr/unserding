@@ -141,4 +141,11 @@ ud_sockaddr_addr(ud_const_sockaddr_t sa)
 	}
 }
 
+static inline void
+ud_sockaddr_ntop(char *restrict buf, size_t len, ud_const_sockaddr_t sa)
+{
+	(void)inet_ntop(ud_sockaddr_fam(sa), ud_sockaddr_addr(sa), buf, len);
+	return;
+}
+
 #endif	/* INCLUDED_mcast_h_ */

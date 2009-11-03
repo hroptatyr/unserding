@@ -20,7 +20,7 @@ endif
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
-header_HEADERS = unserding.h protocore.h seria.h
+header_HEADERS = unserding.h protocore.h seria.h mcast.h
 noinst_HEADERS = protocore-private.h
 
 if BUILD_SERVER

@@ -77,7 +77,7 @@ fetch_hnname(udpc_seria_t sctx, char *buf, size_t bsz)
 
 /* modes we can do, classic mode */
 static bool
-cb(ud_packet_t pkt, void *clo)
+cb(ud_packet_t pkt, ud_const_sockaddr_t sa, void *clo)
 {
 	ccb_clo_t ccb = clo;
 	struct timespec lap;
@@ -108,9 +108,12 @@ cb(ud_packet_t pkt, void *clo)
 	/* print */
 	{
 		double lapf = __as_f(lap);
-		printf("%zu bytes from %s (...): "
+		char psa[INET6_ADDRSTRLEN];
+
+		ud_sockaddr_ntop(psa, sizeof(psa), sa);
+		printf("%zu bytes from %s (%s): "
 		       "convo=%i score=%i time=%2.3f ms\n",
-		       pkt.plen, hnname, udpc_pkt_cno(pkt), score, lapf);
+		       pkt.plen, hnname, psa, udpc_pkt_cno(pkt), score, lapf);
 	}
 	return true;
 }
@@ -162,7 +165,7 @@ typedef struct nego_clo_s {
 } *nego_clo_t;
 
 static bool
-ncb(ud_packet_t pkt, void *clo)
+ncb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 {
 	nego_clo_t nclo = clo;
 	struct udpc_seria_s sctx;

@@ -559,7 +559,7 @@ sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 }
 
 static size_t
-rplpkt_pr_src(char *restrict outbuf, const ud_sockaddr_t *sa)
+rplpkt_pr_src(char *restrict outbuf, ud_const_sockaddr_t sa)
 {
 	static const char srcstr[] = "packet from ";
 	static const char unkstr[] = "unknown";
@@ -596,7 +596,7 @@ static void
 rplpkt_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	ssize_t nread;
-	ud_sockaddr_t sa;
+	ud_sockaddr_u sa;
 	socklen_t lsa = sizeof(sa);
 	char res[UDPC_PKTLEN];
 	/* the print buffer */

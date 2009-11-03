@@ -13,9 +13,6 @@ if BUILD_SERVER
 bin_PROGRAMS += unserdingd unsercli
 noinst_PROGRAMS = instrumenstruation
 endif
-if BUILD_CLIAPPS
-bin_PROGRAMS += ud-instr ud-snap ud-tick ud-ping
-endif
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
 endif
@@ -23,7 +20,7 @@ endif
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
-header_HEADERS = unserding.h protocore.h seria.h
+header_HEADERS = unserding.h protocore.h seria.h mcast.h
 noinst_HEADERS = protocore-private.h
 
 if BUILD_SERVER
@@ -137,24 +134,6 @@ libunserding_la_SOURCES = libstuff.c libhelpers.c
 libunserding_la_SOURCES += svc-pong.c
 libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
-endif
-
-if BUILD_CLIAPPS
-ud_instr_SOURCES = ud-instr.c
-ud_instr_CPPFLAGS = $(PFACK_CFLAGS)
-ud_instr_LDADD = libunserding.la $(PFACK_LIBS)
-
-ud_snap_SOURCES = ud-snap.c
-ud_snap_CPPFLAGS = $(PFACK_CFLAGS)
-ud_snap_LDADD = libunserding.la
-
-ud_tick_SOURCES = ud-tick.c
-ud_tick_CPPFLAGS = $(PFACK_CFLAGS)
-ud_tick_LDADD = libunserding.la
-
-ud_ping_SOURCES = ud-ping.c
-ud_ping_CPPFLAGS =
-ud_ping_LDADD = libunserding.la -lrt
 endif
 
 # 

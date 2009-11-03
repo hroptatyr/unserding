@@ -59,15 +59,15 @@
 /**
  * Deliver the guts of the instrument specified by CONT_ID via XDR.
  * \param hdl the unserding handle to use
- * \param tgt a buffer that the XDR encoded instrument is banged into,
- *   reserve at least UDPC_PLLEN bytes
+ * \param tgt a pointer which will point to a buffer where the XDR
+ *   encoded instrument can be unbanged from,
  * \param inst_id the GA instrument identifier
  * \return the number of bytes copied into TGT.
  * The instrument is delivered in encoded form and can be decoded
  * with libpfack's deser_instrument().
  **/
 extern size_t
-ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t inst_id);
+ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t inst_id);
 
 /**
  * Query a bunch of instruments at once, calling CB() on each result. */

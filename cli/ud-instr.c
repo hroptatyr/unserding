@@ -45,21 +45,33 @@
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "protocore.h"
-#include "xdr-instr-seria.h"
 
-static struct ud_handle_s __hdl;
-static ud_handle_t hdl = &__hdl;
 static bool xmlp;
+static bool tslabp;
 
 static void
-in_cb(const char *buf, size_t len, void *UNUSED(clo))
+find_them_instrs(ud_handle_t hdl, const char *const *insv)
 {
-	struct instr_s in;
+	if (insv == NULL) {
+		/* no uii's at all */
+		return;
+	}
+	/* read the UII's from the command line */
+	for (const char *const *uii = insv; *uii; uii++) {
+		uint32_t cid = strtol(*uii, NULL, 10);
+		const void *xdr;
+		size_t len;
 
-	deser_instrument_into(&in, buf, len);
-	fprintf(stderr, "d/l'd instrument: ");
-	print_instr(stderr, &in);
-	fputc('\n', stderr);
+		if (cid == 0) {
+			continue;
+		}
+		if ((len = ud_find_one_instr(hdl, &xdr, cid)) > 0) {
+			struct instr_s in;
+			deser_instrument_into(&in, xdr, len);
+			print_instr(stdout, &in);
+			fputc('\n', stdout);
+		}
+	}
 	return;
 }
 
@@ -88,6 +100,9 @@ static struct poptOption out_opts[] = {
 	{"xml", 'x', POPT_ARG_NONE,
 	 &xmlp, 0,
 	 "Output instrument specs in XML.", NULL},
+	{"tslab", 't', POPT_ARG_NONE,
+	 &tslabp, 0,
+	 "Request tick slab for each instrument.", NULL},
 	POPT_TABLEEND
 };
 
@@ -131,31 +146,16 @@ ud_parse_cl(size_t argc, const char *argv[])
 int
 main(int argc, const char *argv[])
 {
-	/* vla */
-	uint32_t cid[argc];
+	struct ud_handle_s __hdl;
+	ud_handle_t hdl = &__hdl;
 	const char *const *rest;
-	int n = 0;
 
 	/* parse the command line */
 	rest = ud_parse_cl(argc, argv);
-
-	/* read the UII's from the command line */
-	if (rest == NULL) {
-		/* no uii's at all */
-		return 0;
-	}
-	for (const char *const *uii = rest; *uii; uii++) {
-		if ((cid[n] = strtol(*uii, NULL, 10))) {
-			n++;
-		}
-	}
-	if (n == 0) {
-		return 0;
-	}
 	/* obtain us a new handle */
 	init_unserding_handle(hdl, PF_INET6, true);
 	/* now kick off the finder */
-	ud_find_many_instrs(hdl, in_cb, NULL, cid, n);
+	find_them_instrs(hdl, rest);
 	/* and lose the handle again */
 	free_unserding_handle(&__hdl);
 	return 0;

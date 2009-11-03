@@ -59,40 +59,39 @@
 
 struct f1i_clo_s {
 	ud_convo_t cno;
-	udpc_seria_t sctx;
+	udpc_seria_t s;
 	size_t len;
-	char *restrict tgt;
+	const void **tgt;
 };
 
 static bool
 __f1i_cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 {
 	struct f1i_clo_s *bc = clo;
-	void *out = NULL;
 
 	if (UDPC_PKT_INVALID_P(pkt)) {
+		bc->len = 0;
 		return false;
 	} else if (udpc_pkt_cno(pkt) != bc->cno) {
 		/* we better ask for another packet */
+		bc->len = 0;
 		return true;
 	}
-	udpc_seria_init(bc->sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
-	if ((bc->len = udpc_seria_des_xdr(bc->sctx, (void*)&out)) == 0) {
+	udpc_seria_init(bc->s, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	if ((bc->len = udpc_seria_des_xdr(bc->s, bc->tgt)) == 0) {
 		/* what? just wait a bit */
 		return true;
 	}
-	/* otherwise copy the fucker */
-	memcpy(bc->tgt, out, bc->len);
 	/* no more packets please */
 	return false;
 }
 
 size_t
-ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
+ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
-	ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
+	ud_packet_t pkt = BUF_PACKET(buf);
 	ud_convo_t cno = hdl->convo++;
 	struct f1i_clo_s __f1i_clo;
 
@@ -105,9 +104,8 @@ ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
 	ud_send_raw(hdl, pkt);
 
 	/* use timeout of 0, letting the mart system decide */
-	pkt.plen = sizeof(buf);
 	__f1i_clo.cno = cno;
-	__f1i_clo.sctx = &sctx;
+	__f1i_clo.s = &sctx;
 	__f1i_clo.tgt = tgt;
 	ud_subscr_raw(hdl, 0, __f1i_cb, &__f1i_clo);
 	return __f1i_clo.len;

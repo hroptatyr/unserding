@@ -44,6 +44,7 @@
 
 /* our master include */
 #include "unserding.h"
+#include "unserding-nifty.h"
 #include "protocore.h"
 #include "protocore-private.h"
 #include "xdr-instr-seria.h"
@@ -56,15 +57,43 @@
 #define NRETRIES	2
 //#define USE_SUBSCR
 
+struct f1i_clo_s {
+	ud_convo_t cno;
+	size_t len;
+	const void **tgt;
+};
+
+static bool
+__f1i_cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
+{
+	struct f1i_clo_s *bc = clo;
+	struct udpc_seria_s sctx;
+
+	if (UDPC_PKT_INVALID_P(pkt)) {
+		bc->len = 0;
+		return false;
+	} else if (udpc_pkt_cno(pkt) != bc->cno) {
+		/* we better ask for another packet */
+		bc->len = 0;
+		return true;
+	}
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	if ((bc->len = udpc_seria_des_xdr(&sctx, bc->tgt)) == 0) {
+		/* what? just wait a bit */
+		return true;
+	}
+	/* no more packets please */
+	return false;
+}
+
 size_t
-ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
+ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
-	ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
+	ud_packet_t pkt = BUF_PACKET(buf);
 	ud_convo_t cno = hdl->convo++;
-	size_t len;
-	char *out = NULL;
+	struct f1i_clo_s __f1i_clo;
 
 	memset(buf, 0, sizeof(buf));
 	udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
@@ -75,13 +104,10 @@ ud_find_one_instr(ud_handle_t hdl, char *restrict tgt, uint32_t cont_id)
 	ud_send_raw(hdl, pkt);
 
 	/* use timeout of 0, letting the mart system decide */
-	pkt.plen = sizeof(buf);
-	ud_recv_convo(hdl, &pkt, 0, cno);
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
-	if ((len = udpc_seria_des_xdr(&sctx, (void*)&out)) > 0) {
-		memcpy(tgt, out, len);
-	}
-	return len;
+	__f1i_clo.cno = cno;
+	__f1i_clo.tgt = tgt;
+	ud_subscr_raw(hdl, 0, __f1i_cb, &__f1i_clo);
+	return __f1i_clo.len;
 }
 
 #define index_t		size_t
@@ -129,6 +155,66 @@ ud_find_many_instrs(
 		}
 	} while (rcvd < len && retry > 0);
 	return;
+}
+
+
+/* find tslabs, aka urns */
+struct f1tsl_clo_s {
+	ud_convo_t cno;
+	size_t len;
+	const void **tgt;
+};
+
+static bool
+__f1tsl_cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
+{
+	struct f1i_clo_s *bc = clo;
+	struct udpc_seria_s sctx;
+
+	if (UDPC_PKT_INVALID_P(pkt)) {
+		bc->len = 0;
+		return false;
+	} else if (udpc_pkt_cno(pkt) != bc->cno) {
+		/* we better ask for another packet */
+		bc->len = 0;
+		return true;
+	}
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	if ((bc->len = udpc_seria_des_data(&sctx, bc->tgt)) == 0) {
+		/* what? just wait a bit */
+		return true;
+	}
+	/* no more packets please */
+	return false;
+}
+
+size_t
+ud_find_one_tslab(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
+{
+	struct udpc_seria_s sctx;
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = BUF_PACKET(buf);
+	ud_convo_t cno = hdl->convo++;
+	struct f1tsl_clo_s __f1t_clo;
+
+	memset(buf, 0, sizeof(buf));
+	udpc_make_pkt(pkt, cno, 0, UD_SVC_GET_URN);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	/* dispatch the quodi */
+	udpc_seria_add_ui32(&sctx, cont_id);
+	/* all quotis */
+	udpc_seria_add_ui32(&sctx, 0);
+	/* all pots */
+	udpc_seria_add_ui32(&sctx, 0);
+	/* prepare packet for sending im off */
+	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+	ud_send_raw(hdl, pkt);
+
+	/* use timeout of 0, letting the mart system decide */
+	__f1t_clo.cno = cno;
+	__f1t_clo.tgt = tgt;
+	ud_subscr_raw(hdl, 0, __f1tsl_cb, &__f1t_clo);
+	return __f1t_clo.len;
 }
 
 

@@ -465,10 +465,14 @@ instr_urn_svc(job_t j)
 
 /* fetch urn svc */
 static void
-fetch_urn_svc(job_t j)
+fetch_urn_svc(job_t UNUSED(j))
 {
 	UD_DEBUG("0x%04x (UD_SVC_FETCH_URN)\n", UD_SVC_FETCH_URN);
+	ud_set_service(UD_SVC_FETCH_URN, NULL, NULL);
+#if defined HAVE_MYSQL
 	fetch_urn_mysql();
+#endif	/* HAVE_MYSQL */
+	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	return;
 }
 

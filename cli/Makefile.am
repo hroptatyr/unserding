@@ -1,0 +1,43 @@
+
+
+### Makefile.am
+
+AM_CPPFLAGS = -pthread -I$(top_srcdir)/src
+AM_LDFLAGS = -lpthread
+
+bin_PROGRAMS =
+if BUILD_CLIAPPS
+bin_PROGRAMS += ud-instr ud-snap ud-tick ud-ping
+endif
+
+BUILT_SOURCES =
+CLEANFILES = $(BUILT_SOURCES)
+
+if BUILD_CLIAPPS
+ud_instr_SOURCES = ud-instr.c
+ud_instr_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
+ud_instr_LDADD = $(top_builddir)/src/libunserding.la $(PFACK_LIBS)
+
+ud_snap_SOURCES = ud-snap.c
+ud_snap_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
+ud_snap_LDADD = $(top_builddir)/src/libunserding.la
+
+ud_tick_SOURCES = ud-tick.c
+ud_tick_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
+ud_tick_LDADD = $(top_builddir)/src/libunserding.la
+
+ud_ping_SOURCES = ud-ping.c
+ud_ping_CPPFLAGS = $(AM_CPPFLAGS) 
+ud_ping_LDADD = $(top_builddir)/src/libunserding.la -lrt
+endif
+
+# 
+# Help the developers get nice post-processed source files
+
+## Create preprocessor output (debugging purposes only)
+.c.i:
+	$(COMPILE) -E -o $@ $<
+
+## Create assembler output (debugging purposes only)
+.c.s:
+	$(COMPILE) -S -c $(AM_CFLAGS) $<

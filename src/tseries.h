@@ -131,6 +131,8 @@
 /* migrate to ffff tseries */
 typedef struct tser_pkt_s *tser_pkt_t;
 
+typedef struct tslab_s *tslab_t;
+
 typedef struct secu_s *secu_t;
 typedef struct tick_by_ts_hdr_s *tick_by_ts_hdr_t;
 typedef struct tick_by_instr_hdr_s *tick_by_instr_hdr_t;
@@ -201,6 +203,14 @@ struct tick_by_instr_hdr_s {
 struct sl1t_s {
 	struct secu_s secu;
 	struct l1tick_s tick;
+};
+
+/**
+ * Tslabs, roughly metadata that describe the slabs of tseries. */
+struct tslab_s {
+	struct secu_s secu;
+	time_t from, till;
+	uint32_t types;
 };
 
 #if !defined USE_UTERUS
@@ -588,5 +598,13 @@ udpc_seria_des_spDute(spDute_t t, udpc_seria_t sctx)
 	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
 }
 #endif	/* USE_UTERUS */
+
+/* Attention, a tseries_t object gets transferred as tslab_t,
+ * the corresponding udpc_seria_add_tseries() is in tscoll.h. */
+static inline bool
+udpc_seria_des_tslab(tslab_t ts, udpc_seria_t sctx)
+{
+	return udpc_seria_des_data_into(ts, sizeof(*ts), sctx) > 0;
+}
 
 #endif	/* INCLUDED_tseries_h_ */

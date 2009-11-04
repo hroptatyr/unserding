@@ -80,4 +80,18 @@ extern void tseries_add(tseries_t tsc, dse16_t beg, dse16_t end, tser_pkt_t p);
 
 extern void tscoll_trav_series(tscoll_t tsc, tscoll_trav_f cb, void *clo);
 
+/* This is the marshaller of tslab objects.
+ * The corresponding unmarshaller is in tseries.h. */
+static inline void
+udpc_seria_add_tseries(udpc_seria_t sctx, tseries_t ts)
+{
+	struct tslab_s tslab;
+	tslab.secu = *ts->secu;
+	tslab.from = ts->from;
+	tslab.till = ts->to;
+	tslab.types = ts->types;
+	udpc_seria_add_data(sctx, &tslab, sizeof(tslab));
+	return;
+}
+
 #endif	/* INCLUDED_tscoll_h_ */

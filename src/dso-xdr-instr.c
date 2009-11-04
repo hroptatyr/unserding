@@ -140,36 +140,6 @@ copyadd_instr(instr_t i)
 	return;
 }
 
-#if 0
-static ssize_t
-read_file(char *restrict buf, size_t bufsz, const char *fname)
-{
-	int fd;
-	ssize_t nrd;
-
-	if ((fd = open(fname, O_RDONLY)) < 0) {
-		return -1;
-	}
-	nrd = read(fd, buf, bufsz);
-	close(fd);
-	return nrd;
-}
-
-static ssize_t
-write_file(char *restrict buf, size_t bufsz, const char *fname)
-{
-	int fd;
-	ssize_t nrd;
-
-	if ((fd = open(fname, O_CREAT | O_TRUNC | O_WRONLY, 0644)) < 0) {
-		return -1;
-	}
-	nrd = write(fd, buf, bufsz);
-	close(fd);
-	return nrd;
-}
-#endif
-
 
 /* jobs */
 static void
@@ -216,6 +186,9 @@ instr_add_from_file_svc(job_t j)
 		return;
 	}
 
+#define CAT	((struct cat_s*)instrs)
+	pthread_mutex_lock(&CAT->mtx);
+
 	xdrstdio_create(&hdl, f, XDR_DECODE);
 	while (true) {
 		struct instr_s i;
@@ -224,10 +197,11 @@ instr_add_from_file_svc(job_t j)
 		if (!(xdr_instr_s(&hdl, &i))) {
 			break;
 		}
-		(void)cat_bang_instr(instrs, &i);
+		(void)cat_bang_instr_nolck(instrs, &i);
 	}
 	xdr_destroy(&hdl);
-
+	pthread_mutex_unlock(&CAT->mtx);
+#undef CAT
 	fclose(f);
 	UD_DBGCONT("done\n");
 	return;
@@ -242,6 +216,7 @@ instr_dump_all(job_t j)
 
 /* fuck ugly, mutex'd iterators are a pita */
 #define CAT	((struct cat_s*)instrs)
+	UD_DEBUG("dumping %zu instrs ...", CAT->ninstrs);
 	pthread_mutex_lock(&CAT->mtx);
 
 	do {
@@ -272,6 +247,7 @@ instr_dump_all(job_t j)
 		send_cl(j);
 	} while (i < CAT->ninstrs);
 	pthread_mutex_unlock(&CAT->mtx);
+#undef CAT
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -378,6 +354,7 @@ instr_dump_to_file_svc(job_t j)
 	}
 	xdr_destroy(&hdl);
 	pthread_mutex_unlock(&CAT->mtx);
+#undef CAT
 	fclose(f);
 	UD_DBGCONT("done\n");
 	return;

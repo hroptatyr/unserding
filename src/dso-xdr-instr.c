@@ -46,6 +46,7 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <errno.h>
 
 /* our master include */
 #include "unserding.h"
@@ -261,7 +262,7 @@ instr_dump_all(job_t j)
 	pthread_mutex_lock(&CAT->mtx);
 
 	do {
-		char *enc = &j->buf[UDPC_HDRLEN];
+		char *enc = UDPC_PAYLOAD(j->buf);
 		size_t len;
 
 		/* prepare the packet ... */
@@ -369,10 +370,44 @@ instr_dump_to_file_svc(job_t j)
 /* i think this has to disappear, file-backing should be opaque */
 	struct udpc_seria_s sctx;
 	char fname[256];
+	size_t i = 0;
+	XDR hdl;
+	int fd;
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PAYLLEN(j->blen));
 	udpc_seria_des_str_into(fname, sizeof(fname), &sctx);
-	UD_DEBUG("dumping into %s\n", fname);
+	UD_DEBUG("dumping into %s ...", fname);
+	if ((fd = open(fname, O_CREAT | O_TRUNC | O_WRONLY, 0644)) < 0) {
+		UD_DBGCONT("failed\n");
+		return;
+	}
+
+/* fuck ugly, mutex'd iterators are a pita */
+#define CAT	((struct cat_s*)instrs)
+	pthread_mutex_lock(&CAT->mtx);
+
+	do {
+		char *enc = UDPC_PAYLOAD(j->buf);
+		size_t len;
+		int res;
+
+		xdrmem_create(&hdl, enc, UDPC_PLLEN, XDR_ENCODE);
+		for (; i < CAT->ninstrs; i++) {
+			instr_t instr = &((instr_t)CAT->instrs)[i];
+			if (!xdr_instr_s(&hdl, instr)) {
+				break;
+			}
+		}
+		/* clean up */
+		len = xdr_getpos(&hdl);
+		xdr_destroy(&hdl);
+		/* normally we send him off here, however we now write
+		 * the buffer to a file */
+		res = write(fd, enc, len);
+	} while (i < CAT->ninstrs);
+	pthread_mutex_unlock(&CAT->mtx);
+	close(fd);
+	UD_DBGCONT("done\n");
 	return;
 }
 

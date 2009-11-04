@@ -144,40 +144,6 @@ copyadd_instr(instr_t i)
 	return;
 }
 
-/* goes to its own dso file one day */
-static void
-__add_from_file(const char *fname)
-{
-	XDR hdl;
-	FILE *f;
-
-	UD_DEBUG("getting XDR encoded instrument from %s ...", fname);
-	if ((f = fopen(fname, "r")) == NULL) {
-		UD_DBGCONT("failed\n");
-		return;
-	}
-
-#define CAT	((struct cat_s*)instrs)
-	pthread_mutex_lock(&CAT->mtx);
-
-	xdrstdio_create(&hdl, f, XDR_DECODE);
-	while (true) {
-		struct instr_s i;
-
-		init_instr(&i);
-		if (!(xdr_instr_s(&hdl, &i))) {
-			break;
-		}
-		(void)cat_bang_instr_nolck(instrs, &i);
-	}
-	xdr_destroy(&hdl);
-	pthread_mutex_unlock(&CAT->mtx);
-#undef CAT
-	fclose(f);
-	UD_DBGCONT("done\n");
-	return;
-}
-
 
 /* jobs */
 static void
@@ -202,20 +168,6 @@ instr_add_svc(job_t j)
 	} else {
 		UD_DBGCONT("failed\n");
 	}
-	return;
-}
-
-/* gonna be a more generic fetch service one day */
-static void
-instr_add_from_file_svc(job_t j)
-{
-	/* our serialiser */
-	struct udpc_seria_s sctx;
-	char fname[256];
-
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	udpc_seria_des_str_into(fname, sizeof(fname), &sctx);
-	__add_from_file(fname);
 	return;
 }
 
@@ -332,43 +284,6 @@ instr_dump_svc(job_t j)
 out:
 	/* send what we've got */
 	send_pkt(&rplsctx, &rplj);
-	return;
-}
-
-static void
-instr_dump_to_file_svc(job_t j)
-{
-/* i think this has to disappear, file-backing should be opaque */
-	struct udpc_seria_s sctx;
-	char fname[256];
-	XDR hdl;
-	FILE *f;
-
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PAYLLEN(j->blen));
-	udpc_seria_des_str_into(fname, sizeof(fname), &sctx);
-	UD_DEBUG("dumping into %s ...", fname);
-	if ((f = fopen(fname, "w")) == NULL) {
-		UD_DBGCONT("failed\n");
-		return;
-	}
-
-/* fuck ugly, mutex'd iterators are a pita */
-#define CAT	((struct cat_s*)instrs)
-	pthread_mutex_lock(&CAT->mtx);
-
-	xdrstdio_create(&hdl, f, XDR_ENCODE);
-	for (index_t i = 0; i < CAT->ninstrs; i++) {
-		instr_t instr = &((instr_t)CAT->instrs)[i];
-		if (!xdr_instr_s(&hdl, instr)) {
-			UD_DBGCONT("uhoh ...");
-			break;
-		}
-	}
-	xdr_destroy(&hdl);
-	pthread_mutex_unlock(&CAT->mtx);
-#undef CAT
-	fclose(f);
-	UD_DBGCONT("done\n");
 	return;
 }
 
@@ -523,43 +438,6 @@ unload_instr_fetcher(void *UNUSED(clo))
 }
 
 
-/* could go to a file of its own */
-static char xdrfname[256] = {'\0'};
-
-void
-fetch_instr_file(void)
-{
-	if (xdrfname[0] != '\0') {
-		__add_from_file(xdrfname);
-	}
-	return;
-}
-
-void
-dso_xdr_instr_file_LTX_init(void *clo)
-{
-	void *spec = udctx_get_setting(clo);
-	const char *file = NULL;
-	ud_ctx_t ctx = clo;
-
-	UD_DEBUG("mod/xdr-instr-file: loading ...");
-	udcfg_tbl_lookup_s(&file, ctx, spec, "file");
-	if (file == NULL) {
-		UD_DBGCONT("failed, no `file' specification found\n");
-	}
-	strncpy(xdrfname, file, sizeof(xdrfname));
-	UD_DBGCONT("done\n");
-	return;
-}
-
-void
-dso_xdr_instr_file_LTX_deinit(void *UNUSED(clo))
-{
-	xdrfname[0] = '\0';
-	return;
-}
-
-
 void
 dso_xdr_instr_LTX_init(void *clo)
 {
@@ -571,9 +449,7 @@ dso_xdr_instr_LTX_init(void *clo)
 	instrs = make_cat();
 	/* lodging our bbdb search service */
 	ud_set_service(0x4216, instr_add_svc, NULL);
-	ud_set_service(UD_SVC_INSTR_FROM_FILE, instr_add_from_file_svc, NULL);
 	ud_set_service(UD_SVC_INSTR_BY_ATTR, instr_dump_svc, instr_add_svc);
-	ud_set_service(UD_SVC_INSTR_TO_FILE, instr_dump_to_file_svc, NULL);
 	ud_set_service(UD_SVC_FETCH_INSTR, fetch_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 

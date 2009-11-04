@@ -68,6 +68,7 @@
 
 /* our master include */
 #include "unserding.h"
+#include "unserding-nifty.h"
 #include "protocore.h"
 #include "protocore-private.h"
 
@@ -209,9 +210,9 @@ typedef struct __convo_flt_s {
 } *__convo_flt_t;
 
 static bool
-__pkt_our_convo_p(const ud_packet_t pkt, void *clo)
+__pkt_our_convo_p(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(s), void *c)
 {
-	__convo_flt_t flt = clo;
+	__convo_flt_t flt = c;
 	if (UDPC_PKT_INVALID_P(pkt)) {
 		return false;
 	} else if (udpc_pkt_cno(pkt) == flt->cno) {
@@ -368,6 +369,9 @@ ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo)
 	ssize_t nread;
 	static __thread char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = BUF_PACKET(buf);
+	ud_sockaddr_u __sa;
+	socklen_t lsa = sizeof(__sa);
+	struct sockaddr *sa = (void*)&__sa.sa;
 
 	/* wait for events */
 	ud_ep_prep(hdl);
@@ -381,10 +385,10 @@ ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo)
 			pkt.plen = 0;
 		} else {
 			/* otherwise NFDS was 1 and it MUST be our socket */
-			nread = recvfrom(s, buf, sizeof(buf), 0, NULL, 0);
+			nread = recvfrom(s, buf, sizeof(buf), 0, sa, &lsa);
 			pkt.plen = nread;
 		}
-	} while ((*cb)(pkt, clo));
+	} while ((*cb)(pkt, (void*)sa, clo));
 	ud_ep_fini(hdl);
 	return;
 }

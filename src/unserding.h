@@ -41,28 +41,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
-#define UD_NETWORK_SERVICE	8653
-#define UD_NETWORK_SERVSTR	"8653"
-/* 239.0.0.0/8 are organisational solicited v4 mcast addrs */
-#define UD_MCAST4_ADDR		"239.86.53.1"
-#define UD_MCAST4S2S_ADDR	"239.86.53.3"
-/* ff3x::8000:0-ff3x::ffff:ffff - dynamically allocated by hosts when needed */
-#define UD_MCAST6_ADDR		"ff38::8653:1"
-#define UD_MCAST6S2S_ADDR	"ff38::8653:3"
-
-/* our grand unified sockaddr thingie */
-typedef union ud_sockaddr_u ud_sockaddr_t;
-
-union ud_sockaddr_u {
-		struct sockaddr_storage sas;
-		struct sockaddr sa;
-		struct sockaddr_in sa4;
-		struct sockaddr_in6 sa6;
-};
+#include "mcast.h"
 
 /**
  * Flags. */
@@ -99,7 +78,7 @@ typedef uint16_t ud_pkt_cmd_t;
 typedef uint32_t ud_pkt_no_t;
 /**
  * Callback function for subscriptions. */
-typedef bool(*ud_subscr_f)(const ud_packet_t pkt, void *clo);
+typedef bool(*ud_subscr_f)(const ud_packet_t, ud_const_sockaddr_t, void *clo);
 
 /**
  * Struct to handle conversations. */
@@ -111,7 +90,7 @@ struct ud_handle_s {
 	int epfd;
 	ud_pktchn_t pktchn;
 	/* our connexion later on */
-	ud_sockaddr_t sa;
+	ud_sockaddr_u sa;
 	/* our epoll event, very rudely opaquified */
 	void *data[2];
 	/* moving average roundtrip time (in nano seconds) */
@@ -119,58 +98,6 @@ struct ud_handle_s {
 	/* system score */
 	int score;
 };
-
-
-#if defined __INTEL_COMPILER
-#pragma warning (disable:2259)
-#endif	/* __INTEL_COMPILER */
-/* sockaddr stuff */
-static inline short unsigned int __attribute__((always_inline))
-ud_sockaddr_fam(const ud_sockaddr_t *sa)
-{
-	return sa->sa.sa_family;
-}
-
-static inline short unsigned int __attribute__((always_inline))
-ud_sockaddr_4port(const ud_sockaddr_t *sa)
-{
-	return ntohs(sa->sa4.sin_port);
-}
-
-static inline short unsigned int __attribute__((always_inline))
-ud_sockaddr_6port(const ud_sockaddr_t *sa)
-{
-	return ntohs(sa->sa6.sin6_port);
-}
-
-static inline short unsigned int __attribute__((always_inline))
-ud_sockaddr_port(const ud_sockaddr_t *sa)
-{
-	/* should be properly switched? */
-	return ntohs(sa->sa6.sin6_port);
-}
-
-static inline void __attribute__((always_inline))
-ud_sockaddr_set_6port(ud_sockaddr_t *sa, uint16_t port)
-{
-	sa->sa6.sin6_port = htons(port);
-	return;
-}
-
-static inline void __attribute__((always_inline))
-ud_sockaddr_set_4port(ud_sockaddr_t *sa, uint16_t port)
-{
-	sa->sa4.sin_port = htons(port);
-	return;
-}
-
-static inline void __attribute__((always_inline))
-ud_sockaddr_set_port(ud_sockaddr_t *sa, uint16_t port)
-{
-	/* should be properly switched? */
-	sa->sa6.sin6_port = htons(port);
-	return;
-}
 
 
 /* connexion stuff */
@@ -225,31 +152,6 @@ ud_handle_sock(ud_handle_t hdl)
 	return hdl->sock;
 }	
 
-static inline const void __attribute__((always_inline))*
-ud_sockaddr_4addr(const ud_sockaddr_t *sa)
-{
-	return &sa->sa4.sin_addr;
-}
-
-static inline const void __attribute__((always_inline))*
-ud_sockaddr_6addr(const ud_sockaddr_t *sa)
-{
-	return &sa->sa6.sin6_addr;
-}
-
-static inline const void __attribute__((always_inline))*
-ud_sockaddr_addr(const ud_sockaddr_t *sa)
-{
-	switch (ud_sockaddr_fam(sa)) {
-	case AF_INET6:
-		return ud_sockaddr_6addr(sa);
-	case AF_INET:
-		return ud_sockaddr_4addr(sa);
-	default:
-		return NULL;
-	}
-}
-
 static inline void
 ud_handle_set_port(ud_handle_t hdl, uint16_t port)
 {
@@ -279,5 +181,10 @@ ud_handle_set_4svc(ud_handle_t hdl)
  * Service 0004:
  * Ping/pong service to determine neighbours. */
 #define UD_SVC_PING	0x0004
+
+
+/* more of them */
+#include "xdr-instr-seria.h"
+#include "tseries.h"
 
 #endif	/* INCLUDED_unserding_h_ */

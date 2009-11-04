@@ -36,6 +36,7 @@
  ***/
 
 #include "unserding.h"
+#include "unserding-nifty.h"
 #include "svc-pong.h"
 #include "seria-proto-glue.h"
 
@@ -63,7 +64,7 @@ seria_skip_ui32(udpc_seria_t sctx)
 
 /* conforms to ud_subscr_f */
 static bool
-cb(ud_packet_t pkt, void *clo)
+cb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 {
 	__clo_t nclo = clo;
 	struct udpc_seria_s sctx;

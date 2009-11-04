@@ -463,6 +463,20 @@ instr_urn_svc(job_t j)
 }
 
 
+/* fetch urn svc */
+static void
+fetch_urn_svc(job_t UNUSED(j))
+{
+	UD_DEBUG("0x%04x (UD_SVC_FETCH_URN)\n", UD_SVC_FETCH_URN);
+	ud_set_service(UD_SVC_FETCH_URN, NULL, NULL);
+#if defined HAVE_MYSQL
+	fetch_urn_mysql();
+#endif	/* HAVE_MYSQL */
+	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
+	return;
+}
+
+
 static void*
 cfgspec_get_source(void *ctx, void *spec)
 {
@@ -547,6 +561,7 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	ud_set_service(UD_SVC_GET_URN, instr_urn_svc, NULL);
+	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	if ((settings = udctx_get_setting(ctx)) != NULL) {
@@ -556,6 +571,10 @@ dso_tseries_LTX_init(void *clo)
 	}
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
+
+	/* now kick off a fetch-URN job, dont bother about the
+	 * job slot, it's unused anyway */
+	wpool_enq(gwpool, (wpool_work_f)fetch_urn_svc, NULL, true);
 	return;
 }
 

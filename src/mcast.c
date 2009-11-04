@@ -69,6 +69,7 @@
 #endif	/* AF_INET6 */
 #include "unserding.h"
 #include "unserding-private.h"
+#include "mcast.h"
 #include "protocore.h"
 #include "protocore-private.h"
 
@@ -93,7 +94,7 @@ static ev_timer ALGN16(__s2s_watcher);
 static ev_io ALGN16(__srv4_watcher);
 static struct ip_mreq ALGN16(mreq4);
 /* server to client goodness */
-static ud_sockaddr_t __sa4 = {
+static ud_sockaddr_u __sa4 = {
 	.sa4.sin_addr = {0}
 };
 
@@ -102,7 +103,7 @@ static ud_sockaddr_t __sa4 = {
 static ev_io ALGN16(__srv6_watcher);
 static struct ipv6_mreq ALGN16(mreq6);
 /* server to client goodness */
-static ud_sockaddr_t __sa6 = {
+static ud_sockaddr_u __sa6 = {
 	.sa6.sin6_addr = IN6ADDR_ANY_INIT
 };
 #endif	/* AF_INET */

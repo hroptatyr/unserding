@@ -70,14 +70,8 @@
 #define UD_SVC_INSTR_FROM_FILE	0x4218
 
 /**
- * Service 4222:
- * Find ticks of one instrument over time (time series).
- * This service can be used if the focus is one particular instrument
- * (or one instrument at different exchanges) and the ticks to be returned
- * are numerous.
- * sig: 4222()
- **/
-#define UD_SVC_TICK_BY_INSTR	0x4222
+ * Temporary service for instr fetching. */
+#define UD_SVC_INSTR_TO_FILE	0x421c
 
 #if !defined xnew
 # define xnew(_x)	malloc(sizeof(_x))
@@ -203,33 +197,24 @@ instr_add_svc(job_t j)
 	return;
 }
 
+/* gonna be a more generic fetch service one day */
 static void
 instr_add_from_file_svc(job_t j)
 {
 	/* our serialiser */
 	struct udpc_seria_s sctx;
-	const char *sstrp;
-	size_t ssz;
+	char fname[256];
 	XDR hdl;
 	FILE *f;
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	ssz = udpc_seria_des_str(&sctx, &sstrp);
+	udpc_seria_des_str_into(fname, sizeof(fname), &sctx);
 
-	if (ssz == 0) {
-		UD_DEBUG("Usage: 4218 \"/path/to/file.xdr\"\n");
+	UD_DEBUG("getting XDR encoded instrument from %s ...", fname);
+	if ((f = fopen(fname, "r")) == NULL) {
+		UD_DBGCONT("failed\n");
 		return;
 	}
-
-	UD_DEBUG("getting XDR encoded instrument from %s\n", sstrp);
-
-	if ((f = fopen(sstrp, "r")) == NULL) {
-		UD_DEBUG("no such file or directory\n");
-		return;
-	}
-
-	hrclock_print();
-	fprintf(stderr, " start\n");
 
 	xdrstdio_create(&hdl, f, XDR_DECODE);
 	while (true) {
@@ -244,9 +229,7 @@ instr_add_from_file_svc(job_t j)
 	xdr_destroy(&hdl);
 
 	fclose(f);
-
-	hrclock_print();
-	fprintf(stderr, " stop\n");
+	UD_DBGCONT("done\n");
 	return;
 }
 
@@ -370,14 +353,13 @@ instr_dump_to_file_svc(job_t j)
 /* i think this has to disappear, file-backing should be opaque */
 	struct udpc_seria_s sctx;
 	char fname[256];
-	size_t i = 0;
 	XDR hdl;
-	int fd;
+	FILE *f;
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PAYLLEN(j->blen));
 	udpc_seria_des_str_into(fname, sizeof(fname), &sctx);
 	UD_DEBUG("dumping into %s ...", fname);
-	if ((fd = open(fname, O_CREAT | O_TRUNC | O_WRONLY, 0644)) < 0) {
+	if ((f = fopen(fname, "w")) == NULL) {
 		UD_DBGCONT("failed\n");
 		return;
 	}
@@ -386,27 +368,17 @@ instr_dump_to_file_svc(job_t j)
 #define CAT	((struct cat_s*)instrs)
 	pthread_mutex_lock(&CAT->mtx);
 
-	do {
-		char *enc = UDPC_PAYLOAD(j->buf);
-		size_t len;
-		int res;
-
-		xdrmem_create(&hdl, enc, UDPC_PLLEN, XDR_ENCODE);
-		for (; i < CAT->ninstrs; i++) {
-			instr_t instr = &((instr_t)CAT->instrs)[i];
-			if (!xdr_instr_s(&hdl, instr)) {
-				break;
-			}
+	xdrstdio_create(&hdl, f, XDR_ENCODE);
+	for (index_t i = 0; i < CAT->ninstrs; i++) {
+		instr_t instr = &((instr_t)CAT->instrs)[i];
+		if (!xdr_instr_s(&hdl, instr)) {
+			UD_DBGCONT("uhoh ...");
+			break;
 		}
-		/* clean up */
-		len = xdr_getpos(&hdl);
-		xdr_destroy(&hdl);
-		/* normally we send him off here, however we now write
-		 * the buffer to a file */
-		res = write(fd, enc, len);
-	} while (i < CAT->ninstrs);
+	}
+	xdr_destroy(&hdl);
 	pthread_mutex_unlock(&CAT->mtx);
-	close(fd);
+	fclose(f);
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -466,11 +438,17 @@ deferred_dl(BLA *w, int revents)
 #endif	/* big-0 */
 
 
-/* config file mumbo jumbo */
-#define CFG_GROUP	"dso-xdr-instr"
-#define CFG_TFETCHER	"ticks_fetcher"
-#define CFG_IFETCHER	"instr_fetcher"
+/* (re)fetch instr svc */
+#if 0
+static void
+fetch_instr_svc(job_t UNUSED(j))
+{
+	UD_DEBUG("0x%04x (UD_SVC_FETCH_INSTR)\n", UD_SVC_FETCH_INSTR);
+}
+#endif	/* 0 */
 
+
+/* config file mumbo jumbo */
 static void*
 cfgspec_get_source(ud_ctx_t ctx, ud_cfgset_t spec)
 {
@@ -481,6 +459,7 @@ cfgspec_get_source(ud_ctx_t ctx, ud_cfgset_t spec)
 typedef enum {
 	CST_UNK,
 	CST_MYSQL,
+	CST_XDRFILE,
 } cfgsrc_type_t;
 
 static cfgsrc_type_t
@@ -500,6 +479,8 @@ cfgsrc_type(void *ctx, void *spec)
 		return CST_UNK;
 	} else if (memcmp(type, "mysql", 5) == 0) {
 		return CST_MYSQL;
+	} else if (memcmp(type, "xdrcube", 7) == 0) {
+		return CST_XDRFILE;
 	}
 	return CST_UNK;
 }
@@ -519,6 +500,9 @@ load_instr_fetcher(void *clo, void *spec)
 		/* fetch some instruments by sql */
 		dso_xdr_instr_mysql_LTX_init(clo);
 #endif	/* HAVE_MYSQL */
+		break;
+
+	case CST_XDRFILE:
 		break;
 
 	case CST_UNK:
@@ -553,7 +537,7 @@ dso_xdr_instr_LTX_init(void *clo)
 	ud_set_service(0x4216, instr_add_svc, NULL);
 	ud_set_service(UD_SVC_INSTR_FROM_FILE, instr_add_from_file_svc, NULL);
 	ud_set_service(UD_SVC_INSTR_BY_ATTR, instr_dump_svc, instr_add_svc);
-	ud_set_service(0x421c, instr_dump_to_file_svc, NULL);
+	ud_set_service(UD_SVC_INSTR_TO_FILE, instr_dump_to_file_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	if ((settings = udctx_get_setting(ctx)) != NULL) {

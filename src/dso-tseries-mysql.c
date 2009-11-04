@@ -437,17 +437,21 @@ fill_urns(void)
 /* overview and administrative bullshit */
 static const char ovqry[] =
 	"SELECT "
-#define INSTR_ID	0
+#define QUODI_ID	0
 	"`uiu`.`ga_instr_id`, "
-#define URN_ID		1
+#define QUOTI_ID	1
+	"`uiu`.`quoti_id`, "
+#define POT_ID		2
+	"0 AS `pot_id`, " //"`uiu`.`pot_id`, "
+#define URN_ID		3
 	"`uiu`.`ga_urn_id`, "
-#define URN		2
+#define URN		4
 	"`uiu`.`urn`, "
-#define MIN_DT		3
+#define MIN_DT		5
 	"`uiu`.`min_dt`, "
-#define MAX_DT		4
+#define MAX_DT		6
 	"`uiu`.`max_dt`, "
-#define TYPES_BS	5
+#define TYPES_BS	7
 	"`uiu`.`types_bitset` "
 	"FROM `freundt`.`ga_instr_urns` AS `uiu`";
 
@@ -466,15 +470,16 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 	struct tseries_s tser;
 	uint32_t tbs = strtoul(row[TYPES_BS], NULL, 10);
 
-	secu.instr = strtoul(row[INSTR_ID], NULL, 10);
-	secu.unit = 0;
-	secu.pot = 0;
+	secu.instr = strtoul(row[QUODI_ID], NULL, 10);
+	secu.unit = strtoul(row[QUOTI_ID], NULL, 10);
+	secu.pot = strtoul(row[POT_ID], NULL, 10);
 
 	switch (urn_id) {
 	case 1 ... 3:
 	case 8:
 		/* once-a-day, 5-a-week */
-		UD_DEBUG("OAD/5DW tick for %u\n", secu.instr);
+		UD_DEBUG("OAD/5DW tick for %u/%u@%u\n",
+			 secu.instr, secu.unit, secu.pot);
 		tsc = find_tscoll_by_secu_crea(tscache, &secu);
 
 		tser.urn = find_urn(urn_id, row[URN]);

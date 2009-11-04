@@ -87,7 +87,7 @@
 #endif	/* DEBUG_FLAG */
 
 /* mysql conn, kept open */
-static void *conn;
+static void *conn = NULL;
 
 struct tser_pkt_idx_s {
 	uint32_t i;
@@ -509,6 +509,10 @@ void
 fetch_urn_mysql(void)
 {
 /* make me thread-safe and declare me */
+	if (conn == NULL) {
+		return;
+	}
+
 	UD_DEBUG("leeching overview ...");
 	uddb_qry(conn, ovqry, sizeof(ovqry)-1, ovqry_rowf, NULL);
 	UD_DBGCONT("done\n");
@@ -537,7 +541,9 @@ dso_tseries_mysql_LTX_init(void *clo)
 void
 dso_tseries_mysql_LTX_deinit(void *UNUSED(clo))
 {
-	uddb_disconnect(conn);
+	if (conn != NULL) {
+		uddb_disconnect(conn);
+	}
 	return;
 }
 

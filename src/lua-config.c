@@ -87,7 +87,11 @@ lc_cfgtbl_lookup(void *L, void *s, const char *name)
 		/* get the NAME slot */
 		lua_getfield(L, -1, name);
 		/* ref the result for later use, fucking memleak */
-		res = lc_ref(L);
+		if (!lua_isnoneornil(L, -1)) {
+			res = lc_ref(L);
+		} else {
+			res = NULL;
+		}
 	} else {
 		/* dont bother passing NILs around */
 		res = NULL;

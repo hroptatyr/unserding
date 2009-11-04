@@ -52,6 +52,10 @@
 # pragma warning	(disable:2259)
 #endif	/* __INTEL_COMPILER */
 
+#if !defined MIN
+# define MIN(a, b)	a < b ? a : b;
+#endif	/* !MIN */
+
 
 /* one byte sequences */
 #define UDPC_TYPE_UNK	0x00
@@ -252,6 +256,18 @@ udpc_seria_des_str(udpc_seria_t sctx, const char **s)
 	return len;
 }
 
+static inline size_t
+udpc_seria_des_str_into(char *s, size_t slen, udpc_seria_t sctx)
+{
+	const char *tgt;
+	size_t cplen, deslen;
+	deslen = udpc_seria_des_str(sctx, &tgt);
+	cplen = MIN(deslen, slen - 1);
+	memcpy(s, tgt, cplen);
+	s[cplen] = '\0';
+	return cplen;
+}
+
 /* XDR handling, could rename to opaque since essentially ASN.1 is
  * handled in the very same way */
 #define XDR_HDR_LEN	(1 + 2)
@@ -308,22 +324,14 @@ udpc_seria_des_data(udpc_seria_t sctx, const void **s)
 	return len;
 }
 
-#if !defined MIN
-# define MIN(a, b)	a < b ? a : b;
-#endif	/* !MIN */
-
 static inline uint8_t
 udpc_seria_des_data_into(void *s, size_t slen, udpc_seria_t sctx)
 {
-	uint8_t len, cplen;
-
-	if (udpc_seria_tag(sctx) != UDPC_TYPE_DATA) {
-		return 0;
-	}
-	len = (uint8_t)sctx->msg[sctx->msgoff+1];
-	cplen = MIN(slen, len);
-	memcpy(s, &sctx->msg[sctx->msgoff + DATA_HDR_LEN], cplen);
-	sctx->msgoff += DATA_HDR_LEN + len;
+	const void *tgt;
+	uint8_t cplen, deslen;
+	deslen = udpc_seria_des_data(sctx, &tgt);
+	cplen = MIN(deslen, slen);
+	memcpy(s, tgt, cplen);
 	return cplen;
 }
 

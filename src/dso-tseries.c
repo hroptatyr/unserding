@@ -571,6 +571,10 @@ dso_tseries_LTX_init(void *clo)
 	}
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
+
+	/* now kick off a fetch-URN job, dont bother about the
+	 * job slot, it's unused anyway */
+	wpool_enq(gwpool, (wpool_work_f)fetch_urn_svc, NULL, true);
 	return;
 }
 

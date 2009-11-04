@@ -51,16 +51,6 @@
 static bool xmlp;
 static bool tslabp;
 
-static inline size_t
-print_ts_into(char *restrict tgt, size_t len, time_t ts)
-{
-	struct tm tm;
-
-	memset(&tm, 0, sizeof(tm));
-	(void)gmtime_r(&ts, &tm);
-	return strftime(tgt, len, "%Y-%m-%d %H:%M:%S", &tm);
-}
-
 static void
 find_them_instrs(ud_handle_t hdl, const char *const *insv)
 {

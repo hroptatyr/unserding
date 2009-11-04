@@ -60,7 +60,6 @@
 
 #include <pfack/instruments.h>
 #include "catalogue.h"
-#include "xdr-instr-seria.h"
 #include "xdr-instr-private.h"
 
 /**

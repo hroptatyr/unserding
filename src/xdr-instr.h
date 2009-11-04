@@ -35,8 +35,8 @@
  *
  ***/
 
-#if !defined INCLUDED_xdr_instr_seria_h_
-#define INCLUDED_xdr_instr_seria_h_
+#if !defined INCLUDED_xdr_instr_h_
+#define INCLUDED_xdr_instr_h_
 
 #include <stdbool.h>
 #include <time.h>
@@ -91,4 +91,4 @@ ud_find_many_instrs(
 	void(*cb)(const char *tgt, size_t len, void *clo), void *clo,
 	uint32_t cont_id[], size_t len);
 
-#endif	/* INCLUDED_xdr_instr_seria_h_ */
+#endif	/* INCLUDED_xdr_instr_h_ */

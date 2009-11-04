@@ -88,7 +88,7 @@ instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)
 instrumenstruation_LDFLAGS = $(PFACK_LIBS)
 instrumenstruation_LDADD = $(PFACK_LIBS) libunserding.la -lpopt
 endif  ## BUILD_SERVER
-header_HEADERS += xdr-instr-seria.h tseries.h
+header_HEADERS += xdr-instr.h tseries.h
 
 ## fucking automake
 unsercli_YFLAGS = -d -p "cli_yy"

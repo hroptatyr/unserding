@@ -54,13 +54,11 @@
 #define UNSERSRV
 #include "unserding-dbg.h"
 #include "unserding-ctx.h"
+#include "ud-time.h"
 
-#include "xdr-instr-private.h"
-#include "xdr-instr-seria.h"
 #include "urn.h"
 #include "tscache.h"
 #include "tscoll.h"
-#include "tseries.h"
 #include "tseries-private.h"
 
 #if defined HAVE_MYSQL

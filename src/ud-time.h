@@ -86,4 +86,25 @@ __as_f(struct timespec src)
 	return src.tv_sec * 1000.f + src.tv_nsec / 1000000.f;
 }
 
+/* printers */
+static inline size_t
+print_ts_into(char *restrict tgt, size_t len, time_t ts)
+{
+	struct tm tm;
+
+	memset(&tm, 0, sizeof(tm));
+	(void)gmtime_r(&ts, &tm);
+	return strftime(tgt, len, "%Y-%m-%d %H:%M:%S", &tm);
+}
+
+static inline size_t
+print_ds_into(char *restrict tgt, size_t len, time_t ts)
+{
+	struct tm tm;
+
+	memset(&tm, 0, sizeof(tm));
+	(void)gmtime_r(&ts, &tm);
+	return strftime(tgt, len, "%Y-%m-%d", &tm);
+}
+
 #endif	/* INCLUDED_ud_time_h_ */

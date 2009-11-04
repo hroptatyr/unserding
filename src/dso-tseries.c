@@ -55,9 +55,8 @@
 #include "unserding-dbg.h"
 #include "unserding-ctx.h"
 #include "unserding-private.h"
-
-#include "xdr-instr-seria.h"
-#include "xdr-instr-private.h"
+/* for higher level packet handling */
+#include "seria-proto-glue.h"
 
 /* later to be decoupled from the actual source */
 #if defined HAVE_MYSQL

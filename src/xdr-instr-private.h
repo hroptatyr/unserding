@@ -81,6 +81,12 @@ extern void dso_xdr_instr_LTX_init(void*);
 extern void dso_xdr_instr_LTX_deinit(void*);
 extern void dso_xdr_instr_mysql_LTX_init(void*);
 extern void dso_xdr_instr_mysql_LTX_deinit(void*);
+extern void dso_xdr_instr_file_LTX_init(void*);
+extern void dso_xdr_instr_file_LTX_deinit(void*);
+
+/* semi-private fetchers, must work always */
+extern void fetch_instr_mysql(void);
+extern void fetch_instr_file(void);
 
 
 /* inlines */

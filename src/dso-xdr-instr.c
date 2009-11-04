@@ -56,6 +56,7 @@
 #include "unserding-dbg.h"
 #include "unserding-nifty.h"
 #include "unserding-ctx.h"
+#include "unserding-private.h"
 
 #include <pfack/instruments.h>
 #include "catalogue.h"
@@ -72,6 +73,10 @@
 /**
  * Temporary service for instr fetching. */
 #define UD_SVC_INSTR_TO_FILE	0x421c
+
+/**
+ * Fetch URN service. */
+#define UD_SVC_FETCH_INSTR	0x421e
 
 #if !defined xnew
 # define xnew(_x)	malloc(sizeof(_x))
@@ -140,6 +145,40 @@ copyadd_instr(instr_t i)
 	return;
 }
 
+/* goes to its own dso file one day */
+static void
+__add_from_file(const char *fname)
+{
+	XDR hdl;
+	FILE *f;
+
+	UD_DEBUG("getting XDR encoded instrument from %s ...", fname);
+	if ((f = fopen(fname, "r")) == NULL) {
+		UD_DBGCONT("failed\n");
+		return;
+	}
+
+#define CAT	((struct cat_s*)instrs)
+	pthread_mutex_lock(&CAT->mtx);
+
+	xdrstdio_create(&hdl, f, XDR_DECODE);
+	while (true) {
+		struct instr_s i;
+
+		init_instr(&i);
+		if (!(xdr_instr_s(&hdl, &i))) {
+			break;
+		}
+		(void)cat_bang_instr_nolck(instrs, &i);
+	}
+	xdr_destroy(&hdl);
+	pthread_mutex_unlock(&CAT->mtx);
+#undef CAT
+	fclose(f);
+	UD_DBGCONT("done\n");
+	return;
+}
+
 
 /* jobs */
 static void
@@ -174,36 +213,10 @@ instr_add_from_file_svc(job_t j)
 	/* our serialiser */
 	struct udpc_seria_s sctx;
 	char fname[256];
-	XDR hdl;
-	FILE *f;
 
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	udpc_seria_des_str_into(fname, sizeof(fname), &sctx);
-
-	UD_DEBUG("getting XDR encoded instrument from %s ...", fname);
-	if ((f = fopen(fname, "r")) == NULL) {
-		UD_DBGCONT("failed\n");
-		return;
-	}
-
-#define CAT	((struct cat_s*)instrs)
-	pthread_mutex_lock(&CAT->mtx);
-
-	xdrstdio_create(&hdl, f, XDR_DECODE);
-	while (true) {
-		struct instr_s i;
-
-		init_instr(&i);
-		if (!(xdr_instr_s(&hdl, &i))) {
-			break;
-		}
-		(void)cat_bang_instr_nolck(instrs, &i);
-	}
-	xdr_destroy(&hdl);
-	pthread_mutex_unlock(&CAT->mtx);
-#undef CAT
-	fclose(f);
-	UD_DBGCONT("done\n");
+	__add_from_file(fname);
 	return;
 }
 
@@ -416,13 +429,18 @@ deferred_dl(BLA *w, int revents)
 
 
 /* (re)fetch instr svc */
-#if 0
 static void
 fetch_instr_svc(job_t UNUSED(j))
 {
 	UD_DEBUG("0x%04x (UD_SVC_FETCH_INSTR)\n", UD_SVC_FETCH_INSTR);
+	ud_set_service(UD_SVC_FETCH_INSTR, NULL, NULL);
+#if defined HAVE_MYSQL
+	fetch_instr_mysql();
+#endif	/* HAVE_MYSQL */
+	fetch_instr_file();
+	ud_set_service(UD_SVC_FETCH_INSTR, fetch_instr_svc, NULL);
+	return;
 }
-#endif	/* 0 */
 
 
 /* config file mumbo jumbo */
@@ -480,6 +498,7 @@ load_instr_fetcher(void *clo, void *spec)
 		break;
 
 	case CST_XDRFILE:
+		dso_xdr_instr_file_LTX_init(clo);
 		break;
 
 	case CST_UNK:
@@ -497,6 +516,47 @@ load_instr_fetcher(void *clo, void *spec)
 static void
 unload_instr_fetcher(void *UNUSED(clo))
 {
+#if defined HAVE_MYSQL
+	dso_xdr_instr_mysql_LTX_deinit(clo);
+#endif	/* HAVE_MYSQL */
+	dso_xdr_instr_file_LTX_deinit(clo);
+	return;
+}
+
+
+/* could go to a file of its own */
+static char xdrfname[256] = {'\0'};
+
+void
+fetch_instr_file(void)
+{
+	if (xdrfname[0] != '\0') {
+		__add_from_file(xdrfname);
+	}
+	return;
+}
+
+void
+dso_xdr_instr_file_LTX_init(void *clo)
+{
+	void *spec = udctx_get_setting(clo);
+	const char *file = NULL;
+	ud_ctx_t ctx = clo;
+
+	UD_DEBUG("mod/xdr-instr-file: loading ...");
+	udcfg_tbl_lookup_s(&file, ctx, spec, "file");
+	if (file == NULL) {
+		UD_DBGCONT("failed, no `file' specification found\n");
+	}
+	strncpy(xdrfname, file, sizeof(xdrfname));
+	UD_DBGCONT("done\n");
+	return;
+}
+
+void
+dso_xdr_instr_file_LTX_deinit(void *UNUSED(clo))
+{
+	xdrfname[0] = '\0';
 	return;
 }
 
@@ -515,6 +575,7 @@ dso_xdr_instr_LTX_init(void *clo)
 	ud_set_service(UD_SVC_INSTR_FROM_FILE, instr_add_from_file_svc, NULL);
 	ud_set_service(UD_SVC_INSTR_BY_ATTR, instr_dump_svc, instr_add_svc);
 	ud_set_service(UD_SVC_INSTR_TO_FILE, instr_dump_to_file_svc, NULL);
+	ud_set_service(UD_SVC_FETCH_INSTR, fetch_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	if ((settings = udctx_get_setting(ctx)) != NULL) {
@@ -525,14 +586,23 @@ dso_xdr_instr_LTX_init(void *clo)
 	}
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
+
+	/* kick off a fetch-INSTR job */
+	wpool_enq(gwpool, (wpool_work_f)fetch_instr_svc, NULL, true);
 	return;
 }
 
 void
 dso_xdr_instr_LTX_deinit(void *clo)
 {
-	free_cat(instrs);
+	/* unload the fetchers, they possibly need the catalogue */
 	unload_instr_fetcher(clo);
+	/* unload the instrs now */
+	free_cat(instrs);
+	ud_set_service(UD_SVC_INSTR_FROM_FILE, NULL, NULL);
+	ud_set_service(UD_SVC_INSTR_BY_ATTR, NULL, NULL);
+	ud_set_service(UD_SVC_INSTR_TO_FILE, NULL, NULL);
+	ud_set_service(UD_SVC_FETCH_INSTR, NULL, NULL);
 	return;
 }
 

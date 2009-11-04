@@ -73,7 +73,7 @@
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
 
-static void *conn;
+static void *conn = NULL;
 
 
 static const char iqry[] =
@@ -303,6 +303,26 @@ iqry_rowf(void **row, size_t nflds, void *UNUSED(clo))
 }
 
 
+void
+fetch_instr_mysql(void)
+{
+/* make me thread-safe and declare me */
+	if (conn == NULL) {
+		return;
+	}
+
+	UD_DEBUG("leeching instruments ...");
+	uddb_qry(conn, iqry, sizeof(iqry)-1, iqry_rowf, NULL);
+	UD_DBGCONT("done\n");
+
+	UD_DEBUG("kthxbye ...");
+	uddb_disconnect(conn);
+	conn = NULL;
+	UD_DBGCONT("done\n");
+	return;
+}
+
+
 /* initialiser code */
 void
 dso_xdr_instr_mysql_LTX_init(void *clo)
@@ -323,15 +343,15 @@ dso_xdr_instr_mysql_LTX_init(void *clo)
 		return;
 	}
 	UD_DBGCONT("done\n");
+	return;
+}
 
-	UD_DEBUG("leeching instruments ...");
-	uddb_qry(conn, iqry, sizeof(iqry)-1, iqry_rowf, NULL);
-	UD_DBGCONT("done\n");
-
-	UD_DEBUG("kthxbye ...");
-	uddb_disconnect(conn);
-	conn = NULL;
-	UD_DBGCONT("done\n");
+void
+dso_xdr_instr_mysql_LTX_deinit(void *UNUSED(clo))
+{
+	if (conn != NULL) {
+		uddb_disconnect(conn);
+	}
 	return;
 }
 

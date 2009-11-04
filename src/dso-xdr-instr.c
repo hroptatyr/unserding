@@ -474,9 +474,7 @@ dso_xdr_instr_LTX_deinit(void *clo)
 	unload_instr_fetcher(clo);
 	/* unload the instrs now */
 	free_cat(instrs);
-	ud_set_service(UD_SVC_INSTR_FROM_FILE, NULL, NULL);
 	ud_set_service(UD_SVC_INSTR_BY_ATTR, NULL, NULL);
-	ud_set_service(UD_SVC_INSTR_TO_FILE, NULL, NULL);
 	ud_set_service(UD_SVC_FETCH_INSTR, NULL, NULL);
 	return;
 }

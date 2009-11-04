@@ -489,6 +489,11 @@ cfgsrc_type(void *ctx, void *spec)
 {
 #define CFG_TYPE	"type"
 	const char *type = NULL;
+
+	if (spec == NULL) {
+		UD_DEBUG("mod/tseries: no source specified\n");
+		return CST_UNK;
+	}
 	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
 
 	UD_DEBUG("type %s %p\n", type, spec);

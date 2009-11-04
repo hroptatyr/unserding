@@ -364,8 +364,15 @@ out:
 }
 
 static void
-instr_dump_to_file_svc(job_t UNUSED(j))
+instr_dump_to_file_svc(job_t j)
 {
+/* i think this has to disappear, file-backing should be opaque */
+	struct udpc_seria_s sctx;
+	char fname[256];
+
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PAYLLEN(j->blen));
+	udpc_seria_des_str_into(fname, sizeof(fname), &sctx);
+	UD_DEBUG("dumping into %s\n", fname);
 	return;
 }
 
@@ -446,6 +453,11 @@ cfgsrc_type(void *ctx, void *spec)
 {
 #define CFG_TYPE	"type"
 	const char *type = NULL;
+
+	if (spec == NULL) {
+		UD_DEBUG("no source specified\n");
+		return CST_UNK;
+	}
 	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
 
 	UD_DEBUG("type %s %p\n", type, spec);

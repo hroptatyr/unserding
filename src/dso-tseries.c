@@ -421,15 +421,10 @@ instr_tick_by_instr_svc(job_t j)
 
 /* urn getter */
 static void
-get_urn_cb(uint32_t lo, uint32_t hi, void *data, void *clo)
+get_urn_cb(uint32_t UNUSED(lo), uint32_t UNUSED(hi), void *data, void *clo)
 {
 	tseries_t tser = data;
-	char los[32], his[32];
-	/* debugging mumbo jumbo */
-	print_ts_into(los, sizeof(los), lo);
-	print_ts_into(his, sizeof(his), hi);
-	UD_DEBUG("found %s..%s %p %p\n", los, his, tser, clo);
-	udpc_seria_add_data(clo, tser, sizeof(*tser));
+	udpc_seria_add_tseries(clo, tser);
 	return;
 }
 

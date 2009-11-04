@@ -88,13 +88,14 @@ find_them_instrs(ud_handle_t hdl, const char *const *insv)
 		}
 		if ((len = ud_find_one_tslab(hdl, &data, cid)) > 0) {
 			/* data hereby points to a tseries object */
-			const struct tseries_s *p = data;
+			const struct tslab_s *s = data;
 			char los[32], his[32];
 			/* debugging mumbo jumbo */
-			print_ts_into(los, sizeof(los), p->from);
-			print_ts_into(his, sizeof(his), p->to);
-			fprintf(stdout, "  tslab %d %s..%s\n",
-				p->types, los, his);
+			print_ts_into(los, sizeof(los), s->from);
+			print_ts_into(his, sizeof(his), s->till);
+			fprintf(stdout, "  tslab %u/%u@%u %d %s..%s\n",
+				s->secu.instr, s->secu.unit, s->secu.pot,
+				s->types, los, his);
 		} else {
 			fputs("  no tslabs yet\n", stdout);
 		}

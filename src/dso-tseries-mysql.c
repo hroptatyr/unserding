@@ -442,7 +442,7 @@ static const char ovqry[] =
 #define QUOTI_ID	1
 	"`uiu`.`quoti_id`, "
 #define POT_ID		2
-	"0 AS `pot_id`, " //"`uiu`.`pot_id`, "
+	"`uiu`.`pot_id`, "
 #define URN_ID		3
 	"`uiu`.`ga_urn_id`, "
 #define URN		4

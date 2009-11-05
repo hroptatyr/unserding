@@ -70,6 +70,8 @@
 # define MAX_DCCP_CONNECTION_BACK_LOG	5
 #endif	/* !MAX_DCCP_CONNECTION_BACK_LOG */
 
+static uint32_t cnt = 0;
+
 static void
 __req_dccp(void)
 {
@@ -80,17 +82,20 @@ __req_dccp(void)
 	 * otherwise the TIME_WAIT phenomenon will prevent binding to these
 	 * address.port combinations for (2 * MSL) seconds. */
 	int on = 1;
-	int naught = 0;
 	int res;
 
 	s = socket(PF_INET6, SOCK_DCCP, IPPROTO_DCCP);
+	cnt++;
 	setsockopt(s, SOL_DCCP, SO_REUSEADDR, &on, sizeof(on));
-	setsockopt(s, SOL_DCCP, DCCP_SOCKOPT_SERVICE, &naught, sizeof(naught));
+	setsockopt(s, SOL_DCCP, DCCP_SOCKOPT_SERVICE, &cnt, sizeof(cnt));
+	/* make a timeout for the accept call below */
+	on = 10000 /* milliseconds */;
+	setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &on, sizeof(on));
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa6.sin6_family = AF_INET6;
 	sa.sa6.sin6_addr = in6addr_any;
-	sa.sa6.sin6_port = htons(12121);
+	sa.sa6.sin6_port = htons(UD_NETWORK_SERVICE);
 	/* bind the socket to the local address and port. salocal is sockaddr
 	 * of local IP and port */
 	res = bind(s, &sa.sa, sizeof(sa));
@@ -99,6 +104,8 @@ __req_dccp(void)
 
 	res = accept(s, &remo_sa.sa, &remo_sa_len);
 	UD_DEBUG("finally %d\n", res);
+	close(res);
+	close(s);
 	return;
 }
 

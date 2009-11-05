@@ -41,8 +41,6 @@
 #include <errno.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
-#include "protocore.h"
-#include "seria.h"
 #include "svc-pong.h"
 
 typedef struct clks_s {

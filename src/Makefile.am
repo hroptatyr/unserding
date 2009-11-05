@@ -2,7 +2,7 @@
 
 ### Makefile.am
 
-AM_CPPFLAGS = -pthread
+AM_CPPFLAGS = -pthread -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS = -lpthread
 
 headerdir = $(includedir)/unserding
@@ -133,7 +133,7 @@ if BUILD_LIBRARY
 ## the lib
 libunserding_la_SOURCES = libstuff.c libhelpers.c
 libunserding_la_SOURCES += svc-pong.c
-libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS)
+libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS) $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
 endif
 

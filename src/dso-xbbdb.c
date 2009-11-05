@@ -40,7 +40,6 @@
 #endif
 #include <fcntl.h>
 #include <stdio.h>
-#include <string.h>
 #include <stddef.h>
 
 #include "module.h"
@@ -310,6 +309,7 @@ read_bbdb(void)
 	return 0;
 }
 
+#if 0
 static inline char
 icase(char c)
 {
@@ -318,6 +318,7 @@ icase(char c)
 	}
 	return c;
 }
+#endif	/* 0 */
 
 static inline bool
 icase_eqp(char c1, char c2)
@@ -350,7 +351,7 @@ boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
 	for (index_t j = 0, i; j <= patlen; j++) {
 		for (i = patlen - 1; i >= 1; i--) {
 			for (k = 1; k <= j; k++) {
-				if (i - k < 0) {
+				if (i < k) {
 					goto matched;
 				}
 				if (pat[patlen - k] != pat[i - k]) {

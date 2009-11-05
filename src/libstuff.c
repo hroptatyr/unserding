@@ -325,7 +325,6 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 {
 	int s = ud_handle_sock(hdl);
 	int nfds;
-	ssize_t nread;
 	char buf[UDPC_PKTLEN];
 
 	if (UNLIKELY(UDPC_PKT_INVALID_P(pkt))) {
@@ -343,7 +342,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 		goto out;
 	}
 	/* otherwise NFDS was 1 and it MUST be our socket */
-	nread = recvfrom(s, buf, countof(buf), 0, NULL, 0);
+	(void)recvfrom(s, buf, countof(buf), 0, NULL, 0);
 #if defined DEBUG_PKTTRAF_FLAG
 	udpc_print_pkt(BUF_PACKET(buf));
 #endif	/* DEBUG_PKTTRAF_FLAG */

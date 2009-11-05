@@ -47,6 +47,8 @@
 #include <fcntl.h>
 #include <pthread.h>
 
+#include <pfack/uterus.h>
+#include <pfack/instruments.h>
 /* our master include */
 #include "unserding.h"
 #include "module.h"
@@ -212,7 +214,7 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 			"SELECT %s AS `stamp`, "
 			"%s AS `o`, %s AS `h`, %s AS `l`, %s AS `c`, %s AS `v` "
 			"FROM %s "
-			"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
+			"WHERE %s = %u AND %s BETWEEN '%s' AND '%s' "
 			"ORDER BY 1",
 			urn_fld_date(tser->urn),
 			urn_fld_top(tser->urn),
@@ -232,7 +234,7 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 			"%s `ao`, %s `ah`, %s `al`, %s `ac`, %s `av`, "
 			"%s `to`, %s `th`, %s `tl`, %s `tc`, %s `tv`  "
 			"FROM %s "
-			"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
+			"WHERE %s = %u AND %s BETWEEN '%s' AND '%s' "
 			"ORDER BY 1",
 			urn_fld_date(tser->urn),
 
@@ -476,7 +478,7 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 	case 1 ... 3:
 	case 8:
 		/* once-a-day, 5-a-week */
-		UD_DEBUG("OAD/5DW tick for %u/%u@%u\n",
+		UD_DEBUG("OAD/5DW tick for %u/%u@%hu\n",
 			 secu.instr, secu.unit, secu.pot);
 		tsc = find_tscoll_by_secu_crea(tscache, &secu);
 

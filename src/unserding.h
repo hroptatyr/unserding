@@ -42,6 +42,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "mcast.h"
+#include "dccp.h"
 
 /**
  * Flags. */

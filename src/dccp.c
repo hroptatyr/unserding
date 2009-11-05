@@ -53,6 +53,7 @@
 #include "unserding-ctx.h"
 #include "unserding-dbg.h"
 #include "unserding-nifty.h"
+#include "dccp.h"
 
 #if !defined SOCK_DCCP
 # define SOCK_DCCP		6
@@ -76,7 +77,7 @@ static void
 __req_dccp(void)
 {
 	ud_sockaddr_u sa, remo_sa;
-	size_t remo_sa_len;
+	socklen_t remo_sa_len;
 	int s;
 	/* turn off bind address checking, and allow port numbers to be reused -
 	 * otherwise the TIME_WAIT phenomenon will prevent binding to these

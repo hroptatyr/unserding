@@ -38,6 +38,7 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#define __USE_XOPEN2K8
 #include <stdio.h>
 #include <stdbool.h>
 #include <popt.h>

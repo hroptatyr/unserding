@@ -45,6 +45,7 @@
 
 %{
 #include "config.h"
+#define __USE_XOPEN2K8
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

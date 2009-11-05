@@ -140,10 +140,6 @@ extern FILE *logout;
 
 
 #if defined UNSERSRV
-# if !defined __USE_POSIX199309
-/* for CLOCK_REALTIME and friends */
-#  define __USE_POSIX199309
-# endif	 /* !__USE_POSIX199309 */
 # if defined TIME_WITH_SYS_TIME
 #  include <sys/time.h>
 #  include <time.h>

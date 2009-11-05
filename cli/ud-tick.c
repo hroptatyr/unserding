@@ -37,7 +37,6 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-#define __USE_XOPEN
 #include <time.h>
 #include <pfack/uterus.h>
 #include "unserding.h"

@@ -2,7 +2,7 @@
 
 ### Makefile.am
 
-AM_CPPFLAGS = -pthread
+AM_CPPFLAGS = -pthread -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L
 AM_LDFLAGS = -lpthread
 
 headerdir = $(includedir)/unserding

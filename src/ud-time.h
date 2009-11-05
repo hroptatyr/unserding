@@ -38,20 +38,9 @@
 #if !defined INCLUDED_ud_time_h_
 #define INCLUDED_ud_time_h_
 
-/* this is just a convenience header to overcome differences between the
- * intel and the gcc compiler */
-
-/* allow for the intel compiler to use time.h features we need */
-#if !defined __USE_POSIX
-# define __USE_POSIX
-#endif	/* !__USE_POSIX */
-#if !defined __USE_POSIX199309
-# define __USE_POSIX199309
-#endif	/* !__USE_POSIX199309 */
-#if !defined __USE_XOPEN
-# define __USE_XOPEN
-#endif	/* !__USE_XOPEN */
-
+#include <sys/types.h>
+#include <sys/time.h>
+/* for struct timespec */
 #include <time.h>
 
 /* returns the current CLOCK_REALTIME time stamp */

@@ -2,7 +2,7 @@
 
 ### Makefile.am
 
-AM_CPPFLAGS = -pthread -I$(top_srcdir)/src
+AM_CPPFLAGS = -pthread -D_GNU_SOURCE -I$(top_srcdir)/src
 AM_LDFLAGS = -lpthread
 
 bin_PROGRAMS =

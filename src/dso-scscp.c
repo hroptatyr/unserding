@@ -39,10 +39,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
-#if !defined __USE_MISC
-/* for struct ifreq and friends */
-# define __USE_MISC
-#endif	/* !__USE_MISC */
 #include <net/if.h>
 #include <arpa/inet.h>
 

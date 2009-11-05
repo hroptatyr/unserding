@@ -144,7 +144,9 @@ ud_sockaddr_addr(ud_const_sockaddr_t sa)
 static inline void
 ud_sockaddr_ntop(char *restrict buf, size_t len, ud_const_sockaddr_t sa)
 {
-	(void)inet_ntop(ud_sockaddr_fam(sa), ud_sockaddr_addr(sa), buf, len);
+	short unsigned int fam = ud_sockaddr_fam(sa);
+	const void *saa = ud_sockaddr_addr(sa);
+	(void)inet_ntop(fam, saa, buf, len);
 	return;
 }
 

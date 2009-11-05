@@ -243,7 +243,7 @@ spDute_bang_secu(spDute_t tgt, secu_t s, uint8_t tt, dse16_t pivot)
 
 static inline void
 spDute_bang_tser(
-	spDute_t tgt, secu_t s, uint8_t tt,
+	spDute_t tgt, secu_t s, tt_t tt,
 	dse16_t t, tser_pkt_t pkt, uint8_t idx)
 {
 	spDute_bang_secu(tgt, s, tt, t);
@@ -484,7 +484,7 @@ fill_sl1t_secu(sl1t_t l1t, uint32_t secu, uint32_t fund, uint16_t exch)
 }
 
 static inline void
-fill_sl1t_tick(sl1t_t l1t, time_t ts, uint16_t msec, uint8_t tt, uint32_t v)
+fill_sl1t_tick(sl1t_t l1t, time_t ts, uint16_t msec, tt_t tt, uint32_t v)
 {
 	l1t->tick.ts = ts;
 	l1t->tick.nsec = msec * 1000000;

@@ -40,7 +40,9 @@
 
 #include <unistd.h>
 
-typedef size_t index_t;
+#if !defined index_t
+# define index_t	long unsigned int
+#endif	/* !index_t */
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)

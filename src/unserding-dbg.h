@@ -198,7 +198,7 @@ __ud_log(void)
 #  endif  /* HAVE_CLOCK_GETTIME */
 	clock_gettime(CLOCK_REALTIME, &n);
 	/* there must be %lu.%09u in the format string */
-	fprintf(logout, "%lu.%09u ", n.tv_sec, n.tv_nsec);
+	fprintf(logout, "%lu.%09lu ", n.tv_sec, n.tv_nsec);
 	return;
 }
 

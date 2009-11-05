@@ -84,11 +84,13 @@ pong(job_t UNUSED(j))
 	return;
 }
 
+#if 0
 static inline ud_pong_score_t
 udctx_score(ud_ctx_t ctx)
 {
 	return ctx->hdl->score;
 }
+#endif	/* 0 */
 
 
 void

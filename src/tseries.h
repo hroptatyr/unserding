@@ -39,7 +39,6 @@
 #define INCLUDED_tseries_h_
 
 #include <stdbool.h>
-#include <pfack/uterus.h>
 #include <time.h>
 #include "unserding.h"
 #include "protocore.h"
@@ -49,9 +48,6 @@
 #if !defined index_t
 # define index_t	size_t
 #endif	/* !index_t */
-
-#define USE_UTERUS	1
-//#undef USE_UTERUS
 
 /**
  * Time series (per instrument) and market snapshots (per point in time)
@@ -137,7 +133,9 @@ typedef struct secu_s *secu_t;
 typedef struct tick_by_ts_hdr_s *tick_by_ts_hdr_t;
 typedef struct tick_by_instr_hdr_s *tick_by_instr_hdr_t;
 typedef struct sl1tp_s *sl1tp_t;
+#if defined INCLUDED_uterus_h_
 typedef struct sl1t_s *sl1t_t;
+#endif	/* INCLUDED_uterus_h_ */
 
 typedef uint32_t date_t;
 
@@ -200,10 +198,12 @@ struct tick_by_instr_hdr_s {
 	uint32_t types;
 };
 
+#if defined INCLUDED_uterus_h_
 struct sl1t_s {
 	struct secu_s secu;
 	struct l1tick_s tick;
 };
+#endif	/* INCLUDED_uterus_h_ */
 
 /**
  * Tslabs, roughly metadata that describe the slabs of tseries. */
@@ -213,19 +213,12 @@ struct tslab_s {
 	uint32_t types;
 };
 
-#if !defined USE_UTERUS
-/* packet of 10 ticks, fuck ugly */
-struct tser_pkt_s {
-	monetary32_t t[10];
-};
-#else  /* USE_UTERUS */
+#if defined INCLUDED_uterus_h_
 /* packet of 10 uterus blocks, still fuck ugly */
 struct tser_pkt_s {
 	uterus_s t[10];
 };
-#endif	/* !USE_UTERUS */
 
-#if defined USE_UTERUS
 /* although we have stored uterus blocks in our tseries, the stuff that
  * gets sent is slightly different.
  * We send sparsely (ohlcv_p_s + admin) candles where then uterus macros
@@ -299,7 +292,7 @@ spDute_bang_onhold(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
 	}
 	return;
 }
-#endif	/* USE_UTERUS */
+#endif	/* INCLUDED_uterus_h_ */
 
 
 /**
@@ -325,6 +318,7 @@ ud_find_ticks_by_ts(
 	secu_t s, size_t slen,
 	uint32_t bs, time_t ts);
 
+#if defined INCLUDED_uterus_h_
 typedef void(*ud_find_ticks_by_instr_cb_f)(spDute_t, void *clo);
 
 /**
@@ -336,6 +330,7 @@ ud_find_ticks_by_instr(
 	ud_find_ticks_by_instr_cb_f cb, void *clo,
 	secu_t s, uint32_t bs,
 	time_t *ts, size_t tslen);
+#endif	/* INCLUDED_uterus_h_ */
 
 
 /* inlines, type (de)muxers */
@@ -473,6 +468,7 @@ sl1tp_set_exch(sl1tp_t t, uint16_t exch)
 	return;
 }
 
+#if defined INCLUDED_uterus_h_
 /* them old sl1t ticks, consumes 28 bytes */
 static inline void
 fill_sl1t_secu(sl1t_t l1t, uint32_t secu, uint32_t fund, uint16_t exch)
@@ -511,6 +507,7 @@ tser_pkt_beg_dse(dse16_t dse)
 	uint8_t sub = index_in_pkt(dse);
 	return dse - sub;
 }
+#endif	/* INCLUDED_uterus_h_ */
 
 
 /* (de)serialisers */
@@ -584,7 +581,7 @@ udpc_seria_des_sl1tick(sl1tick_t t, udpc_seria_t sctx)
 	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
 }
 
-#if defined USE_UTERUS
+#if defined INCLUDED_uterus_h_
 static inline void
 udpc_seria_add_spDute(udpc_seria_t sctx, spDute_t t)
 {
@@ -597,7 +594,7 @@ udpc_seria_des_spDute(spDute_t t, udpc_seria_t sctx)
 {
 	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
 }
-#endif	/* USE_UTERUS */
+#endif	/* INCLUDED_uterus_h_ */
 
 /* Attention, a tseries_t object gets transferred as tslab_t,
  * the corresponding udpc_seria_add_tseries() is in tscoll.h. */

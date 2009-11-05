@@ -40,6 +40,10 @@
 
 #include <stdbool.h>
 #include <time.h>
+/* pfack goodies */
+#include <pfack/uterus.h>
+#include <pfack/instruments.h>
+
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"

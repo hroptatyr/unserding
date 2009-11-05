@@ -70,10 +70,16 @@ extern void cli_yyset_column(int, yyscan_t);
 	} while (0)
 
 /* turn off tedious warnings */
-#pragma GCC diagnostic ignored "-Wswitch-default"
-#pragma GCC diagnostic ignored "-Wsign-compare"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-
+#if defined __INTEL_COMPILER
+# pragma warning (disable:593)
+# pragma warning (disable:869)
+# pragma warning (disable:1419)
+# pragma warning (disable:2259)
+#elif defined __GNUC__
+# pragma GCC diagnostic ignored "-Wswitch-default"
+# pragma GCC diagnostic ignored "-Wsign-compare"
+# pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif	/* __GNUC__ || __INTEL_COMPILER */
 %}
 
 ws		[ \t\f\n\r]+

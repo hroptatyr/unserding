@@ -42,6 +42,8 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <pfack/instruments.h>
+#include <pfack/uterus.h>
 /* our master include */
 #include "unserding.h"
 #include "unserding-nifty.h"
@@ -108,7 +110,6 @@ ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 	return __f1i_clo.len;
 }
 
-#define index_t		size_t
 void
 ud_find_many_instrs(
 	ud_handle_t hdl,

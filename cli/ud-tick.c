@@ -112,7 +112,7 @@ ttc(spDute_t t)
 static void
 t_cb(spDute_t t, void *UNUSED(clo))
 {
-	fprintf(stdout, "tick storm, ticks:1 ii:%u/%u/%u tt:%c  ts:%i",
+	fprintf(stdout, "tick storm, ticks:1 ii:%u/%u@%hu tt:%c  ts:%i",
 		t->instr, t->unit, spDute_pot(t), ttc(t), t->pivot);
 
 	if (spDute_nexist_p(t)) {

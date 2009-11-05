@@ -163,7 +163,7 @@ boyer_moore(const char *buf, size_t buflen, const char *pat, size_t patlen)
 	for (index_t j = 0, i; j <= patlen; j++) {
 		for (i = patlen - 1; i >= 1; i--) {
 			for (k = 1; k <= j; k++) {
-				if (i - k < 0) {
+				if (i < k) {
 					goto matched;
 				}
 				if (pat[patlen - k] != pat[i - k]) {

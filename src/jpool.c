@@ -79,12 +79,14 @@ jpi_from_job(job_t j)
 	return (void*)((char*)j - offsetof(struct jpi_s, data));
 }
 
+#if 0
 static inline jpool_t
 jpool_from_job(job_t j)
 {
 	jpi_t jpi = jpi_from_job(j);
 	return jpi->pool;
 }
+#endif	/* 0 */
 
 
 jpool_t

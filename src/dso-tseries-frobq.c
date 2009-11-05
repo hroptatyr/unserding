@@ -38,11 +38,11 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#include <pfack/uterus.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
-#include "tseries.h"
+#include "unserding-private.h"
 #include "tseries-private.h"
-#include "wpool.h"
 
 /* our queuing backend */
 #include "fsarrqueue.h"
@@ -53,9 +53,6 @@
 #if !defined UD_DEBUG
 # define UD_DEBUG(args...)
 #endif	/* UNSERSRV */
-
-/* um :O */
-extern wpool_t gwpool;
 
 typedef struct frobq_s *frobq_t;
 typedef struct frobjob_s *frobjob_t;

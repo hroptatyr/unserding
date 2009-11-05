@@ -150,7 +150,7 @@ ud_sprint_pkthdr(char *restrict buf, ud_packet_t pkt)
 		       ntohs(((const uint16_t*)pkt.pbuf)[3]));
 }
 
-static inline void __attribute__((always_inline, gnu_inline))
+static inline void
 b2a(char *restrict outbuf, char a)
 {
 	char b = a & 0xf, c = (a >> 4) & 0xf;
@@ -178,7 +178,7 @@ b2a(char *restrict outbuf, char a)
 	return;
 }
 
-static inline void __attribute__((always_inline, gnu_inline))
+static inline void
 putb(char a, FILE *fp)
 {
 	char b = a & 0xf, c = (a >> 4) & 0xf;
@@ -374,7 +374,8 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		size_t len = udpc_seria_des_sequi32(sctx, &v);
 		res = sprintf(buf, "seqof(xi32) * %d:\n", (int)len);
 		for (index_t i = 0; i < len; i++) {
-			res += sprintf(&buf[res], "  %08x (%d)\n", v[i], v[i]);
+			res += sprintf(&buf[res], "  %08x (%d)\n",
+				       v[i], (int32_t)v[i]);
 		}
 		break;
 	}
@@ -387,7 +388,7 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		for (index_t i = 0; i < len; i++) {
 			res += sprintf(&buf[res],
 				       "  %016" PRIx64 " (%" PRId64 ")\n",
-				       v[i], v[i]);
+				       v[i], (int64_t)v[i]);
 		}
 		break;
 	}
@@ -454,7 +455,7 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 
 		memcpy(buf, "(DATA)", 6);
 		len = udpc_seria_des_data(sctx, (const void**)&s);
-		len = sprintf(buf + 6, "%u\n", len);
+		len = sprintf(buf + 6, "%u\n", (unsigned int)len);
 		return len + 6;
 	}
 
@@ -480,7 +481,7 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 
 	case UDPC_TYPE_UI16: {
 		uint16_t v = udpc_seria_des_ui16(sctx);
-		return sprintf(buf, "(ui16)0x%04x (%u)\n", v, v);
+		return sprintf(buf, "(ui16)0x%04x (%hu)\n", v, v);
 	}
 	case UDPC_TYPE_SI16: {
 		int16_t v = udpc_seria_des_si16(sctx);
@@ -493,7 +494,7 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 	}
 	case UDPC_TYPE_SI32: {
 		int32_t v = udpc_seria_des_si32(sctx);
-		return sprintf(buf, "(si32)0x%08x (%u)\n", v, v);
+		return sprintf(buf, "(si32)0x%08x (%d)\n", v, v);
 	}
 
 

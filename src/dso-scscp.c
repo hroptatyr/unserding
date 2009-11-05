@@ -111,10 +111,7 @@ scscp_connect(const char *scscp_srv)
 		UD_DBGCONT("failed, inet_pton() screwed up\n");
 		return -1;
 	}
-	if ((s6->sin6_scope_id = if_index(s, scscp_dev)) < 0) {
-		UD_DBGCONT("failed, if_index() screwed up\n");
-		return -1;
-	}
+	s6->sin6_scope_id = if_index(s, scscp_dev);
 	/* connect him */
 	if (connect(s, (struct sockaddr*)(void*)&srv, srvlen) < 0) {
 		UD_DBGCONT("failed, connect() screwed up\n");
@@ -135,10 +132,9 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	ev_timer *wtimer = &__wtimer;
 	char buf[4096];
-	ssize_t nread;
 
 	UD_DEBUG("they got back to us\n");
-	if ((nread = read(w->fd, buf, sizeof(buf))) <= 0) {
+	if (read(w->fd, buf, sizeof(buf)) <= 0) {
 		UD_DEBUG("no data, closing socket\n");
 		ev_io_stop(EV_A_ w);
 		if (w->fd == sock_i) {

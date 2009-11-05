@@ -209,6 +209,11 @@ instr_dump_all(job_t j)
 		/* ... and send him off */
 		j->blen = UDPC_HDRLEN + 3 + len;
 		send_cl(j);
+
+		{
+			struct timeval tv = {.tv_sec = 0, .tv_usec = 10};
+			select(0, NULL, NULL, NULL, &tv);
+		}
 	} while (i < CAT->ninstrs);
 	pthread_mutex_unlock(&CAT->mtx);
 #undef CAT

@@ -51,11 +51,77 @@
 static bool xmlp;
 static bool tslabp;
 
+
+/* porno mode to behold the packet loss */
+struct pcb_clo_s {
+	size_t cnt;
+	ud_pkt_no_t pno;
+};
+
+static bool
+pcb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
+{
+	struct pcb_clo_s *pcb_clo = clo;
+	struct udpc_seria_s sctx;
+	const void *foo;
+	ud_pkt_no_t pno;
+	size_t len;
+
+	if (UDPC_PKT_INVALID_P(pkt)) {
+		fprintf(stderr, "that's it\n");
+		return false;
+	}
+	if ((pno = udpc_pkt_pno(pkt)) > pcb_clo->pno + 1) {
+		for (unsigned int i = pcb_clo->pno + 1; i < pno; i++) {
+			fprintf(stderr, "pkt %u went missing\n", i);
+		}
+	}
+	pcb_clo->pno = pno;
+
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	if ((len = udpc_seria_des_xdr(&sctx, &foo)) > 0) {
+		XDR hdl;
+		struct instr_s ins;
+		init_instr(&ins);
+		xdrmem_create(&hdl, (caddr_t)&foo, len, XDR_DECODE);
+		while (true) {
+			if (!xdr_instr_s(&hdl, &ins)) {
+				break;
+			}
+			pcb_clo->cnt++;
+		}
+		xdr_destroy(&hdl);
+	} else {
+		fprintf(stderr, "uh oh, packet looks cunted\n");
+	}
+	/* more packets please */
+	return true;
+}
+
+static void
+porno_mode(ud_handle_t hdl)
+{
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = BUF_PACKET(buf);
+	ud_convo_t cno = hdl->convo++;
+	struct pcb_clo_s pcb_clo = {.cnt = 0, .pno = 0};
+
+	memset(buf, 0, sizeof(buf));
+	udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
+	/* prepare packet for sending im off */
+	pkt.plen = UDPC_HDRLEN;
+	ud_send_raw(hdl, pkt);
+	ud_subscr_raw(hdl, 1000, pcb, &pcb_clo);
+	fprintf(stdout, "recv'd %zu instrs\n", pcb_clo.cnt);
+	return;
+}
+
 static void
 find_them_instrs(ud_handle_t hdl, const char *const *insv)
 {
 	if (insv == NULL) {
 		/* no uii's at all */
+		porno_mode(hdl);
 		return;
 	}
 	/* read the UII's from the command line */

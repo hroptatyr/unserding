@@ -83,7 +83,7 @@ find_them_instrs(ud_handle_t hdl, const char *const *insv)
 			/* debugging mumbo jumbo */
 			print_ts_into(los, sizeof(los), s->from);
 			print_ts_into(his, sizeof(his), s->till);
-			fprintf(stdout, "  tslab %u/%u@%u %d %s..%s\n",
+			fprintf(stdout, "  tslab %u/%u@%hu %u %s..%s\n",
 				s->secu.instr, s->secu.unit, s->secu.pot,
 				s->types, los, his);
 		} else {
@@ -143,7 +143,6 @@ static struct poptOption porn_opts[] = {
 static const char *const*
 ud_parse_cl(size_t argc, const char *argv[])
 {
-        int rc;
         poptContext opt_ctx;
 
         opt_ctx = poptGetContext(NULL, argc, argv, porn_opts, 0);
@@ -153,7 +152,7 @@ ud_parse_cl(size_t argc, const char *argv[])
 		"uii [uii [...]]");
 
         /* auto-do */
-        while ((rc = poptGetNextOpt(opt_ctx)) > 0) {
+        while (poptGetNextOpt(opt_ctx) > 0) {
                 /* Read all the options ... */
                 ;
         }

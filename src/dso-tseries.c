@@ -529,6 +529,9 @@ load_ticks_fetcher(void *clo, void *spec)
 		break;
 	}
 
+	/* fetch fx tseries, should be configurable */
+	dso_tseries_sl1t_LTX_init(clo);
+
 	/* also load the frobber in this case */
 	dso_tseries_frobq_LTX_init(clo);
 
@@ -545,6 +548,7 @@ unload_ticks_fetcher(void *UNUSED(clo))
 	/* fetch some instruments by sql */
 	dso_tseries_mysql_LTX_deinit(clo);
 #endif	/* HAVE_MYSQL */
+	dso_tseries_sl1t_LTX_deinit(clo);
 	return;
 }
 

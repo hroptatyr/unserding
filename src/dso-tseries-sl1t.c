@@ -1,4 +1,4 @@
-/*** tseries.h -- stuff that is soon to be replaced by ffff's tseries
+/*** dso-tseries-sl1t.c -- sl1t tick files
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -35,37 +35,81 @@
  *
  ***/
 
-#if !defined INCLUDED_tseries_private_h_
-#define INCLUDED_tseries_private_h_
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
+#include <stdlib.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <pthread.h>
 
-#include "tseries.h"
-#include "tscoll.h"
-#include "tscache.h"
+#include <sushi/sl1t.h>
+#include <sushi/sl1tfile.h>
+/* our master include */
+#include "unserding.h"
+#include "module.h"
+#include "protocore.h"
+#define UNSERSRV
+#include "unserding-dbg.h"
+#include "unserding-ctx.h"
+#include "unserding-private.h"
+/* for higher level packet handling */
+#include "seria-proto-glue.h"
+#include "tseries-private.h"
 
-/* the main one used in dso-tseries.c */
-extern tscache_t tscache;
+#if defined DEBUG_FLAG
+# define UD_DEBUG_TSER(args...)			\
+	fprintf(logout, "[unserding/tseries] " args)
+#endif	/* DEBUG_FLAG */
 
-#if defined HAVE_MYSQL
-extern size_t
-fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t b, dse16_t e);
-extern void
-fetch_urn_mysql(void);
-#endif	/* HAVE_MYSQL */
+typedef struct tssl1t_s *tssl1t_t;
+
+struct tssl1t_s {
+	int infd;
+	void *rdr;
+};
 
 
-/* module like helpers */
-extern void dso_tseries_LTX_init(void*);
-extern void dso_tseries_LTX_deinit(void*);
-extern void dso_tseries_mysql_LTX_init(void*);
-extern void dso_tseries_mysql_LTX_deinit(void*);
-extern void dso_tseries_frobq_LTX_init(void*);
-extern void dso_tseries_frobq_LTX_deinit(void*);
-extern void dso_tseries_sl1t_LTX_init(void*);
-extern void dso_tseries_sl1t_LTX_deinit(void*);
+static const char fxsl1tf[] = "/home/freundt/.unserding/EUR_hist.sl1t";
+
+static void
+load_sl1t_file(tssl1t_t ctx)
+{
+	if ((ctx->infd = open(fxsl1tf, O_RDONLY, 0644)) < 0) {
+		/* file not found */
+		ctx->rdr = NULL;
+		return;
+	}
+	ctx->rdr = make_sl1t_reader(ctx->infd);
+	return;
+}
 
 
-/* frob queue mumbo jumbo */
-extern void defer_frob(tseries_t tser, dse16_t refds, bool immediatep);
-extern void frobnicate(void);
+static struct tssl1t_s my_ctx[1];
 
-#endif	/* INCLUDED_tseries_private_h_ */
+void
+dso_tseries_sl1t_LTX_init(void *UNUSED(clo))
+{
+	UD_DEBUG("mod/tseries-sl1t: loading ...");
+	load_sl1t_file(my_ctx);
+	UD_DBGCONT("done\n");
+	return;
+}
+
+void
+dso_tseries_sl1t_LTX_deinit(void *UNUSED(clo))
+{
+	UD_DEBUG("mod/tseries-sl1t: unloading ...");
+	if (my_ctx->rdr != NULL) {
+		free_sl1t_reader(my_ctx->rdr);
+	}
+	close(my_ctx->infd);
+	UD_DBGCONT("done\n");
+	return;
+}
+
+/* dso-sl1t.c */

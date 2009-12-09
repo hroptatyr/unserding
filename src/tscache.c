@@ -78,9 +78,9 @@ secukey_valid_p(secukey_t k)
 }
 
 static inline secukey_t
-secukey_from_secu(secu_t s)
+secukey_from_secu(su_secu_t s)
 {
-	return s->instr;
+	return su_secu_quodi(s);
 }
 
 static inline bool
@@ -245,7 +245,7 @@ tscache_size(tscache_t tsc)
 }
 
 tscoll_t
-find_tscoll_by_secu(tscache_t tsc, secu_t secu)
+find_tscoll_by_secu(tscache_t tsc, su_secu_t secu)
 {
 	tscoll_t res = NULL;
 	_tscache_t c = tsc;
@@ -261,7 +261,7 @@ find_tscoll_by_secu(tscache_t tsc, secu_t secu)
 }
 
 tscoll_t
-find_tscoll_by_secu_crea(tscache_t tsc, secu_t secu)
+find_tscoll_by_secu_crea(tscache_t tsc, su_secu_t secu)
 {
 	tscoll_t res = NULL;
 	_tscache_t c = tsc;

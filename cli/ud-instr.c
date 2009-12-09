@@ -130,7 +130,9 @@ find_one_instr(ud_handle_t hdl, const char *uii)
 		print_ts_into(los, sizeof(los), s->from);
 		print_ts_into(his, sizeof(his), s->till);
 		fprintf(stdout, "  tslab %u/%u@%hu %u %s..%s\n",
-			s->secu.instr, s->secu.unit, s->secu.pot,
+			su_secu_quodi(s->secu),
+			su_secu_quoti(s->secu),
+			su_secu_pot(s->secu),
 			s->types, los, his);
 	} else {
 		fputs("  no tslabs yet\n", stdout);

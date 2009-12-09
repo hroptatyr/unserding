@@ -27,15 +27,15 @@ int
 main(int argc, const char *argv[])
 {
 	/* vla */
-	struct secu_s cid[argc];
+	su_secu_t cid[argc];
 	int n = 0;
 	time_t ts = time(NULL);
 	uint32_t bs = PFTB_EOD | PFTB_STL;
 
 	for (int i = 1; i < argc; i++) {
-		if ((cid[n].instr = strtol(argv[i], NULL, 10))) {
-			cid[n].unit = 0;
-			cid[n].pot = 0;
+		uint32_t qd = strtol(argv[i], NULL, 10);
+		if (qd) {
+			cid[n] = su_secu(qd, 0, 0);
 			n++;
 		} else if (strcmp(argv[i], "--xml") == 0) {
 			xmlp = true;

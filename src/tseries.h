@@ -43,6 +43,8 @@
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"
+/* comes from sushi */
+#include "secu.h"
 
 /* tick services */
 #if !defined index_t
@@ -129,7 +131,6 @@ typedef struct tser_pkt_s *tser_pkt_t;
 
 typedef struct tslab_s *tslab_t;
 
-typedef struct secu_s *secu_t;
 typedef struct tick_by_ts_hdr_s *tick_by_ts_hdr_t;
 typedef struct tick_by_instr_hdr_s *tick_by_instr_hdr_t;
 typedef struct sl1tp_s *sl1tp_t;
@@ -187,20 +188,14 @@ struct tick_by_ts_hdr_s {
 	uint32_t types;
 };
 
-struct secu_s {
-	uint32_t instr;
-	uint32_t unit;
-	uint16_t pot;
-};
-
 struct tick_by_instr_hdr_s {
-	struct secu_s secu;
+	su_secu_t secu;
 	uint32_t types;
 };
 
 #if defined INCLUDED_uterus_h_
 struct sl1t_s {
-	struct secu_s secu;
+	su_secu_t secu;
 	struct l1tick_s tick;
 };
 #endif	/* INCLUDED_uterus_h_ */
@@ -208,7 +203,7 @@ struct sl1t_s {
 /**
  * Tslabs, roughly metadata that describe the slabs of tseries. */
 struct tslab_s {
-	struct secu_s secu;
+	su_secu_t secu;
 	time_t from, till;
 	uint32_t types;
 };
@@ -225,18 +220,18 @@ struct tser_pkt_s {
  * can be used to bang these into uterus blocks again. */
 
 static inline void
-spDute_bang_secu(spDute_t tgt, secu_t s, uint8_t tt, dse16_t pivot)
+spDute_bang_secu(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t pivot)
 {
-	tgt->instr = s->instr;
-	tgt->unit = s->unit;
-	tgt->mux = ((s->pot & 0x3ff) << 6) | (tt & 0x3f);
+	tgt->instr = su_secu_quodi(s);
+	tgt->unit = su_secu_quoti(s);
+	tgt->mux = ((su_secu_pot(s) & 0x3ff) << 6) | (tt & 0x3f);
 	tgt->pivot = pivot;
 	return;
 }
 
 static inline void
 spDute_bang_tser(
-	spDute_t tgt, secu_t s, tt_t tt,
+	spDute_t tgt, su_secu_t s, tt_t tt,
 	dse16_t t, tser_pkt_t pkt, uint8_t idx)
 {
 	spDute_bang_secu(tgt, s, tt, t);
@@ -260,7 +255,7 @@ spDute_bang_tser(
 }
 
 static inline void
-spDute_bang_nexist(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
+spDute_bang_nexist(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t t)
 {
 	spDute_bang_secu(tgt, s, tt, t);
 	switch (tt) {
@@ -277,7 +272,7 @@ spDute_bang_nexist(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
 }
 
 static inline void
-spDute_bang_onhold(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
+spDute_bang_onhold(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t t)
 {
 	spDute_bang_secu(tgt, s, tt, t);
 	switch (tt) {
@@ -306,7 +301,7 @@ spDute_bang_onhold(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
  * \return the length of the tick packet
  **/
 extern size_t
-ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
+ud_find_one_price(ud_handle_t, char *tgt, su_secu_t s, uint32_t bs, time_t ts);
 
 /**
  * Deliver a packet storm of ticks for instruments specified by S at TS.
@@ -315,7 +310,7 @@ extern void
 ud_find_ticks_by_ts(
 	ud_handle_t hdl,
 	void(*cb)(sl1tick_t, void *clo), void *clo,
-	secu_t s, size_t slen,
+	su_secu_t *s, size_t slen,
 	uint32_t bs, time_t ts);
 
 #if defined INCLUDED_uterus_h_
@@ -328,7 +323,7 @@ extern void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
 	ud_find_ticks_by_instr_cb_f cb, void *clo,
-	secu_t s, uint32_t bs,
+	su_secu_t s, uint32_t bs,
 	time_t *ts, size_t tslen);
 #endif	/* INCLUDED_uterus_h_ */
 
@@ -471,11 +466,9 @@ sl1tp_set_exch(sl1tp_t t, uint16_t exch)
 #if defined INCLUDED_uterus_h_
 /* them old sl1t ticks, consumes 28 bytes */
 static inline void
-fill_sl1t_secu(sl1t_t l1t, uint32_t secu, uint32_t fund, uint16_t exch)
+fill_sl1t_secu(sl1t_t l1t, uint32_t secu, int32_t fund, uint16_t exch)
 {
-	l1t->secu.instr = secu;
-	l1t->secu.unit = fund;
-	l1t->secu.pot = exch;
+	l1t->secu = su_secu(secu, fund, exch);
 	return;
 }
 
@@ -528,34 +521,27 @@ udpc_seria_des_tick_by_ts_hdr(tick_by_ts_hdr_t t, udpc_seria_t sctx)
 }
 
 static inline void
-udpc_seria_add_secu(udpc_seria_t sctx, secu_t secu)
+udpc_seria_add_secu(udpc_seria_t sctx, su_secu_t secu)
 {
-	udpc_seria_add_ui32(sctx, secu->instr);
-	udpc_seria_add_ui32(sctx, secu->unit);
-	udpc_seria_add_ui32(sctx, secu->pot);
+	udpc_seria_add_ui32(sctx, su_secu_quodi(secu));
+	udpc_seria_add_ui32(sctx, su_secu_quoti(secu));
+	udpc_seria_add_ui32(sctx, su_secu_pot(secu));
 	return;
 }
 
-static inline bool
-udpc_seria_des_secu(secu_t t, udpc_seria_t sctx)
+static inline su_secu_t
+udpc_seria_des_secu(udpc_seria_t sctx)
 {
-	if ((t->instr = udpc_seria_des_ui32(sctx)) == 0) {
-		/* no gaid? fuck off early */
-		t->unit = 0;
-		t->pot = 0;
-		return false;
-	}
-	/* currency */
-	t->unit = udpc_seria_des_ui32(sctx);
-	/* exchange */	
-	t->pot = udpc_seria_des_ui32(sctx);
-	return true;
+	uint32_t quodi = udpc_seria_des_ui32(sctx);
+	int32_t quoti = udpc_seria_des_ui32(sctx);
+	int16_t pot = udpc_seria_des_ui32(sctx);
+	return su_secu(quodi, quoti, pot);
 }
 
 static inline void
 udpc_seria_add_tick_by_instr_hdr(udpc_seria_t sctx, tick_by_instr_hdr_t h)
 {
-	udpc_seria_add_secu(sctx, &h->secu);
+	udpc_seria_add_secu(sctx, h->secu);
 	udpc_seria_add_ui32(sctx, h->types);
 	return;
 }
@@ -563,7 +549,7 @@ udpc_seria_add_tick_by_instr_hdr(udpc_seria_t sctx, tick_by_instr_hdr_t h)
 static inline void
 udpc_seria_des_tick_by_instr_hdr(tick_by_instr_hdr_t h, udpc_seria_t sctx)
 {
-	udpc_seria_des_secu(&h->secu, sctx);
+	h->secu = udpc_seria_des_secu(sctx);
 	h->types = udpc_seria_des_ui32(sctx);
 	return;
 }

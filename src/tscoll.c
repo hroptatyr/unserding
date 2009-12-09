@@ -48,9 +48,9 @@
 #include "unserding-nifty.h"
 
 tscoll_t
-make_tscoll(secu_t s)
+make_tscoll(su_secu_t s)
 {
-	return make_itree_sat(s, sizeof(*s));
+	return make_itree_sat(&s, sizeof(s));
 }
 
 void
@@ -60,10 +60,11 @@ free_tscoll(tscoll_t tsc)
 	return;
 }
 
-secu_t
+su_secu_t
 tscoll_secu(tscoll_t tsc)
 {
-	return itree_satellite(tsc);
+	su_secu_t *s = itree_satellite(tsc);
+	return *s;
 }
 
 void

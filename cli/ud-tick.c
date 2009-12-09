@@ -44,6 +44,8 @@
 #include "protocore.h"
 #include "tseries.h"
 
+#include "clihelper.c"
+
 static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
 
@@ -147,7 +149,7 @@ int
 main(int argc, const char *argv[])
 {
 	/* vla */
-	struct secu_s cid;
+	su_secu_t cid;
 	int n = 0;
 	time_t ts[argc-1];
 	uint32_t bs = PFTB_BID | PFTB_ASK | PFTB_TRA | PFTB_STL | PFTB_FIX;
@@ -157,9 +159,10 @@ main(int argc, const char *argv[])
 		exit(1);
 	}
 	/* we've got at least the instr id */
-	cid.instr = strtol(argv[1], NULL, 10);
-	cid.unit = 0;
-	cid.pot = 0;
+	cid = su_secu(strtol(argv[1], NULL, 10), 0, 0);
+
+	/* just a test */
+	//secu_from_str(hdl, argv[1]);
 
 	if (argc == 2) {
 		ts[0] = time(NULL);
@@ -176,7 +179,7 @@ main(int argc, const char *argv[])
 	/* obtain us a new handle */
 	init_unserding_handle(hdl, PF_INET6, true);
 	/* now kick off the finder */
-	ud_find_ticks_by_instr(hdl, t_cb, NULL, &cid, bs, ts, n);
+	ud_find_ticks_by_instr(hdl, t_cb, NULL, cid, bs, ts, n);
 	/* and lose the handle again */
 	free_unserding_handle(&__hdl);
 	return 0;

@@ -65,17 +65,17 @@ struct tseries_s {
 	time_t from, to;
 	uint32_t types;
 	/** points back into the tscoll satellite */
-	secu_t secu;
+	su_secu_t secu;
 	/** do not fiddle with me */
 	void *private;
 };
 
-extern tscoll_t make_tscoll(secu_t secu);
+extern tscoll_t make_tscoll(su_secu_t secu);
 extern void free_tscoll(tscoll_t tsc);
 
 extern void tscoll_add(tscoll_t tsc, tseries_t);
 extern tseries_t tscoll_add2(tscoll_t, const_urn_t, time_t, time_t, uint32_t);
-extern secu_t tscoll_secu(tscoll_t tsc);
+extern su_secu_t tscoll_secu(tscoll_t tsc);
 
 extern tseries_t tscoll_find_series(tscoll_t tsc, time_t ts);
 /* move to tseries.[ch]? */
@@ -90,7 +90,7 @@ static inline void
 udpc_seria_add_tseries(udpc_seria_t sctx, tseries_t ts)
 {
 	struct tslab_s tslab;
-	tslab.secu = *ts->secu;
+	tslab.secu = ts->secu;
 	tslab.from = ts->from;
 	tslab.till = ts->to;
 	tslab.types = ts->types;

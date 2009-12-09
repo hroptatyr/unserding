@@ -223,7 +223,8 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 			urn_fld_tcp(tser->urn),
 			urn_fld_tv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
 			urn_fld_dbtbl(tser->urn),
-			urn_fld_id(tser->urn), tser->secu->instr,
+			urn_fld_id(tser->urn),
+			su_secu_quodi(tser->secu),
 			urn_fld_date(tser->urn), begs, ends);
 		break;
 	case URN_UTE_CDL:
@@ -257,7 +258,8 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 			urn_fld_tv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
 
 			urn_fld_dbtbl(tser->urn),
-			urn_fld_id(tser->urn), tser->secu->instr,
+			urn_fld_id(tser->urn),
+			su_secu_quodi(tser->secu),
 			urn_fld_date(tser->urn), begs, ends);
 		break;
 
@@ -465,22 +467,28 @@ static void
 ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 {
 	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
-	struct secu_s secu;
+	su_secu_t secu;
 	tscoll_t tsc;
 	struct tseries_s tser;
 	uint32_t tbs = strtoul(row[TYPES_BS], NULL, 10);
+	uint32_t qd;
+	int32_t qt;
+	uint16_t p;
 
-	secu.instr = strtoul(row[QUODI_ID], NULL, 10);
-	secu.unit = strtoul(row[QUOTI_ID], NULL, 10);
-	secu.pot = strtoul(row[POT_ID], NULL, 10);
+	qd = strtoul(row[QUODI_ID], NULL, 10);
+	qt = strtoul(row[QUOTI_ID], NULL, 10);
+	p = strtoul(row[POT_ID], NULL, 10);
+	secu = su_secu(qd, qt, p);
 
 	switch (urn_id) {
 	case 1 ... 3:
 	case 8:
 		/* once-a-day, 5-a-week */
 		UD_DEBUG("OAD/5DW tick for %u/%u@%hu\n",
-			 secu.instr, secu.unit, secu.pot);
-		tsc = find_tscoll_by_secu_crea(tscache, &secu);
+			 su_secu_quodi(secu),
+			 su_secu_quoti(secu),
+			 su_secu_pot(secu));
+		tsc = find_tscoll_by_secu_crea(tscache, secu);
 
 		tser.urn = find_urn(urn_id, row[URN]);
 		if (UNLIKELY(row[MIN_DT] == NULL)) {

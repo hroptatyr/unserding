@@ -67,6 +67,9 @@
  **/
 extern size_t
 ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t inst_id);
+/* same but for symbols */
+extern size_t
+ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym);
 
 /**
  * Deliver a list of tslabs known to the network for the instrument

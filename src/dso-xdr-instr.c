@@ -243,6 +243,16 @@ __seria_instr(udpc_seria_t sctx, instr_t in)
 }
 
 static void
+instr_dump_name(udpc_seria_t sctx, const char *sym)
+{
+	instr_t in = find_instr_by_name(instrs, sym);
+
+	/* serialise what we've got */
+	__seria_instr(sctx, in);
+	return;
+}
+
+static void
 instr_dump_gaid(udpc_seria_t sctx, gaid_t gaid)
 {
 	instr_t in = find_instr_by_gaid(instrs, gaid);
@@ -268,9 +278,13 @@ instr_dump_svc(job_t j)
 
 	do {
 		switch (udpc_seria_tag(&sctx)) {
-		case UDPC_TYPE_STR:
+		case UDPC_TYPE_STR: {
 			/* find by name */
+			const char *s;
+			udpc_seria_des_str(&sctx, &s);
+			instr_dump_name(&rplsctx, s);
 			break;
+		}
 		case UDPC_TYPE_SI32: {
 			/* find by gaid */
 			int32_t id = udpc_seria_des_si32(&sctx);

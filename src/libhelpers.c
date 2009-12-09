@@ -110,6 +110,30 @@ ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 	return __f1i_clo.len;
 }
 
+size_t
+ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym)
+{
+	struct udpc_seria_s sctx;
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = BUF_PACKET(buf);
+	ud_convo_t cno = hdl->convo++;
+	struct f1i_clo_s __f1i_clo;
+
+	memset(buf, 0, sizeof(buf));
+	udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	udpc_seria_add_str(&sctx, sym, strlen(sym));
+	/* prepare packet for sending im off */
+	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+	ud_send_raw(hdl, pkt);
+
+	/* use timeout of 0, letting the mart system decide */
+	__f1i_clo.cno = cno;
+	__f1i_clo.tgt = tgt;
+	ud_subscr_raw(hdl, 0, __f1i_cb, &__f1i_clo);
+	return __f1i_clo.len;
+}
+
 void
 ud_find_many_instrs(
 	ud_handle_t hdl,

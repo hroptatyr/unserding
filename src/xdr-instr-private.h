@@ -84,5 +84,7 @@ extern void dso_xdr_instr_file_LTX_deinit(void*);
 /* semi-private fetchers, must work always */
 extern void fetch_instr_mysql(void);
 extern void fetch_instr_file(void);
+/* dumpers, sole purpose is to provide instr caching */
+extern void dump_instr_file(void);
 
 #endif	/* INCLUDED_xdr_instr_private_h_ */

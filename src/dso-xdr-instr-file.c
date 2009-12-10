@@ -128,7 +128,7 @@ __dump_to_file(const char *fname)
 	FILE *f;
 
 	UD_DEBUG("dumping into %s ...", fname);
-	if ((f = fopen(fname, "w")) == NULL) {
+	if (fname[0] == '\0' || (f = fopen(fname, "w")) == NULL) {
 		UD_DBGCONT("failed\n");
 		return;
 	}
@@ -188,6 +188,15 @@ fetch_instr_file(void)
 {
 	if (xdrfname[0] != '\0') {
 		__add_from_file(xdrfname);
+	}
+	return;
+}
+
+void
+dump_instr_file(void)
+{
+	if (xdrfname[0] != '\0') {
+		__dump_to_file(xdrfname);
 	}
 	return;
 }

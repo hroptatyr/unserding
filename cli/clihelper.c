@@ -42,7 +42,6 @@ secu_from_str(ud_handle_t hdl, const char *s)
 /* we support "a" and "a/b@c" syntax, use `0' or `*' as placeholder,
  * "a" is expanded to "a/0@0"
  * we need the handle for lookups */
-	su_secu_t res;
 	const char *ends, *slp, *atp;
 	uint32_t qd = 0;
 	int32_t qt = 0;
@@ -67,6 +66,6 @@ secu_from_str(ud_handle_t hdl, const char *s)
 #if defined DEBUG_FLAG
 	fprintf(stderr, "parsed secu %u/%i@%hu\n", qd, qt, p);
 #endif	/* DEBUG_FLAG */
-	return res;
+	return su_secu(qd, qt, p);
 }
 

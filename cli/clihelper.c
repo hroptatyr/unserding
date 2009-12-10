@@ -1,7 +1,39 @@
 #include <sushi/secu.h>
+#include <pfack/instruments.h>
 
 #define SLASH_FOUND	1
 #define ATSYM_FOUND	2
+
+static int32_t
+gaid_from_str(ud_handle_t hdl, const char *s, size_t len)
+{
+	char *ends;
+	long int i = strtol(s, &ends, 10);
+
+	if (ends == s) {
+		/* probably a string, we look her up now */
+		struct instr_s in[1];
+		const void *data;
+		size_t ninstr;
+		if ((ninstr = ud_find_one_isym(hdl, &data, s, len)) > 0) {
+			deser_instrument_into(in, data, ninstr);
+			return instr_gaid(in);
+		}
+	}
+	return (int32_t)i;
+}
+
+static uint16_t
+potid_from_str(ud_handle_t UNUSED(hdl), const char *s, size_t UNUSED(len))
+{
+	char *ends;
+	long int i = strtol(s, &ends, 10);
+
+	if (ends == s) {
+		return 0;
+	}
+	return (uint16_t)i;
+}
 
 static su_secu_t
 secu_from_str(ud_handle_t hdl, const char *s)
@@ -23,12 +55,13 @@ secu_from_str(ud_handle_t hdl, const char *s)
 			atp = ends + 1;
 		}
 	}
-	qd = strtoul(s, NULL, 10);
+	qd = gaid_from_str(
+		hdl, s, slp ? slp - s - 1 : (atp ? atp - s - 1 : ends - s));
 	if (slp) {
-		qt = strtol(slp, NULL, 10);
+		qt = gaid_from_str(hdl, slp, atp ? atp - slp - 1 : ends - slp);
 	}
 	if (atp) {
-		p = strtoul(atp, NULL, 10);
+		p = potid_from_str(hdl, atp, ends - atp);
 	}
 	printf("parsed secu %u/%i@%hu\n", qd, qt, p);
 	return res;

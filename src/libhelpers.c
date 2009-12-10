@@ -111,7 +111,7 @@ ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 }
 
 size_t
-ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym)
+ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym, size_t len)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
@@ -122,7 +122,7 @@ ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym)
 	memset(buf, 0, sizeof(buf));
 	udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-	udpc_seria_add_str(&sctx, sym, strlen(sym));
+	udpc_seria_add_str(&sctx, sym, len);
 	/* prepare packet for sending im off */
 	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 	ud_send_raw(hdl, pkt);

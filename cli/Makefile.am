@@ -27,7 +27,7 @@ ud_snap_LDFLAGS = $(AM_LDFLAGS) -static
 
 ud_tick_SOURCES = ud-tick.c
 ud_tick_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
-ud_tick_LDADD = $(top_builddir)/src/libunserding.la
+ud_tick_LDADD = $(top_builddir)/src/libunserding.la $(PFACK_LIBS)
 ud_tick_LDFLAGS = $(AM_LDFLAGS) -static
 
 ud_ping_SOURCES = ud-ping.c

@@ -158,11 +158,6 @@ main(int argc, const char *argv[])
 		fprintf(stderr, "Usage: ud-tick instr [date] [date] ...\n");
 		exit(1);
 	}
-	/* we've got at least the instr id */
-	cid = su_secu(strtol(argv[1], NULL, 10), 0, 0);
-
-	/* just a test */
-	cid = secu_from_str(hdl, argv[1]);
 
 	if (argc == 2) {
 		ts[0] = time(NULL);
@@ -178,6 +173,8 @@ main(int argc, const char *argv[])
 	}
 	/* obtain us a new handle */
 	init_unserding_handle(hdl, PF_INET6, true);
+	/* just a test */
+	cid = secu_from_str(hdl, argv[1]);
 	/* now kick off the finder */
 	ud_find_ticks_by_instr(hdl, t_cb, NULL, cid, bs, ts, n);
 	/* and lose the handle again */

@@ -66,10 +66,10 @@
  * with libpfack's deser_instrument().
  **/
 extern size_t
-ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t inst_id);
+ud_find_one_instr(ud_handle_t h, const void **tgt, uint32_t inst_id);
 /* same but for symbols */
 extern size_t
-ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym);
+ud_find_one_isym(ud_handle_t h, const void **tgt, const char *sym, size_t len);
 
 /**
  * Deliver a list of tslabs known to the network for the instrument

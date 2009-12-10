@@ -107,7 +107,7 @@ find_one_instr(ud_handle_t hdl, const char *uii)
 	struct instr_s in[1];
 
 	if ((cid = strtol(uii, NULL, 10)) == 0) {
-		len = ud_find_one_isym(hdl, &data, uii);
+		len = ud_find_one_isym(hdl, &data, uii, strlen(uii));
 	} else {
 		len = ud_find_one_instr(hdl, &data, cid);
 	}

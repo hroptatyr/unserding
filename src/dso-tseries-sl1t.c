@@ -88,6 +88,24 @@ load_sl1t_file(tssl1t_t ctx)
 	return;
 }
 
+void
+fetch_urn_file(void)
+{
+/* make me thread-safe and declare me */
+	if (conn == NULL) {
+		return;
+	}
+
+	UD_DEBUG("leeching overview ...");
+	uddb_qry(conn, ovqry, sizeof(ovqry)-1, ovqry_rowf, NULL);
+	UD_DBGCONT("done\n");
+
+	UD_DEBUG("inspecting URNs ...");
+	fill_urns();
+	UD_DBGCONT("done\n");
+	return;
+}
+
 
 static struct tssl1t_s my_ctx[1];
 

@@ -479,6 +479,7 @@ fetch_urn_svc(job_t UNUSED(j))
 #if defined HAVE_MYSQL
 	fetch_urn_mysql();
 #endif	/* HAVE_MYSQL */
+	fetch_urn_sl1t();
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	return;
 }

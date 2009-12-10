@@ -10,18 +10,27 @@ secu_from_str(ud_handle_t hdl, const char *s)
  * "a" is expanded to "a/0@0"
  * we need the handle for lookups */
 	su_secu_t res;
-	const char *ends;
-	int state = 0;
+	const char *ends, *slp, *atp;
+	uint32_t qd = 0;
+	int32_t qt = 0;
+	uint16_t p = 0;
 
 	/* check if we have a/b@c syntax */
-	for (ends = s; *s != '\0'; s++) {
-		if (*s == '/') {
-			state |= SLASH_FOUND;
-		} else if (*s == '@') {
-			state |= ATSYM_FOUND;
+	for (ends = s, slp = atp = NULL; *ends != '\0'; ends++) {
+		if (*ends == '/') {
+			slp = ends + 1;
+		} else if (*ends == '@') {
+			atp = ends + 1;
 		}
 	}
-	printf("state %x\n", state);
+	qd = strtoul(s, NULL, 10);
+	if (slp) {
+		qt = strtol(slp, NULL, 10);
+	}
+	if (atp) {
+		p = strtoul(atp, NULL, 10);
+	}
+	printf("parsed secu %u/%i@%hu\n", qd, qt, p);
 	return res;
 }
 

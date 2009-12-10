@@ -162,7 +162,7 @@ main(int argc, const char *argv[])
 	cid = su_secu(strtol(argv[1], NULL, 10), 0, 0);
 
 	/* just a test */
-	//secu_from_str(hdl, argv[1]);
+	cid = secu_from_str(hdl, argv[1]);
 
 	if (argc == 2) {
 		ts[0] = time(NULL);

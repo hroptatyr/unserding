@@ -1,3 +1,4 @@
+/* to be included somewhere */
 #include <sushi/secu.h>
 #include <pfack/instruments.h>
 
@@ -63,7 +64,9 @@ secu_from_str(ud_handle_t hdl, const char *s)
 	if (atp) {
 		p = potid_from_str(hdl, atp, ends - atp);
 	}
-	printf("parsed secu %u/%i@%hu\n", qd, qt, p);
+#if defined DEBUG_FLAG
+	fprintf(stderr, "parsed secu %u/%i@%hu\n", qd, qt, p);
+#endif	/* DEBUG_FLAG */
 	return res;
 }
 

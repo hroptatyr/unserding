@@ -74,6 +74,27 @@ struct tssl1t_s {
 };
 
 
+static su_secu_t
+hardcoded_shit(const char *sym)
+{
+	uint32_t qd = 73380;
+	int32_t qt = 0;
+
+	if (memcmp(sym, "EUR", 4) == 0) {
+		qt = 73380;
+	} else if (memcmp(sym, "USD", 4) == 0) {
+		qt = 73381;
+	} else if (memcmp(sym, "GBP", 4) == 0) {
+		qt = 73382;
+	} else if (memcmp(sym, "KRW", 4) == 0) {
+		qt = 73383;
+	} else if (memcmp(sym, "CAD", 4) == 0) {
+		qt = 73384;
+	}
+	return su_secu(qd, qt, 0);
+}
+
+#if 0
 static inline size_t
 pr_ts(char *restrict buf, uint32_t sec)
 {
@@ -101,36 +122,44 @@ print_trng(uint16_t idx, void *clo)
 	}
 	return;
 }
+#endif
 
 static void
 fill_urn_sym(uint16_t idx, const char *sym, void *UNUSED(clo))
 {
+	tscoll_t tsc;
+	struct tseries_s tser[1];
+	su_secu_t s;
+	const uint32_t tbs = 0x01 | 0x02;
+
 	if (sl1t_stbl_sym_slot_free_p(sym)) {
 		return;
 	}
-	fprintf(stdout, "%hu: %s", idx, sym);
 
-	/* print the life span of this instrument in this file */
-	print_trng(idx, clo);
-	fputc('\n', stdout);
+	/* create us one of these nifty ts entries */
+	s = hardcoded_shit(sym);
+	tsc = find_tscoll_by_secu_crea(tscache, s);
+	tser->urn = (void*)(long int)idx;
+	tser->from = 915148800;
+	tser->to = 0x7fffffff;
+	tser->types = tbs;
+	/* add to the collection of time stamps */
+	tscoll_add(tsc, tser);
 	return;
 }
 
 static void
-fill_urn_sec(uint16_t idx, su_secu_t sec, void *clo)
+fill_urn_sec(uint16_t idx, su_secu_t sec, void *UNUSED(clo))
 {
+/* not gonna happen in this hardcoded fantasy world */
 	if (sl1t_stbl_sec_slot_free_p(sec)) {
 		return;
 	} else {
 		uint32_t quodi = su_secu_quodi(sec);
 		int32_t quoti = su_secu_quoti(sec);
 		uint16_t pot = su_secu_pot(sec);
-		fprintf(stdout, "%hu: %u/%i@%hu", idx, quodi, quoti, pot);
+		fprintf(stdout, "%hu: %u/%i@%hu\n", idx, quodi, quoti, pot);
 	}
-
-	/* print the life span of this instrument in this file */
-	print_trng(idx, clo);
-	fputc('\n', stdout);
 	return;
 }
 

@@ -273,8 +273,8 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 	return len;
 }
 
-size_t
-fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
+static size_t
+fetch_ticks(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
 {
 /* assumes eod ticks for now,
  * i wonder if it's wise to have all the intelligence in here
@@ -504,6 +504,8 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 			tser.to = parse_time(row[MAX_DT]);
 		}
 		tser.types = tbs;
+		/* our cb */
+		tser.fetch_cb = fetch_ticks;
 		/* add to the collection of time stamps */
 		tscoll_add(tsc, &tser);
 

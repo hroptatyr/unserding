@@ -74,6 +74,13 @@ struct tssl1t_s {
 };
 
 
+static size_t
+fetch_ticks(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
+{
+	return 0;
+}
+
+
 static su_secu_t
 hardcoded_shit(const char *sym)
 {
@@ -138,11 +145,16 @@ fill_urn_sym(uint16_t idx, const char *sym, void *UNUSED(clo))
 
 	/* create us one of these nifty ts entries */
 	s = hardcoded_shit(sym);
+	fprintf(stdout, "%hu: %u/%i@%hu\n",
+		idx, su_secu_quodi(s), su_secu_quoti(s), su_secu_pot(s));
 	tsc = find_tscoll_by_secu_crea(tscache, s);
 	tser->urn = (void*)(long int)idx;
+	/* hardcoded */
 	tser->from = 915148800;
 	tser->to = 0x7fffffff;
 	tser->types = tbs;
+	/* our cb */
+	tser->fetch_cb = fetch_ticks;
 	/* add to the collection of time stamps */
 	tscoll_add(tsc, tser);
 	return;

@@ -62,10 +62,12 @@ typedef void(*tscoll_trav_f)(uint32_t lo, uint32_t hi, void *data, void *clo);
 
 struct tseries_s {
 	const_urn_t urn;
-	time_t from, to;
+	int32_t from, to;
 	uint32_t types;
 	/** points back into the tscoll satellite */
 	su_secu_t secu;
+	/** callback fun to call when ticks are to be fetched */
+	size_t(*fetch_cb)(tser_pkt_t, tseries_t, dse16_t beg, dse16_t end);
 	/** do not fiddle with me */
 	void *private;
 };

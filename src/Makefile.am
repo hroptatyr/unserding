@@ -84,7 +84,7 @@ dso_tseries_la_SOURCES += dso-tseries-mysql.c
 endif
 dso_tseries_la_SOURCES += dso-tseries-frobq.c
 dso_tseries_la_SOURCES += dso-tseries-sl1t.c
-dso_tseries_la_LIBADD += -lsushi
+dso_tseries_la_LIBADD += -luterus
 
 ## to fiddle with option chains and other instruments
 instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)

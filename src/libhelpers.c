@@ -111,7 +111,7 @@ ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 }
 
 size_t
-ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym)
+ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym, size_t len)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
@@ -122,7 +122,7 @@ ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym)
 	memset(buf, 0, sizeof(buf));
 	udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-	udpc_seria_add_str(&sctx, sym, strlen(sym));
+	udpc_seria_add_str(&sctx, sym, len);
 	/* prepare packet for sending im off */
 	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 	ud_send_raw(hdl, pkt);
@@ -247,7 +247,8 @@ ud_find_one_tslab(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 
 #if defined USE_TICK_BY_TS
 size_t
-ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
+ud_find_one_price(
+	ud_handle_t hdl, char *tgt, su_secu_t s, uint32_t bs, time_t ts)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
@@ -276,7 +277,8 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 }
 #elif defined USE_TICK_BY_INSTR
 size_t
-ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
+ud_find_one_price(
+	ud_handle_t hdl, char *tgt, su_secu_t s, uint32_t bs, time_t ts)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
@@ -334,7 +336,7 @@ void
 ud_find_ticks_by_ts(
 	ud_handle_t hdl,
 	void(*cb)(sl1tick_t, void *clo), void *clo,
-	secu_t s, size_t slen,
+	su_secu_t *s, size_t slen,
 	uint32_t bs, time_t ts)
 {
 	index_t rcvd = 0;
@@ -357,7 +359,7 @@ ud_find_ticks_by_ts(
 		/* 4220(ts, tick_bitset, triples-of-instrs) */
 		udpc_seria_add_tick_by_ts_hdr(&sctx, &hdr);
 		for (index_t j = 0, i = rcvd; j < FILL && i < slen; i++, j++) {
-			udpc_seria_add_secu(&sctx, &s[i]);
+			udpc_seria_add_secu(&sctx, s[i]);
 		}
 #undef FILL
 		/* prepare packet for sending im off */
@@ -373,7 +375,7 @@ ud_find_ticks_by_ts(
 		 * requested *inside* the packet */
 		while (udpc_seria_des_sl1tick(&t, &sctx)) {
 			/* marking-less approach, so we could make s[] const */
-			if (sl1tick_instr(&t) == s[rcvd].instr) {
+			if (sl1tick_instr(&t) == su_secu_quodi(s[rcvd])) {
 				rcvd++;
 			}
 			/* callback */
@@ -395,7 +397,7 @@ struct ftbi_ctx_s {
 	char buf[UDPC_PKTLEN];
 	struct sparse_Dute_s Dute;
 	struct udpc_seria_s sctx;
-	secu_t secu;
+	su_secu_t secu;
 	uint32_t types;
 	ud_packet_t pkt;
 	/* hope this still works on 32b systems
@@ -570,7 +572,7 @@ lodge_closure(ftbi_ctx_t bictx, void(*cb)(spDute_t, void *clo), void *clo)
 }
 
 static inline void
-lodge_ihdr(ftbi_ctx_t bictx, secu_t secu, uint32_t types)
+lodge_ihdr(ftbi_ctx_t bictx, su_secu_t secu, uint32_t types)
 {
 	bictx->secu = secu;
 	bictx->types = types;
@@ -581,7 +583,7 @@ void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
 	ud_find_ticks_by_instr_cb_f cb, void *clo,
-	secu_t s, uint32_t bs,
+	su_secu_t s, uint32_t bs,
 	time_t *ts, size_t tslen)
 {
 /* fixme, the retry cruft should be a parameter? */

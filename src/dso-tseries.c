@@ -86,7 +86,7 @@ typedef struct spitfire_ctx_s *spitfire_ctx_t;
 typedef enum spitfire_res_e spitfire_res_t;
 
 struct spitfire_ctx_s {
-	secu_t secu;
+	su_secu_t *secu;
 	size_t slen;
 	index_t idx;
 	time_t ts;
@@ -108,22 +108,26 @@ spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
 	/* start out with one tick per instr */
 	while (sfctx->idx < sfctx->slen &&
 	       sctx->msgoff < sctx->len - /*yuck*/7*8) {
-		secu_t s = &sfctx->secu[sfctx->idx];
+		su_secu_t s = sfctx->secu[sfctx->idx];
 
 		if (trick && (1 << (PFTT_EOD))/* bollocks */ & sfctx->types) {
-			gaid_t i = s->instr;
-			gaid_t u = s->unit ? s->unit : 73380;
-			gaid_t p = s->pot ? s->pot : 4;
+			gaid_t i = su_secu_quodi(s);
+			gaid_t u = su_secu_quoti(s);
+			gaid_t p = su_secu_pot(s);
 
+			u = u ? u : 73380;
+			p = p ? p : 4;
 			fill_sl1tick_shdr(&t, i, u, p);
 			fill_sl1tick_tick(&t, sfctx->ts, 0, PFTT_EOD, 10000);
 			udpc_seria_add_sl1tick(sctx, &t);
 		}
 		if (!trick && (1 << (PFTT_STL))/* bollocks */ & sfctx->types) {
-			gaid_t i = s->instr;
-			gaid_t u = s->unit ? s->unit : 73380;
-			gaid_t p = s->pot ? s->pot : 4;
+			gaid_t i = su_secu_quodi(s);
+			gaid_t u = su_secu_quoti(s);
+			gaid_t p = su_secu_pot(s);
 
+			u = u ? u : 73380;
+			p = p ? p : 4;
 			fill_sl1tick_shdr(&t, i, u, p);
 			fill_sl1tick_tick(&t, sfctx->ts, 0, PFTT_STL, 15000);
 			udpc_seria_add_sl1tick(sctx, &t);
@@ -135,7 +139,8 @@ spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
 }
 
 static void
-init_spitfire(spitfire_ctx_t ctx, secu_t secu, size_t slen, tick_by_ts_hdr_t t)
+init_spitfire(
+	spitfire_ctx_t ctx, su_secu_t *secu, size_t slen, tick_by_ts_hdr_t t)
 {
 	ctx->secu = secu;
 	ctx->slen = slen;
@@ -154,7 +159,7 @@ instr_tick_by_ts_svc(job_t j)
 	/* in args */
 	struct tick_by_ts_hdr_s hdr;
 	/* allow to filter for 64 instruments at once */
-	struct secu_s filt[64];
+	su_secu_t filt[64];
 	unsigned int nfilt = 0;
 	struct spitfire_ctx_s sfctx;
 
@@ -164,7 +169,7 @@ instr_tick_by_ts_svc(job_t j)
 	udpc_seria_des_tick_by_ts_hdr(&hdr, &sctx);
 
 	/* triples of instrument identifiers */
-	while (udpc_seria_des_secu(&filt[nfilt], &sctx) &&
+	while ((filt[nfilt].mux = udpc_seria_des_secu(&sctx).mux) &&
 	       ++nfilt < countof(filt));
 
 	UD_DEBUG("0x4220: ts:%d filtered for %u instrs\n", (int)hdr.ts, nfilt);
@@ -191,7 +196,7 @@ instr_tick_by_ts_svc(job_t j)
 typedef struct oadt_ctx_s *oadt_ctx_t;
 struct oadt_ctx_s {
 	udpc_seria_t sctx;
-	secu_t secu;
+	su_secu_t secu;
 	tscoll_t coll;
 	time_t filt[NFILT];
 	size_t nfilt;
@@ -325,18 +330,18 @@ proc_one(oadt_ctx_t octx, time_t ts)
 	if ((idx = index_in_pkt(refts)) >= TICKS_PER_FORTNIGHT) {
 		/* leave a note in the packet? */
 		UD_DEBUG_TSER("week end tick (%u %s)\n",
-			      octx->secu->instr, tsbugger(ts));
+			      su_secu_quodi(octx->secu), tsbugger(ts));
 		spDute_bang_all_nexist(octx, refts);
 
 	} else if ((tser = tscoll_find_series(octx->coll, ts)) == NULL) {
 		/* no way of obtaining ticks */
 		UD_DEBUG_TSER("No suitable URN found (%u %s)\n",
-			      octx->secu->instr, tsbugger(ts));
+			      su_secu_quodi(octx->secu), tsbugger(ts));
 		spDute_bang_all_nexist(octx, refts);
 
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
 		UD_DEBUG_TSER("URN not cached, deferring (%u %s)\n",
-			      octx->secu->instr, tsbugger(ts));
+			      su_secu_quodi(octx->secu), tsbugger(ts));
 		defer_frob(tser, refts - idx, false);
 		spDute_bang_all_onhold(octx, refts);
 
@@ -388,10 +393,13 @@ instr_tick_by_instr_svc(job_t j)
 		return;
 	}
 	UD_DEBUG("0x4222: %u/%u@%hu filtered for %u time stamps\n",
-		 hdr.secu.instr, hdr.secu.unit, hdr.secu.pot, nfilt);
+		 su_secu_quodi(hdr.secu),
+		 su_secu_quoti(hdr.secu),
+		 su_secu_pot(hdr.secu),
+		 nfilt);
 
 	/* get us the tseries we're talking about */
-	if ((tsc = find_tscoll_by_secu(tscache, &hdr.secu)) == NULL) {
+	if ((tsc = find_tscoll_by_secu(tscache, hdr.secu)) == NULL) {
 		/* means we have no means of fetching */
 		/* we could issue a packet saying so */
 		UD_DEBUG("No way of fetching stuff\n");
@@ -400,7 +408,7 @@ instr_tick_by_instr_svc(job_t j)
 
 	/* initialise our context */
 	oadtctx.sctx = &rplsctx;
-	oadtctx.secu = &hdr.secu;
+	oadtctx.secu = hdr.secu;
 	oadtctx.coll = tsc;
 	oadtctx.nfilt = nfilt;
 
@@ -434,18 +442,21 @@ instr_urn_svc(job_t j)
 {
 	struct udpc_seria_s sctx;
 	/* in args */
-	struct secu_s secu;
+	su_secu_t secu;
 	tscoll_t tsc;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the header off of the wire */
-	udpc_seria_des_secu(&secu, &sctx);
+	secu = udpc_seria_des_secu(&sctx);
 	UD_DEBUG("0x%04x (UD_SVC_GET_URN): %u/%u@%hu\n",
-		 UD_SVC_GET_URN, secu.instr, secu.unit, secu.pot);
+		 UD_SVC_GET_URN,
+		 su_secu_quodi(secu),
+		 su_secu_quoti(secu),
+		 su_secu_pot(secu));
 
 	/* get us the tseries we're talking about */
-	if ((tsc = find_tscoll_by_secu(tscache, &secu)) == NULL) {
+	if ((tsc = find_tscoll_by_secu(tscache, secu)) == NULL) {
 		/* means we have no means of fetching */
 		/* we could issue a packet saying so */
 		UD_DEBUG("No way of fetching stuff\n");
@@ -468,6 +479,7 @@ fetch_urn_svc(job_t UNUSED(j))
 #if defined HAVE_MYSQL
 	fetch_urn_mysql();
 #endif	/* HAVE_MYSQL */
+	fetch_urn_sl1t();
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	return;
 }

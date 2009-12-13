@@ -143,18 +143,13 @@ __frobnicate(void *UNUSED(clo))
 /* should now be in the worker thread */
 	struct frobjob_s j;
 	while (frobq_deq(&j, gfrobq)) {
-#if defined HAVE_MYSQL
 		struct tser_pkt_s pkt;
-		if (fetch_ticks_intv_mysql(&pkt, j.tser, j.beg, j.end) == 0) {
+		if (j.tser->fetch_cb(&pkt, j.tser, j.beg, j.end) == 0) {
 			/* we should massage the URN here so that this
 			 * particular slot is never retried */
 			return;
 		}
 		tseries_add(j.tser, j.beg, j.end, &pkt);
-#else
-		/* we should massage the URN here */
-		;
-#endif	/* HAVE_MYSQL */
 	}
 	return;
 }

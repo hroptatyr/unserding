@@ -46,11 +46,10 @@
 extern tscache_t tscache;
 
 #if defined HAVE_MYSQL
-extern size_t
-fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t b, dse16_t e);
 extern void
 fetch_urn_mysql(void);
 #endif	/* HAVE_MYSQL */
+extern void fetch_urn_sl1t(void);
 
 
 /* module like helpers */

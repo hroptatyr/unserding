@@ -94,6 +94,11 @@ extern size_t cat_size(cat_t cat);
  * Check if I is known, if not add it to the catalogue CAT.
  * If known replace the existing instrument in CAT by I. */
 extern instr_t cat_bang_instr(cat_t cat, instr_t i);
+/**
+ * Like cat_bang_instr() but do not lock the catalogue.
+ * The caller has to make sure that the catalogue lock is held. */
+extern instr_t
+cat_bang_instr_nolck(cat_t cat, instr_t i);
 
 extern instr_t find_instr_by_gaid(cat_t cat, gaid_t gaid);
 extern instr_t find_instr_by_name(cat_t cat, const char *name);

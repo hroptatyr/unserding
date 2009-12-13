@@ -38,8 +38,6 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
-#include <pthread.h>
-#include <time.h>
 #include "unserding.h"
 #include "unserding-ctx.h"
 #include "unserding-nifty.h"
@@ -86,11 +84,13 @@ pong(job_t UNUSED(j))
 	return;
 }
 
+#if 0
 static inline ud_pong_score_t
 udctx_score(ud_ctx_t ctx)
 {
 	return ctx->hdl->score;
 }
+#endif	/* 0 */
 
 
 void

@@ -40,10 +40,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
-#if !defined __USE_MISC
-/* for struct ifreq and friends */
-# define __USE_MISC
-#endif	/* !__USE_MISC */
 #include <net/if.h>
 #include <arpa/inet.h>
 
@@ -173,10 +169,7 @@ scscp_connect(sock_ctx_t ctx)
 		UD_DBGCONT("failed, inet_pton() screwed up\n");
 		return -1;
 	}
-	if ((s6->sin6_scope_id = if_index(s, ctx->had->dev)) < 0) {
-		UD_DBGCONT("failed, if_index() screwed up\n");
-		return -1;
-	}
+	s6->sin6_scope_id = if_index(s, ctx->had->dev);
 	/* connect him */
 	if (connect(s, (struct sockaddr*)(void*)&srv, srvlen) < 0) {
 		UD_DBGCONT("failed, connect() screwed up\n");
@@ -191,10 +184,9 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	sock_ctx_t ctx = sock_ctx_from_evio(w);
 	char buf[4096];
-	ssize_t nread;
 
 	UD_DEBUG("%s got back to us\n", sock_ctx_host(ctx));
-	if ((nread = read(w->fd, buf, sizeof(buf))) <= 0) {
+	if (read(w->fd, buf, sizeof(buf)) <= 0) {
 		UD_DEBUG("no data, closing socket %s\n", sock_ctx_host(ctx));
 		ev_io_stop(EV_A_ w);
 		close(w->fd);

@@ -102,6 +102,18 @@
 #endif	/* !xrealloc */
 #endif	/* 0 */
 
+/* turn off tedious warnings */
+#if defined __INTEL_COMPILER
+# pragma warning (disable:593)
+# pragma warning (disable:869)
+# pragma warning (disable:1419)
+# pragma warning (disable:2259)
+#elif defined __GNUC__
+# pragma GCC diagnostic ignored "-Wswitch-default"
+# pragma GCC diagnostic ignored "-Wsign-compare"
+# pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif	/* __GNUC__ || __INTEL_COMPILER */
+
 /* declarations */
 extern int cli_yyparse(void *scanner, ud_handle_t hdl);
 
@@ -713,7 +725,7 @@ static struct poptOption dpy_opts[] = {
         POPT_TABLEEND
 };
 
-static const struct poptOption const uc_opts[] = {
+static const struct poptOption uc_opts[] = {
 #if 1
         { NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
           "Server Options", NULL },
@@ -727,7 +739,6 @@ static const struct poptOption const uc_opts[] = {
 static const char *const*
 ud_parse_cl(size_t argc, const char *argv[])
 {
-        int rc;
         poptContext opt_ctx;
 
         UD_DEBUG("parsing command line options\n");
@@ -735,7 +746,7 @@ ud_parse_cl(size_t argc, const char *argv[])
         poptSetOtherOptionHelp(opt_ctx, "-4x -p <port>");
 
         /* auto-do */
-        while ((rc = poptGetNextOpt(opt_ctx)) > 0) {
+        while (poptGetNextOpt(opt_ctx) > 0) {
                 /* Read all the options ... */
                 ;
         }

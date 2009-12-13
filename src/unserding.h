@@ -184,7 +184,7 @@ ud_handle_set_4svc(ud_handle_t hdl)
 
 
 /* more of them */
-#include "xdr-instr-seria.h"
+#include "xdr-instr.h"
 #include "tseries.h"
 
 #endif	/* INCLUDED_unserding_h_ */

@@ -47,6 +47,8 @@
 #include <fcntl.h>
 #include <pthread.h>
 
+#include <pfack/uterus.h>
+#include <pfack/instruments.h>
 /* our master include */
 #include "unserding.h"
 #include "module.h"
@@ -55,9 +57,8 @@
 #include "unserding-dbg.h"
 #include "unserding-ctx.h"
 #include "unserding-private.h"
-
-#include "xdr-instr-seria.h"
-#include "xdr-instr-private.h"
+/* for higher level packet handling */
+#include "seria-proto-glue.h"
 
 /* later to be decoupled from the actual source */
 #if defined HAVE_MYSQL
@@ -323,18 +324,18 @@ proc_one(oadt_ctx_t octx, time_t ts)
 #define TICKS_PER_FORTNIGHT	10
 	if ((idx = index_in_pkt(refts)) >= TICKS_PER_FORTNIGHT) {
 		/* leave a note in the packet? */
-		UD_DEBUG_TSER("week end tick (%i %s)\n",
+		UD_DEBUG_TSER("week end tick (%u %s)\n",
 			      octx->secu->instr, tsbugger(ts));
 		spDute_bang_all_nexist(octx, refts);
 
 	} else if ((tser = tscoll_find_series(octx->coll, ts)) == NULL) {
 		/* no way of obtaining ticks */
-		UD_DEBUG_TSER("No suitable URN found (%i %s)\n",
+		UD_DEBUG_TSER("No suitable URN found (%u %s)\n",
 			      octx->secu->instr, tsbugger(ts));
 		spDute_bang_all_nexist(octx, refts);
 
 	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
-		UD_DEBUG_TSER("URN not cached, deferring (%i %s)\n",
+		UD_DEBUG_TSER("URN not cached, deferring (%u %s)\n",
 			      octx->secu->instr, tsbugger(ts));
 		defer_frob(tser, refts - idx, false);
 		spDute_bang_all_onhold(octx, refts);
@@ -386,7 +387,7 @@ instr_tick_by_instr_svc(job_t j)
 	if ((nfilt = snarf_times(&sctx, oadtctx.filt, NFILT)) == 0) {
 		return;
 	}
-	UD_DEBUG("0x4222: %u/%u@%u filtered for %u time stamps\n",
+	UD_DEBUG("0x4222: %u/%u@%hu filtered for %u time stamps\n",
 		 hdr.secu.instr, hdr.secu.unit, hdr.secu.pot, nfilt);
 
 	/* get us the tseries we're talking about */
@@ -440,7 +441,7 @@ instr_urn_svc(job_t j)
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the header off of the wire */
 	udpc_seria_des_secu(&secu, &sctx);
-	UD_DEBUG("0x%04x (UD_SVC_GET_URN): %u/%u@%u\n",
+	UD_DEBUG("0x%04x (UD_SVC_GET_URN): %u/%u@%hu\n",
 		 UD_SVC_GET_URN, secu.instr, secu.unit, secu.pot);
 
 	/* get us the tseries we're talking about */
@@ -489,6 +490,11 @@ cfgsrc_type(void *ctx, void *spec)
 {
 #define CFG_TYPE	"type"
 	const char *type = NULL;
+
+	if (spec == NULL) {
+		UD_DEBUG("mod/tseries: no source specified\n");
+		return CST_UNK;
+	}
 	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
 
 	UD_DEBUG("type %s %p\n", type, spec);
@@ -523,6 +529,9 @@ load_ticks_fetcher(void *clo, void *spec)
 		break;
 	}
 
+	/* fetch fx tseries, should be configurable */
+	dso_tseries_sl1t_LTX_init(clo);
+
 	/* also load the frobber in this case */
 	dso_tseries_frobq_LTX_init(clo);
 
@@ -539,6 +548,7 @@ unload_ticks_fetcher(void *UNUSED(clo))
 	/* fetch some instruments by sql */
 	dso_tseries_mysql_LTX_deinit(clo);
 #endif	/* HAVE_MYSQL */
+	dso_tseries_sl1t_LTX_deinit(clo);
 	return;
 }
 

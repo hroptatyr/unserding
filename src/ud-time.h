@@ -38,20 +38,9 @@
 #if !defined INCLUDED_ud_time_h_
 #define INCLUDED_ud_time_h_
 
-/* this is just a convenience header to overcome differences between the
- * intel and the gcc compiler */
-
-/* allow for the intel compiler to use time.h features we need */
-#if !defined __USE_POSIX
-# define __USE_POSIX
-#endif	/* !__USE_POSIX */
-#if !defined __USE_POSIX199309
-# define __USE_POSIX199309
-#endif	/* !__USE_POSIX199309 */
-#if !defined __USE_XOPEN
-# define __USE_XOPEN
-#endif	/* !__USE_XOPEN */
-
+#include <sys/types.h>
+#include <sys/time.h>
+/* for struct timespec */
 #include <time.h>
 
 /* returns the current CLOCK_REALTIME time stamp */
@@ -84,6 +73,27 @@ __as_f(struct timespec src)
 {
 /* return time as float in milliseconds */
 	return src.tv_sec * 1000.f + src.tv_nsec / 1000000.f;
+}
+
+/* printers */
+static inline size_t
+print_ts_into(char *restrict tgt, size_t len, time_t ts)
+{
+	struct tm tm;
+
+	memset(&tm, 0, sizeof(tm));
+	(void)gmtime_r(&ts, &tm);
+	return strftime(tgt, len, "%Y-%m-%d %H:%M:%S", &tm);
+}
+
+static inline size_t
+print_ds_into(char *restrict tgt, size_t len, time_t ts)
+{
+	struct tm tm;
+
+	memset(&tm, 0, sizeof(tm));
+	(void)gmtime_r(&ts, &tm);
+	return strftime(tgt, len, "%Y-%m-%d", &tm);
 }
 
 #endif	/* INCLUDED_ud_time_h_ */

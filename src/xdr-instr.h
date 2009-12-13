@@ -35,12 +35,11 @@
  *
  ***/
 
-#if !defined INCLUDED_xdr_instr_seria_h_
-#define INCLUDED_xdr_instr_seria_h_
+#if !defined INCLUDED_xdr_instr_h_
+#define INCLUDED_xdr_instr_h_
 
 #include <stdbool.h>
 #include <time.h>
-#include <pfack/instruments.h>
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"
@@ -68,6 +67,9 @@
  **/
 extern size_t
 ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t inst_id);
+/* same but for symbols */
+extern size_t
+ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym);
 
 /**
  * Deliver a list of tslabs known to the network for the instrument
@@ -91,4 +93,4 @@ ud_find_many_instrs(
 	void(*cb)(const char *tgt, size_t len, void *clo), void *clo,
 	uint32_t cont_id[], size_t len);
 
-#endif	/* INCLUDED_xdr_instr_seria_h_ */
+#endif	/* INCLUDED_xdr_instr_h_ */

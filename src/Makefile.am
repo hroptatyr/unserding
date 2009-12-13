@@ -2,7 +2,7 @@
 
 ### Makefile.am
 
-AM_CPPFLAGS = -pthread
+AM_CPPFLAGS = -pthread -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS = -lpthread
 
 headerdir = $(includedir)/unserding
@@ -67,6 +67,7 @@ dso_xdr_instr_la_SOURCES = catalogue.c dso-xdr-instr.c
 if USE_MYSQL
 dso_xdr_instr_la_SOURCES += dso-xdr-instr-mysql.c
 endif
+dso_xdr_instr_la_SOURCES += dso-xdr-instr-file.c
 
 ## the time series module
 dso_tseries_la_LDFLAGS = -module $(PFACK_LIBS)
@@ -82,13 +83,15 @@ if USE_MYSQL
 dso_tseries_la_SOURCES += dso-tseries-mysql.c
 endif
 dso_tseries_la_SOURCES += dso-tseries-frobq.c
+dso_tseries_la_SOURCES += dso-tseries-sl1t.c
+dso_tseries_la_LIBADD += -lsushi
 
 ## to fiddle with option chains and other instruments
 instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)
 instrumenstruation_LDFLAGS = $(PFACK_LIBS)
 instrumenstruation_LDADD = $(PFACK_LIBS) libunserding.la -lpopt
 endif  ## BUILD_SERVER
-header_HEADERS += xdr-instr-seria.h tseries.h
+header_HEADERS += xdr-instr.h tseries.h
 
 ## fucking automake
 unsercli_YFLAGS = -d -p "cli_yy"
@@ -132,7 +135,7 @@ if BUILD_LIBRARY
 ## the lib
 libunserding_la_SOURCES = libstuff.c libhelpers.c
 libunserding_la_SOURCES += svc-pong.c
-libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS)
+libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS) $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
 endif
 

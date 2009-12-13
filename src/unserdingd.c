@@ -236,8 +236,6 @@ jpool_t gjpool;
 /* holds worker pool */
 wpool_t gwpool;
 
-static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
-
 static void
 sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
@@ -396,7 +394,6 @@ static const struct poptOption const ud_opts[] = {
 static const char *const*
 ud_parse_cl(size_t argc, const char *argv[])
 {
-        int rc;
         poptContext opt_ctx;
 
         UD_DEBUG("parsing command line options\n");
@@ -407,7 +404,7 @@ ud_parse_cl(size_t argc, const char *argv[])
 		"module [module [...]]");
 
         /* auto-do */
-        while ((rc = poptGetNextOpt(opt_ctx)) > 0) {
+        while (poptGetNextOpt(opt_ctx) > 0) {
                 /* Read all the options ... */
                 ;
         }

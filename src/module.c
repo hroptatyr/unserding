@@ -112,16 +112,27 @@ static void
 add_myself(void)
 {
 	const char myself[] = "/proc/self/exe";
+	const char libdir[] = "/lib/unserding";
 	char wd[PATH_MAX], *dp;
 	size_t sz;
 
 	sz = readlink(myself, wd, sizeof(wd));
 	wd[sz] = '\0';
-	if ((dp = strrchr(wd, '/'))) {
-		*dp = '\0';
-		UD_DEBUG("adding %s\n", wd);
-		lt_dladdsearchdir(wd);
+	if ((dp = strrchr(wd, '/')) == NULL) {
+		return;
 	}
+	/* add the path where the binary resides */
+	*dp = '\0';
+	UD_DEBUG("adding %s\n", wd);
+	lt_dladdsearchdir(wd);
+
+	if ((dp = strrchr(wd, '/')) == NULL) {
+		return;
+	}
+	/* add the path where the binary resides + ../lib/unserding/ */
+	strncpy(dp, libdir, sizeof(libdir));
+	UD_DEBUG("adding %s\n", wd);
+	lt_dladdsearchdir(wd);
 	return;
 }
 

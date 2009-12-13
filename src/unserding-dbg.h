@@ -140,10 +140,6 @@ extern FILE *logout;
 
 
 #if defined UNSERSRV
-# if !defined __USE_POSIX199309
-/* for CLOCK_REALTIME and friends */
-#  define __USE_POSIX199309
-# endif	 /* !__USE_POSIX199309 */
 # if defined TIME_WITH_SYS_TIME
 #  include <sys/time.h>
 #  include <time.h>
@@ -202,7 +198,7 @@ __ud_log(void)
 #  endif  /* HAVE_CLOCK_GETTIME */
 	clock_gettime(CLOCK_REALTIME, &n);
 	/* there must be %lu.%09u in the format string */
-	fprintf(logout, "%lu.%09u ", n.tv_sec, n.tv_nsec);
+	fprintf(logout, "%ld.%09ld ", n.tv_sec, n.tv_nsec);
 	return;
 }
 

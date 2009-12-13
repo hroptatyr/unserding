@@ -280,7 +280,7 @@ check_resize(_cat_t c)
 }
 
 instr_t
-cat_bang_instr(cat_t cat, instr_t i)
+cat_bang_instr_nolck(cat_t cat, instr_t i)
 {
 /* returns the next instrument we've banged into */
 	_cat_t c = cat;
@@ -289,12 +289,10 @@ cat_bang_instr(cat_t cat, instr_t i)
 	/* key slot and instr slot */
 	uint32_t ks, is;
 
-	pthread_mutex_lock(&c->mtx);
 	(void)check_resize(c);
 	ks = slot(c->keys, c->alloc_sz, gaid);
 	if (UNLIKELY(c->keys[ks].key != 0)) {
 		res = (void*)cat_instr(c, c->keys[ks].val);
-		pthread_mutex_unlock(&c->mtx);
 		return res;
 	}
 	is = c->ninstrs++;
@@ -302,6 +300,18 @@ cat_bang_instr(cat_t cat, instr_t i)
 	c->keys[ks].val = is;
 	res = (void*)cat_instr(c, is);
 	memcpy(res, i, sizeof(*i));
+	return res;
+}
+
+instr_t
+cat_bang_instr(cat_t cat, instr_t i)
+{
+/* returns the next instrument we've banged into */
+	_cat_t c = cat;
+	instr_t res;
+
+	pthread_mutex_lock(&c->mtx);
+	res = cat_bang_instr_nolck(cat, i);
 	pthread_mutex_unlock(&c->mtx);
 	return res;
 }

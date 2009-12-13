@@ -60,6 +60,8 @@ extern void dso_tseries_mysql_LTX_init(void*);
 extern void dso_tseries_mysql_LTX_deinit(void*);
 extern void dso_tseries_frobq_LTX_init(void*);
 extern void dso_tseries_frobq_LTX_deinit(void*);
+extern void dso_tseries_sl1t_LTX_init(void*);
+extern void dso_tseries_sl1t_LTX_deinit(void*);
 
 
 /* frob queue mumbo jumbo */

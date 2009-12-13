@@ -47,6 +47,8 @@
 #include <fcntl.h>
 #include <pthread.h>
 
+#include <pfack/uterus.h>
+#include <pfack/instruments.h>
 /* our master include */
 #include "unserding.h"
 #include "module.h"
@@ -54,13 +56,11 @@
 #define UNSERSRV
 #include "unserding-dbg.h"
 #include "unserding-ctx.h"
+#include "ud-time.h"
 
-#include "xdr-instr-private.h"
-#include "xdr-instr-seria.h"
 #include "urn.h"
 #include "tscache.h"
 #include "tscoll.h"
-#include "tseries.h"
 #include "tseries-private.h"
 
 #if defined HAVE_MYSQL
@@ -87,7 +87,7 @@
 #endif	/* DEBUG_FLAG */
 
 /* mysql conn, kept open */
-static void *conn;
+static void *conn = NULL;
 
 struct tser_pkt_idx_s {
 	uint32_t i;
@@ -214,7 +214,7 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 			"SELECT %s AS `stamp`, "
 			"%s AS `o`, %s AS `h`, %s AS `l`, %s AS `c`, %s AS `v` "
 			"FROM %s "
-			"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
+			"WHERE %s = %u AND %s BETWEEN '%s' AND '%s' "
 			"ORDER BY 1",
 			urn_fld_date(tser->urn),
 			urn_fld_top(tser->urn),
@@ -234,7 +234,7 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 			"%s `ao`, %s `ah`, %s `al`, %s `ac`, %s `av`, "
 			"%s `to`, %s `th`, %s `tl`, %s `tc`, %s `tv`  "
 			"FROM %s "
-			"WHERE %s = %d AND %s BETWEEN '%s' AND '%s' "
+			"WHERE %s = %u AND %s BETWEEN '%s' AND '%s' "
 			"ORDER BY 1",
 			urn_fld_date(tser->urn),
 
@@ -437,17 +437,21 @@ fill_urns(void)
 /* overview and administrative bullshit */
 static const char ovqry[] =
 	"SELECT "
-#define INSTR_ID	0
+#define QUODI_ID	0
 	"`uiu`.`ga_instr_id`, "
-#define URN_ID		1
+#define QUOTI_ID	1
+	"`uiu`.`quoti_id`, "
+#define POT_ID		2
+	"`uiu`.`pot_id`, "
+#define URN_ID		3
 	"`uiu`.`ga_urn_id`, "
-#define URN		2
+#define URN		4
 	"`uiu`.`urn`, "
-#define MIN_DT		3
+#define MIN_DT		5
 	"`uiu`.`min_dt`, "
-#define MAX_DT		4
+#define MAX_DT		6
 	"`uiu`.`max_dt`, "
-#define TYPES_BS	5
+#define TYPES_BS	7
 	"`uiu`.`types_bitset` "
 	"FROM `freundt`.`ga_instr_urns` AS `uiu`";
 
@@ -466,15 +470,16 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 	struct tseries_s tser;
 	uint32_t tbs = strtoul(row[TYPES_BS], NULL, 10);
 
-	secu.instr = strtoul(row[INSTR_ID], NULL, 10);
-	secu.unit = 0;
-	secu.pot = 0;
+	secu.instr = strtoul(row[QUODI_ID], NULL, 10);
+	secu.unit = strtoul(row[QUOTI_ID], NULL, 10);
+	secu.pot = strtoul(row[POT_ID], NULL, 10);
 
 	switch (urn_id) {
 	case 1 ... 3:
 	case 8:
 		/* once-a-day, 5-a-week */
-		UD_DEBUG("OAD/5DW tick for %u\n", secu.instr);
+		UD_DEBUG("OAD/5DW tick for %u/%u@%hu\n",
+			 secu.instr, secu.unit, secu.pot);
 		tsc = find_tscoll_by_secu_crea(tscache, &secu);
 
 		tser.urn = find_urn(urn_id, row[URN]);
@@ -504,6 +509,10 @@ void
 fetch_urn_mysql(void)
 {
 /* make me thread-safe and declare me */
+	if (conn == NULL) {
+		return;
+	}
+
 	UD_DEBUG("leeching overview ...");
 	uddb_qry(conn, ovqry, sizeof(ovqry)-1, ovqry_rowf, NULL);
 	UD_DBGCONT("done\n");
@@ -532,7 +541,9 @@ dso_tseries_mysql_LTX_init(void *clo)
 void
 dso_tseries_mysql_LTX_deinit(void *UNUSED(clo))
 {
-	uddb_disconnect(conn);
+	if (conn != NULL) {
+		uddb_disconnect(conn);
+	}
 	return;
 }
 

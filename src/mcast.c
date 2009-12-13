@@ -132,6 +132,7 @@ next_slot(void)
 	return res;
 }
 
+#if 0
 static inline index_t
 curr_slot(void)
 {
@@ -141,6 +142,7 @@ curr_slot(void)
 	}
 	return res - 1;
 }
+#endif	/* 0 */
 
 static void
 add_packet(const char *buf, size_t len)

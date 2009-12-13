@@ -1,6 +1,6 @@
-/*** instr.c -- unserding instruments
+/*** dso-tseries-sl1t.c -- sl1t tick files
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2009 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
  *
@@ -35,36 +35,81 @@
  *
  ***/
 
-#include "config.h"
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <fcntl.h>
+#include <pthread.h>
 
+#include <sushi/sl1t.h>
+#include <sushi/sl1tfile.h>
 /* our master include */
 #include "unserding.h"
+#include "module.h"
+#include "protocore.h"
+#define UNSERSRV
+#include "unserding-dbg.h"
+#include "unserding-ctx.h"
 #include "unserding-private.h"
+/* for higher level packet handling */
+#include "seria-proto-glue.h"
+#include "tseries-private.h"
 
+#if defined DEBUG_FLAG
+# define UD_DEBUG_TSER(args...)			\
+	fprintf(logout, "[unserding/tseries] " args)
+#endif	/* DEBUG_FLAG */
 
+typedef struct tssl1t_s *tssl1t_t;
 
-void
-init_instr(void)
+struct tssl1t_s {
+	int infd;
+	void *rdr;
+};
+
+
+static const char fxsl1tf[] = "/home/freundt/.unserding/EUR_hist.sl1t";
+
+static void
+load_sl1t_file(tssl1t_t ctx)
 {
-#if 0
-	static const char instr[] = "instrument";
-	ud_tlv_t tmp = make_tlv(UD_TAG_CLASS, countof_m1(instr));
-
-	UD_DEBUG("adding instruments\n");
-	instr = ud_cat_add_child(ud_catalogue, "instruments", UD_CF_JUSTCAT);
-	equit = ud_cat_add_child(instr, "equity", UD_CF_JUSTCAT);
-	commo = ud_cat_add_child(instr, "commodity", UD_CF_JUSTCAT);
-	curnc = ud_cat_add_child(instr, "currency", UD_CF_JUSTCAT);
-	intrs = ud_cat_add_child(instr, "interest", UD_CF_JUSTCAT);
-	deriv = ud_cat_add_child(instr, "derivative", UD_CF_JUSTCAT);
-#endif
+	if ((ctx->infd = open(fxsl1tf, O_RDONLY, 0644)) < 0) {
+		/* file not found */
+		ctx->rdr = NULL;
+		return;
+	}
+	ctx->rdr = make_sl1t_reader(ctx->infd);
 	return;
 }
 
-/* instr.c ends here */
+
+static struct tssl1t_s my_ctx[1];
+
+void
+dso_tseries_sl1t_LTX_init(void *UNUSED(clo))
+{
+	UD_DEBUG("mod/tseries-sl1t: loading ...");
+	load_sl1t_file(my_ctx);
+	UD_DBGCONT("done\n");
+	return;
+}
+
+void
+dso_tseries_sl1t_LTX_deinit(void *UNUSED(clo))
+{
+	UD_DEBUG("mod/tseries-sl1t: unloading ...");
+	if (my_ctx->rdr != NULL) {
+		free_sl1t_reader(my_ctx->rdr);
+	}
+	close(my_ctx->infd);
+	UD_DBGCONT("done\n");
+	return;
+}
+
+/* dso-sl1t.c */

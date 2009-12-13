@@ -46,6 +46,7 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <errno.h>
 
 /* our master include */
 #include "unserding.h"
@@ -55,10 +56,10 @@
 #include "unserding-dbg.h"
 #include "unserding-nifty.h"
 #include "unserding-ctx.h"
+#include "unserding-private.h"
 
 #include <pfack/instruments.h>
 #include "catalogue.h"
-#include "xdr-instr-seria.h"
 #include "xdr-instr-private.h"
 
 /**
@@ -69,14 +70,12 @@
 #define UD_SVC_INSTR_FROM_FILE	0x4218
 
 /**
- * Service 4222:
- * Find ticks of one instrument over time (time series).
- * This service can be used if the focus is one particular instrument
- * (or one instrument at different exchanges) and the ticks to be returned
- * are numerous.
- * sig: 4222()
- **/
-#define UD_SVC_TICK_BY_INSTR	0x4222
+ * Temporary service for instr fetching. */
+#define UD_SVC_INSTR_TO_FILE	0x421c
+
+/**
+ * Fetch URN service. */
+#define UD_SVC_FETCH_INSTR	0x421e
 
 #if !defined xnew
 # define xnew(_x)	malloc(sizeof(_x))
@@ -145,36 +144,6 @@ copyadd_instr(instr_t i)
 	return;
 }
 
-#if 0
-static ssize_t
-read_file(char *restrict buf, size_t bufsz, const char *fname)
-{
-	int fd;
-	ssize_t nrd;
-
-	if ((fd = open(fname, O_RDONLY)) < 0) {
-		return -1;
-	}
-	nrd = read(fd, buf, bufsz);
-	close(fd);
-	return nrd;
-}
-
-static ssize_t
-write_file(char *restrict buf, size_t bufsz, const char *fname)
-{
-	int fd;
-	ssize_t nrd;
-
-	if ((fd = open(fname, O_CREAT | O_TRUNC | O_WRONLY, 0644)) < 0) {
-		return -1;
-	}
-	nrd = write(fd, buf, bufsz);
-	close(fd);
-	return nrd;
-}
-#endif
-
 
 /* jobs */
 static void
@@ -203,53 +172,6 @@ instr_add_svc(job_t j)
 }
 
 static void
-instr_add_from_file_svc(job_t j)
-{
-	/* our serialiser */
-	struct udpc_seria_s sctx;
-	const char *sstrp;
-	size_t ssz;
-	XDR hdl;
-	FILE *f;
-
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	ssz = udpc_seria_des_str(&sctx, &sstrp);
-
-	if (ssz == 0) {
-		UD_DEBUG("Usage: 4218 \"/path/to/file.xdr\"\n");
-		return;
-	}
-
-	UD_DEBUG("getting XDR encoded instrument from %s\n", sstrp);
-
-	if ((f = fopen(sstrp, "r")) == NULL) {
-		UD_DEBUG("no such file or directory\n");
-		return;
-	}
-
-	hrclock_print();
-	fprintf(stderr, " start\n");
-
-	xdrstdio_create(&hdl, f, XDR_DECODE);
-	while (true) {
-		struct instr_s i;
-
-		init_instr(&i);
-		if (!(xdr_instr_s(&hdl, &i))) {
-			break;
-		}
-		(void)cat_bang_instr(instrs, &i);
-	}
-	xdr_destroy(&hdl);
-
-	fclose(f);
-
-	hrclock_print();
-	fprintf(stderr, " stop\n");
-	return;
-}
-
-static void
 instr_dump_all(job_t j)
 {
 	/* our stuff */
@@ -258,10 +180,11 @@ instr_dump_all(job_t j)
 
 /* fuck ugly, mutex'd iterators are a pita */
 #define CAT	((struct cat_s*)instrs)
+	UD_DEBUG("dumping %zu instrs ...", CAT->ninstrs);
 	pthread_mutex_lock(&CAT->mtx);
 
 	do {
-		char *enc = &j->buf[UDPC_HDRLEN];
+		char *enc = UDPC_PAYLOAD(j->buf);
 		size_t len;
 
 		/* prepare the packet ... */
@@ -286,8 +209,14 @@ instr_dump_all(job_t j)
 		/* ... and send him off */
 		j->blen = UDPC_HDRLEN + 3 + len;
 		send_cl(j);
+
+		{
+			struct timeval tv = {.tv_sec = 0, .tv_usec = 10};
+			select(0, NULL, NULL, NULL, &tv);
+		}
 	} while (i < CAT->ninstrs);
 	pthread_mutex_unlock(&CAT->mtx);
+#undef CAT
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -310,6 +239,16 @@ __seria_instr(udpc_seria_t sctx, instr_t in)
 	sctx->msg[sctx->msgoff + 1] = (uint8_t)(len >> 8);
 	sctx->msg[sctx->msgoff + 2] = (uint8_t)(len & 0xff);
 	sctx->msgoff += XDR_HDR_LEN + len;
+	return;
+}
+
+static void
+instr_dump_name(udpc_seria_t sctx, const char *sym)
+{
+	instr_t in = find_instr_by_name(instrs, sym);
+
+	/* serialise what we've got */
+	__seria_instr(sctx, in);
 	return;
 }
 
@@ -339,9 +278,13 @@ instr_dump_svc(job_t j)
 
 	do {
 		switch (udpc_seria_tag(&sctx)) {
-		case UDPC_TYPE_STR:
+		case UDPC_TYPE_STR: {
 			/* find by name */
+			const char *s;
+			udpc_seria_des_str(&sctx, &s);
+			instr_dump_name(&rplsctx, s);
 			break;
+		}
 		case UDPC_TYPE_SI32: {
 			/* find by gaid */
 			int32_t id = udpc_seria_des_si32(&sctx);
@@ -360,12 +303,6 @@ instr_dump_svc(job_t j)
 out:
 	/* send what we've got */
 	send_pkt(&rplsctx, &rplj);
-	return;
-}
-
-static void
-instr_dump_to_file_svc(job_t UNUSED(j))
-{
 	return;
 }
 
@@ -424,11 +361,22 @@ deferred_dl(BLA *w, int revents)
 #endif	/* big-0 */
 
 
-/* config file mumbo jumbo */
-#define CFG_GROUP	"dso-xdr-instr"
-#define CFG_TFETCHER	"ticks_fetcher"
-#define CFG_IFETCHER	"instr_fetcher"
+/* (re)fetch instr svc */
+static void
+fetch_instr_svc(job_t UNUSED(j))
+{
+	UD_DEBUG("0x%04x (UD_SVC_FETCH_INSTR)\n", UD_SVC_FETCH_INSTR);
+	ud_set_service(UD_SVC_FETCH_INSTR, NULL, NULL);
+#if defined HAVE_MYSQL
+	fetch_instr_mysql();
+#endif	/* HAVE_MYSQL */
+	fetch_instr_file();
+	ud_set_service(UD_SVC_FETCH_INSTR, fetch_instr_svc, NULL);
+	return;
+}
 
+
+/* config file mumbo jumbo */
 static void*
 cfgspec_get_source(ud_ctx_t ctx, ud_cfgset_t spec)
 {
@@ -439,6 +387,7 @@ cfgspec_get_source(ud_ctx_t ctx, ud_cfgset_t spec)
 typedef enum {
 	CST_UNK,
 	CST_MYSQL,
+	CST_XDRFILE,
 } cfgsrc_type_t;
 
 static cfgsrc_type_t
@@ -446,6 +395,11 @@ cfgsrc_type(void *ctx, void *spec)
 {
 #define CFG_TYPE	"type"
 	const char *type = NULL;
+
+	if (spec == NULL) {
+		UD_DEBUG("no source specified\n");
+		return CST_UNK;
+	}
 	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
 
 	UD_DEBUG("type %s %p\n", type, spec);
@@ -453,6 +407,8 @@ cfgsrc_type(void *ctx, void *spec)
 		return CST_UNK;
 	} else if (memcmp(type, "mysql", 5) == 0) {
 		return CST_MYSQL;
+	} else if (memcmp(type, "xdrcube", 7) == 0) {
+		return CST_XDRFILE;
 	}
 	return CST_UNK;
 }
@@ -474,6 +430,10 @@ load_instr_fetcher(void *clo, void *spec)
 #endif	/* HAVE_MYSQL */
 		break;
 
+	case CST_XDRFILE:
+		dso_xdr_instr_file_LTX_init(clo);
+		break;
+
 	case CST_UNK:
 	default:
 		/* do fuckall */
@@ -489,6 +449,10 @@ load_instr_fetcher(void *clo, void *spec)
 static void
 unload_instr_fetcher(void *UNUSED(clo))
 {
+#if defined HAVE_MYSQL
+	dso_xdr_instr_mysql_LTX_deinit(clo);
+#endif	/* HAVE_MYSQL */
+	dso_xdr_instr_file_LTX_deinit(clo);
 	return;
 }
 
@@ -504,9 +468,8 @@ dso_xdr_instr_LTX_init(void *clo)
 	instrs = make_cat();
 	/* lodging our bbdb search service */
 	ud_set_service(0x4216, instr_add_svc, NULL);
-	ud_set_service(UD_SVC_INSTR_FROM_FILE, instr_add_from_file_svc, NULL);
 	ud_set_service(UD_SVC_INSTR_BY_ATTR, instr_dump_svc, instr_add_svc);
-	ud_set_service(0x421c, instr_dump_to_file_svc, NULL);
+	ud_set_service(UD_SVC_FETCH_INSTR, fetch_instr_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	if ((settings = udctx_get_setting(ctx)) != NULL) {
@@ -517,14 +480,21 @@ dso_xdr_instr_LTX_init(void *clo)
 	}
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
+
+	/* kick off a fetch-INSTR job */
+	wpool_enq(gwpool, (wpool_work_f)fetch_instr_svc, NULL, true);
 	return;
 }
 
 void
 dso_xdr_instr_LTX_deinit(void *clo)
 {
-	free_cat(instrs);
+	/* unload the fetchers, they possibly need the catalogue */
 	unload_instr_fetcher(clo);
+	/* unload the instrs now */
+	free_cat(instrs);
+	ud_set_service(UD_SVC_INSTR_BY_ATTR, NULL, NULL);
+	ud_set_service(UD_SVC_FETCH_INSTR, NULL, NULL);
 	return;
 }
 

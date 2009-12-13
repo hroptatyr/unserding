@@ -13,12 +13,13 @@ static bool xmlp;
 static void
 t_cb(sl1tick_t t, void *UNUSED(clo))
 {
-	fprintf(stdout, "ii:%u  tt:%d ts:%ld.%03d v:%2.4f\n",
-		sl1tick_instr(t),
-		sl1tick_tick_type(t),
-		(long int)sl1tick_timestamp(t),
-		(short int)sl1tick_msec(t),
-		ffff_monetary32_d(sl1tick_value(t)));
+	uint32_t i = sl1tick_instr(t);
+	int tt = (int)sl1tick_tick_type(t);
+	long int s = (long int)sl1tick_timestamp(t);
+	short int ms = (short int)sl1tick_msec(t);
+	double v = ffff_monetary32_d(sl1tick_value(t));
+
+	fprintf(stdout, "ii:%u  tt:%d ts:%ld.%03hd v:%2.4f\n", i, tt, s, ms, v);
 	return;
 }
 

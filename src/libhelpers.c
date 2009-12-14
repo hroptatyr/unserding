@@ -308,28 +308,13 @@ ud_find_one_price(
 }
 #endif	/* USE_TICK_BY_TS || USE_TICK_BY_INSTR */
 
+/* for __popcnt */
+#include "aux.h"
+
 static size_t
 max_num_ticks(uint32_t bitset)
 {
-#if defined __SSE4_2__
-	__asm__("popcnt %0\n"
-		: "=r" (bitset) : "rm" (bitset));
-	return bitset;
-#else
-/* stolen from http://www-graphics.stanford.edu/~seander/bithacks.html */
-	/* Magic Binary Numbers */
-	static const int S[] = {1, 2, 4, 8, 16};
-	static const int B[] = {
-		0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF, 0x0000FFFF};
-	size_t cnt = bitset;
-
-	cnt = cnt - ((cnt >> 1) & B[0]);
-	cnt = ((cnt >> S[1]) & B[1]) + (cnt & B[1]);
-	cnt = ((cnt >> S[2]) + cnt) & B[2];
-	cnt = ((cnt >> S[3]) + cnt) & B[3];
-	cnt = ((cnt >> S[4]) + cnt) & B[4];
-	return cnt;
-#endif	/* !SSE */
+	return __popcnt(bitset);
 }
 
 void
@@ -345,7 +330,7 @@ ud_find_ticks_by_ts(
 
 	do {
 		struct udpc_seria_s sctx;
-		struct sl1tick_s t;
+		struct sl1t_s t;
 		char buf[UDPC_PKTLEN];
 		ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
 		ud_convo_t cno = hdl->convo++;
@@ -373,7 +358,7 @@ ud_find_ticks_by_ts(
 
 		/* we assume that instrs are sent in the same order as
 		 * requested *inside* the packet */
-		while (udpc_seria_des_sl1tick(&t, &sctx)) {
+		while (udpc_seria_des_sl1t(&t, &sctx)) {
 			/* marking-less approach, so we could make s[] const */
 			if (sl1tick_instr(&t) == su_secu_quodi(s[rcvd])) {
 				rcvd++;

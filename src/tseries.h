@@ -523,19 +523,15 @@ udpc_seria_des_tick_by_ts_hdr(tick_by_ts_hdr_t t, udpc_seria_t sctx)
 static inline void
 udpc_seria_add_secu(udpc_seria_t sctx, su_secu_t secu)
 {
-	udpc_seria_add_ui32(sctx, su_secu_quodi(secu));
-	udpc_seria_add_ui32(sctx, su_secu_quoti(secu));
-	udpc_seria_add_ui32(sctx, su_secu_pot(secu));
+	udpc_seria_add_ui64(sctx, su_secu_ui64(secu));
 	return;
 }
 
 static inline su_secu_t
 udpc_seria_des_secu(udpc_seria_t sctx)
 {
-	uint32_t quodi = udpc_seria_des_ui32(sctx);
-	int32_t quoti = udpc_seria_des_ui32(sctx);
-	int16_t pot = udpc_seria_des_ui32(sctx);
-	return su_secu(quodi, quoti, pot);
+	uint_t wire = udpc_seria_des_ui(sctx);
+	return su_secu_set_ui64(wire);
 }
 
 static inline void

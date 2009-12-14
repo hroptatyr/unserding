@@ -76,11 +76,6 @@ struct tssl1t_s {
 	void *rdr;
 };
 
-/* we need this coz sushi's/uterus' sl1t_t screws up tseries.h's one */
-struct tser_pkt_s {
-	uterus_s t[10];
-};
-
 
 /* we expect a .ute file with secus and tt 4 (TTF_FIX) */
 static const char fxsl1tf[] = "/home/freundt/.unserding/eur.ute";
@@ -104,8 +99,7 @@ seqsearch(tser_pkt_t pkt, const_sl1t_t t, size_t nt,
 	/* now just keep looking for index files */
 	for (; t < et && sl1t_stmp_sec(t) <= ets; t++) {
 		if (sl1t_tblidx(t) == idx) {
-			pkt->t[res].f.p = t->v[0];
-			pkt->t[res].f.s = sl1t_stmp_sec(t);
+			pkt->t[res] = *t;
 			if (++res >= (ssize_t)countof(pkt->t)) {
 				break;
 			}

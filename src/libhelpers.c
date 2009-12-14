@@ -325,16 +325,13 @@ udpc_seria_add_tick_by_ts_hdr(udpc_seria_t sctx, time_t ts, tbs_t bs)
 	return;
 }
 
-#if 0
-/* um */
 static inline void
-udpc_seria_des_tick_by_ts_hdr(tick_by_ts_hdr_t t, udpc_seria_t sctx)
+udpc_seria_add_tick_by_instr_hdr(udpc_seria_t sctx, su_secu_t s, tbs_t bs)
 {
-	t->ts = udpc_seria_des_ui32(sctx);
-	t->types = udpc_seria_des_ui32(sctx);
+	udpc_seria_add_secu(sctx, s);
+	udpc_seria_add_tbs(sctx, bs);
 	return;
 }
-#endif
 
 void
 ud_find_ticks_by_ts(
@@ -470,8 +467,7 @@ static void
 feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 {
 #define FILL(X)	(48 / max_num_ticks(X))
-	udpc_seria_add_secu(bictx->sctx, bictx->secu);
-	udpc_seria_add_tbs(bictx->sctx, bictx->tbs);
+	udpc_seria_add_tick_by_instr_hdr(bictx->sctx, bictx->secu, bictx->tbs);
 	for (index_t j = 0, i = 0; j < FILL(bictx->tbs) && i < nts; i++) {
 		if (!seenp(bictx, i)) {
 			udpc_seria_add_ui32(bictx->sctx, ts[i]);

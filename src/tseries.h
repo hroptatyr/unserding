@@ -233,25 +233,22 @@ sl1t_onhold_p(const_sl1t_t h)
 	return scom_thdr_onhold_p((const void*)h);
 }
 
+static inline void
+scom_thdr_mark_onhold(scom_thdr_t t)
+{
+	scom_thdr_set_msec(t, SCOM_ONHOLD);
+	return;
+}
+
 
+/* MEH! */
+/* packet of 16 sparse level1 ticks, still fuck ugly */
+struct tser_pkt_s {
+	struct sl1t_s t[16];
+};
+
 /* gathered bullshit */
 #if defined INCLUDED_uterus_h_ && 0
-static inline void
-udpc_seria_add_tick_by_instr_hdr(udpc_seria_t sctx, tick_by_instr_hdr_t h)
-{
-	udpc_seria_add_secu(sctx, h->secu);
-	udpc_seria_add_ui32(sctx, h->types);
-	return;
-}
-
-static inline void
-udpc_seria_des_tick_by_instr_hdr(tick_by_instr_hdr_t h, udpc_seria_t sctx)
-{
-	h->secu = udpc_seria_des_secu(sctx);
-	h->types = udpc_seria_des_ui32(sctx);
-	return;
-}
-
 /* super-auxiliary, where does this belong? */
 static inline uint8_t
 index_in_pkt(dse16_t dse)
@@ -272,10 +269,6 @@ tser_pkt_beg_dse(dse16_t dse)
 	return dse - sub;
 }
 
-/* packet of 16 sparse level1 ticks, still fuck ugly */
-struct tser_pkt_s {
-	struct sl1t_s t[16];
-};
 
 /* although we have stored uterus blocks in our tseries, the stuff that
  * gets sent is slightly different.
@@ -308,44 +301,6 @@ spDute_bang_tser(
 		tgt->pri = pkt->t[idx].f.p;
 		break;
 	default:
-		break;
-	}
-#endif
-	return;
-}
-
-static inline void
-spDute_bang_nexist(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t t)
-{
-	spDute_bang_secu(tgt, s, tt, t);
-#if 0
-	switch (tt) {
-	case PFTT_BID:
-	case PFTT_ASK:
-	case PFTT_TRA:
-		ute_fill_ohlcv_p_nexist(&tgt->ohlcv);
-		break;
-	default:
-		tgt->pri = UTE_NEXIST;
-		break;
-	}
-#endif
-	return;
-}
-
-static inline void
-spDute_bang_onhold(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t t)
-{
-	spDute_bang_secu(tgt, s, tt, t);
-#if 0
-	switch (tt) {
-	case PFTT_BID:
-	case PFTT_ASK:
-	case PFTT_TRA:
-		ute_fill_ohlcv_p_onhold(&tgt->ohlcv);
-		break;
-	default:
-		tgt->pri = UTE_ONHOLD;
 		break;
 	}
 #endif

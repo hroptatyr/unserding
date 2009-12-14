@@ -165,7 +165,7 @@ ud_find_ticks_by_ts(
 extern void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
-	void(*cb)(scom_t, void *clo), void *clo,
+	void(*cb)(su_secu_t, scom_t, void *clo), void *clo,
 	su_secu_t s, tbs_t bs,
 	time_t *ts, size_t tslen);
 

@@ -405,7 +405,7 @@ struct ftbi_ctx_s {
 	/* hope this still works on 32b systems
 	 * oh oh, this implicitly encodes NFILL (which is 64 at the mo) */
 	uint64_t seen;
-	void(*cb)(scom_t, void *clo);
+	void(*cb)(su_secu_t, scom_t, void *clo);
 	void *clo;
 #if defined USE_SUBSCR
 	time_t *ts;
@@ -557,7 +557,7 @@ frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 			}
 		}
 		/* callback */
-		bictx->cb((const void*)bictx->sl1t, bictx->clo);
+		bictx->cb(bictx->secu, (const void*)bictx->sl1t, bictx->clo);
 		bictx->retry = NRETRIES;
 	}
 	return;
@@ -565,10 +565,10 @@ frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 #endif	/* USE_SUBSCR */
 
 static inline void
-lodge_closure(ftbi_ctx_t bictx, void(*cb)(scom_t, void *clo), void *clo)
+lodge_closure(ftbi_ctx_t b, void(*cb)(su_secu_t, scom_t, void *clo), void *clo)
 {
-	bictx->cb = cb;
-	bictx->clo = clo;
+	b->cb = cb;
+	b->clo = clo;
 	return;
 }
 
@@ -583,7 +583,7 @@ lodge_ihdr(ftbi_ctx_t bictx, su_secu_t secu, tbs_t tbs)
 void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
-	void(*cb)(scom_t, void *clo), void *clo,
+	void(*cb)(su_secu_t, scom_t, void *clo), void *clo,
 	su_secu_t s, tbs_t bs,
 	time_t *ts, size_t tslen)
 {

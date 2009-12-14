@@ -44,7 +44,10 @@
 #include "protocore.h"
 #include "seria.h"
 /* comes from sushi */
-#include "secu.h"
+#include <sushi/secu.h>
+#include <sushi/scommon.h>
+#include <sushi/sl1t.h>
+#include <sushi/scdl.h>
 
 /* tick services */
 #if !defined index_t
@@ -107,25 +110,6 @@
 #define UD_SVC_FETCH_URN	0x4226
 
 
-/* points to the tick-type of the day */
-#define sl1tick_s		sl1tp_s
-#define sl1tick_t		sl1tp_t
-#define fill_sl1tick_shdr	fill_sl1tp_shdr
-#define fill_sl1tick_tick	fill_sl1tp_tick
-#define sl1tick_value		sl1tp_value
-#define sl1tick_set_value	sl1tp_set_value
-#define sl1tick_tick_type	sl1tp_tt
-#define sl1tick_set_tick_type	sl1tp_set_tt
-#define sl1tick_timestamp	sl1tp_ts
-#define sl1tick_set_stamp	sl1tp_set_stamp
-#define sl1tick_msec		sl1tp_msec
-#define sl1tick_instr		sl1tp_inst
-#define sl1tick_set_instr	sl1tp_set_inst
-#define sl1tick_unit		sl1tp_unit
-#define sl1tick_set_unit	sl1tp_set_unit
-#define sl1tick_pot		sl1tp_exch
-#define sl1tick_set_pot		sl1tp_set_exch
-
 /* migrate to ffff tseries */
 typedef struct tser_pkt_s *tser_pkt_t;
 
@@ -134,9 +118,6 @@ typedef struct tslab_s *tslab_t;
 typedef struct tick_by_ts_hdr_s *tick_by_ts_hdr_t;
 typedef struct tick_by_instr_hdr_s *tick_by_instr_hdr_t;
 typedef struct sl1tp_s *sl1tp_t;
-#if defined INCLUDED_uterus_h_
-typedef struct sl1t_s *sl1t_t;
-#endif	/* INCLUDED_uterus_h_ */
 
 typedef uint32_t date_t;
 
@@ -193,13 +174,6 @@ struct tick_by_instr_hdr_s {
 	uint32_t types;
 };
 
-#if defined INCLUDED_uterus_h_
-struct sl1t_s {
-	su_secu_t secu;
-	struct l1tick_s tick;
-};
-#endif	/* INCLUDED_uterus_h_ */
-
 /**
  * Tslabs, roughly metadata that describe the slabs of tseries. */
 struct tslab_s {
@@ -209,9 +183,9 @@ struct tslab_s {
 };
 
 #if defined INCLUDED_uterus_h_
-/* packet of 10 uterus blocks, still fuck ugly */
+/* packet of 16 sparse level1 ticks, still fuck ugly */
 struct tser_pkt_s {
-	uterus_s t[10];
+	struct sl1t_s t[16];
 };
 
 /* although we have stored uterus blocks in our tseries, the stuff that
@@ -235,6 +209,7 @@ spDute_bang_tser(
 	dse16_t t, tser_pkt_t pkt, uint8_t idx)
 {
 	spDute_bang_secu(tgt, s, tt, t);
+#if 0
 	/* pkt should consist of uterus blocks */
 	switch (tt) {
 	case PFTT_BID:
@@ -251,6 +226,7 @@ spDute_bang_tser(
 	default:
 		break;
 	}
+#endif
 	return;
 }
 
@@ -258,6 +234,7 @@ static inline void
 spDute_bang_nexist(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t t)
 {
 	spDute_bang_secu(tgt, s, tt, t);
+#if 0
 	switch (tt) {
 	case PFTT_BID:
 	case PFTT_ASK:
@@ -268,6 +245,7 @@ spDute_bang_nexist(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t t)
 		tgt->pri = UTE_NEXIST;
 		break;
 	}
+#endif
 	return;
 }
 
@@ -275,6 +253,7 @@ static inline void
 spDute_bang_onhold(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t t)
 {
 	spDute_bang_secu(tgt, s, tt, t);
+#if 0
 	switch (tt) {
 	case PFTT_BID:
 	case PFTT_ASK:
@@ -285,6 +264,7 @@ spDute_bang_onhold(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t t)
 		tgt->pri = UTE_ONHOLD;
 		break;
 	}
+#endif
 	return;
 }
 #endif	/* INCLUDED_uterus_h_ */
@@ -309,7 +289,7 @@ ud_find_one_price(ud_handle_t, char *tgt, su_secu_t s, uint32_t bs, time_t ts);
 extern void
 ud_find_ticks_by_ts(
 	ud_handle_t hdl,
-	void(*cb)(sl1tick_t, void *clo), void *clo,
+	void(*cb)(scom_t, void *clo), void *clo,
 	su_secu_t *s, size_t slen,
 	uint32_t bs, time_t ts);
 
@@ -463,7 +443,7 @@ sl1tp_set_exch(sl1tp_t t, uint16_t exch)
 	return;
 }
 
-#if defined INCLUDED_uterus_h_
+#if defined INCLUDED_uterus_h_ && 0
 /* them old sl1t ticks, consumes 28 bytes */
 static inline void
 fill_sl1t_secu(sl1t_t l1t, uint32_t secu, int32_t fund, uint16_t exch)
@@ -523,6 +503,7 @@ udpc_seria_des_tick_by_ts_hdr(tick_by_ts_hdr_t t, udpc_seria_t sctx)
 static inline void
 udpc_seria_add_secu(udpc_seria_t sctx, su_secu_t secu)
 {
+/* we assume sizeof(su_secu_t) == 8 */
 	udpc_seria_add_ui64(sctx, su_secu_ui64(secu));
 	return;
 }
@@ -530,7 +511,8 @@ udpc_seria_add_secu(udpc_seria_t sctx, su_secu_t secu)
 static inline su_secu_t
 udpc_seria_des_secu(udpc_seria_t sctx)
 {
-	uint_t wire = udpc_seria_des_ui(sctx);
+/* we assume sizeof(su_secu_t) == 8 */
+	uint64_t wire = udpc_seria_des_ui64(sctx);
 	return su_secu_set_ui64(wire);
 }
 
@@ -551,19 +533,19 @@ udpc_seria_des_tick_by_instr_hdr(tick_by_instr_hdr_t h, udpc_seria_t sctx)
 }
 
 static inline void
-udpc_seria_add_sl1tick(udpc_seria_t sctx, sl1tick_t t)
+udpc_seria_add_sl1t(udpc_seria_t sctx, const_sl1t_t t)
 {
 	udpc_seria_add_data(sctx, t, sizeof(*t));
 	return;
 }
 
 static inline bool
-udpc_seria_des_sl1tick(sl1tick_t t, udpc_seria_t sctx)
+udpc_seria_des_sl1t(sl1t_t t, udpc_seria_t sctx)
 {
 	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
 }
 
-#if defined INCLUDED_uterus_h_
+#if defined INCLUDED_uterus_h_ && 0
 static inline void
 udpc_seria_add_spDute(udpc_seria_t sctx, spDute_t t)
 {

@@ -335,7 +335,7 @@ max_num_ticks(uint32_t bitset)
 void
 ud_find_ticks_by_ts(
 	ud_handle_t hdl,
-	void(*cb)(sl1tick_t, void *clo), void *clo,
+	void(*cb)(scom_t, void *clo), void *clo,
 	su_secu_t *s, size_t slen,
 	uint32_t bs, time_t ts)
 {

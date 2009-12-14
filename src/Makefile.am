@@ -11,7 +11,7 @@ moddir = $(libdir)/unserding
 bin_PROGRAMS =
 if BUILD_SERVER
 bin_PROGRAMS += unserdingd unsercli
-noinst_PROGRAMS = instrumenstruation
+noinst_PROGRAMS = instrumenstruation uteseries
 endif
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
@@ -85,6 +85,11 @@ endif
 dso_tseries_la_SOURCES += dso-tseries-frobq.c
 dso_tseries_la_SOURCES += dso-tseries-sl1t.c
 dso_tseries_la_LIBADD += -luterus
+
+## stuff we develop here but that will go eventually to sushi
+uteseries_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_MODE
+uteseries_LDFLAGS = -static
+uteseries_LDADD = -luterus -lpopt
 
 ## to fiddle with option chains and other instruments
 instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)

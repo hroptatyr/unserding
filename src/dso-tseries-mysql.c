@@ -47,7 +47,6 @@
 #include <fcntl.h>
 #include <pthread.h>
 
-#include <pfack/uterus.h>
 #include <pfack/instruments.h>
 /* our master include */
 #include "unserding.h"
@@ -74,6 +73,8 @@
 #include "mysql-helpers.h"
 #include "tseries.h"
 
+#include <sushi/m30.h>
+
 #if !defined countof
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
@@ -92,6 +93,10 @@ static void *conn = NULL;
 struct tser_pkt_idx_s {
 	uint32_t i;
 	tser_pkt_t pkt;
+};
+
+struct ohlc_p_s {
+	m30_t o, h, l, c;
 };
 
 static time_t
@@ -124,22 +129,23 @@ dupfld(const char *r)
 	return res;
 }
 
-static m32_t
-get_m32(const char *s)
+static m30_t
+get_m30(const char *s)
 {
 	if (UNLIKELY(s == NULL)) {
-		return UTE_NEXIST;
+		m30_t res = {.v = 0};
+		return res;
 	}
-	return ffff_monetary32_get_s(s);
+	return ffff_m30_get_s(&s);
 }
 
 
 static void
 qry_rowf(void **row, size_t nflds, void *clo)
 {
-	dse16_t ds = time_to_dse(parse_time(row[0]));
+	time_t ts = parse_time(row[0]);
 	tser_pkt_t pkt = clo;
-	uint8_t iip = index_in_pkt(ds);
+	uint8_t iip = index_in_pkt(ts);
 
 	if (UNLIKELY(iip >= countof(pkt->t))) {
 		/* do not cache weekend `prices' */
@@ -147,23 +153,46 @@ qry_rowf(void **row, size_t nflds, void *clo)
 	}
 	/* brilliantly hard-coded bollocks */
 	if (nflds == 2) {
-		m32_t p = get_m32(row[1]);
+		m30_t p = get_m30(row[1]);
+		scom_thdr_t th = (void*)&pkt->t[iip];
+
 		UD_DEBUG("putting %s %2.4f into slot %d\n",
-			 (char*)row[0], ffff_monetary32_d(p), iip);
-		pkt->t[iip].f.p = p;
+			 (char*)row[0], ffff_m30_d(p), iip);
+		/* bang bang */
+		scom_thdr_set_sec(th, ts);
+		scom_thdr_set_msec(th, 0);
+		scom_thdr_set_ttf(th, SL1T_TTF_FIX);
+		scom_thdr_set_tblidx(th, 0);
+		pkt->t[iip].v[0] = p.v;
 
 	} else if (nflds == 5 || nflds == 6) {
 		/* just a spot-OHLCV */
+#if 0
 		struct ohlcv_p_s cdl = {
-			.o = get_m32(row[1]),
-			.h = get_m32(row[2]),
-			.l = get_m32(row[3]),
-			.c = get_m32(row[4]),
+			.o = get_m30(row[1]),
+			.h = get_m30(row[2]),
+			.l = get_m30(row[3]),
+			.c = get_m30(row[4]),
 		};
+#else
+/* we're just using the close price anyway */
+		m30_t c = get_m30(row[4]);
+#endif
+		scom_thdr_t th = (void*)&pkt->t[iip];
+
 		UD_DEBUG("putting %s OHLC candle into slot %d\n",
 			 (char*)row[0], iip);
-		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_TRA, ds, &cdl);
+
+		/* YAY, just put the close price now */
+		scom_thdr_set_sec(th, ts);
+		scom_thdr_set_msec(th, 0);
+		scom_thdr_set_ttf(th, SL1T_TTF_TRA);
+		scom_thdr_set_tblidx(th, 0);
+		pkt->t[iip].v[0] = c.v;
+
 	} else {
+		abort();
+#if 0
 		/* full BATOMCFX candles */
 		struct ohlcv_p_s cdl;
 
@@ -193,6 +222,7 @@ qry_rowf(void **row, size_t nflds, void *clo)
 		UD_DEBUG("putting %s T-OHLC candle into slot %d\n",
 			 (char*)row[0], iip);
 		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_TRA, ds, &cdl);
+#endif
 	}
 	return;
 }

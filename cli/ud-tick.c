@@ -38,11 +38,12 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
-#include <pfack/uterus.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "protocore.h"
 #include "tseries.h"
+/* should be included somewhere */
+#include <sushi/m30.h>
 
 #include "clihelper.c"
 
@@ -50,61 +51,66 @@ static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
 
 static void
-t1(spDute_t t)
+t1(scom_t t)
 {
-	switch (spDute_tick_type(t)) {
-	case PFTT_BID:
-	case PFTT_ASK:
-	case PFTT_TRA:
-		fprintf(stdout,
-			"  o:%2.4f h:%2.4f l:%2.4f c:%2.4f v:%2.4f\n",
-			ffff_monetary32_d(t->ohlcv.o),
-			ffff_monetary32_d(t->ohlcv.h),
-			ffff_monetary32_d(t->ohlcv.l),
-			ffff_monetary32_d(t->ohlcv.c),
-			ffff_monetary64_d(t->ohlcv.v));
+	const_sl1t_t tv = (const void*)t;
+
+	fputc(' ', stdout);
+	fputc(' ', stdout);
+	switch (scom_thdr_ttf(t)) {
+	case SL1T_TTF_BID:
+		fputc('b', stdout);
 		break;
-	case PFTT_STL:
-		fprintf(stdout, "  x:%2.4f\n", ffff_monetary32_d(t->pri));
+	case SL1T_TTF_ASK:
+		fputc('a', stdout);
 		break;
-	case PFTT_FIX:
-		fprintf(stdout, "  f:%2.4f\n", ffff_monetary32_d(t->pri));
+	case SL1T_TTF_TRA:
+		fputc('t', stdout);
 		break;
-	case PFTT_UNK:
+	case SL1T_TTF_STL:
+		fputc('x', stdout);
+		break;
+	case SL1T_TTF_FIX:
+		fputc('f', stdout);
+		break;
+	case SL1T_TTF_UNK:
 	default:
-		fputc('\n', stdout);
+		fputc('@', stdout);
 		break;
 	}
+
+	fprintf(stdout, ":%2.4f\n",
+		ffff_m30_d(ffff_m30_get_ui32(tv->v[0])));
 	return;
 }
 
 static void
-ne(spDute_t UNUSED(t))
+ne(scom_t UNUSED(t))
 {
 	fputs("  v:does not exist\n", stdout);
 	return;
 }
 
 static void
-oh(spDute_t UNUSED(t))
+oh(scom_t UNUSED(t))
 {
 	fputs("  v:deferred\n", stdout);
 	return;
 }
 
 static char
-ttc(spDute_t t)
+ttc(scom_t t)
 {
-	switch (spDute_tick_type(t)) {
-	case PFTT_BID:
+	switch (scom_thdr_ttf(t)) {
+	case SL1T_TTF_BID:
 		return 'b';
-	case PFTT_ASK:
+	case SL1T_TTF_ASK:
 		return 'a';
-	case PFTT_TRA:
+	case SL1T_TTF_TRA:
 		return 't';
-	case PFTT_STL:
+	case SL1T_TTF_STL:
 		return 'x';
-	case PFTT_FIX:
+	case SL1T_TTF_FIX:
 		return 'f';
 	default:
 		return 'u';
@@ -112,14 +118,20 @@ ttc(spDute_t t)
 }
 
 static void
-t_cb(spDute_t t, void *UNUSED(clo))
+t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 {
-	fprintf(stdout, "tick storm, ticks:1 ii:%u/%u@%hu tt:%c  ts:%i",
-		t->instr, t->unit, spDute_pot(t), ttc(t), t->pivot);
+	uint32_t qd = su_secu_quodi(s);
+	int32_t qt = su_secu_quoti(s);
+	uint16_t p = su_secu_pot(s);
+	char ttf = ttc(t);
+	int32_t ts = scom_thdr_sec(t);
 
-	if (spDute_nexist_p(t)) {
+	fprintf(stdout, "tick storm, ticks:1 ii:%u/%u@%hu tt:%c  ts:%i",
+		qd, qt, p, ttf, ts);
+
+	if (scom_thdr_nexist_p(t)) {
 		ne(t);
-	} else if (spDute_onhold_p(t)) {
+	} else if (scom_thdr_onhold_p(t)) {
 		oh(t);
 	} else {
 		t1(t);
@@ -152,7 +164,12 @@ main(int argc, const char *argv[])
 	su_secu_t cid;
 	int n = 0;
 	time_t ts[argc-1];
-	uint32_t bs = PFTB_BID | PFTB_ASK | PFTB_TRA | PFTB_STL | PFTB_FIX;
+	uint32_t bs = \
+		SL1T_TTF_BID | \
+		SL1T_TTF_ASK | \
+		SL1T_TTF_TRA | \
+		SL1T_TTF_STL | \
+		SL1T_TTF_FIX;
 
 	if (argc <= 1) {
 		fprintf(stderr, "Usage: ud-tick instr [date] [date] ...\n");

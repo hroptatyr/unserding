@@ -61,6 +61,9 @@
 #include "seria-proto-glue.h"
 #include "tseries-private.h"
 
+/* YUCK! */
+#include <pfack/uterus.h>
+
 #if defined DEBUG_FLAG
 # define UD_DEBUG_TSER(args...)			\
 	fprintf(logout, "[unserding/tseries] " args)
@@ -74,80 +77,76 @@ struct tssl1t_s {
 };
 
 
+/* we expect a .ute file with secus and tt 4 (TTF_FIX) */
+static const char fxsl1tf[] = "/home/freundt/.unserding/eur.ute";
+static struct tssl1t_s my_ctx[1];
+
+static ssize_t
+seqsearch(tser_pkt_t pkt, const_sl1t_t t, size_t nt,
+	  uint16_t idx, uint32_t bts, uint32_t ets)
+{
+/* assumes ordered files */
+	const_sl1t_t et = t + nt;
+	ssize_t res = 0;
+
+	/* check the upper boundary */
+	if (sl1t_stmp_sec(&t[nt - 1]) < bts) {
+		/* skip the whole block */
+		return -1;
+	}
+	/* fast forward */
+	for (; sl1t_stmp_sec(t) < bts; t++);
+	/* now just keep looking for index files */
+	for (; t < et && sl1t_stmp_sec(t) <= ets; t++) {
+		if (sl1t_tblidx(t) == idx) {
+			pkt->t[res] = *t;
+			if (++res >= (ssize_t)countof(pkt->t)) {
+				break;
+			}
+		}
+	}
+	return res;
+}
+
 static size_t
 fetch_ticks(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
 {
-	return 0;
+	int32_t bts = dse_to_time(beg);
+	int32_t ets = dse_to_time(end);
+	uint16_t idx = (uint16_t)(long int)(const void*)tser->urn;
+	void *rdr = my_ctx->rdr;
+	/* stuff for the reader to have a dump on */
+	const_sl1t_t ticks;
+	ssize_t nt = 0;
+
+	UD_DEBUG_TSER("fetching em ticks [%hu,%hu]\n", beg, end);
+
+	/* rinse first */
+	memset(pkt, 0, sizeof(*pkt));
+	/* stupid sequential search */
+	for (size_t tidx = 0, nticks;
+	     (nticks = sl1t_fio_read_ticks(rdr, &ticks, tidx, -1UL)) > 0 &&
+		     /* simple linear search */
+		     (nt = seqsearch(pkt, ticks, nticks, idx, bts, ets));
+	     tidx += nticks);
+	return nt > 0 ? nt : 0;
 }
 
 
-static su_secu_t
-hardcoded_shit(const char *sym)
-{
-	uint32_t qd = 73380;
-	int32_t qt = 0;
-
-	if (memcmp(sym, "EUR", 4) == 0) {
-		qt = 73380;
-	} else if (memcmp(sym, "USD", 4) == 0) {
-		qt = 73381;
-	} else if (memcmp(sym, "GBP", 4) == 0) {
-		qt = 73382;
-	} else if (memcmp(sym, "KRW", 4) == 0) {
-		qt = 73383;
-	} else if (memcmp(sym, "CAD", 4) == 0) {
-		qt = 73384;
-	}
-	return su_secu(qd, qt, 0);
-}
-
-#if 0
-static inline size_t
-pr_ts(char *restrict buf, uint32_t sec)
-{
-	struct tm tm[1];
-	gmtime_r((time_t*)&sec, tm);
-	strftime(buf, 32, "%Y-%m-%d %H:%M:%S", tm);
-	return 19;
-}
-
 static void
-print_trng(uint16_t idx, void *clo)
-{
-	char tsf[32], tsl[32];
-	sl1t_fhdr_t fhdr = sl1t_fio_fhdr(clo);
-	time_range_t tr;
-
-	if (sl1t_fhdr_trngtbl_p(fhdr) &&
-	    (tr = sl1t_fhdr_nth_trng(fhdr, idx)) != NULL) {
-		pr_ts(tsf, tr->lo);
-		pr_ts(tsl, tr->hi);
-		fputc(' ', stdout);
-		fputs(tsf, stdout);
-		fputc(' ', stdout);
-		fputs(tsl, stdout);
-	}
-	return;
-}
-#endif
-
-static void
-fill_urn_sym(uint16_t idx, const char *sym, void *UNUSED(clo))
+fill_urn_sec(uint16_t idx, su_secu_t sec, void *UNUSED(clo))
 {
 	tscoll_t tsc;
 	struct tseries_s tser[1];
-	su_secu_t s;
 	const uint32_t tbs = 0x01 | 0x02;
 
-	if (sl1t_stbl_sym_slot_free_p(sym)) {
+	if (sl1t_stbl_sec_slot_free_p(sec)) {
 		return;
 	}
 
-	/* create us one of these nifty ts entries */
-	s = hardcoded_shit(sym);
-	fprintf(stdout, "%hu: %u/%i@%hu\n",
-		idx, su_secu_quodi(s), su_secu_quoti(s), su_secu_pot(s));
-	tsc = find_tscoll_by_secu_crea(tscache, s);
+	/* create us one of these nifty ts entries
+	 * this should be really done by the lib itself */
+	tsc = find_tscoll_by_secu_crea(tscache, sec);
 	tser->urn = (void*)(long int)idx;
 	/* hardcoded */
 	tser->from = 915148800;
@@ -161,32 +160,14 @@ fill_urn_sym(uint16_t idx, const char *sym, void *UNUSED(clo))
 }
 
 static void
-fill_urn_sec(uint16_t idx, su_secu_t sec, void *UNUSED(clo))
-{
-/* not gonna happen in this hardcoded fantasy world */
-	if (sl1t_stbl_sec_slot_free_p(sec)) {
-		return;
-	} else {
-		uint32_t quodi = su_secu_quodi(sec);
-		int32_t quoti = su_secu_quoti(sec);
-		uint16_t pot = su_secu_pot(sec);
-		fprintf(stdout, "%hu: %u/%i@%hu\n", idx, quodi, quoti, pot);
-	}
-	return;
-}
-
-static void
 fill_urns(tssl1t_t ctx)
 {
 	void *rdr = ctx->rdr;
-	sl1t_fio_trav_stbl(rdr, fill_urn_sec, fill_urn_sym, rdr);
+	sl1t_fio_trav_stbl(rdr, fill_urn_sec, NULL /* punish */, rdr);
 	return;
 }
 
 
-static const char fxsl1tf[] = "/home/freundt/.unserding/EUR_hist.sl1t";
-static struct tssl1t_s my_ctx[1];
-
 static void
 load_sl1t_file(tssl1t_t ctx)
 {

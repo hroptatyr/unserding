@@ -285,9 +285,9 @@ instr_dump_svc(job_t j)
 			instr_dump_name(&rplsctx, s);
 			break;
 		}
-		case UDPC_TYPE_SI32: {
+		case UDPC_TYPE_UI32: {
 			/* find by gaid */
-			int32_t id = udpc_seria_des_si32(&sctx);
+			int32_t id = udpc_seria_des_ui32(&sctx);
 			instr_dump_gaid(&rplsctx, id);
 			break;
 		}

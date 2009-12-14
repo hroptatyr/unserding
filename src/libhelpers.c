@@ -98,7 +98,7 @@ ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 	memset(buf, 0, sizeof(buf));
 	udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-	udpc_seria_add_si32(&sctx, cont_id);
+	udpc_seria_add_ui32(&sctx, cont_id);
 	/* prepare packet for sending im off */
 	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 	ud_send_raw(hdl, pkt);
@@ -157,7 +157,7 @@ ud_find_many_instrs(
 		udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
 #define FILL	(UDPC_PLLEN / sizeof(struct instr_s))
 		for (index_t j = 0, i = rcvd; j < FILL && i < len; i++, j++) {
-			udpc_seria_add_si32(&sctx, cont_id[i]);
+			udpc_seria_add_ui32(&sctx, cont_id[i]);
 		}
 #undef FILL
 		/* prepare packet for sending im off */

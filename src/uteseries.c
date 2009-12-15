@@ -103,6 +103,7 @@ struct tblister_s {
 	uint64_t ttfbs[UTEHDR_MAX_SECS];
 	uint32_t cnt[UTEHDR_MAX_SECS];
 
+	/* now all the stuff that we do not plan on writing back to the disk */
 	/* just to chain these guys, must stay behind ttfbs, as we have
 	 * a copy operation that copies everything before that */
 	tblister_t next;
@@ -137,7 +138,7 @@ free_tblister(tblister_t t)
 	return;
 }
 
-static void
+static __attribute__((unused)) void
 cons_tblister(tblister_t tgt, tblister_t src)
 {
 /* chain src and tgt together */
@@ -159,7 +160,7 @@ tblister_copy_hdr(tblister_t tgt, tblister_t src)
 	return;
 }
 
-static void
+static __attribute__((unused)) void
 tblister_clear_tbls(tblister_t tbl)
 {
 	const size_t sz = sizeof(*tbl) - offsetof(struct tblister_s, ttfbs);
@@ -168,7 +169,7 @@ tblister_clear_tbls(tblister_t tbl)
 }
 
 static void
-tblister_print(tblister_t tbl)
+__print(tblister_t tbl)
 {
 	fprintf(stderr, "blister %p  tk %i - %i (%i)  tk %u - %u (%u)\n",
 		tbl,
@@ -183,39 +184,80 @@ tblister_print(tblister_t tbl)
 	return;
 }
 
-static __attribute__((unused)) void
-__inspect_ts(tblister_t t, const_sl1t_t tk, size_t ntk)
+static void
+tblister_print(tblister_t tbl)
 {
-	const_sl1t_t etk = tk + ntk;
-	uint32_t per = t->ets - t->bts;
-
-	while (tk < etk) {
-		int32_t ets = t->ets;
-		int32_t ts;
-
-		for (; tk < etk && (ts = sl1t_stmp_sec(tk)) < ets; tk++) {
-			uint16_t idx = sl1t_tblidx(tk);
-			uint16_t ttf = sl1t_ttf(tk);
-			tbl_set(t, idx, ttf);
-			t->etk++;
-		}
-		tblister_print(t);
-		tblister_clear_tbls(t);
-		t->bts = ts - ts % per;
-		t->ets = t->bts + per;
-		t->btk = t->etk;
+	for (; tbl; tbl = tbl->next) {
+		__print(tbl);
 	}
 	return;
 }
 
-static __attribute__((unused)) void
+static tblister_t
+tblister_fork_new(tblister_t t)
+{
+	if (UNLIKELY(t == NULL)) {
+		return make_tblister();
+	} else if (UNLIKELY(t->btk == t->etk)) {
+		return t;
+	} else {
+		tblister_t res = make_tblister();
+		tblister_copy_hdr(res, t);
+		/* cons them */
+		res->next = t;
+		return res;
+	}
+}
+
+static __attribute__((unused)) tblister_t
+__inspect_ts(tblister_t t, const_sl1t_t tk, size_t ntk)
+{
+	const_sl1t_t etk = tk + ntk;
+	uint32_t per;
+	int32_t ts;
+
+	if (LIKELY(t != NULL)) {
+		per = t->ets - t->bts;
+	} else {
+		ts = sl1t_stmp_sec(tk);
+		per = DEFAULT_PER;
+
+		/* god i hate myself, this is what we get when co-routinising
+		 * the shit */
+	ugly:
+		t = tblister_fork_new(t);
+		t->bts = ts - ts % per;
+		t->ets = t->bts + per;
+		t->btk = t->etk;
+	moreso:
+		;
+	}
+
+	if (tk >= etk) {
+		return t;
+	} else if ((ts = sl1t_stmp_sec(tk)) >= t->ets) {
+		goto ugly;
+	} else {
+		uint16_t idx = sl1t_tblidx(tk);
+		uint16_t ttf = sl1t_ttf(tk);
+		tbl_set(t, idx, ttf);
+		t->etk++;
+		tk++;
+		goto moreso;
+	}
+	/* not reached */
+}
+
+static __attribute__((unused)) tblister_t
 __inspect_tk(tblister_t t, const_sl1t_t tk, size_t ntk)
 {
 	const_sl1t_t et = tk + ntk;
 	int32_t bts = sl1t_stmp_sec(tk);
+	uint32_t old_etk = t ? t->etk : 0;
 
-	tblister_clear_tbls(t);
+	t = tblister_fork_new(t);
 	t->bts = bts;
+	t->btk = old_etk;
 	t->etk = t->btk + ntk;
 	for (; tk < et; tk++) {
 		uint16_t idx = sl1t_tblidx(tk);
@@ -223,9 +265,7 @@ __inspect_tk(tblister_t t, const_sl1t_t tk, size_t ntk)
 		tbl_set(t, idx, ttf);
 	}
 	t->ets = sl1t_stmp_sec(tk - 1);
-	tblister_print(t);
-	t->btk = t->etk;
-	return;
+	return t;
 }
 
 #if FIXATION == USE_FIXED_TSRNG
@@ -250,13 +290,7 @@ ute_inspect(ute_ctx_t ctx)
 	for (size_t tidx = 0, nt;
 	     (nt = sl1t_fio_read_ticks(ctx, &t, tidx, UPPER_FETCH)) > 0;
 	     tidx += nt) {
-		/* store old result */
-		tblister_t tmp = make_tblister();
-
-		tblister_copy_hdr(tmp, res);
-		__inspect(tmp, t, nt);
-		cons_tblister(tmp, res);
-		res = tmp;
+		res = __inspect(res, t, nt);
 	}
 	return res;
 }
@@ -282,6 +316,7 @@ main(int argc, const char *argv[])
 	}
 
 	res = ute_inspect(ctx);
+	tblister_print(res);
 
 	free_tblister(res);
 	close_ute_file(ctx);

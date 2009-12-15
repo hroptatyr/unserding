@@ -100,7 +100,7 @@ struct tblister_s {
 	uint32_t btk;
 	uint32_t etk;
 
-	uint64_t ttfbs[UTEHDR_MAX_SECS];
+	uint16_t ttfbs[UTEHDR_MAX_SECS];
 	uint32_t cnt[UTEHDR_MAX_SECS];
 
 	/* now all the stuff that we do not plan on writing back to the disk */
@@ -177,7 +177,7 @@ __print(tblister_t tbl)
 		tbl->btk, tbl->etk, tbl->etk - tbl->btk);
 	for (uint16_t i = 0; i < countof(tbl->ttfbs); i++) {
 		if (tbl->ttfbs[i]) {
-			fprintf(stderr, "  %hu: %lx %u\n",
+			fprintf(stderr, "  %hu: %hx %u\n",
 				i, tbl->ttfbs[i], tbl->cnt[i]);
 		}
 	}
@@ -302,6 +302,11 @@ ute_inspect(ute_ctx_t ctx)
 		float tsptk = (float)(ets - bts) / (float)nt;
 		fprintf(stderr, "%2.4f s/tk\n", tsptk);
 #endif
+
+
+/* search functions using an existing blister */
+
+
 
 
 #if defined TEST_MODE

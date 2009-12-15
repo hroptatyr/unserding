@@ -90,6 +90,7 @@ struct tsblister_s {
 	int32_t bts;
 	uint32_t per;
 	uint64_t ttfbs[UTEHDR_MAX_SECS];
+	uint32_t cnt[UTEHDR_MAX_SECS];
 };
 
 struct tkblister_s {
@@ -102,6 +103,7 @@ static void
 tsbl_set(tsblister_t tsbl, uint16_t idx, uint16_t ttf)
 {
 	tsbl->ttfbs[idx] |= (1UL << ttf);
+	tsbl->cnt[idx]++;
 	return;
 }
 
@@ -136,7 +138,8 @@ tsblister_print(tsblister_t tsbl)
 		tsbl, tsbl->bts, tsbl->per);
 	for (uint16_t i = 0; i < countof(tsbl->ttfbs); i++) {
 		if (tsbl->ttfbs[i]) {
-			fprintf(stderr, "  %hu: %lx\n", i, tsbl->ttfbs[i]);
+			fprintf(stderr, "  %hu: %lx %u\n",
+				i, tsbl->ttfbs[i], tsbl->cnt[i]);
 		}
 	}
 	return;

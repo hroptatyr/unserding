@@ -53,6 +53,7 @@
 #include "unserding-nifty.h"
 
 typedef sl1t_fio_t ute_ctx_t;
+typedef int32_t time32_t;
 
 static ute_ctx_t
 open_ute_file(const char *fn)
@@ -83,122 +84,120 @@ close_ute_file(ute_ctx_t ctx)
 }
 
 
-typedef struct tsblister_s *tsblister_t;
-typedef struct tkblister_s *tkblister_t;
+typedef struct tblister_s *tblister_t;
 
-struct tsblister_s {
-	int32_t bts;
-	uint32_t per;
+struct tblister_s {
+	time32_t bts;
+	time32_t ets;
+	uint32_t btk;
+	uint32_t etk;
 	uint64_t ttfbs[UTEHDR_MAX_SECS];
 	uint32_t cnt[UTEHDR_MAX_SECS];
 };
 
-struct tkblister_s {
-	uint32_t tk;
-	uint32_t sz;
-	uint64_t ttfbs[UTEHDR_MAX_SECS];
-};
+static void
+tbl_set(tblister_t tbl, uint16_t idx, uint16_t ttf)
+{
+	tbl->ttfbs[idx] |= (1UL << ttf);
+	tbl->cnt[idx]++;
+	return;
+}
+
+static struct tblister_s gtbl[1];
 
 static void
-tsbl_set(tsblister_t tsbl, uint16_t idx, uint16_t ttf)
+init_tblister_tbls(tblister_t tbl)
 {
-	tsbl->ttfbs[idx] |= (1UL << ttf);
-	tsbl->cnt[idx]++;
+	const size_t sz = sizeof(*tbl) - offsetof(struct tblister_s, ttfbs);
+	memset(tbl->ttfbs, 0, sz);
 	return;
 }
 
 static void
-tkbl_set(tkblister_t tkbl, uint16_t idx, uint16_t ttf)
+init_tblister_hdr(tblister_t tbl)
 {
-	tkbl->ttfbs[idx] |= (1UL << ttf);
-	return;
-}
-
-static struct tsblister_s gtsbl[1];
-static struct tkblister_s gtkbl[1];
-
-static void
-init_tsblister(tsblister_t tsbl)
-{
-	memset(tsbl, 0, sizeof(*tsbl));
+	const size_t sz = offsetof(struct tblister_s, ttfbs);
+	memset(tbl->ttfbs, 0, sz);
 	return;
 }
 
 static void
-init_tkblister(tkblister_t tkbl)
+init_tblister(tblister_t tbl)
 {
-	memset(tkbl, 0, sizeof(*tkbl));
+	memset(tbl, 0, sizeof(*tbl));
 	return;
 }
 
-static __attribute__((noinline)) void
-tsblister_print(tsblister_t tsbl)
+static void
+tblister_print(tblister_t tbl)
 {
-	fprintf(stderr, "blister %p  asof %i for %u\n",
-		tsbl, tsbl->bts, tsbl->per);
-	for (uint16_t i = 0; i < countof(tsbl->ttfbs); i++) {
-		if (tsbl->ttfbs[i]) {
+	fprintf(stderr, "blister %p  tk %i - %i (%i)  tk %u - %u (%u)\n",
+		tbl,
+		tbl->bts, tbl->ets, tbl->ets - tbl->bts,
+		tbl->btk, tbl->etk, tbl->etk - tbl->btk);
+	for (uint16_t i = 0; i < countof(tbl->ttfbs); i++) {
+		if (tbl->ttfbs[i]) {
 			fprintf(stderr, "  %hu: %lx %u\n",
-				i, tsbl->ttfbs[i], tsbl->cnt[i]);
+				i, tbl->ttfbs[i], tbl->cnt[i]);
 		}
-	}
-	return;
-}
-
-static void
-tkblister_print(tkblister_t tkbl)
-{
-	fprintf(stderr, "blister %p  asof %u for %u\n",
-		tkbl, tkbl->tk, tkbl->sz);
-	for (uint16_t i = 0; i < countof(tkbl->ttfbs); i++) {
-		if (tkbl->ttfbs[i]) {
-			fprintf(stderr, "  %hu: %lx\n", i, tkbl->ttfbs[i]);
-		}
-	}
-	return;
-}
-
-static __attribute__((unused, noinline)) void
-__inspect_ts(const_sl1t_t t, size_t nticks)
-{
-/* coroutine-ised */
-	const_sl1t_t et = t + nticks;
-	uint32_t per = gtsbl->per;
-
-	while (t < et) {
-		int32_t ets = gtsbl->bts + per;
-		int32_t ts;
-
-		for (; t < et && (ts = sl1t_stmp_sec(t)) < ets; t++) {
-			uint16_t idx = sl1t_tblidx(t);
-			uint16_t ttf = sl1t_ttf(t);
-			tsbl_set(gtsbl, idx, ttf);
-		}
-		tsblister_print(gtsbl);
-		init_tsblister(gtsbl);
-		gtsbl->bts = ts - ts % per;
-		gtsbl->per = per;
 	}
 	return;
 }
 
 static __attribute__((unused)) void
-__inspect_tk(const_sl1t_t ticks, size_t nticks)
+__inspect_ts(const_sl1t_t t, size_t nticks)
 {
-	const_sl1t_t et = ticks + nticks;
+	const_sl1t_t et = t + nticks;
+	uint32_t per = gtbl->ets - gtbl->bts;
 
-	init_tkblister(gtkbl);
-	for (; ticks < et; ticks++) {
-		uint16_t idx = sl1t_tblidx(ticks);
-		uint16_t ttf = sl1t_ttf(ticks);
-		tkbl_set(gtkbl, idx, ttf);
+	while (t < et) {
+		int32_t ets = gtbl->ets;
+		int32_t ts;
+
+		for (; t < et && (ts = sl1t_stmp_sec(t)) < ets; t++) {
+			uint16_t idx = sl1t_tblidx(t);
+			uint16_t ttf = sl1t_ttf(t);
+			tbl_set(gtbl, idx, ttf);
+			gtbl->etk++;
+		}
+		tblister_print(gtbl);
+		init_tblister_tbls(gtbl);
+		gtbl->bts = ts - ts % per;
+		gtbl->ets = gtbl->bts + per;
+		gtbl->btk = gtbl->etk;
 	}
-	tkblister_print(gtkbl);
 	return;
 }
 
+static __attribute__((unused)) void
+__inspect_tk(const_sl1t_t t, size_t nticks)
+{
+	const_sl1t_t et = t + nticks;
+	int32_t bts = sl1t_stmp_sec(t);
+
+	init_tblister_tbls(gtbl);
+	gtbl->bts = bts;
+	gtbl->etk = gtbl->btk + nticks;
+	for (; t < et; t++) {
+		uint16_t idx = sl1t_tblidx(t);
+		uint16_t ttf = sl1t_ttf(t);
+		tbl_set(gtbl, idx, ttf);
+	}
+	gtbl->ets = sl1t_stmp_sec(t - 1);
+	tblister_print(gtbl);
+	gtbl->btk = gtbl->etk;
+	return;
+}
+
+#define USE_FIXED_TSRNG		1
+#define USE_FIXED_TKRNG		2
+#define FIXATION		USE_FIXED_TSRNG
+
+#define DEFAULT_PER		600
+#define DEFAULT_TKSZ		262144
+
 /* roughly look at what's in the file, keep track of secus and times */
-static __attribute__((noinline)) void
+static void
 ute_inspect(ute_ctx_t ctx)
 {
 	const_sl1t_t t;
@@ -207,13 +206,34 @@ ute_inspect(ute_ctx_t ctx)
 		return;
 	}
 
-	init_tsblister(gtsbl);
-	gtsbl->per = 600;
+#if FIXATION == USE_FIXED_TSRNG
+	init_tblister(gtbl);
+	gtbl->bts = 0;
+	gtbl->ets = DEFAULT_PER;
+#elif FIXATION == USE_FIXED_TKRNG
+	init_tblister_hdr(gtbl);
+#endif
 	for (size_t tidx = 0, nt;
-	     (nt = sl1t_fio_read_ticks(ctx, &t, tidx, -1UL)) > 0;
+	     (nt = sl1t_fio_read_ticks(ctx, &t, tidx,
+#if FIXATION == USE_FIXED_TSRNG
+				       -1UL
+#elif FIXATION == USE_FIXED_TKRNG
+				       tidx + DEFAULT_TKSZ
+#endif
+		     )) > 0;
 	     tidx += nt) {
-		/* simple linear search */
+#if 0
+		/* simple specs, avg. ticks per second */
+		uint32_t bts = sl1t_stmp_sec(t);
+		uint32_t ets = sl1t_stmp_sec(t + nt - 1);
+		float tsptk = (float)(ets - bts) / (float)nt;
+		fprintf(stderr, "%2.4f s/tk\n", tsptk);
+#endif
+#if FIXATION == USE_FIXED_TSRNG
 		__inspect_ts(t, nt);
+#elif FIXATION == USE_FIXED_TKRNG
+		__inspect_tk(t, nt);
+#endif
 	}
 	return;
 }

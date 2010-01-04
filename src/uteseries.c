@@ -169,12 +169,28 @@ tblister_clear_tbls(tblister_t tbl)
 }
 
 static void
+__prts(char *restrict tgt, size_t tsz, time_t ts)
+{
+	struct tm tm[1];
+	memset(tm, 0, sizeof(*tm));
+	gmtime_r(&ts, tm);
+	strftime(tgt, tsz, "%F %T", tm);
+	return;
+}
+
+static void
 __print(tblister_t tbl)
 {
-	fprintf(stderr, "blister %p  tk %i - %i (%i)  tk %u - %u (%u)\n",
+	char btss[32], etss[32];
+
+	__prts(btss, sizeof(btss), tbl->bts);
+	__prts(etss, sizeof(etss), tbl->ets);
+
+	fprintf(stderr, "blister %p  tk %i - %i (%i)  tk %u - %u (%u) %s %s\n",
 		tbl,
 		tbl->bts, tbl->ets, tbl->ets - tbl->bts,
-		tbl->btk, tbl->etk, tbl->etk - tbl->btk);
+		tbl->btk, tbl->etk, tbl->etk - tbl->btk,
+		btss, etss);
 	for (uint16_t i = 0; i < countof(tbl->ttfbs); i++) {
 		if (tbl->ttfbs[i]) {
 			fprintf(stderr, "  %hu: %hx %u\n",
@@ -305,11 +321,41 @@ ute_inspect(ute_ctx_t ctx)
 
 
 /* search functions using an existing blister */
+static tblister_t
+__find_blister_by_ts(tblister_t tbl, time_t ts)
+{
+	for (; tbl; tbl = tbl->next) {
+		if (ts >= tbl->bts && ts < tbl->ets) {
+			return tbl;
+		}
+	}
+	return NULL;
+}
 
-
+/* assumes the time is correct in this blister, so no next slots will be
+ * visited */
+static void
+__find_tk(tblister_t tbl, uint16_t idx, uint16_t ttf)
+{
+	if (tbl->ttfbs[idx] & (1 << ttf)) {
+		fprintf(stderr, "YAY %hu: %hu  %hx %u\n",
+			idx, ttf, tbl->ttfbs[idx], tbl->cnt[idx]);
+	}
+	return;
+}
 
 
 #if defined TEST_MODE
+static time_t
+__parse_ts(const char *str)
+{
+	struct tm tm[1];
+
+	memset(tm, 0, sizeof(*tm));
+	strptime(str, "%F %T", tm);
+	return timegm(tm);
+}
+
 int
 main(int argc, const char *argv[])
 {
@@ -322,6 +368,23 @@ main(int argc, const char *argv[])
 
 	res = ute_inspect(ctx);
 	tblister_print(res);
+
+	if (argc > 2) {
+		time_t ts = __parse_ts(argv[2]);
+		tblister_t tmp = __find_blister_by_ts(res, ts);
+		uint16_t idx = 1;
+
+		if (argc > 3) {
+			idx = strtoul(argv[3], NULL, 10);
+		}
+
+		//fprintf(stderr, "parsed %lu\n", ts);
+		if (tmp) {
+			__find_tk(tmp, idx, SL1T_TTF_BID);
+			__find_tk(tmp, idx, SL1T_TTF_ASK);
+			__find_tk(tmp, idx, SL1T_TTF_TRA);
+		}
+	}
 
 	free_tblister(res);
 	close_ute_file(ctx);

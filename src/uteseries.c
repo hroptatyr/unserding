@@ -49,6 +49,7 @@
 #include <sys/mman.h>
 
 #include <sushi/sl1tfile.h>
+#include <sushi/m30.h>
 
 /* our master include */
 #include "unserding-nifty.h"
@@ -334,14 +335,38 @@ __find_blister_by_ts(tblister_t tbl, time_t ts)
 
 /* assumes the time is correct in this blister, so no next slots will be
  * visited */
-static void
-__find_tk(tblister_t tbl, uint16_t idx, uint16_t ttf)
+/**
+ * Given the details in TGTSRC (time, tblidx and ttf will be eval'd) find
+ * the nearest match in the blister TBL. */
+static const_sl1t_t
+__find_tk(ute_ctx_t ctx, tblister_t tbl, sl1t_t tgtsrc)
 {
-	if (tbl->ttfbs[idx] & (1 << ttf)) {
-		fprintf(stderr, "YAY %hu: %hu  %hx %u\n",
-			idx, ttf, tbl->ttfbs[idx], tbl->cnt[idx]);
+	const_scom_thdr_t src = (const void*)tgtsrc;
+	time32_t ts = scom_thdr_sec(src);
+	uint16_t idx = scom_thdr_tblidx(src);
+	uint16_t ttf = scom_thdr_ttf(src);
+	size_t nt;
+	const_sl1t_t t;
+
+	if (UNLIKELY(tbl == NULL)) {
+		return NULL;
+	} else if (!(tbl->ttfbs[idx] & (1 << ttf))) {
+		return NULL;
 	}
-	return;
+
+	/* get the corresponding tick block */
+	nt = sl1t_fio_read_ticks(ctx, &t, tbl->btk, tbl->etk);
+	/* assume ascending order */
+	for (const_sl1t_t tk = &t[nt - 1]; tk >= t; tk--) {
+		uint16_t tkidx = sl1t_tblidx(tk);
+		uint16_t tkttf = sl1t_ttf(tk);
+
+		if (tkidx == idx && tkttf == ttf && sl1t_stmp_sec(tk) <= ts) {
+			*tgtsrc = *tk;
+			return tgtsrc;
+		}
+	}
+	return NULL;
 }
 
 
@@ -367,7 +392,6 @@ main(int argc, const char *argv[])
 	}
 
 	res = ute_inspect(ctx);
-	tblister_print(res);
 
 	if (argc > 2) {
 		time_t ts = __parse_ts(argv[2]);
@@ -378,12 +402,26 @@ main(int argc, const char *argv[])
 			idx = strtoul(argv[3], NULL, 10);
 		}
 
-		//fprintf(stderr, "parsed %lu\n", ts);
 		if (tmp) {
-			__find_tk(tmp, idx, SL1T_TTF_BID);
-			__find_tk(tmp, idx, SL1T_TTF_ASK);
-			__find_tk(tmp, idx, SL1T_TTF_TRA);
+			struct sl1t_s t[1];
+
+			sl1t_set_stmp_sec(t, ts);
+			sl1t_set_tblidx(t, idx);
+			sl1t_set_ttf(t, SL1T_TTF_TRA);
+			/* given the template above, try n find the bugger */
+			if (__find_tk(ctx, tmp, t)) {
+				m30_t v0 = ffff_m30_get_ui32(t->v[0]);
+				m30_t v1 = ffff_m30_get_ui32(t->v[1]);
+				char stmp[32];
+
+				__prts(stmp, sizeof(stmp), sl1t_stmp_sec(t));
+				fprintf(stderr, "%s %2.4f %2.4f\n",
+					stmp, ffff_m30_d(v0), ffff_m30_d(v1));
+			}
 		}
+	} else {
+		/* otherwise just print the bugger */
+		tblister_print(res);
 	}
 
 	free_tblister(res);

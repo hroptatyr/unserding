@@ -46,7 +46,7 @@ mod_LTLIBRARIES =
 mod_LTLIBRARIES += dso-cli.la dso-scscp.la dso-scscp2.la dso-bbdb.la dso-xbbdb.la
 #mod_LTLIBRARIES += dso-instr.la
 mod_LTLIBRARIES += dso-xdr-instr.la
-mod_LTLIBRARIES += dso-tseries.la
+mod_LTLIBRARIES += dso-tseries.la dso-tseries-ute.la
 dso_cli_la_LDFLAGS = -module
 dso_scscp_la_LDFLAGS = -module
 dso_scscp2_la_LDFLAGS = -module
@@ -84,8 +84,10 @@ dso_tseries_la_SOURCES += dso-tseries-mysql.c
 endif
 dso_tseries_la_SOURCES += dso-tseries-frobq.c
 dso_tseries_la_SOURCES += dso-tseries-sl1t.c
-dso_tseries_la_SOURCES += dso-tseries-ute.c
 dso_tseries_la_LIBADD += -luterus
+
+dso_tseries_ute_la_SOURCES = dso-tseries-ute.c
+dso_tseries_ute_la_LIBADD = -luterus
 
 ## stuff we develop here but that will go eventually to sushi
 uteseries_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_MODE

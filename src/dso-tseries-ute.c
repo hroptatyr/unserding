@@ -66,13 +66,28 @@
 #include "uteseries.c"
 
 
-static void *my_ctx;
+typedef struct my_ctx_s *my_ctx_t;
+struct my_ctx_s {
+	ute_ctx_t ctx;
+	tblister_t tbl;
+};
+
+static void
+fill_urns(my_ctx_t ctx)
+{
+	ctx->tbl = ute_inspect(ctx->ctx);
+	return;
+}
+
+
+static struct my_ctx_s my_ctx[1];
+static const char my_hardcoded_file[] = "/home/freundt/.unserding/eur.ute";
 
 void
 fetch_urn_ute(void)
 {
 /* make me thread-safe and declare me */
-	if (my_ctx == NULL) {
+	if (my_ctx->ctx == NULL) {
 		return;
 	}
 
@@ -86,7 +101,7 @@ void
 dso_tseries_ute_LTX_init(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: loading ...");
-	my_ctx = open_ute_file(my_hardcoded_file);
+	my_ctx->ctx = open_ute_file(my_hardcoded_file);
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -95,8 +110,11 @@ void
 dso_tseries_ute_LTX_deinit(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: unloading ...");
-	if (my_ctx != NULL) {
-		close_ute_file(my_ctx);
+	if (my_ctx->tbl != NULL) {
+		free_tblister(my_ctx->tbl);
+	}
+	if (my_ctx->ctx != NULL) {
+		close_ute_file(my_ctx->ctx);
 	}
 	UD_DBGCONT("done\n");
 	return;

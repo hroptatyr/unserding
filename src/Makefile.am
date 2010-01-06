@@ -86,6 +86,7 @@ dso_tseries_la_SOURCES += dso-tseries-frobq.c
 dso_tseries_la_SOURCES += dso-tseries-sl1t.c
 dso_tseries_la_LIBADD += -luterus
 
+dso_tseries_ute_la_LDFLAGS = -module
 dso_tseries_ute_la_SOURCES = dso-tseries-ute.c
 dso_tseries_ute_la_LIBADD = -luterus
 

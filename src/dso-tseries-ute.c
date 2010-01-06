@@ -64,6 +64,7 @@
 
 /* ugly */
 #include "uteseries.c"
+#include "tscube.c"
 
 
 typedef struct my_ctx_s *my_ctx_t;
@@ -72,16 +73,34 @@ struct my_ctx_s {
 	tblister_t tbl;
 };
 
-static void
-fill_urns(my_ctx_t ctx)
+size_t
+FUCKING_FETCH(void **bla, tsc_key_t voo, void *doo)
 {
-	ctx->tbl = ute_inspect(ctx->ctx);
+	fprintf(stderr, "YAY\n");
+	return;
+}
+
+static void
+fill_cube(tscube_t c)
+{
+/* hardcoded as fuck */
+	struct tsc_key_s k = {
+		.beg = 915148800,
+		.end = 0x7fffffff,
+		.ttf = SL1T_TTF_FIX,
+		.fetch_cb = FUCKING_FETCH,
+	};
+
+	/* one such addition is EURUSD */
+	k.secu = su_secu(73380, 73381, 0);
+	tsc_add(c, &k, (void*)0xdeadbeef);
 	return;
 }
 
 
 static struct my_ctx_s my_ctx[1];
 static const char my_hardcoded_file[] = "/home/freundt/.unserding/eur.ute";
+static tscube_t cube;
 
 void
 fetch_urn_ute(void)
@@ -102,6 +121,9 @@ dso_tseries_ute_LTX_init(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: loading ...");
 	my_ctx->ctx = open_ute_file(my_hardcoded_file);
+
+	cube = make_tscube();
+	fill_cube(cube);
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -110,6 +132,8 @@ void
 dso_tseries_ute_LTX_deinit(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: unloading ...");
+	free_tscube(cube);
+
 	if (my_ctx->tbl != NULL) {
 		free_tblister(my_ctx->tbl);
 	}

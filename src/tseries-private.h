@@ -43,9 +43,6 @@
 #include "tseries.h"
 #include "tscoll.h"
 #include "tscache.h"
-
-/* the main one used in dso-tseries.c */
-extern tscache_t tscache;
 #endif
 
 extern tscube_t gcube;
@@ -54,7 +51,6 @@ extern tscube_t gcube;
 extern void
 fetch_urn_mysql(void);
 #endif	/* HAVE_MYSQL */
-extern void fetch_urn_sl1t(void);
 extern void fetch_urn_ute(void);
 
 

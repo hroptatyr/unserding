@@ -75,7 +75,6 @@
 #include "tseries.h"
 #include "tseries-private.h"
 
-tscache_t tscache = NULL;
 tscube_t gcube = NULL;
 
 #if defined DEBUG_FLAG
@@ -447,6 +446,7 @@ instr_tick_by_instr_svc(job_t j)
 	UD_DEBUG("0x4222: %s filtered for %u time stamps\n",
 		 secbugger(sec), nfilt);
 
+#if 0
 	/* get us the tseries we're talking about */
 	if ((tsc = find_tscoll_by_secu(tscache, sec)) == NULL) {
 		/* means we have no means of fetching */
@@ -474,6 +474,7 @@ instr_tick_by_instr_svc(job_t j)
 
 	/* we cater for any frobnication desires now */
 	frobnicate();
+#endif
 	return;
 }
 
@@ -502,6 +503,7 @@ instr_urn_svc(job_t j)
 	UD_DEBUG("0x%04x (UD_SVC_GET_URN): %s\n",
 		 UD_SVC_GET_URN, secbugger(secu));
 
+#if 0
 	/* get us the tseries we're talking about */
 	if ((tsc = find_tscoll_by_secu(tscache, secu)) == NULL) {
 		/* means we have no means of fetching */
@@ -513,6 +515,7 @@ instr_urn_svc(job_t j)
 	clear_pkt(&sctx, j);
 	tscoll_trav_series(tsc, get_urn_cb, &sctx);
 	send_pkt(&sctx, j);
+#endif
 	return;
 }
 
@@ -526,7 +529,6 @@ fetch_urn_svc(job_t UNUSED(j))
 #if defined HAVE_MYSQL
 	fetch_urn_mysql();
 #endif	/* HAVE_MYSQL */
-	fetch_urn_sl1t();
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	return;
 }
@@ -620,7 +622,6 @@ dso_tseries_LTX_init(void *clo)
 
 	UD_DEBUG("mod/tseries: loading ...");
 	/* create the catalogue */
-	tscache = make_tscache();
 	gcube = make_tscube();
 	/* tick service */
 	//ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
@@ -647,7 +648,6 @@ void
 dso_tseries_LTX_deinit(void *clo)
 {
 	free_tscube(gcube);
-	free_tscache(tscache);
 	unload_ticks_fetcher(clo);
 	return;
 }

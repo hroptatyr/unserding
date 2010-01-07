@@ -513,6 +513,7 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 	switch (urn_id) {
 	case 1 ... 3:
 	case 8:
+#if 0
 		/* once-a-day, 5-a-week */
 		UD_DEBUG("OAD/5DW tick for %u/%u@%hu\n",
 			 su_secu_quodi(secu),
@@ -538,6 +539,7 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 		tser.fetch_cb = fetch_ticks;
 		/* add to the collection of time stamps */
 		tscoll_add(tsc, &tser);
+#endif
 
 	default:
 		break;

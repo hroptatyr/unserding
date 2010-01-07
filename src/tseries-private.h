@@ -38,6 +38,7 @@
 #if !defined INCLUDED_tseries_private_h_
 #define INCLUDED_tseries_private_h_
 
+#include "tscube.h"
 #if !defined NO_LEGACY
 #include "tseries.h"
 #include "tscoll.h"
@@ -46,6 +47,8 @@
 /* the main one used in dso-tseries.c */
 extern tscache_t tscache;
 #endif
+
+extern tscube_t gcube;
 
 #if defined HAVE_MYSQL
 extern void

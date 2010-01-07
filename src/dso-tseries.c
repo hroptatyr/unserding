@@ -69,12 +69,14 @@
 # endif
 #endif	/* HAVE_MYSQL */
 /* tseries stuff, to be replaced with ffff */
+#include "tscube.h"
 #include "tscache.h"
 #include "tscoll.h"
 #include "tseries.h"
 #include "tseries-private.h"
 
 tscache_t tscache = NULL;
+tscube_t gcube = NULL;
 
 #if defined DEBUG_FLAG
 # define UD_DEBUG_TSER(args...)			\
@@ -576,7 +578,7 @@ load_ticks_fetcher(void *clo, void *spec)
 	case CST_MYSQL:
 #if defined HAVE_MYSQL
 		/* fetch some instruments by sql */
-		dso_tseries_mysql_LTX_init(clo);
+		//dso_tseries_mysql_LTX_init(clo);
 #endif	/* HAVE_MYSQL */
 		break;
 
@@ -587,7 +589,7 @@ load_ticks_fetcher(void *clo, void *spec)
 	}
 
 	/* fetch fx tseries, should be configurable */
-	dso_tseries_sl1t_LTX_init(clo);
+	//dso_tseries_sl1t_LTX_init(clo);
 
 	/* also load the frobber in this case */
 	dso_tseries_frobq_LTX_init(clo);
@@ -603,9 +605,9 @@ unload_ticks_fetcher(void *UNUSED(clo))
 {
 #if defined HAVE_MYSQL
 	/* fetch some instruments by sql */
-	dso_tseries_mysql_LTX_deinit(clo);
+	//dso_tseries_mysql_LTX_deinit(clo);
 #endif	/* HAVE_MYSQL */
-	dso_tseries_sl1t_LTX_deinit(clo);
+	//dso_tseries_sl1t_LTX_deinit(clo);
 	return;
 }
 
@@ -619,6 +621,7 @@ dso_tseries_LTX_init(void *clo)
 	UD_DEBUG("mod/tseries: loading ...");
 	/* create the catalogue */
 	tscache = make_tscache();
+	gcube = make_tscube();
 	/* tick service */
 	//ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
@@ -643,6 +646,7 @@ dso_tseries_LTX_init(void *clo)
 void
 dso_tseries_LTX_deinit(void *clo)
 {
+	free_tscube(gcube);
 	free_tscache(tscache);
 	unload_ticks_fetcher(clo);
 	return;

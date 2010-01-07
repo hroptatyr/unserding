@@ -101,7 +101,6 @@ fill_cube(tscube_t c)
 
 static struct my_ctx_s my_ctx[1];
 static const char my_hardcoded_file[] = "/home/freundt/.unserding/eur.ute";
-static tscube_t cube;
 
 void
 fetch_urn_ute(void)
@@ -122,9 +121,7 @@ dso_tseries_ute_LTX_init(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: loading ...");
 	my_ctx->ctx = open_ute_file(my_hardcoded_file);
-
-	cube = make_tscube();
-	fill_cube(cube);
+	fill_cube(gcube);
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -133,8 +130,6 @@ void
 dso_tseries_ute_LTX_deinit(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: unloading ...");
-	free_tscube(cube);
-
 	if (my_ctx->tbl != NULL) {
 		free_tblister(my_ctx->tbl);
 	}

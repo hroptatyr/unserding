@@ -62,7 +62,10 @@
 #define DEFAULT_TKSZ		262144
 
 typedef sl1t_fio_t ute_ctx_t;
+#if !defined time32_t
 typedef int32_t time32_t;
+#define time32_t	time32_t
+#endif	/* !time32_t */
 
 static ute_ctx_t
 open_ute_file(const char *fn)

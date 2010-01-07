@@ -84,7 +84,7 @@ struct ud_deferred_s {
 };
 
 static ud_mod_t ud_mods = NULL;
-static ud_deferred_t ud_defs = NULL;
+static ud_deferred_t ud_defs = NULL, curr = NULL;
 
 void
 ud_defer_dso(const char *name, void *cfgset)
@@ -92,8 +92,15 @@ ud_defer_dso(const char *name, void *cfgset)
 	ud_deferred_t res = xnew(*res);
 	res->fn = name;
 	res->cfgset = cfgset;
-	res->next = ud_defs;
-	ud_defs = res;
+	res->next = NULL;
+
+	/* fiddle with the global list */
+	if (curr) {
+		curr->next = res;
+	} else {
+		ud_defs = res;
+	}
+	curr = res;
 	return;
 }
 

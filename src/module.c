@@ -143,6 +143,21 @@ add_myself(void)
 	return;
 }
 
+lt_dlhandle
+my_dlopen(const char *filename)
+{
+	lt_dlhandle handle = 0;
+	lt_dladvise advice[1];
+
+	if (!lt_dladvise_init(advice) &&
+	    !lt_dladvise_ext(advice) &&
+	    !lt_dladvise_global(advice)) {
+		handle = lt_dlopenadvise(filename, advice[0]);
+	}
+	lt_dladvise_destroy(advice);
+	return handle;
+}
+
 /**
  * Open NAME, call `init(CLO)' there. */
 void*
@@ -154,7 +169,7 @@ open_aux(const char *name, void *clo)
 	struct ud_mod_s tmpmod;
 	ud_mod_t m;
 
-	tmpmod.handle = lt_dlopenext(name);
+	tmpmod.handle = my_dlopen(name);
 	if (tmpmod.handle == NULL) {
 		perror("unserding: cannot open module");
 		return NULL;

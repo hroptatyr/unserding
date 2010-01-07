@@ -41,6 +41,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <pthread.h>
+#include <string.h>
 #include <sushi/secu.h>
 #include <sushi/scommon.h>
 #include "tscube.h"
@@ -105,17 +106,21 @@ typedef itree_t tsc_itr_t;
 #endif
 
 
-/* helpers */
+/* helpers, for hmap */
 static inline bool
 __key_equal_p(tsc_key_t id1, tsc_key_t id2)
 {
-	return id1 == id2;
+	return id1 && id2 &&
+		id1->beg == id2->beg &&
+		id1->end == id2->end &&
+		id1->secu.mux == id2->secu.mux &&
+		id1->ttf == id2->ttf;
 }
 
 static inline bool
 __key_valid_p(tsc_key_t id1)
 {
-	return id1 != NULL;
+	return su_secu_ui64(id1->secu) != 0;
 }
 
 static void
@@ -132,9 +137,11 @@ free_tbl(hmap_t c)
 {
 	for (index_t i = 0; i < c->alloc_sz; i++) {
 		if (__key_valid_p(c->tbl[i].key)) {
+#if 0
 			if (c->tbl[i].val->intv) {
 				free_tsc_itr(c->tbl[i].val->intv);
 			}
+#endif
 		}
 	}
 	xfree(c->tbl);
@@ -254,7 +261,8 @@ free_tscube(tscube_t tsc)
 size_t
 tscube_size(tscube_t tsc)
 {
-	return (size_t)-1;
+	__tscube_t c = tsc;
+	return c->hmap->nseries;
 }
 
 void*
@@ -289,7 +297,7 @@ tsc_add(tscube_t tsc, tsc_key_t key, void *val)
 		(void)check_resize(m);
 		ks = slot(m->tbl, m->alloc_sz, key);
 		/* oh we want to keep track of this */
-		*m->tbl[ks].key = *key;
+		memcpy(m->tbl[ks].key, key, sizeof(*key));
 		/* create an interval tree, TODO */
 		//m->tbl[ks].val->intv = make_tsc_itr();
 		//tsc_itr_add(m->tbl[ks].val->intv, key->beg, key->end, val);

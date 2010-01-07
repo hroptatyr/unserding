@@ -79,6 +79,16 @@ struct tscube_s {
 };
 
 
+/* decouple from intvtree madness */
+#include "intvtree.h"
+
+typedef itree_t tsc_itr_t;
+
+#define make_tsc_itr	make_itree
+#define free_tsc_itr	free_itree
+#define tsc_itr_add	itree_add
+
+
 /* helpers */
 static inline bool
 __key_equal_p(tsc_key_t id1, tsc_key_t id2)
@@ -106,9 +116,9 @@ free_tbl(__tscube_t c)
 {
 	for (index_t i = 0; i < c->alloc_sz; i++) {
 		if (__key_valid_p(c->tbl[i].key)) {
-#if 0
-			free_tscoll(c->tbl[i].val);
-#endif
+			if (c->tbl[i].val->intv) {
+				free_tsc_itr(c->tbl[i].val->intv);
+			}
 		}
 	}
 	xfree(c->tbl);
@@ -188,7 +198,7 @@ resize_tbl(__tscube_t c, size_t old_sz, size_t new_sz)
 		*new[new_s].key = *c->tbl[i].key;
 		*new[new_s].val = *c->tbl[i].val;
 	}
-	free(c->tbl);
+	xfree(c->tbl);
 	/* assign the new one */
 	c->tbl = new;
 	return;
@@ -282,9 +292,11 @@ tsc_add(tscube_t tsc, tsc_key_t key, void *val)
 		 * associated */
 		(void)check_resize(c);
 		ks = slot(c->tbl, c->alloc_sz, key);
+		/* oh we want to keep track of this */
 		*c->tbl[ks].key = *key;
 		/* create an interval tree, TODO */
-		c->tbl[ks].val->intv = NULL; //make_tscoll(secu);
+		c->tbl[ks].val->intv = make_tsc_itr();
+		tsc_itr_add(c->tbl[ks].val->intv, key->beg, key->end, val);
 		/* assign user's idea of this */
 		c->tbl[ks].val->uval = val;
 		c->nseries++;

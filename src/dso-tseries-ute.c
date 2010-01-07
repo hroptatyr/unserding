@@ -111,7 +111,7 @@ fetch_urn_ute(void)
 	}
 
 	UD_DEBUG("inspecting sl1t ...");
-	fill_urns(my_ctx);
+	//fill_urns(my_ctx);
 	UD_DBGCONT("done\n");
 	return;
 }

@@ -309,4 +309,67 @@ tsc_add(tscube_t tsc, tsc_key_t key, void *val)
 	return;
 }
 
+/* finder */
+static bool
+__key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
+{
+	if (UNLIKELY(matcher == NULL)) {
+		/* completely unspecified */
+		return true;
+	}
+
+	if (matcher->beg == 0 && matcher->end == 0) {
+		/* do nothing, just means we're not filtering by ts */
+		;
+	} else if (!(matchee->beg <= matcher->beg &&
+		     matchee->end >= matcher->end)) {
+		/* our series does not overlap matcher entirely */
+		return false;
+	}
+
+	if (matcher->ttf == SL1T_TTF_UNK) {
+		/* bingo, user doesnt care */
+		;
+	} else if (matchee->ttf != matcher->ttf) {
+		/* ttf's do not match */
+		return false;
+	}
+
+	{
+		uint32_t qd = su_secu_quodi(matcher->secu);
+		int32_t qt = su_secu_quoti(matcher->secu);
+		uint16_t p = su_secu_pot(matcher->secu);
+
+		if (qd && qd != su_secu_quodi(matchee->secu)) {
+			return false;
+		} else if (qt && qt != su_secu_quoti(matchee->secu)) {
+			return false;
+		} else if (p && p != su_secu_pot(matchee->secu)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void
+tsc_find1(tscube_t tsc, tsc_key_t *key, void **val)
+{
+	__tscube_t c = tsc;
+	hmap_t m = c->hmap;
+
+	pthread_mutex_lock(&m->mtx);
+	/* perform sequential scan */
+	for (uint32_t i = 0; i < m->alloc_sz; i++) {
+		if (!__key_valid_p(m->tbl[i].key)) {
+			continue;
+		} else if (__key_matches_p(m->tbl[i].key, *key)) {
+			**key = *m->tbl[i].key;
+			*val = m->tbl[i].val->uval;
+			break;
+		}
+	}
+	pthread_mutex_unlock(&m->mtx);
+	return;
+}
+
 /* tscube.c ends here */

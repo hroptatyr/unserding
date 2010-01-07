@@ -68,4 +68,7 @@ extern size_t tscube_size(tscube_t);
 extern void *tsc_get(tscube_t c, tsc_key_t key);
 extern void tsc_add(tscube_t c, tsc_key_t key, void *val);
 
+/* quick hack, find the first entry in tsc that matches key */
+extern void tsc_find1(tscube_t c, tsc_key_t *key, void **val);
+
 #endif	/* !INCLUDED_tscube_h_ */

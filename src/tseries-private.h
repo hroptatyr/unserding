@@ -38,12 +38,14 @@
 #if !defined INCLUDED_tseries_private_h_
 #define INCLUDED_tseries_private_h_
 
+#if !defined NO_LEGACY
 #include "tseries.h"
 #include "tscoll.h"
 #include "tscache.h"
 
 /* the main one used in dso-tseries.c */
 extern tscache_t tscache;
+#endif
 
 #if defined HAVE_MYSQL
 extern void
@@ -65,10 +67,13 @@ extern void dso_tseries_sl1t_LTX_deinit(void*);
 
 
 /* frob queue mumbo jumbo */
+#if !defined NO_LEGACY
 extern void defer_frob(tseries_t tser, dse16_t refds, bool immediatep);
+#endif
 extern void frobnicate(void);
 
 
+#if !defined NO_LEGACY
 static inline uint8_t
 index_in_pkt(time_t ts)
 {
@@ -81,5 +86,6 @@ index_in_pkt(time_t ts)
 	};
 	return offs[res];
 }
+#endif	/* !NO_LEGACY */
 
 #endif	/* INCLUDED_tseries_private_h_ */

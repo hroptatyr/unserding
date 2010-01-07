@@ -59,12 +59,13 @@
 #include "unserding-private.h"
 /* for higher level packet handling */
 #include "seria-proto-glue.h"
+#include "tscube.h"
+#define NO_LEGACY
 #include "tseries-private.h"
 
 
 /* ugly */
 #include "uteseries.c"
-#include "tscube.c"
 
 
 typedef struct my_ctx_s *my_ctx_t;

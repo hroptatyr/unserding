@@ -34,9 +34,13 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
+/* tscube has no hashing at the mo, means it's just an ordinary array-based
+ * sequentially scanned list */
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
+#include <pthread.h>
 #include <sushi/secu.h>
 #include <sushi/scommon.h>
 #include "tscube.h"
@@ -47,8 +51,9 @@
 typedef struct tscube_s *__tscube_t;
 typedef struct tsc_key_s key_s;
 typedef struct __val_s val_s;
-typedef key_s *tsc_key_t;
 typedef val_s *tsc_val_t;
+/* helpers */
+typedef struct hmap_s *hmap_t;
 
 struct __val_s {
 	/* we should point to our interval tree here */
@@ -67,26 +72,37 @@ struct keyval_s {
 };
 
 /**
- * The time series cube data structure.
+ * The master hash table for the cube which maps secu + ttf to itrees.
  * Naive, just an array of time series interval trees, used as hash table
  * per the keys vector which gives a primitive lookup from
  * the hashing key to the index in the former vector. */
-struct tscube_s {
+struct hmap_s {
 	size_t nseries;
 	size_t alloc_sz;
 	struct keyval_s *tbl;
 	pthread_mutex_t mtx;
 };
 
+/**
+ * The time series cube data structure. */
+struct tscube_s {
+	struct hmap_s hmap[1];
+	/** global itree to answer questions like, which instruments did
+	 * exist given a time stamp or time range. */
+};
+
 
+#if 0
 /* decouple from intvtree madness */
 #include "intvtree.h"
+#include "intvtree.c"
 
 typedef itree_t tsc_itr_t;
 
 #define make_tsc_itr	make_itree
 #define free_tsc_itr	free_itree
 #define tsc_itr_add	itree_add
+#endif
 
 
 /* helpers */
@@ -103,7 +119,7 @@ __key_valid_p(tsc_key_t id1)
 }
 
 static void
-init_tbl(__tscube_t c, size_t ini_sz)
+init_tbl(hmap_t c, size_t ini_sz)
 {
 	size_t msz = ini_sz * sizeof(*c->tbl);
 	c->tbl = xmalloc(msz);
@@ -112,7 +128,7 @@ init_tbl(__tscube_t c, size_t ini_sz)
 }
 
 static void
-free_tbl(__tscube_t c)
+free_tbl(hmap_t c)
 {
 	for (index_t i = 0; i < c->alloc_sz; i++) {
 		if (__key_valid_p(c->tbl[i].key)) {
@@ -125,35 +141,6 @@ free_tbl(__tscube_t c)
 	return;
 }
 
-#if 0
-/* state-of-the-art hash seems to be murmur2, so let's adapt it for gaids */
-static uint32_t
-murmur2(secukey_t key)
-{
-	/* 'm' and 'r' are mixing constants generated offline.
-	 * They're not really 'magic', they just happen to work well. */
-	const unsigned int m = 0x5bd1e995;
-	const int r = 24;
-	/* initialise to a random value, originally passed as `seed'*/
-#define seed	137173456
-	unsigned int h = seed;
-
-	key *= m;
-	key ^= key >> r;
-	key *= m;
-
-	h *= m;
-	h ^= key;
-
-	/* Do a few final mixes of the hash to ensure the last few
-	 * bytes are well-incorporated. */
-	h ^= h >> 13;
-	h *= m;
-	h ^= h >> 15;
-	return h;
-}
-#endif
-
 #define SLOTS_FULL	((uint32_t)0xffffffff)
 static uint32_t
 slot(struct keyval_s *tbl, size_t size, tsc_key_t key)
@@ -161,7 +148,8 @@ slot(struct keyval_s *tbl, size_t size, tsc_key_t key)
 /* return the first slot in c->tbl that either contains gaid or would
  * be a warm n cuddly place for it
  * linear probing */
-	uint32_t res = 0; //murmur2(key) % size;
+	/* normally we obtain a good starting value here */
+	uint32_t res = 0;
 	for (uint32_t i = res; i < size; i++) {
 		if (!__key_valid_p(tbl[i].key)) {
 			return i;
@@ -182,7 +170,7 @@ slot(struct keyval_s *tbl, size_t size, tsc_key_t key)
 }
 
 static void
-resize_tbl(__tscube_t c, size_t old_sz, size_t new_sz)
+resize_tbl(hmap_t c, size_t old_sz, size_t new_sz)
 {
 	size_t new_msz = new_sz * sizeof(*c->tbl);
 	struct keyval_s *new = malloc(new_msz);
@@ -205,7 +193,7 @@ resize_tbl(__tscube_t c, size_t old_sz, size_t new_sz)
 }
 
 static inline bool
-check_resize(__tscube_t c)
+check_resize(hmap_t c)
 {
 	if (UNLIKELY(c->nseries == c->alloc_sz)) {
 		/* resize */
@@ -220,17 +208,35 @@ check_resize(__tscube_t c)
 	return false;
 }
 
+static void
+init_hmap(hmap_t m)
+{
+	pthread_mutex_init(&m->mtx, NULL);
+	init_tbl(m, INITIAL_SIZE);
+	m->alloc_sz = INITIAL_SIZE;
+	m->nseries = 0;
+	return;
+}
+
+static void
+free_hmap(hmap_t m)
+{
+	pthread_mutex_lock(&m->mtx);
+	pthread_mutex_unlock(&m->mtx);
+	pthread_mutex_destroy(&m->mtx);
+
+	free_tbl(m);
+	return;
+}
+
 
 /* ctor, dtor */
-tscache_t
+tscube_t
 make_tscube(void)
 {
 	__tscube_t res = xnew(*res);
 
-	pthread_mutex_init(&res->mtx, NULL);
-	init_tbl(res, INITIAL_SIZE);
-	res->alloc_sz = INITIAL_SIZE;
-	res->nseries = 0;
+	init_hmap(res->hmap);
 	return (void*)res;
 }
 
@@ -239,69 +245,59 @@ free_tscube(tscube_t tsc)
 {
 	struct tscube_s *c = tsc;
 
-	pthread_mutex_lock(&c->mtx);
-	pthread_mutex_unlock(&c->mtx);
-	pthread_mutex_destroy(&c->mtx);
-
-	free_tbl(c);
-	xfree(c);
+	free_hmap(c->hmap);
+	/* free the cube itself */
+	xfree(tsc);
 	return;
 }
 
-#if 0
-/* modifiers */
 size_t
-tscache_size(tscache_t tsc)
+tscube_size(tscube_t tsc)
 {
-	__tscube_t c = tsc;
-	size_t res;
-
-	pthread_mutex_lock(&c->mtx);
-	res = c->nseries;
-	pthread_mutex_unlock(&c->mtx);
-	return res;
+	return (size_t)-1;
 }
 
-tscoll_t
-find_tscoll_by_secu(tscache_t tsc, su_secu_t secu)
+void*
+tsc_get(tscube_t tsc, tsc_key_t key)
 {
-	tscoll_t res = NULL;
 	__tscube_t c = tsc;
+	hmap_t m = c->hmap;
 	uint32_t ks;
+	void *res = NULL;
 
-	pthread_mutex_lock(&c->mtx);
-	ks = slot(c->tbl, c->alloc_sz, secukey_from_secu(secu));
-	if (LIKELY(ks != SLOTS_FULL && secukey_valid_p(c->tbl[ks].key))) {
-		res = c->tbl[ks].val;
+	pthread_mutex_lock(&m->mtx);
+	ks = slot(m->tbl, m->alloc_sz, key);
+	if (LIKELY(ks != SLOTS_FULL && __key_valid_p(m->tbl[ks].key))) {
+		res = m->tbl[ks].val;
 	}
-	pthread_mutex_unlock(&c->mtx);
+	pthread_mutex_unlock(&m->mtx);
 	return res;
 }
-#endif
 
 void
 tsc_add(tscube_t tsc, tsc_key_t key, void *val)
 {
 	__tscube_t c = tsc;
+	hmap_t m = c->hmap;
 	uint32_t ks;
 
-	pthread_mutex_lock(&c->mtx);
-	ks = slot(c->tbl, c->alloc_sz, key);
-	if (UNLIKELY(ks == SLOTS_FULL || !__key_valid_p(c->tbl[ks].key))) {
+	pthread_mutex_lock(&m->mtx);
+	ks = slot(m->tbl, m->alloc_sz, key);
+	if (UNLIKELY(ks == SLOTS_FULL || !__key_valid_p(m->tbl[ks].key))) {
 		/* means the slot is there, but it hasnt got a coll
 		 * associated */
-		(void)check_resize(c);
-		ks = slot(c->tbl, c->alloc_sz, key);
+		(void)check_resize(m);
+		ks = slot(m->tbl, m->alloc_sz, key);
 		/* oh we want to keep track of this */
-		*c->tbl[ks].key = *key;
+		*m->tbl[ks].key = *key;
 		/* create an interval tree, TODO */
-		c->tbl[ks].val->intv = make_tsc_itr();
-		tsc_itr_add(c->tbl[ks].val->intv, key->beg, key->end, val);
+		//m->tbl[ks].val->intv = make_tsc_itr();
+		//tsc_itr_add(m->tbl[ks].val->intv, key->beg, key->end, val);
 		/* assign user's idea of this */
-		c->tbl[ks].val->uval = val;
-		c->nseries++;
+		m->tbl[ks].val->uval = val;
+		m->nseries++;
 	}
-	pthread_mutex_unlock(&c->mtx);
+	pthread_mutex_unlock(&m->mtx);
 	return;
 }
 

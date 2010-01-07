@@ -87,7 +87,7 @@ dso_tseries_la_SOURCES += dso-tseries-sl1t.c
 dso_tseries_la_LIBADD += -luterus
 
 dso_tseries_ute_la_LDFLAGS = -module
-dso_tseries_ute_la_SOURCES = intvtree.c dso-tseries-ute.c
+dso_tseries_ute_la_SOURCES = tscube.c dso-tseries-ute.c
 dso_tseries_ute_la_LIBADD = -luterus
 
 ## stuff we develop here but that will go eventually to sushi

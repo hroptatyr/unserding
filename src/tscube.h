@@ -65,6 +65,7 @@ extern tscube_t make_tscube(void);
 extern void free_tscube(tscube_t);
 extern size_t tscube_size(tscube_t);
 
+extern void *tsc_get(tscube_t c, tsc_key_t key);
 extern void tsc_add(tscube_t c, tsc_key_t key, void *val);
 
 #endif	/* !INCLUDED_tscube_h_ */

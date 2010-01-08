@@ -55,9 +55,17 @@ typedef struct tsc_key_s *tsc_key_t;
 typedef struct tsc_ce_s *tsc_ce_t;
 /* cube operations (or methods if you will) */
 typedef struct tsc_ops_s *tsc_ops_t;
+
+/**
+ * The idea of the fetch function is to fetch (a subseries of) the time
+ * series specified by K (from BEG till END). */
 typedef size_t(*fetch_f)(
-	sl1t_t tgt, size_t tsz, tsc_key_t k, void *v,
+	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
 	time32_t beg, time32_t end);
+
+/**
+ * The idea of the urn refetch function is to allow for ... */
+typedef void(*urn_refetch_f)(tsc_key_t k, void *uval);
 
 /**
  * Keys for cube entries that can be searched for. */
@@ -86,6 +94,7 @@ struct tsc_ce_s {
 struct tsc_ops_s {
 	/** callback fun to call when ticks are to be fetched */
 	fetch_f fetch_cb;
+	urn_refetch_f urn_refetch_cb;
 };
 
 

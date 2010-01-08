@@ -75,14 +75,31 @@ struct my_ctx_s {
 };
 
 static size_t
-FUCKING_FETCH(void **bla, tsc_key_t voo, void *doo)
+FUCKING_FETCH(
+	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
+	time32_t beg, time32_t end)
 {
 	fprintf(stderr, "YAY\n");
 	return 0;
 }
 
+static void
+fetch_urn(tsc_key_t UNUSED(key), void *uval)
+{
+/* make me thread-safe and declare me */
+	if (uval == NULL) {
+		return;
+	}
+
+	UD_DEBUG("inspecting sl1t ...");
+	//fill_urns(my_ctx);
+	UD_DBGCONT("done\n");
+	return;
+}
+
 static struct tsc_ops_s ute_ops[1] = {{
 		.fetch_cb = FUCKING_FETCH,
+		.urn_refetch_cb = fetch_urn,
 	}};
 
 static void
@@ -101,6 +118,7 @@ fill_cube(tscube_t c)
 
 	/* one such addition is EURUSD */
 	ce.key->secu = su_secu(73380, 73381, 0);
+	ce.uval = (void*)0xdeadbeef;
 	tsc_add(c, &ce);
 	return;
 }
@@ -108,20 +126,6 @@ fill_cube(tscube_t c)
 
 static struct my_ctx_s my_ctx[1];
 static const char my_hardcoded_file[] = "/home/freundt/.unserding/eur.ute";
-
-void
-fetch_urn_ute(void)
-{
-/* make me thread-safe and declare me */
-	if (my_ctx->ctx == NULL) {
-		return;
-	}
-
-	UD_DEBUG("inspecting sl1t ...");
-	//fill_urns(my_ctx);
-	UD_DBGCONT("done\n");
-	return;
-}
 
 void
 dso_tseries_ute_LTX_init(void *UNUSED(clo))

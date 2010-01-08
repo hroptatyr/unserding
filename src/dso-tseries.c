@@ -410,11 +410,14 @@ proc_one(oadt_ctx_t octx, time32_t ts)
 		.beg = ts, .end = ts,
 		/* just noughtify the rest */
 		.ttf = 0,
+		/* make sure we let the system know what we want */
+		.msk = 1 | 2 | 4,
 	};
-	void *val = NULL;
+	struct sl1t_s tk[1];
+	size_t ntk;
 
-	//tsc_find1(gcube, &k, &val);
-	UD_DEBUG("found %p\n", val);
+	ntk = tsc_find1(tk, countof(tk), gcube, &k);
+	UD_DEBUG("found %zu\n", ntk);
 	return;
 }
 #endif
@@ -495,14 +498,6 @@ instr_tick_by_instr_svc(job_t j)
 
 
 /* urn getter */
-static void
-get_urn_cb(uint32_t UNUSED(lo), uint32_t UNUSED(hi), void *data, void *clo)
-{
-	tseries_t tser = data;
-	udpc_seria_add_tseries(clo, tser);
-	return;
-}
-
 static void
 instr_urn_svc(job_t j)
 {

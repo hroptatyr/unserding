@@ -342,26 +342,28 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 size_t
 tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 {
-#if 0
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
+	size_t ntk = 0;
+
+	/* filter out stupidity */
+	if (UNLIKELY(tsz == 0)) {
+		return 0;
+	}
 
 	pthread_mutex_lock(&m->mtx);
 	/* perform sequential scan */
 	for (uint32_t i = 0; i < m->alloc_sz; i++) {
 		if (!__key_valid_p(m->tbl[i].ce->key)) {
 			continue;
-		} else if (__key_matches_p(m->tbl[i].key, key)) {
-			*key = *m->tbl[i].key;
-			*val = m->tbl[i].val->uval;
+		} else if (__key_matches_p(m->tbl[i].ce->key, key)) {
+			memset(tgt, 0, sizeof(*tgt));
+			ntk++;
 			break;
 		}
 	}
 	pthread_mutex_unlock(&m->mtx);
-	return;
-#else
-	return 0;
-#endif
+	return ntk;
 }
 
 /* tscube.c ends here */

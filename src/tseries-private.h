@@ -51,7 +51,6 @@ extern tscube_t gcube;
 extern void
 fetch_urn_mysql(void);
 #endif	/* HAVE_MYSQL */
-extern void fetch_urn_ute(void);
 
 
 /* module like helpers */

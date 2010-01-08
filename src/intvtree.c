@@ -139,7 +139,7 @@ itree_root_node(itree_t it)
 	return &it->root;
 }
 
-static inline bool
+static inline __attribute__((unused)) bool
 itree_root_node_p(itree_t it, it_node_t in)
 {
 	return in == itree_root_node(it);
@@ -641,7 +641,7 @@ stack_pop(it_ndstk_t stk)
 	return stk->stk[--stk->idx];
 }
 
-static inline it_node_t
+static inline __attribute__((unused)) it_node_t
 stack_top(it_ndstk_t stk)
 {
 	if (stk->idx == 0) {

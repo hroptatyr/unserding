@@ -41,6 +41,7 @@
 #include <stdint.h>
 #include <sushi/secu.h>
 #include <sushi/scommon.h>
+#include <sushi/sl1t.h>
 
 #if !defined time32_t
 typedef int32_t time32_t;
@@ -49,6 +50,9 @@ typedef int32_t time32_t;
 typedef void *tscube_t;
 
 typedef struct tsc_key_s *tsc_key_t;
+typedef size_t(*fetch_f)(
+	sl1t_t tgt, size_t tsz, tsc_key_t k, void *v,
+	time32_t beg, time32_t end);
 
 struct tsc_key_s {
 	time32_t beg, end;
@@ -56,7 +60,7 @@ struct tsc_key_s {
 	uint16_t ttf;
 
 	/** callback fun to call when ticks are to be fetched */
-	size_t(*fetch_cb)(void **, tsc_key_t key, void *val);
+	fetch_f fetch_cb;
 };
 
 

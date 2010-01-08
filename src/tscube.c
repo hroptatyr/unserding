@@ -301,12 +301,7 @@ tsc_add(tscube_t tsc, tsc_ce_t ce)
 static bool
 __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 {
-	if (UNLIKELY(matcher == NULL)) {
-		/* completely unspecified */
-		return true;
-	}
-
-	if (matcher->beg == 0 && matcher->end == 0) {
+	if ((matcher->msk & 1) == 0 && (matcher->end & 2) == 0) {
 		/* do nothing, just means we're not filtering by ts */
 		;
 	} else if (!(matchee->beg <= matcher->beg &&
@@ -315,7 +310,7 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 		return false;
 	}
 
-	if (matcher->ttf == SL1T_TTF_UNK) {
+	if ((matcher->msk & 8) == 0) {
 		/* bingo, user doesnt care */
 		;
 	} else if (matchee->ttf != matcher->ttf) {
@@ -323,7 +318,10 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 		return false;
 	}
 
-	{
+	if ((matcher->msk & 4) == 0) {
+		/* user not interested in specifying the secu */
+		;
+	} else {
 		uint32_t qd = su_secu_quodi(matcher->secu);
 		int32_t qt = su_secu_quoti(matcher->secu);
 		uint16_t p = su_secu_pot(matcher->secu);

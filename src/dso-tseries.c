@@ -211,7 +211,7 @@ struct oadt_ctx_s {
 
 /* we sort the list of requested time stamps to collapse contiguous ones */
 static index_t
-selsort_minidx(time_t arr[], size_t narr, index_t offs)
+selsort_minidx(time32_t arr[], size_t narr, index_t offs)
 {
 	index_t minidx = offs;
 
@@ -224,9 +224,9 @@ selsort_minidx(time_t arr[], size_t narr, index_t offs)
 }
 
 static inline void
-selsort_swap(time_t arr[], index_t i1, index_t i2)
+selsort_swap(time32_t arr[], index_t i1, index_t i2)
 {
-	time_t tmp;
+	time32_t tmp;
 	tmp = arr[i1];
 	arr[i1] = arr[i2];
 	arr[i2] = tmp;
@@ -234,7 +234,7 @@ selsort_swap(time_t arr[], index_t i1, index_t i2)
 }
 
 static void
-selsort_in_situ(time_t arr[], size_t narr)
+selsort_in_situ(time32_t arr[], size_t narr)
 {
 	for (index_t i = 0; i < narr-1; i++) {
 		index_t minidx;
@@ -245,7 +245,7 @@ selsort_in_situ(time_t arr[], size_t narr)
 }
 
 static size_t
-snarf_times(udpc_seria_t sctx, time_t ts[], size_t nts)
+snarf_times(udpc_seria_t sctx, time32_t ts[], size_t nts)
 {
 	size_t nfilt = 0;
 	while ((ts[nfilt] = udpc_seria_des_ui32(sctx)) && ++nfilt < nts);
@@ -285,7 +285,7 @@ __tbs_has_p(tbs_t tbs, uint16_t ttf)
 }
 
 
-static void
+static __attribute__((unused)) void
 __bang(oadt_ctx_t octx, tser_pkt_t pkt, uint8_t idx)
 {
 	udpc_seria_add_secu(octx->sctx, octx->secu);
@@ -325,7 +325,7 @@ __bang_onhold(oadt_ctx_t octx, time_t refts, uint16_t ttf)
 	return;
 }
 
-static void
+static __attribute__((unused)) void
 __bang_all_nexist(oadt_ctx_t octx, time_t refts)
 {
 	tbs_t tbs = octx->tbs;
@@ -345,7 +345,7 @@ __bang_all_nexist(oadt_ctx_t octx, time_t refts)
 	return;
 }
 
-static void
+static __attribute__((unused)) void
 __bang_all_onhold(oadt_ctx_t octx, time_t refts)
 {
 	tbs_t tbs = octx->tbs;
@@ -413,7 +413,7 @@ proc_one(oadt_ctx_t octx, time32_t ts)
 	};
 	void *val = NULL;
 
-	tsc_find1(gcube, &k, &val);
+	//tsc_find1(gcube, &k, &val);
 	UD_DEBUG("found %p\n", val);
 	return;
 }
@@ -448,7 +448,6 @@ instr_tick_by_instr_svc(job_t j)
 	tbs_t tbs;
 	/* allow to filter for 64 time stamps at once */
 	unsigned int nfilt = 0;
-	tscoll_t tsc;
 	bool moarp = true;
 
 	/* prepare the iterator for the incoming packet */
@@ -476,7 +475,6 @@ instr_tick_by_instr_svc(job_t j)
 	/* initialise our context */
 	oadtctx->sctx = rplsctx;
 	oadtctx->secu = sec;
-	oadtctx->coll = tsc;
 	oadtctx->nfilt = nfilt;
 	oadtctx->tbs = tbs;
 
@@ -511,7 +509,6 @@ instr_urn_svc(job_t j)
 	struct udpc_seria_s sctx;
 	/* in args */
 	su_secu_t secu;
-	tscoll_t tsc;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);

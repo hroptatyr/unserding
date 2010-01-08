@@ -74,27 +74,34 @@ struct my_ctx_s {
 	tblister_t tbl;
 };
 
-size_t
+static size_t
 FUCKING_FETCH(void **bla, tsc_key_t voo, void *doo)
 {
 	fprintf(stderr, "YAY\n");
-	return;
+	return 0;
 }
+
+static struct tsc_ops_s ute_ops[1] = {{
+		.fetch_cb = FUCKING_FETCH,
+	}};
 
 static void
 fill_cube(tscube_t c)
 {
 /* hardcoded as fuck */
-	struct tsc_key_s k = {
-		.beg = 915148800,
-		.end = 0x7fffffff,
-		.ttf = SL1T_TTF_FIX,
-		.fetch_cb = FUCKING_FETCH,
+	struct tsc_ce_s ce = {
+		.key = {{
+				.beg = 915148800,
+				.end = 0x7fffffff,
+				.ttf = SL1T_TTF_FIX,
+				.msk = 1 | 2 | 4 | 8 | 16,
+			}},
+		.ops = ute_ops,
 	};
 
 	/* one such addition is EURUSD */
-	k.secu = su_secu(73380, 73381, 0);
-	tsc_add(c, &k, (void*)0xdeadbeef);
+	ce.key->secu = su_secu(73380, 73381, 0);
+	tsc_add(c, &ce);
 	return;
 }
 

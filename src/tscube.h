@@ -49,16 +49,41 @@ typedef int32_t time32_t;
 #endif	/* !time32_t */
 typedef void *tscube_t;
 
+/** Cube entry keys. */
 typedef struct tsc_key_s *tsc_key_t;
+/** Cube entries. */
+typedef struct tsc_ce_s *tsc_ce_t;
+/* cube operations (or methods if you will) */
+typedef struct tsc_ops_s *tsc_ops_t;
 typedef size_t(*fetch_f)(
 	sl1t_t tgt, size_t tsz, tsc_key_t k, void *v,
 	time32_t beg, time32_t end);
 
+/**
+ * Keys for cube entries that can be searched for. */
 struct tsc_key_s {
 	time32_t beg, end;
 	su_secu_t secu;
 	uint16_t ttf;
+	/* two times 64 bit + 16, leaves 48 bits of general purpose */
+	/** when used as search input this masks the fields that are set */
+	uint16_t msk;
+	/** general purpose 32bit integer, used as index mostly */
+	uint32_t gen;
+};
 
+struct tsc_ce_s {
+	struct tsc_key_s key[1];
+
+	/**
+	 * Following is not directly searchable, but yields different
+	 * cube entries upon different values */
+	tsc_ops_t ops;
+	/** General purpose user value. */
+	void *uval;
+};
+
+struct tsc_ops_s {
 	/** callback fun to call when ticks are to be fetched */
 	fetch_f fetch_cb;
 };
@@ -69,10 +94,10 @@ extern tscube_t make_tscube(void);
 extern void free_tscube(tscube_t);
 extern size_t tscube_size(tscube_t);
 
-extern void *tsc_get(tscube_t c, tsc_key_t key);
-extern void tsc_add(tscube_t c, tsc_key_t key, void *val);
+extern tsc_ce_t tsc_get(tscube_t c, tsc_key_t key);
+extern void tsc_add(tscube_t c, tsc_ce_t ce);
 
 /* quick hack, find the first entry in tsc that matches key */
-extern void tsc_find1(tscube_t c, tsc_key_t key, void **val);
+extern size_t tsc_find1(sl1t_t tgt, size_t tsz, tscube_t c, tsc_key_t key);
 
 #endif	/* !INCLUDED_tscube_h_ */

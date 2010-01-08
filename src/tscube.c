@@ -50,26 +50,16 @@
 #define INITIAL_SIZE	1024
 
 typedef struct tscube_s *__tscube_t;
-typedef struct tsc_key_s key_s;
-typedef struct __val_s val_s;
-typedef val_s *tsc_val_t;
 /* helpers */
 typedef struct hmap_s *hmap_t;
-
-struct __val_s {
-	/* we should point to our interval tree here */
-	void *intv;
-	/* user's value */
-	void *uval;
-};
 
 /**
  * Just a reverse lookup structure. */
 struct keyval_s {
-	/* user provided key */
-	key_s key[1];
-	/* lookup value */
-	val_s val[1];
+	/** user provided key */
+	struct tsc_ce_s ce[1];
+	/** interval trees to see what's cached: ce + (b, e) |-> sl1t */
+	void *intv;
 };
 
 /**
@@ -136,7 +126,7 @@ static void
 free_tbl(hmap_t c)
 {
 	for (index_t i = 0; i < c->alloc_sz; i++) {
-		if (__key_valid_p(c->tbl[i].key)) {
+		if (__key_valid_p(c->tbl[i].ce->key)) {
 #if 0
 			if (c->tbl[i].val->intv) {
 				free_tsc_itr(c->tbl[i].val->intv);
@@ -158,17 +148,17 @@ slot(struct keyval_s *tbl, size_t size, tsc_key_t key)
 	/* normally we obtain a good starting value here */
 	uint32_t res = 0;
 	for (uint32_t i = res; i < size; i++) {
-		if (!__key_valid_p(tbl[i].key)) {
+		if (!__key_valid_p(tbl[i].ce->key)) {
 			return i;
-		} else if (__key_equal_p(tbl[i].key, key)) {
+		} else if (__key_equal_p(tbl[i].ce->key, key)) {
 			return i;
 		}
 	}
 	/* rotate round */
 	for (uint32_t i = 0; i < res; i++) {
-		if (!__key_valid_p(tbl[i].key)) {
+		if (!__key_valid_p(tbl[i].ce->key)) {
 			return i;
-		} else if (__key_equal_p(tbl[i].key, key)) {
+		} else if (__key_equal_p(tbl[i].ce->key, key)) {
 			return i;
 		}
 	}
@@ -186,12 +176,11 @@ resize_tbl(hmap_t c, size_t old_sz, size_t new_sz)
 	for (uint32_t i = 0; i < old_sz; i++) {
 		uint32_t new_s;
 
-		if (!__key_valid_p(c->tbl[i].key)) {
+		if (!__key_valid_p(c->tbl[i].ce->key)) {
 			continue;
 		}
-		new_s = slot(new, new_sz, c->tbl[i].key);
-		*new[new_s].key = *c->tbl[i].key;
-		*new[new_s].val = *c->tbl[i].val;
+		new_s = slot(new, new_sz, c->tbl[i].ce->key);
+		*new[new_s].ce->key = *c->tbl[i].ce->key;
 	}
 	xfree(c->tbl);
 	/* assign the new one */
@@ -265,44 +254,43 @@ tscube_size(tscube_t tsc)
 	return c->hmap->nseries;
 }
 
-void*
+tsc_ce_t
 tsc_get(tscube_t tsc, tsc_key_t key)
 {
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
 	uint32_t ks;
-	void *res = NULL;
+	tsc_ce_t res = NULL;
 
 	pthread_mutex_lock(&m->mtx);
 	ks = slot(m->tbl, m->alloc_sz, key);
-	if (LIKELY(ks != SLOTS_FULL && __key_valid_p(m->tbl[ks].key))) {
-		res = m->tbl[ks].val;
+	if (LIKELY(ks != SLOTS_FULL && __key_valid_p(m->tbl[ks].ce->key))) {
+		res = m->tbl[ks].ce;
 	}
 	pthread_mutex_unlock(&m->mtx);
 	return res;
 }
 
 void
-tsc_add(tscube_t tsc, tsc_key_t key, void *val)
+tsc_add(tscube_t tsc, tsc_ce_t ce)
 {
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
 	uint32_t ks;
 
 	pthread_mutex_lock(&m->mtx);
-	ks = slot(m->tbl, m->alloc_sz, key);
-	if (UNLIKELY(ks == SLOTS_FULL || !__key_valid_p(m->tbl[ks].key))) {
+	ks = slot(m->tbl, m->alloc_sz, ce->key);
+	if (UNLIKELY(ks == SLOTS_FULL || !__key_valid_p(m->tbl[ks].ce->key))) {
 		/* means the slot is there, but it hasnt got a coll
 		 * associated */
 		(void)check_resize(m);
-		ks = slot(m->tbl, m->alloc_sz, key);
+		ks = slot(m->tbl, m->alloc_sz, ce->key);
 		/* oh we want to keep track of this */
-		memcpy(m->tbl[ks].key, key, sizeof(*key));
+		memcpy(m->tbl[ks].ce->key, ce, sizeof(*ce));
 		/* create an interval tree, TODO */
 		//m->tbl[ks].val->intv = make_tsc_itr();
 		//tsc_itr_add(m->tbl[ks].val->intv, key->beg, key->end, val);
 		/* assign user's idea of this */
-		m->tbl[ks].val->uval = val;
 		m->nseries++;
 	}
 	pthread_mutex_unlock(&m->mtx);
@@ -351,16 +339,17 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 	return true;
 }
 
-void
-tsc_find1(tscube_t tsc, tsc_key_t key, void **val)
+size_t
+tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 {
+#if 0
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
 
 	pthread_mutex_lock(&m->mtx);
 	/* perform sequential scan */
 	for (uint32_t i = 0; i < m->alloc_sz; i++) {
-		if (!__key_valid_p(m->tbl[i].key)) {
+		if (!__key_valid_p(m->tbl[i].ce->key)) {
 			continue;
 		} else if (__key_matches_p(m->tbl[i].key, key)) {
 			*key = *m->tbl[i].key;
@@ -370,6 +359,9 @@ tsc_find1(tscube_t tsc, tsc_key_t key, void **val)
 	}
 	pthread_mutex_unlock(&m->mtx);
 	return;
+#else
+	return 0;
+#endif
 }
 
 /* tscube.c ends here */

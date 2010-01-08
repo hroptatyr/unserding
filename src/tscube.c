@@ -352,7 +352,7 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 }
 
 void
-tsc_find1(tscube_t tsc, tsc_key_t *key, void **val)
+tsc_find1(tscube_t tsc, tsc_key_t key, void **val)
 {
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
@@ -362,8 +362,8 @@ tsc_find1(tscube_t tsc, tsc_key_t *key, void **val)
 	for (uint32_t i = 0; i < m->alloc_sz; i++) {
 		if (!__key_valid_p(m->tbl[i].key)) {
 			continue;
-		} else if (__key_matches_p(m->tbl[i].key, *key)) {
-			**key = *m->tbl[i].key;
+		} else if (__key_matches_p(m->tbl[i].key, key)) {
+			*key = *m->tbl[i].key;
 			*val = m->tbl[i].val->uval;
 			break;
 		}

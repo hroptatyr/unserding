@@ -204,7 +204,7 @@ struct oadt_ctx_s {
 	udpc_seria_t sctx;
 	su_secu_t secu;
 	tscoll_t coll;
-	time_t filt[NFILT];
+	time32_t filt[NFILT];
 	size_t nfilt;
 	tbs_t tbs;
 };
@@ -365,7 +365,7 @@ __bang_all_onhold(oadt_ctx_t octx, time_t refts)
 	return;
 }
 
-
+#if 0
 static void
 proc_one(oadt_ctx_t octx, time_t ts)
 {
@@ -401,6 +401,23 @@ proc_one(oadt_ctx_t octx, time_t ts)
 	}
 	return;
 }
+#else
+static void
+proc_one(oadt_ctx_t octx, time32_t ts)
+{
+	struct tsc_key_s k = {
+		.secu = octx->secu,
+		.beg = ts, .end = ts,
+		/* just noughtify the rest */
+		.ttf = 0,
+	};
+	void *val = NULL;
+
+	tsc_find1(gcube, &k, &val);
+	UD_DEBUG("found %p\n", val);
+	return;
+}
+#endif
 
 static inline bool
 one_moar_p(oadt_ctx_t octx)
@@ -454,6 +471,7 @@ instr_tick_by_instr_svc(job_t j)
 		UD_DEBUG("No way of fetching stuff\n");
 		return;
 	}
+#endif
 
 	/* initialise our context */
 	oadtctx->sctx = rplsctx;
@@ -474,7 +492,6 @@ instr_tick_by_instr_svc(job_t j)
 
 	/* we cater for any frobnication desires now */
 	frobnicate();
-#endif
 	return;
 }
 

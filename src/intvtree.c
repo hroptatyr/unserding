@@ -241,6 +241,10 @@ itree_satellite(itree_t it)
 }
 
 /* opers */
+#if defined __INTEL_COMPILER
+/* args are eval'd in unspecified order */
+#pragma warning (disable:981)
+#endif	/* __INTEL_COMPILER */
 static void
 itree_rot_left(itree_t UNUSED(it), it_node_t p)
 {

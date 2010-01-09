@@ -84,8 +84,13 @@ fetch_tick(
 
 	/* different keying now */
 	sl1t_set_stmp_sec(tgt, beg);
-	__find_tk(ctx->ctx, tbl, tgt);
-	return 1;
+	/* use the global secu -> tblidx map */
+	sl1t_set_tblidx(tgt, 2);
+	sl1t_set_ttf(tgt, k->ttf);
+	if (__find_tk(ctx->ctx, tbl, tgt)) {
+		return 1;
+	}
+	return 0;
 }
 
 static void

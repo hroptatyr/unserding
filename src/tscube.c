@@ -53,6 +53,8 @@ typedef struct tscube_s *__tscube_t;
 /* helpers */
 typedef struct hmap_s *hmap_t;
 
+typedef struct keyval_s *keyval_t;
+
 /**
  * Just a reverse lookup structure. */
 struct keyval_s {
@@ -337,6 +339,20 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 	return true;
 }
 
+static size_t
+bother_cube(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key, keyval_t kv)
+{
+/* sig subject to change */
+	/* normally we'd just bother our interval trees
+	 * however for now we just use the fetcher in ops */
+	if (kv->ce->ops && kv->ce->ops->fetch_cb) {
+		return kv->ce->ops->fetch_cb(
+			tgt, tsz, kv->ce->key, kv->ce->uval,
+			key->beg, key->beg);
+	}
+	return 0;
+}
+
 size_t
 tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 {
@@ -355,8 +371,7 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 		if (!__key_valid_p(m->tbl[i].ce->key)) {
 			continue;
 		} else if (__key_matches_p(m->tbl[i].ce->key, key)) {
-			memset(tgt, 0, sizeof(*tgt));
-			ntk++;
+			ntk = bother_cube(tgt, tsz, tsc, key, &m->tbl[i]);
 			break;
 		}
 	}

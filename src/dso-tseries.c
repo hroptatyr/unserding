@@ -413,11 +413,12 @@ proc_one(oadt_ctx_t octx, time32_t ts)
 		/* make sure we let the system know what we want */
 		.msk = 1 | 2 | 4,
 	};
-	struct sl1t_s tk[1];
+	struct tser_pkt_s pkt[1];
 	size_t ntk;
 
-	ntk = tsc_find1(tk, countof(tk), gcube, &k);
+	ntk = tsc_find1(pkt->t, countof(pkt->t), gcube, &k);
 	UD_DEBUG("found %zu\n", ntk);
+	__bang(octx, pkt, 0);
 	return;
 }
 #endif

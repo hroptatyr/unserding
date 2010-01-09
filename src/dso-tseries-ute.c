@@ -75,12 +75,17 @@ struct my_ctx_s {
 };
 
 static size_t
-FUCKING_FETCH(
+fetch_tick(
 	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
 	time32_t beg, time32_t end)
 {
-	fprintf(stderr, "YAY\n");
-	return 0;
+	my_ctx_t ctx = uval;
+	tblister_t tbl = __find_blister_by_ts(ctx->tbl, beg);
+
+	/* different keying now */
+	sl1t_set_stmp_sec(tgt, beg);
+	__find_tk(ctx->ctx, tbl, tgt);
+	return 1;
 }
 
 static void
@@ -98,12 +103,12 @@ fetch_urn(tsc_key_t UNUSED(key), void *uval)
 }
 
 static struct tsc_ops_s ute_ops[1] = {{
-		.fetch_cb = FUCKING_FETCH,
+		.fetch_cb = fetch_tick,
 		.urn_refetch_cb = fetch_urn,
 	}};
 
 static void
-fill_cube(tscube_t c)
+fill_cube(tscube_t c, my_ctx_t ctx)
 {
 /* hardcoded as fuck */
 	struct tsc_ce_s ce = {
@@ -118,7 +123,7 @@ fill_cube(tscube_t c)
 
 	/* one such addition is EURUSD */
 	ce.key->secu = su_secu(73380, 73381, 0);
-	ce.uval = (void*)0xdeadbeef;
+	ce.uval = ctx;
 	tsc_add(c, &ce);
 	return;
 }
@@ -132,7 +137,8 @@ dso_tseries_ute_LTX_init(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: loading ...");
 	my_ctx->ctx = open_ute_file(my_hardcoded_file);
-	fill_cube(gcube);
+	my_ctx->tbl = ute_inspect(my_ctx->ctx);
+	fill_cube(gcube, my_ctx);
 	UD_DBGCONT("done\n");
 	return;
 }

@@ -548,7 +548,7 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 }
 
 void
-fetch_urn_mysql(void)
+fetch_urn_mysql(job_t UNUSED(j))
 {
 /* make me thread-safe and declare me */
 	if (conn == NULL) {
@@ -646,6 +646,8 @@ dso_tseries_mysql_LTX_init(void *clo)
 	/* clean up */
 	udctx_set_setting(ctx, NULL);
 	UD_DBGCONT("done\n");
+	/* announce our hook fun */
+	add_hook(fetch_urn_hook, fetch_urn_mysql);
 	return;
 }
 

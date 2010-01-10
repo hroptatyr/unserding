@@ -428,7 +428,7 @@ whereis(const_sl1t_t t, time_t ts[], size_t nts)
 {
 /* look if the tick in t has been asked for and return the index */
 	for (index_t i = 0; i < nts; i++) {
-		if (sl1t_stmp_sec(t) == ts[i]) {
+		if ((time_t)sl1t_stmp_sec(t) == ts[i]) {
 			return i;
 		}
 	}
@@ -515,7 +515,7 @@ __recv_tick_cb(const ud_packet_t pkt, void *clo)
 			}
 		}
 		/* callback */
-		(*bc->cb)(&bc->Dute, bc->clo);
+		bc->cb(&bc->Dute, bc->clo);
 		bc->retry = NRETRIES;
 	}
 	/* ask for more */
@@ -547,6 +547,8 @@ recv_ticks(ftbi_ctx_t bc)
 static void
 frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 {
+	/* we don't really need this, do we? */
+	udpc_seria_des_secu(bictx->sctx);
 	while (udpc_seria_des_sl1t(bictx->sl1t, bictx->sctx)) {
 		index_t where;
 		if ((where = whereis(bictx->sl1t, ts, nts)) < nts) {

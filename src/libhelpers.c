@@ -55,7 +55,7 @@
 #endif
 
 #define NRETRIES	2
-//#define USE_SUBSCR
+#define USE_SUBSCR
 
 struct f1i_clo_s {
 	ud_convo_t cno;
@@ -492,8 +492,9 @@ send_stamps(ftbi_ctx_t bictx)
 
 #if defined USE_SUBSCR
 /* we combine recv_ticks() and frob_ticks() in here */
+#define usa	UNUSED(sa)
 static bool
-__recv_tick_cb(const ud_packet_t pkt, void *clo)
+__recv_tick_cb(const ud_packet_t pkt, ud_const_sockaddr_t usa, void *clo)
 {
 	ftbi_ctx_t bc = clo;
 
@@ -505,17 +506,18 @@ __recv_tick_cb(const ud_packet_t pkt, void *clo)
 	}
 	udpc_seria_init(
 		bc->sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	while (udpc_seria_des_spDute(&bc->Dute, &bc->sctx)) {
+	udpc_seria_des_secu(bc->sctx);
+	while (udpc_seria_des_sl1t(bc->sl1t, bc->sctx)) {
 		index_t where;
-		if ((where = whereis(&bc->Dute, bc->ts, bc->nts)) < bc->nts) {
-			if (!spDute_onhold_p(&bc->Dute)) {
+		if ((where = whereis(bc->sl1t, bc->ts, bc->nts)) < bc->nts) {
+			if (!sl1t_onhold_p(bc->sl1t)) {
 				bc->rcvd++;
 				/* mark it, use our mark vector */
 				set_seen(bc, where);
 			}
 		}
 		/* callback */
-		bc->cb(&bc->Dute, bc->clo);
+		bc->cb(bc->secu, (const void*)bc->sl1t, bc->clo);
 		bc->retry = NRETRIES;
 	}
 	/* ask for more */

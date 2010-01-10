@@ -354,6 +354,9 @@ fld_date_p(const char *row_name)
 		return false;						\
 	}
 
+#if defined __INTEL_COMPILER
+# pragma warning	(disable:424)
+#endif
 MAKE_PRED(bo, "bop");
 MAKE_PRED(bh, "bhp");
 MAKE_PRED(bl, "blp");
@@ -547,7 +550,7 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 	return;
 }
 
-void
+static void
 fetch_urn_mysql(job_t UNUSED(j))
 {
 /* make me thread-safe and declare me */

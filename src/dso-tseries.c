@@ -418,7 +418,9 @@ proc_one(oadt_ctx_t octx, time32_t ts)
 
 	ntk = tsc_find1(pkt->t, countof(pkt->t), gcube, &k);
 	UD_DEBUG("found %zu\n", ntk);
-	__bang(octx, pkt, 0);
+	for (index_t i = 0; i < ntk; i++) {
+		udpc_seria_add_sl1t(octx->sctx, &pkt->t[i]);
+	}
 	return;
 }
 #endif
@@ -434,6 +436,7 @@ one_moar_p(oadt_ctx_t octx)
 static index_t
 proc_some(oadt_ctx_t octx, index_t i)
 {
+	udpc_seria_add_secu(octx->sctx, octx->secu);
 	for (; i < octx->nfilt && one_moar_p(octx); i++) {
 		proc_one(octx, octx->filt[i]);
 	}

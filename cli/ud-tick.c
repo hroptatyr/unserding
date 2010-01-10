@@ -126,7 +126,7 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 	char ttf = ttc(t);
 	int32_t ts = scom_thdr_sec(t);
 
-	fprintf(stdout, "tick storm, ticks:1 ii:%u/%u@%hu tt:%c  ts:%i",
+	fprintf(stdout, "tick storm, ticks:1 ii:%u/%i@%hu tt:%c  ts:%i",
 		qd, qt, p, ttf, ts);
 
 	if (scom_thdr_nexist_p(t)) {

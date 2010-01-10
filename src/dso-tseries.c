@@ -68,6 +68,7 @@
 #include "tseries-private.h"
 
 tscube_t gcube = NULL;
+struct hook_s __fetch_urn_hook[1], *fetch_urn_hook = __fetch_urn_hook;
 
 #if defined DEBUG_FLAG
 # define UD_DEBUG_TSER(args...)			\
@@ -527,10 +528,13 @@ instr_urn_svc(job_t j)
 
 /* fetch urn svc */
 static void
-fetch_urn_svc(job_t UNUSED(j))
+fetch_urn_svc(job_t j)
 {
 	UD_DEBUG("0x%04x (UD_SVC_FETCH_URN)\n", UD_SVC_FETCH_URN);
 	ud_set_service(UD_SVC_FETCH_URN, NULL, NULL);
+	for (index_t i = 0; i < fetch_urn_hook->nf; i++) {
+		fetch_urn_hook->f[i](j);
+	}
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	return;
 }

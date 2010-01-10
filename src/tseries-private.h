@@ -47,11 +47,6 @@
 
 extern tscube_t gcube;
 
-#if defined HAVE_MYSQL
-extern void
-fetch_urn_mysql(void);
-#endif	/* HAVE_MYSQL */
-
 
 /* module like helpers */
 extern void dso_tseries_LTX_init(void*);
@@ -87,5 +82,24 @@ index_in_pkt(time_t ts)
 	return offs[res];
 }
 #endif	/* !NO_LEGACY */
+
+
+/* hooks */
+typedef struct hook_s *hook_t;
+typedef void(*hook_f)(job_t);
+
+struct hook_s {
+	size_t nf;
+	hook_f f[16];
+};
+
+extern hook_t fetch_urn_hook;
+
+static void
+add_hook(hook_t h, hook_f f)
+{
+	h->f[h->nf++] = f;
+	return;
+}
 
 #endif	/* INCLUDED_tseries_private_h_ */

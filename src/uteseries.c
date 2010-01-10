@@ -111,6 +111,7 @@ struct tblister_s {
 	/* just to chain these guys, must stay behind ttfbs, as we have
 	 * a copy operation that copies everything before that */
 	tblister_t next;
+	void *data;
 };
 
 static void

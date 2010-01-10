@@ -72,20 +72,45 @@ typedef struct my_ctx_s *my_ctx_t;
 struct my_ctx_s {
 	ute_ctx_t ctx;
 	tblister_t tbl;
+	
 };
+
+static inline uint16_t
+__fhdr_nsecs(utehdr_t fhdr)
+{
+/* assumed that fhdr contains secs, this is not checked */
+	uint32_t ploff = utehdr_payload_offset(fhdr);
+	uint32_t sz1 = sizeof(su_secu_t) + sizeof(struct time_range_s);
+	return (uint16_t)(ploff / sz1 - UTEHDR_FIRST_SECIDX);
+}
+
+static uint16_t
+find_secu_idx(my_ctx_t ctx, su_secu_t sec)
+{
+/* hardcoded as fuck */
+	utehdr_t fhdr = ((sl1t_fio_t)ctx->ctx)->fhdr;
+	for (index_t i = UTEHDR_FIRST_SECIDX;
+	     i < __fhdr_nsecs(fhdr) + UTEHDR_FIRST_SECIDX; i++) {
+		if (fhdr->sec[i].mux == sec.mux) {
+			return i;
+		}
+	}
+	return 0;
+}
 
 static size_t
 fetch_tick(
-	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
-	time32_t beg, time32_t end)
+	sl1t_t tgt, size_t UNUSED(tsz), tsc_key_t k, void *uval,
+	time32_t beg, time32_t UNUSED(end))
 {
 	my_ctx_t ctx = uval;
 	tblister_t tbl = __find_blister_by_ts(ctx->tbl, beg);
+	uint16_t idx = find_secu_idx(ctx, k->secu);
 
 	/* different keying now */
 	sl1t_set_stmp_sec(tgt, beg);
 	/* use the global secu -> tblidx map */
-	sl1t_set_tblidx(tgt, 2);
+	sl1t_set_tblidx(tgt, idx);
 	sl1t_set_ttf(tgt, k->ttf);
 	if (__find_tk(ctx->ctx, tbl, tgt)) {
 		return 1;
@@ -112,22 +137,29 @@ static struct tsc_ops_s ute_ops[1] = {{
 		.urn_refetch_cb = fetch_urn,
 	}};
 
+struct cb_clo_s {
+	tscube_t c;
+	my_ctx_t ctx;
+};
+
 static void
-fill_cube(tscube_t c, my_ctx_t ctx)
+fill_cube_cb(uint16_t UNUSED(idx), su_secu_t sec, void *clo)
 {
 /* hardcoded as fuck */
+	struct cb_clo_s *fcclo = clo;
+	tscube_t c = fcclo->c;
+	my_ctx_t ctx = fcclo->ctx;
 	struct tsc_ce_s ce = {
 		.key = {{
 				.beg = 915148800,
 				.end = 0x7fffffff,
 				.ttf = SL1T_TTF_FIX,
 				.msk = 1 | 2 | 4 | 8 | 16,
+				.secu = sec,
 			}},
 		.ops = ute_ops,
 	};
 
-	/* one such addition is EURUSD */
-	ce.key->secu = su_secu(73380, 73381, 0);
 	ce.uval = ctx;
 	tsc_add(c, &ce);
 	return;
@@ -140,10 +172,12 @@ static const char my_hardcoded_file[] = "/home/freundt/.unserding/eur.ute";
 void
 dso_tseries_ute_LTX_init(void *UNUSED(clo))
 {
+	struct cb_clo_s cbclo = {.c = gcube, .ctx = my_ctx};
+
 	UD_DEBUG("mod/tseries-ute: loading ...");
 	my_ctx->ctx = open_ute_file(my_hardcoded_file);
 	my_ctx->tbl = ute_inspect(my_ctx->ctx);
-	fill_cube(gcube, my_ctx);
+	sl1t_fio_trav_stbl(my_ctx->ctx, fill_cube_cb, NULL, &cbclo);
 	UD_DBGCONT("done\n");
 	return;
 }

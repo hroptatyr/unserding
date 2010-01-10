@@ -565,17 +565,86 @@ fetch_urn_mysql(void)
 	return;
 }
 
+static void*
+cfgspec_get_source(void *ctx, void *spec)
+{
+#define CFG_SOURCE	"source"
+	return udcfg_tbl_lookup(ctx, spec, CFG_SOURCE);
+}
+
+
+typedef enum {
+	CST_UNK,
+	CST_MYSQL,
+} cfgsrc_type_t;
+
+static cfgsrc_type_t
+cfgsrc_type(void *ctx, void *spec)
+{
+#define CFG_TYPE	"type"
+	const char *type = NULL;
+
+	if (spec == NULL) {
+		UD_DEBUG("mod/tseries: no source specified\n");
+		return CST_UNK;
+	}
+	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
+
+	if (type == NULL) {
+		return CST_UNK;
+	} else if (memcmp(type, "mysql", 5) == 0) {
+		return CST_MYSQL;
+	}
+	return CST_UNK;
+}
+
+static void
+load_ticks_fetcher(void *clo, void *spec)
+{
+	void *src;
+
+	if ((src = cfgspec_get_source(clo, spec)) == NULL) {
+		return;
+	}
+
+	/* pass along the src settings */
+	udctx_set_setting(clo, src);
+
+	/* find out about its type */
+	switch (cfgsrc_type(clo, src)) {
+	case CST_MYSQL:
+		if ((conn = uddb_connect(clo, src)) == NULL) {
+			UD_DBGCONT("failed\n");
+		}
+
+	case CST_UNK:
+	default:
+		/* do fuckall */
+		break;
+	}
+
+	/* clean up */
+	udctx_set_setting(clo, NULL);
+	udcfg_tbl_free(clo, src);
+	return;
+}
+
+
 /* initialiser code */
 void
 dso_tseries_mysql_LTX_init(void *clo)
 {
-	void *spec = udctx_get_setting(clo);
+	ud_ctx_t ctx = clo;
+	void *settings;
 
 	UD_DEBUG("mod/tseries-mysql: connecting ...");
-	if ((conn = uddb_connect(clo, spec)) == NULL) {
-		UD_DBGCONT("failed\n");
-		return;
+	if ((settings = udctx_get_setting(ctx)) != NULL) {
+		load_ticks_fetcher(clo, settings);
+		/* be so kind as to unref the settings */
+		udcfg_tbl_free(ctx, settings);
 	}
+	/* clean up */
+	udctx_set_setting(ctx, NULL);
 	UD_DBGCONT("done\n");
 	return;
 }

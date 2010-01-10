@@ -60,14 +60,6 @@
 /* for higher level packet handling */
 #include "seria-proto-glue.h"
 
-/* later to be decoupled from the actual source */
-#if defined HAVE_MYSQL
-# if defined HAVE_MYSQL_MYSQL_H
-#  include <mysql/mysql.h>
-# elif defined HAVE_MYSQL_H
-#  include <mysql.h>
-# endif
-#endif	/* HAVE_MYSQL */
 /* tseries stuff, to be replaced with ffff */
 #include "tscube.h"
 #include "tscache.h"
@@ -539,90 +531,7 @@ fetch_urn_svc(job_t UNUSED(j))
 {
 	UD_DEBUG("0x%04x (UD_SVC_FETCH_URN)\n", UD_SVC_FETCH_URN);
 	ud_set_service(UD_SVC_FETCH_URN, NULL, NULL);
-#if defined HAVE_MYSQL
-	fetch_urn_mysql();
-#endif	/* HAVE_MYSQL */
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
-	return;
-}
-
-
-static void*
-cfgspec_get_source(void *ctx, void *spec)
-{
-#define CFG_SOURCE	"source"
-	return udcfg_tbl_lookup(ctx, spec, CFG_SOURCE);
-}
-
-typedef enum {
-	CST_UNK,
-	CST_MYSQL,
-} cfgsrc_type_t;
-
-static cfgsrc_type_t
-cfgsrc_type(void *ctx, void *spec)
-{
-#define CFG_TYPE	"type"
-	const char *type = NULL;
-
-	if (spec == NULL) {
-		UD_DEBUG("mod/tseries: no source specified\n");
-		return CST_UNK;
-	}
-	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
-
-	UD_DEBUG("type %s %p\n", type, spec);
-	if (type == NULL) {
-		return CST_UNK;
-	} else if (memcmp(type, "mysql", 5) == 0) {
-		return CST_MYSQL;
-	}
-	return CST_UNK;
-}
-
-static void
-load_ticks_fetcher(void *clo, void *spec)
-{
-	void *src = cfgspec_get_source(clo, spec);
-
-	/* pass along the src settings */
-	udctx_set_setting(clo, src);
-
-	/* find out about its type */
-	switch (cfgsrc_type(clo, src)) {
-	case CST_MYSQL:
-#if defined HAVE_MYSQL
-		/* fetch some instruments by sql */
-		//dso_tseries_mysql_LTX_init(clo);
-#endif	/* HAVE_MYSQL */
-		break;
-
-	case CST_UNK:
-	default:
-		/* do fuckall */
-		break;
-	}
-
-	/* fetch fx tseries, should be configurable */
-	//dso_tseries_sl1t_LTX_init(clo);
-
-	/* also load the frobber in this case */
-	dso_tseries_frobq_LTX_init(clo);
-
-	/* clean up */
-	udctx_set_setting(clo, NULL);
-	udcfg_tbl_free(clo, src);
-	return;
-}
-
-static void
-unload_ticks_fetcher(void *UNUSED(clo))
-{
-#if defined HAVE_MYSQL
-	/* fetch some instruments by sql */
-	//dso_tseries_mysql_LTX_deinit(clo);
-#endif	/* HAVE_MYSQL */
-	//dso_tseries_sl1t_LTX_deinit(clo);
 	return;
 }
 
@@ -643,14 +552,6 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	UD_DBGCONT("done\n");
 
-	if ((settings = udctx_get_setting(ctx)) != NULL) {
-		load_ticks_fetcher(clo, settings);
-		/* be so kind as to unref the settings */
-		udcfg_tbl_free(ctx, settings);
-	}
-	/* clean up */
-	udctx_set_setting(ctx, NULL);
-
 	/* now kick off a fetch-URN job, dont bother about the
 	 * job slot, it's unused anyway */
 	wpool_enq(gwpool, (wpool_work_f)fetch_urn_svc, NULL, true);
@@ -661,7 +562,6 @@ void
 dso_tseries_LTX_deinit(void *clo)
 {
 	free_tscube(gcube);
-	unload_ticks_fetcher(clo);
 	return;
 }
 

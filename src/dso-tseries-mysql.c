@@ -499,54 +499,26 @@ static const char ovqry[] =
 static void
 ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 {
-	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
-	su_secu_t secu;
-	tscoll_t tsc;
-	struct tseries_s tser;
-	uint32_t tbs = strtoul(row[TYPES_BS], NULL, 10);
-	uint32_t qd;
-	int32_t qt;
-	uint16_t p;
+	tscube_t c = gcube;
+	time32_t beg = parse_time(row[MIN_DT]);
+	time32_t end = row[MAX_DT] == NULL
+		? 0x7fffffff
+		: parse_time(row[MAX_DT]);
+	uint32_t qd = strtoul(row[QUODI_ID], NULL, 10);
+	int32_t qt = strtol(row[QUOTI_ID], NULL, 10);
+	uint16_t p = strtoul(row[POT_ID], NULL, 10);
+	struct tsc_ce_s ce = {
+		.key = {{
+				.beg = beg,
+				.end = end,
+				.ttf = SL1T_TTF_FIX,
+				.msk = 1 | 2 | 4 | 8 | 16,
+				.secu = su_secu(qd, qt, p),
+			}},
+		.ops = NULL,
+	};
 
-	qd = strtoul(row[QUODI_ID], NULL, 10);
-	qt = strtoul(row[QUOTI_ID], NULL, 10);
-	p = strtoul(row[POT_ID], NULL, 10);
-	secu = su_secu(qd, qt, p);
-
-	switch (urn_id) {
-	case 1 ... 3:
-	case 8:
-#if 0
-		/* once-a-day, 5-a-week */
-		UD_DEBUG("OAD/5DW tick for %u/%u@%hu\n",
-			 su_secu_quodi(secu),
-			 su_secu_quoti(secu),
-			 su_secu_pot(secu));
-		tsc = find_tscoll_by_secu_crea(tscache, secu);
-
-		tser.urn = find_urn(urn_id, row[URN]);
-		if (UNLIKELY(row[MIN_DT] == NULL)) {
-			/* i'm not entirely sure about the meaning of this */
-			break;
-		}
-		tser.from = parse_time(row[MIN_DT]);
-		if (UNLIKELY(row[MAX_DT] == NULL)) {
-			/* we agreed on saying that this means up-to-date
-			 * so consequently we assign the maximum key */
-			tser.to = 0x7fffffff;
-		} else {
-			tser.to = parse_time(row[MAX_DT]);
-		}
-		tser.types = tbs;
-		/* our cb */
-		tser.fetch_cb = fetch_ticks;
-		/* add to the collection of time stamps */
-		tscoll_add(tsc, &tser);
-#endif
-
-	default:
-		break;
-	}
+	tsc_add(c, &ce);
 	return;
 }
 

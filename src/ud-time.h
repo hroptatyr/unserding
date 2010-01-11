@@ -107,7 +107,7 @@ typedef int32_t time32_t;
 
 typedef enum dow_e dow_t;
 
-enum dayofweek_e {
+enum dow_e {
 	DOW_SUNDAY,
 	DOW_MONDAY,
 	DOW_TUESDAY,

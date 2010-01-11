@@ -52,6 +52,7 @@
 #include "tscube.h"
 #include "unserding-nifty.h"
 
+#include <stdio.h>
 #if defined USE_ASSERTIONS
 # include <assert.h>
 #else
@@ -184,8 +185,6 @@ tsc_box_find_best_before(tsc_box_t b, time32_t ts)
 		} else if (sl1t_stmp_sec(ar + i) > ts) {
 			/* prefer lower half */
 			hi = i - 1;
-		} else if (sl1t_stmp_sec(ar + i + 1) <= ts) {
-			return ar + i + 1;
 		} else {
 			/* strictly less, prefer upper half */
 			lo = i + 1;
@@ -469,7 +468,6 @@ last_monday_midnight(time32_t ts)
 	return ts - sub;
 }
 
-#include <stdio.h>
 #define utsc		UNUSED(tsc)
 #define utsz		UNUSED(tsz)
 

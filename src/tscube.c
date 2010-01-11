@@ -378,6 +378,40 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 #include <stdio.h>
 #define utsc		UNUSED(tsc)
 
+static time32_t
+last_monday_midnight(time32_t ts)
+{
+	dow_t dow = __dayofweek(ts);
+	time32_t sub = ts % 86400;
+	switch (dow) {
+	case DOW_SUNDAY:
+		sub += 6 * 86400;
+		break;
+	case DOW_MONDAY:
+		sub += 7 * 86400;
+		break;
+	case DOW_TUESDAY:
+		sub += 1 * 86400;
+		break;
+	case DOW_WEDNESDAY:
+		sub += 2 * 86400;
+		break;
+	case DOW_THURSDAY:
+		sub += 3 * 86400;
+		break;
+	case DOW_FRIDAY:
+		sub += 4 * 86400;
+		break;
+	case DOW_SATURDAY:
+		sub += 5 * 86400;
+		break;
+	case DOW_MIRACLEDAY:
+	default:
+		break;
+	}
+	return ts - sub;
+}
+
 static size_t
 bother_cube(sl1t_t tgt, size_t tsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 {
@@ -394,7 +428,9 @@ bother_cube(sl1t_t tgt, size_t tsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 		fprintf(stderr, "uncached\n");
 		res = kv->ce->ops->fetch_cb(
 			tgt, tsz, kv->ce->key, kv->ce->uval,
-			key->beg, 0x7fffffff);
+			/* check if it's eligible to actually go back to
+			 * the monday before!!! */
+			last_monday_midnight(key->beg), 0x7fffffff);
 	}
 	return res;
 }

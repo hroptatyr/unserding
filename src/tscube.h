@@ -42,11 +42,8 @@
 #include <sushi/secu.h>
 #include <sushi/scommon.h>
 #include <sushi/sl1t.h>
+#include "ud-time.h"
 
-#if !defined time32_t
-typedef int32_t time32_t;
-#define time32_t	time32_t
-#endif	/* !time32_t */
 typedef void *tscube_t;
 
 /** Cube entry keys. */

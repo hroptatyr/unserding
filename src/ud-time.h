@@ -43,6 +43,7 @@
 /* for struct timespec */
 #include <time.h>
 
+#if defined __USE_POSIX199309
 /* returns the current CLOCK_REALTIME time stamp */
 static inline struct timespec
 __stamp(void)
@@ -67,6 +68,7 @@ __lapse(struct timespec then)
 	}
 	return res;
 }
+#endif	/* __USE_POSIX199309 */
 
 static inline double
 __as_f(struct timespec src)
@@ -94,6 +96,48 @@ print_ds_into(char *restrict tgt, size_t len, time_t ts)
 	memset(&tm, 0, sizeof(tm));
 	(void)gmtime_r(&ts, &tm);
 	return strftime(tgt, len, "%Y-%m-%d", &tm);
+}
+
+/* pfack's __daydiff() and __dayofweek() but over time32_t */
+/* date/time */
+#if !defined time32_t
+typedef int32_t time32_t;
+#define time32_t	time32_t
+#endif	/* !time32_t */
+
+typedef enum dow_e dow_t;
+
+enum dayofweek_e {
+	DOW_SUNDAY,
+	DOW_MONDAY,
+	DOW_TUESDAY,
+	DOW_WEDNESDAY,
+	DOW_THURSDAY,
+	DOW_FRIDAY,
+	DOW_SATURDAY,
+	DOW_MIRACLEDAY,
+};
+
+static inline time32_t __attribute__((always_inline))
+__midnight(time32_t ts)
+{
+	return ts - ts % 86400U;
+}
+
+static inline int __attribute__((always_inline))
+__daydiff(time32_t t1, time32_t t2)
+{
+	time32_t m1 = __midnight(t1);
+	time32_t m2 = __midnight(t2);
+	return (m2 - m1) / 86400U;
+}
+
+static inline dow_t __attribute__((always_inline))
+__dayofweek(time32_t t)
+{
+	/* we know that 15/01/1984 was a sunday, and this is 442972800 */
+	t = __daydiff((time32_t)442972800, t);
+	return (dow_t)(t % 7);
 }
 
 #endif	/* INCLUDED_ud_time_h_ */

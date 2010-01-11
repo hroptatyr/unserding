@@ -143,6 +143,7 @@ __frobnicate(void *UNUSED(clo))
 /* should now be in the worker thread */
 	struct frobjob_s j;
 	while (frobq_deq(&j, gfrobq)) {
+#if 0
 		struct tser_pkt_s pkt;
 		if (j.tser->fetch_cb(&pkt, j.tser, j.beg, j.end) == 0) {
 			/* we should massage the URN here so that this
@@ -150,6 +151,9 @@ __frobnicate(void *UNUSED(clo))
 			return;
 		}
 		tseries_add(j.tser, j.beg, j.end, &pkt);
+#else
+		UD_DEBUG("stuff on the frobq ... doing, nothing\n");
+#endif
 	}
 	return;
 }

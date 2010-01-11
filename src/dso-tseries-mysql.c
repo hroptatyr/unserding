@@ -72,7 +72,7 @@
 /* some common routines */
 #include "mysql-helpers.h"
 #include "tseries.h"
-
+#define DEFINE_GORY_STUFF
 #include <sushi/m30.h>
 
 #if !defined countof
@@ -89,15 +89,6 @@
 
 /* mysql conn, kept open */
 static void *conn = NULL;
-
-struct tser_pkt_idx_s {
-	uint32_t i;
-	tser_pkt_t pkt;
-};
-
-struct ohlc_p_s {
-	m30_t o, h, l, c;
-};
 
 static time_t
 parse_time(const char *t)
@@ -133,62 +124,45 @@ static m30_t
 get_m30(const char *s)
 {
 	if (UNLIKELY(s == NULL)) {
-		m30_t res = {.v = 0};
-		return res;
+		return ffff_m30_get_ui32(0);
 	}
 	return ffff_m30_get_s(&s);
 }
 
 
+struct qrclo_s {
+	uint32_t cnt;
+	uint32_t max;
+	sl1t_t box;
+};
+
 static void
 qry_rowf(void **row, size_t nflds, void *clo)
 {
+	struct qrclo_s *qrclo = clo;
 	time_t ts = parse_time(row[0]);
-	tser_pkt_t pkt = clo;
-	uint8_t iip = index_in_pkt(ts);
+	uint32_t cnt;
 
-	if (UNLIKELY(iip >= countof(pkt->t))) {
-		/* do not cache weekend `prices' */
+	if (UNLIKELY(qrclo->cnt >= qrclo->max)) {
+		/* stop caching */
 		return;
 	}
+	cnt = qrclo->cnt++;
 	/* brilliantly hard-coded bollocks */
-	if (nflds == 2) {
+	if (nflds == 2 || nflds == 3) {
 		m30_t p = get_m30(row[1]);
-		scom_thdr_t th = (void*)&pkt->t[iip];
+		m30_t q = nflds == 3 ? get_m30(row[2]) : ffff_m30_get_ui32(0);
+		scom_thdr_t th = (void*)(qrclo->box + cnt);
 
-		UD_DEBUG("putting %s %2.4f into slot %d\n",
-			 (char*)row[0], ffff_m30_d(p), iip);
+		UD_DEBUG("putting %s %2.4f into slot %u\n",
+			 (char*)row[0], ffff_m30_d(p), cnt);
 		/* bang bang */
 		scom_thdr_set_sec(th, ts);
 		scom_thdr_set_msec(th, 0);
 		scom_thdr_set_ttf(th, SL1T_TTF_FIX);
 		scom_thdr_set_tblidx(th, 0);
-		pkt->t[iip].v[0] = p.v;
-
-	} else if (nflds == 5 || nflds == 6) {
-		/* just a spot-OHLCV */
-#if 0
-		struct ohlcv_p_s cdl = {
-			.o = get_m30(row[1]),
-			.h = get_m30(row[2]),
-			.l = get_m30(row[3]),
-			.c = get_m30(row[4]),
-		};
-#else
-/* we're just using the close price anyway */
-		m30_t c = get_m30(row[4]);
-#endif
-		scom_thdr_t th = (void*)&pkt->t[iip];
-
-		UD_DEBUG("putting %s OHLC candle into slot %d\n",
-			 (char*)row[0], iip);
-
-		/* YAY, just put the close price now */
-		scom_thdr_set_sec(th, ts);
-		scom_thdr_set_msec(th, 0);
-		scom_thdr_set_ttf(th, SL1T_TTF_TRA);
-		scom_thdr_set_tblidx(th, 0);
-		pkt->t[iip].v[0] = c.v;
+		qrclo->box[cnt].v[0] = ffff_m30_ui32(p);
+		qrclo->box[cnt].v[1] = ffff_m30_ui32(q);
 
 	} else {
 		abort();
@@ -228,36 +202,38 @@ qry_rowf(void **row, size_t nflds, void *clo)
 }
 
 static inline size_t
-print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
+print_qry(char *tgt, size_t len, tsc_key_t k, urn_t urn, time32_t b, time32_t e)
 {
 	char begs[16], ends[16];
 
-	print_ds_into(begs, sizeof(begs), dse_to_time(b));
-	print_ds_into(ends, sizeof(ends), dse_to_time(e));
+	print_ds_into(begs, sizeof(begs), b);
+	print_ds_into(ends, sizeof(ends), e);
 
-	switch (urn_type(tser->urn)) {
+#if defined __INTEL_COMPILER
+# pragma warning	(disable:981)
+#endif	/* __INTEL_COMPILER */
+	switch (urn_type(urn)) {
 	case URN_OAD_C:
 	case URN_OAD_OHLC:
 	case URN_OAD_OHLCV:
 		len = snprintf(
 			tgt, len,
-			"SELECT %s AS `stamp`, "
-			"%s AS `o`, %s AS `h`, %s AS `l`, %s AS `c`, %s AS `v` "
+			"SELECT "
+			"%s AS `stamp`, "
+			"%s AS `c`, %s AS `v` "
 			"FROM %s "
 			"WHERE %s = %u AND %s BETWEEN '%s' AND '%s' "
 			"ORDER BY 1",
-			urn_fld_date(tser->urn),
-			urn_fld_top(tser->urn),
-			urn_fld_thp(tser->urn),
-			urn_fld_tlp(tser->urn),
-			urn_fld_tcp(tser->urn),
-			urn_fld_tv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
-			urn_fld_dbtbl(tser->urn),
-			urn_fld_id(tser->urn),
-			su_secu_quodi(tser->secu),
-			urn_fld_date(tser->urn), begs, ends);
+			urn_fld_date(urn),
+			urn_fld_tcp(urn),
+			urn_fld_tv(urn) ? urn_fld_tv(urn) : "0",
+			urn_fld_dbtbl(urn),
+			urn_fld_id(urn),
+			su_secu_quodi(k->secu),
+			urn_fld_date(urn), begs, ends);
 		break;
 	case URN_UTE_CDL:
+#if 0
 		len = snprintf(
 			tgt, len,
 			"SELECT %s AS `stamp`, "
@@ -291,6 +267,9 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 			urn_fld_id(tser->urn),
 			su_secu_quodi(tser->secu),
 			urn_fld_date(tser->urn), begs, ends);
+#else
+		len = 0;
+#endif
 		break;
 
 	case URN_L1_TICK:
@@ -300,26 +279,31 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 	default:
 		len = 0;
 	}
+#if defined __INTEL_COMPILER
+# pragma warning	(default:981)
+#endif	/* __INTEL_COMPILER */
 	return len;
 }
 
+/* tick fetching revised */
 static size_t
-fetch_ticks(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
+fetch_tick(
+	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
+	time32_t beg, time32_t end)
 {
-/* assumes eod ticks for now,
- * i wonder if it's wise to have all the intelligence in here
- * to go through various different tsa's as they are now chained
- * together */
 	char qry[480];
 	size_t len;
 	size_t nres;
+	struct qrclo_s qrclo[1];
 
-	memset(pkt, 0, sizeof(*pkt));
-	len = print_qry(qry, sizeof(qry), tser, beg, end);
+	len = print_qry(qry, sizeof(qry), k, uval, beg, end);
 	UD_DEBUG_SQL("querying: %s\n", qry);
-	nres = uddb_qry(conn, qry, len, qry_rowf, pkt);
-	UD_DEBUG("got %lu prices\n", (long unsigned int)nres);
-	return nres;
+	qrclo->box = tgt;
+	qrclo->max = tsz;
+	qrclo->cnt = 0;
+	nres = uddb_qry(conn, qry, len, qry_rowf, qrclo);
+	UD_DEBUG("got %u/%zu prices\n", qrclo->cnt, nres);
+	return qrclo->cnt;
 }
 
 
@@ -381,7 +365,7 @@ MAKE_PRED(x, "x", "set");
 #define fld_close_p	fld_tc_p
 #define fld_volume_p	fld_tv_p
 
-static const_urn_t
+static urn_t
 find_urn(urn_type_t type, const char *urn)
 {
 	index_t idx;
@@ -402,7 +386,7 @@ fill_batfx_ohlcv(urn_t urn, const char *r)
 {
 #define APPEND(_urn, _x, _r)						\
 	if (fld_##_x##_p(_r)) {						\
-		UD_DBGCONT("=> " #_x "\n");				\
+		/*UD_DBGCONT("=> " #_x "\n");*/				\
 		_urn->flds.batfx_ohlcv.fld_##_x = dupfld(_r);		\
 		return;							\
 	}
@@ -424,7 +408,7 @@ fill_batfx_ohlcv(urn_t urn, const char *r)
 	APPEND(urn, tv, r);
 	APPEND(urn, f, r);
 	APPEND(urn, x, r);
-	UD_DBGCONT("unknown column: \"%s\"\n", r);
+	//UD_DBGCONT("unknown column: \"%s\"\n", r);
 #undef APPEND
 	return;
 }
@@ -434,12 +418,12 @@ urnqry_rowf(void **row, size_t UNUSED(nflds), void *clo)
 {
 	urn_t urn = clo;
 
-	UD_DEBUG("column %s %s ... ", urn->dbtbl, (char*)row[0]);
+	//UD_DEBUG("column %s %s ... ", urn->dbtbl, (char*)row[0]);
 	if (urn->flds.unk.fld_id == NULL && fld_id_p(row[0])) {
-		UD_DBGCONT("=> id\n");
+		//UD_DBGCONT("=> id\n");
 		urn->flds.unk.fld_id = dupfld(row[0]);
 	} else if (urn->flds.unk.fld_date == NULL && fld_date_p(row[0])) {
-		UD_DBGCONT("=> stamp\n");
+		//UD_DBGCONT("=> stamp\n");
 		urn->flds.unk.fld_date = dupfld(row[0]);
 	} else {
 		fill_batfx_ohlcv(urn, row[0]);
@@ -496,17 +480,29 @@ static const char ovqry[] =
 /* if TBS_OAD is set, this indicates if there are 5 days in a week */
 #define TBS_5DW		0x02
 
+/* forward decl */
+static void fetch_urn_mysql(job_t UNUSED(j));
+
+static struct tsc_ops_s mysql_ops[1] = {{
+		.fetch_cb = fetch_tick,
+		.urn_refetch_cb = NULL,
+	}};
+
 static void
 ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 {
 	tscube_t c = gcube;
 	time32_t beg = parse_time(row[MIN_DT]);
-	time32_t end = row[MAX_DT] == NULL
+	time32_t end = UNLIKELY(row[MAX_DT] == NULL)
 		? 0x7fffffff
 		: parse_time(row[MAX_DT]);
 	uint32_t qd = strtoul(row[QUODI_ID], NULL, 10);
 	int32_t qt = strtol(row[QUOTI_ID], NULL, 10);
 	uint16_t p = strtoul(row[POT_ID], NULL, 10);
+	/* urn voodoo */
+	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
+	urn_t urn = find_urn((urn_type_t)urn_id, row[URN]);
+	/* the final cube entry */
 	struct tsc_ce_s ce = {
 		.key = {{
 				.beg = beg,
@@ -515,9 +511,10 @@ ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 				.msk = 1 | 2 | 4 | 8 | 16,
 				.secu = su_secu(qd, qt, p),
 			}},
-		.ops = NULL,
+		.ops = mysql_ops,
+		.uval = urn,
 	};
-
+	/* add to the cube */
 	tsc_add(c, &ce);
 	return;
 }
@@ -540,6 +537,7 @@ fetch_urn_mysql(job_t UNUSED(j))
 	return;
 }
 
+
 static void*
 cfgspec_get_source(void *ctx, void *spec)
 {

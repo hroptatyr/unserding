@@ -37,16 +37,39 @@
 /* tscube has no hashing at the mo, means it's just an ordinary array-based
  * sequentially scanned list */
 
+#if !defined _BSD_SOURCE
+# define _BSD_SOURCE
+#endif	/* !_BSD_SOURCE */
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <pthread.h>
 #include <string.h>
+#include <sys/mman.h>
+
 #include <sushi/secu.h>
 #include <sushi/scommon.h>
 #include "tscube.h"
 #include "unserding-nifty.h"
 
+#if defined USE_ASSERTIONS
+# include <assert.h>
+#else
+# define assert(args...)
+#endif	/* USE_ASSERTIONS */
+
+
+/* decouple from intvtree madness */
+#include "intvtree.h"
+
+typedef itree_t tsc_itr_t;
+
+#define make_tsc_itr	make_itree
+#define free_tsc_itr	free_itree
+#define tsc_itr_add	itree_add
+#define tsc_itr_find	itree_find_point
+
+
 #define INITIAL_SIZE	1024
 
 typedef struct tscube_s *__tscube_t;
@@ -61,7 +84,7 @@ struct keyval_s {
 	/** user provided key */
 	struct tsc_ce_s ce[1];
 	/** interval trees to see what's cached: ce + (b, e) |-> sl1t */
-	void *intv;
+	tsc_itr_t intv;
 };
 
 /**
@@ -85,17 +108,30 @@ struct tscube_s {
 };
 
 
-#if 0
-/* decouple from intvtree madness */
-#include "intvtree.h"
-#include "intvtree.c"
+/* for one bunch of ticks */
+/* we'll just use the whole allocation for ticks */
+#define TSC_BOX_SZ	4096
+typedef void *tsc_box_t;
+struct tsc_box_s {
+	size_t nt;
 
-typedef itree_t tsc_itr_t;
+	struct sl1t_s t[];
+};
 
-#define make_tsc_itr	make_itree
-#define free_tsc_itr	free_itree
-#define tsc_itr_add	itree_add
-#endif
+#define MAP_MEMMAP	(MAP_PRIVATE | MAP_ANONYMOUS)
+#define PROT_MEMMAP	(PROT_READ | PROT_WRITE)
+static __attribute__((unused)) tsc_box_t
+make_tsc_box(void)
+{
+	return mmap(NULL, TSC_BOX_SZ, PROT_MEMMAP, MAP_MEMMAP, 0, 0);
+}
+
+static __attribute__((unused)) void
+free_tsc_box(tsc_box_t b)
+{
+	munmap(b, TSC_BOX_SZ);
+	return;
+}
 
 
 /* helpers, for hmap */
@@ -289,9 +325,8 @@ tsc_add(tscube_t tsc, tsc_ce_t ce)
 		ks = slot(m->tbl, m->alloc_sz, ce->key);
 		/* oh we want to keep track of this */
 		memcpy(m->tbl[ks].ce->key, ce, sizeof(*ce));
-		/* create an interval tree, TODO */
-		//m->tbl[ks].val->intv = make_tsc_itr();
-		//tsc_itr_add(m->tbl[ks].val->intv, key->beg, key->end, val);
+		/* create an interval tree */
+		m->tbl[ks].intv = make_tsc_itr();
 		/* assign user's idea of this */
 		m->nseries++;
 	}
@@ -339,18 +374,29 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 	return true;
 }
 
+/* ugly */
+#include <stdio.h>
+#define utsc		UNUSED(tsc)
+
 static size_t
-bother_cube(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key, keyval_t kv)
+bother_cube(sl1t_t tgt, size_t tsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 {
 /* sig subject to change */
-	/* normally we'd just bother our interval trees
-	 * however for now we just use the fetcher in ops */
-	if (kv->ce->ops && kv->ce->ops->fetch_cb) {
-		return kv->ce->ops->fetch_cb(
+	size_t res = 0;
+	tsc_box_t box;
+
+	/* bother the interval trees first */
+	assert(kv->intv != NULL);
+	if ((box = tsc_itr_find(kv->intv, key->beg))) {
+		fprintf(stderr, "cached %p\n", box);
+		;
+	} else if (kv->ce->ops && kv->ce->ops->fetch_cb) {
+		fprintf(stderr, "uncached\n");
+		res = kv->ce->ops->fetch_cb(
 			tgt, tsz, kv->ce->key, kv->ce->uval,
-			key->beg, key->beg);
+			key->beg, 0x7fffffff);
 	}
-	return 0;
+	return res;
 }
 
 size_t
@@ -372,6 +418,7 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 			continue;
 		} else if (__key_matches_p(m->tbl[i].ce->key, key)) {
 			ntk = bother_cube(tgt, tsz, tsc, key, &m->tbl[i]);
+			fprintf(stderr, "bothered cube, yielded %zu\n", ntk);
 			break;
 		}
 	}

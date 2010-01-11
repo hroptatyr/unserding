@@ -182,7 +182,7 @@ resize_tbl(hmap_t c, size_t old_sz, size_t new_sz)
 			continue;
 		}
 		new_s = slot(new, new_sz, c->tbl[i].ce->key);
-		*new[new_s].ce->key = *c->tbl[i].ce->key;
+		new[new_s] = c->tbl[i];
 	}
 	xfree(c->tbl);
 	/* assign the new one */

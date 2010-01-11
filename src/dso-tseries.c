@@ -459,8 +459,8 @@ instr_tick_by_instr_svc(job_t j)
 	if ((nfilt = snarf_times(sctx, oadtctx->filt, NFILT)) == 0) {
 		return;
 	}
-	UD_DEBUG("0x4222: %s filtered for %u time stamps\n",
-		 secbugger(sec), nfilt);
+	UD_DEBUG("0x%04x (UD_SVC_TICK_BY_INSTR): secu %s for %u time stamps\n",
+		 UD_SVC_TICK_BY_INSTR, secbugger(sec), nfilt);
 
 	/* initialise our context */
 	oadtctx->sctx = rplsctx;

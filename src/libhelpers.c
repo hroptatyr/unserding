@@ -212,7 +212,7 @@ __f1tsl_cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 }
 
 size_t
-ud_find_one_tslab(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
+ud_find_one_tslab(ud_handle_t hdl, const void **tgt, su_secu_t s)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
@@ -223,12 +223,8 @@ ud_find_one_tslab(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 	memset(buf, 0, sizeof(buf));
 	udpc_make_pkt(pkt, cno, 0, UD_SVC_GET_URN);
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-	/* dispatch the quodi */
-	udpc_seria_add_ui32(&sctx, cont_id);
-	/* all quotis */
-	udpc_seria_add_ui32(&sctx, 0);
-	/* all pots */
-	udpc_seria_add_ui32(&sctx, 0);
+	/* dispatch the secu */
+	udpc_seria_add_secu(&sctx, s);
 	/* prepare packet for sending im off */
 	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 	ud_send_raw(hdl, pkt);

@@ -43,6 +43,7 @@
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"
+#include <sushi/secu.h>
 
 /**
  * Service 421a:
@@ -83,7 +84,7 @@ ud_find_one_isym(ud_handle_t h, const void **tgt, const char *sym, size_t len);
  * with libpfack's deser_instrument().
  **/
 extern size_t
-ud_find_one_tslab(ud_handle_t hdl, const void **tgt, uint32_t inst_id);
+ud_find_one_tslab(ud_handle_t hdl, const void **tgt, su_secu_t s);
 
 /**
  * Query a bunch of instruments at once, calling CB() on each result. */

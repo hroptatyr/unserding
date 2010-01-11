@@ -122,7 +122,7 @@ find_one_instr(ud_handle_t hdl, const char *uii)
 	}
 	/* now use the gaii of the instr(s) fetched */
 	cid = instr_gaid(in);
-	if ((len = ud_find_one_tslab(hdl, &data, cid)) > 0) {
+	if ((len = ud_find_one_tslab(hdl, &data, su_secu(cid, 0, 0))) > 0) {
 		/* data hereby points to a tseries object */
 		const struct tsc_ce_s *s = data;
 		char los[32], his[32];

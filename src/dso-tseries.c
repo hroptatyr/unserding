@@ -462,16 +462,6 @@ instr_tick_by_instr_svc(job_t j)
 	UD_DEBUG("0x4222: %s filtered for %u time stamps\n",
 		 secbugger(sec), nfilt);
 
-#if 0
-	/* get us the tseries we're talking about */
-	if ((tsc = find_tscoll_by_secu(tscache, sec)) == NULL) {
-		/* means we have no means of fetching */
-		/* we could issue a packet saying so */
-		UD_DEBUG("No way of fetching stuff\n");
-		return;
-	}
-#endif
-
 	/* initialise our context */
 	oadtctx->sctx = rplsctx;
 	oadtctx->secu = sec;
@@ -543,9 +533,6 @@ fetch_urn_svc(job_t j)
 void
 dso_tseries_LTX_init(void *clo)
 {
-	ud_ctx_t ctx = clo;
-	void *settings;
-
 	UD_DEBUG("mod/tseries: loading ...");
 	/* create the catalogue */
 	gcube = make_tscube();
@@ -556,6 +543,9 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	UD_DBGCONT("done\n");
 
+	/* have the frobq initialised */
+	dso_tseries_frobq_LTX_init(clo);
+
 	/* now kick off a fetch-URN job, dont bother about the
 	 * job slot, it's unused anyway */
 	wpool_enq(gwpool, (wpool_work_f)fetch_urn_svc, NULL, true);
@@ -565,6 +555,8 @@ dso_tseries_LTX_init(void *clo)
 void
 dso_tseries_LTX_deinit(void *clo)
 {
+	/* have the frobq initialised */
+	dso_tseries_frobq_LTX_deinit(clo);
 	free_tscube(gcube);
 	return;
 }

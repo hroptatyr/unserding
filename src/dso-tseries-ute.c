@@ -98,24 +98,74 @@ find_secu_idx(my_ctx_t ctx, su_secu_t sec)
 	return 0;
 }
 
+/* belongs in uteseries.c? */
+static size_t
+__cp_tk(const_sl1t_t *tgt, my_ctx_t ctx, sl1t_t src)
+{
+	const_scom_thdr_t scsrc = (const void*)src;
+	time32_t ts = scom_thdr_sec(scsrc);
+	uint16_t idx = scom_thdr_tblidx(scsrc);
+	uint16_t ttf = scom_thdr_ttf(scsrc);
+	tblister_t tbl = __find_blister_by_ts(ctx->tbl, ts);
+	size_t nt;
+	const_sl1t_t t;
+
+	if (UNLIKELY(tbl == NULL)) {
+		return 0;
+	} else if (!(tbl->ttfbs[idx] & (1 << ttf))) {
+		return 0;
+	}
+
+	/* get the corresponding tick block */
+	nt = sl1t_fio_read_ticks(ctx->ctx, &t, tbl->btk, tbl->etk);
+	/* assume ascending order */
+	for (const_sl1t_t tk = &t[nt - 1]; tk >= t; tk--) {
+		uint16_t tkidx = sl1t_tblidx(tk);
+		uint16_t tkttf = sl1t_ttf(tk);
+
+		if (tkidx == idx && tkttf == ttf && sl1t_stmp_sec(tk) <= ts) {
+			/* not thread-safe */
+			*tgt = tk;
+			return t + nt - tk;
+		}
+	}
+	return 0;
+}
+
 static size_t
 fetch_tick(
-	sl1t_t tgt, size_t UNUSED(tsz), tsc_key_t k, void *uval,
-	time32_t beg, time32_t UNUSED(end))
+	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
+	time32_t beg, time32_t end)
 {
 	my_ctx_t ctx = uval;
-	tblister_t tbl = __find_blister_by_ts(ctx->tbl, beg);
 	uint16_t idx = find_secu_idx(ctx, k->secu);
+	const_sl1t_t t[1];
+	size_t nt, res = 0;
 
 	/* different keying now */
 	sl1t_set_stmp_sec(tgt, beg);
 	/* use the global secu -> tblidx map */
 	sl1t_set_tblidx(tgt, idx);
 	sl1t_set_ttf(tgt, k->ttf);
-	if (__find_tk(ctx->ctx, tbl, tgt)) {
-		return 1;
+
+	if ((nt = __cp_tk(t, ctx, tgt)) == 0) {
+		return 0;
 	}
-	return 0;
+	/* otherwise iterate */
+	for (const_sl1t_t tp = t[0]; tp < t[0] + nt && res < tsz; tp++) {
+		uint16_t tkidx = sl1t_tblidx(tp);
+		uint16_t tkttf = sl1t_ttf(tp);
+
+		/* assume ascending order */
+		if (sl1t_stmp_sec(tp) > end) {
+			break;
+		} else if (tkidx == idx && tkttf == k->ttf) {
+			/* not thread-safe */
+			*tgt++ = *tp;
+			res++;
+		}
+	}
+	return res;
 }
 
 static void

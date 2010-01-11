@@ -120,17 +120,78 @@ struct tsc_box_s {
 
 #define MAP_MEMMAP	(MAP_PRIVATE | MAP_ANONYMOUS)
 #define PROT_MEMMAP	(PROT_READ | PROT_WRITE)
-static __attribute__((unused)) tsc_box_t
+static tsc_box_t
 make_tsc_box(void)
 {
 	return mmap(NULL, TSC_BOX_SZ, PROT_MEMMAP, MAP_MEMMAP, 0, 0);
 }
 
-static __attribute__((unused)) void
+static void
 free_tsc_box(tsc_box_t b)
 {
 	munmap(b, TSC_BOX_SZ);
 	return;
+}
+
+static inline size_t
+tsc_box_nticks(tsc_box_t UNUSED(b))
+{
+	return TSC_BOX_SZ / sizeof(struct sl1t_s);
+}
+
+static time32_t
+tsc_box_frstts(tsc_box_t b)
+{
+	return sl1t_stmp_sec((void*)b);
+}
+
+static time32_t
+tsc_box_lastts(tsc_box_t b)
+{
+	sl1t_t ar = (void*)b;
+	size_t max = tsc_box_nticks(b);
+
+	if (sl1t_stmp_sec(ar + max - 1)) {
+		return sl1t_stmp_sec(ar + max - 1);
+	} else if (sl1t_stmp_sec(ar + (max / 2) - 1)) {
+		for (index_t i = max / 2; i < max; i++) {
+			if (!sl1t_stmp_sec(ar + i)) {
+				return sl1t_stmp_sec(ar + i - 1);
+			}
+		}
+	} else {
+		for (index_t i = 1; i < max / 2; i++) {
+			if (!sl1t_stmp_sec(ar + i)) {
+				return sl1t_stmp_sec(ar + i - 1);
+			}
+		}
+	}
+	/* not reached */
+	return 0;
+}
+
+static sl1t_t
+tsc_box_find_best_before(tsc_box_t b, time32_t ts)
+{
+	sl1t_t ar = (void*)b;
+	index_t i, hi = tsc_box_nticks(b), lo = 0;
+
+	do {
+		i = (hi + lo) / 2;
+		if (sl1t_stmp_sec(ar + i) <= ts &&
+		    sl1t_stmp_sec(ar + i + 1) > ts) {
+			return ar + i;
+		} else if (sl1t_stmp_sec(ar + i) > ts) {
+			/* prefer lower half */
+			hi = i - 1;
+		} else if (sl1t_stmp_sec(ar + i + 1) <= ts) {
+			return ar + i + 1;
+		} else {
+			/* strictly less, prefer upper half */
+			lo = i + 1;
+		}
+	} while (true);
+	/* not reached */
 }
 
 
@@ -374,10 +435,6 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 	return true;
 }
 
-/* ugly */
-#include <stdio.h>
-#define utsc		UNUSED(tsc)
-
 static time32_t
 last_monday_midnight(time32_t ts)
 {
@@ -412,8 +469,12 @@ last_monday_midnight(time32_t ts)
 	return ts - sub;
 }
 
+#include <stdio.h>
+#define utsc		UNUSED(tsc)
+#define utsz		UNUSED(tsz)
+
 static size_t
-bother_cube(sl1t_t tgt, size_t tsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
+bother_cube(sl1t_t tgt, size_t utsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 {
 /* sig subject to change */
 	size_t res = 0;
@@ -423,14 +484,35 @@ bother_cube(sl1t_t tgt, size_t tsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 	assert(kv->intv != NULL);
 	if ((box = tsc_itr_find(kv->intv, key->beg))) {
 		fprintf(stderr, "cached %p\n", box);
-		;
+	hmpf:
+		/* yummy NULL pointer dereferencing */
+		*tgt = *tsc_box_find_best_before(box, key->beg);
+		res = 1;
+
 	} else if (kv->ce->ops && kv->ce->ops->fetch_cb) {
+		time32_t beg = last_monday_midnight(key->beg);
+		time32_t end = 0x7fffffff;
+
 		fprintf(stderr, "uncached\n");
+		box = make_tsc_box();
 		res = kv->ce->ops->fetch_cb(
-			tgt, tsz, kv->ce->key, kv->ce->uval,
+			box, tsc_box_nticks(box),
+			kv->ce->key, kv->ce->uval,
 			/* check if it's eligible to actually go back to
 			 * the monday before!!! */
-			last_monday_midnight(key->beg), 0x7fffffff);
+			beg, end);
+
+		if (res == 0) {
+			/* what a waste of time */
+			free_tsc_box(box);
+		} else {
+			beg = tsc_box_frstts(box);
+			end = tsc_box_lastts(box);
+			/* add the box to our interval tree */
+			tsc_itr_add(kv->intv, beg, end, box);
+			/* try and find the tick again */
+			goto hmpf;
+		}
 	}
 	return res;
 }

@@ -95,7 +95,7 @@ struct hook_s {
 
 extern hook_t fetch_urn_hook;
 
-static void
+static inline void
 add_hook(hook_t h, hook_f f)
 {
 	h->f[h->nf++] = f;

@@ -410,7 +410,7 @@ proc_one(oadt_ctx_t octx, time32_t ts)
 	size_t ntk;
 
 	ntk = tsc_find1(pkt->t, countof(pkt->t), gcube, &k);
-	UD_DEBUG("found %zu\n", ntk);
+	UD_DEBUG("found %zu for secu %s\n", ntk, secbugger(octx->secu));
 	for (index_t i = 0; i < ntk; i++) {
 		udpc_seria_add_sl1t(octx->sctx, &pkt->t[i]);
 	}
@@ -422,7 +422,7 @@ static inline bool
 one_moar_p(oadt_ctx_t octx)
 {
 	size_t cur = udpc_seria_msglen(octx->sctx);
-	size_t add = (sizeof(struct sparse_Dute_s) + 2) * 5;
+	size_t add = (sizeof(struct sl1t_s) + 2) * 5;
 	return cur + add < UDPC_PLLEN;
 }
 
@@ -555,7 +555,10 @@ dso_tseries_LTX_init(void *clo)
 
 	/* now kick off a fetch-URN job, dont bother about the
 	 * job slot, it's unused anyway */
+#if 0
+/* it's too fast */
 	wpool_enq(gwpool, (wpool_work_f)fetch_urn_svc, NULL, true);
+#endif
 	return;
 }
 

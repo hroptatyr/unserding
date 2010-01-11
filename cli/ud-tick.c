@@ -45,6 +45,7 @@
 /* should be included somewhere */
 #include <sushi/m30.h>
 
+#include "ud-time.h"
 #include "clihelper.c"
 
 static struct ud_handle_s __hdl;
@@ -125,9 +126,12 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 	uint16_t p = su_secu_pot(s);
 	char ttf = ttc(t);
 	int32_t ts = scom_thdr_sec(t);
+	uint16_t ms = scom_thdr_msec(t);
+	char tss[32];
 
-	fprintf(stdout, "tick storm, ticks:1 ii:%u/%i@%hu tt:%c  ts:%i",
-		qd, qt, p, ttf, ts);
+	print_ts_into(tss, sizeof(tss), ts);
+	fprintf(stdout, "tick storm, ticks:1 ii:%u/%i@%hu tt:%c  ts:%s.%03u",
+		qd, qt, p, ttf, tss, ms);
 
 	if (scom_thdr_nexist_p(t)) {
 		ne(t);

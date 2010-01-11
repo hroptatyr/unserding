@@ -486,32 +486,39 @@ instr_tick_by_instr_svc(job_t j)
 
 /* urn getter */
 static void
+get_urn_cb(tsc_ce_t ce, void *clo)
+{
+	udpc_seria_t sctx = clo;
+	UD_DEBUG("series for %s from %i till %i\n",
+		 secbugger(ce->key->secu), ce->key->beg, ce->key->end);
+	udpc_seria_add_data(sctx, ce, sizeof(*ce));
+	return;
+}
+
+static void
 instr_urn_svc(job_t j)
 {
-	struct udpc_seria_s sctx;
+	struct udpc_seria_s sctx[1];
 	/* in args */
 	su_secu_t secu;
+	/* to query the cube */
+	struct tsc_key_s k;
 
 	/* prepare the iterator for the incoming packet */
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the header off of the wire */
-	secu = udpc_seria_des_secu(&sctx);
+	secu = udpc_seria_des_secu(sctx);
 	UD_DEBUG("0x%04x (UD_SVC_GET_URN): %s\n",
 		 UD_SVC_GET_URN, secbugger(secu));
 
-#if 0
-	/* get us the tseries we're talking about */
-	if ((tsc = find_tscoll_by_secu(tscache, secu)) == NULL) {
-		/* means we have no means of fetching */
-		/* we could issue a packet saying so */
-		UD_DEBUG("No way of fetching stuff\n");
-		return;
-	}
-	/* reuse buf and sctx, just traverse tscoll and send off the bugger */
-	clear_pkt(&sctx, j);
-	tscoll_trav_series(tsc, get_urn_cb, &sctx);
-	send_pkt(&sctx, j);
-#endif
+	/* prepare the key */
+	k.secu = secu;
+	k.msk = 4 /* only secu is set */;
+
+	/* reuse buf and sctx, just traverse the cube and send the bugger */
+	clear_pkt(sctx, j);
+	tsc_trav(gcube, &k, get_urn_cb, sctx);
+	send_pkt(sctx, j);
 	return;
 }
 

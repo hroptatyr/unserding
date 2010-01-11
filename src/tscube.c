@@ -379,4 +379,22 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 	return ntk;
 }
 
+void
+tsc_trav(tscube_t tsc, tsc_key_t key, tsc_trav_f cb, void *clo)
+{
+	__tscube_t c = tsc;
+	hmap_t m = c->hmap;
+
+	pthread_mutex_lock(&m->mtx);
+	/* perform sequential scan */
+	for (uint32_t i = 0; i < m->alloc_sz; i++) {
+		if (__key_valid_p(m->tbl[i].ce->key) &&
+		    __key_matches_p(m->tbl[i].ce->key, key)) {
+			cb(m->tbl[i].ce, clo);
+		}
+	}
+	pthread_mutex_unlock(&m->mtx);
+	return;
+}
+
 /* tscube.c ends here */

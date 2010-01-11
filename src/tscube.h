@@ -68,6 +68,10 @@ typedef size_t(*fetch_f)(
 typedef void(*urn_refetch_f)(tsc_key_t k, void *uval);
 
 /**
+ * For cube traversals, generic callback function. */
+typedef void(*tsc_trav_f)(tsc_ce_t ce, void *clo);
+
+/**
  * Keys for cube entries that can be searched for. */
 struct tsc_key_s {
 	time32_t beg, end;
@@ -108,5 +112,9 @@ extern void tsc_add(tscube_t c, tsc_ce_t ce);
 
 /* quick hack, find the first entry in tsc that matches key */
 extern size_t tsc_find1(sl1t_t tgt, size_t tsz, tscube_t c, tsc_key_t key);
+
+/* nother quick hack, used to traverse over all cube entries in TSC based
+ * on a query KEY, calling CB with the ce and CLO for each match. */
+extern void tsc_trav(tscube_t tsc, tsc_key_t key, tsc_trav_f cb, void *clo);
 
 #endif	/* !INCLUDED_tscube_h_ */

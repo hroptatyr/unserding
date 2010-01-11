@@ -46,7 +46,7 @@
 #include "unserding-nifty.h"
 #include "protocore.h"
 #include "ud-time.h"
-#include "tscoll.h"
+#include "tscube.h"
 
 static bool xmlp;
 static bool tslabp;
@@ -124,16 +124,20 @@ find_one_instr(ud_handle_t hdl, const char *uii)
 	cid = instr_gaid(in);
 	if ((len = ud_find_one_tslab(hdl, &data, cid)) > 0) {
 		/* data hereby points to a tseries object */
-		const struct tslab_s *s = data;
+		const struct tsc_ce_s *s = data;
 		char los[32], his[32];
+		/* secu dismantling */
+		uint32_t qd = su_secu_quodi(s->key->secu);
+		int32_t qt = su_secu_quoti(s->key->secu);
+		uint16_t p = su_secu_pot(s->key->secu);
+		/* ttf */
+		uint16_t ttf = s->key->ttf;
+
 		/* debugging mumbo jumbo */
-		print_ts_into(los, sizeof(los), s->from);
-		print_ts_into(his, sizeof(his), s->till);
-		fprintf(stdout, "  tslab %u/%u@%hu %u %s..%s\n",
-			su_secu_quodi(s->secu),
-			su_secu_quoti(s->secu),
-			su_secu_pot(s->secu),
-			s->types, los, his);
+		print_ts_into(los, sizeof(los), s->key->beg);
+		print_ts_into(his, sizeof(his), s->key->end);
+		fprintf(stdout, "  tslab %u/%i@%hu %hu %s..%s\n",
+			qd, qt, p, ttf, los, his);
 	} else {
 		fputs("  no tslabs yet\n", stdout);
 	}

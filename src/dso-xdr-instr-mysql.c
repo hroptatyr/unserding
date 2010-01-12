@@ -73,6 +73,9 @@
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
 
+/* for the mo, we don't need debugging output here */
+#define UD_DEBUG_XDR(args...)
+
 static void *conn = NULL;
 
 
@@ -134,7 +137,7 @@ make_currency(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
 	uint16_t co = strtoul(rows[CCY_CODE], NULL, 10);
 	make_tcnxxx_into(in, id, co);
-	UD_DEBUG("made currency %s (%u)\n", instr_name(in), id);
+	UD_DEBUG_XDR("made currency %s (%u)\n", instr_name(in), id);
 	return;
 }
 
@@ -142,7 +145,7 @@ static void
 make_index(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
 	make_tixxxx_into(in, id, rows[IDENT_GA]);
-	UD_DEBUG("made index %s (%u)\n", instr_name(in), id);
+	UD_DEBUG_XDR("made index %s (%u)\n", instr_name(in), id);
 	return;
 }
 
@@ -264,7 +267,7 @@ make_interest_rate(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 	uint16_t ccy = strtoul(rows[FRA_CCY], NULL, 10);
 
 	make_trxxxx_into(in, id, rows[IDENT_GA], mmat, annu, ccy);
-	UD_DEBUG("made irate %s (%u)\n", instr_name(in), id);
+	UD_DEBUG_XDR("made irate %s (%u)\n", instr_name(in), id);
 	return;
 }
 

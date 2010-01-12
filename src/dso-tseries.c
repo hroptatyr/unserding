@@ -196,7 +196,6 @@ typedef struct oadt_ctx_s *oadt_ctx_t;
 struct oadt_ctx_s {
 	udpc_seria_t sctx;
 	su_secu_t secu;
-	tscoll_t coll;
 	time32_t filt[NFILT];
 	size_t nfilt;
 	tbs_t tbs;
@@ -278,16 +277,15 @@ __tbs_has_p(tbs_t tbs, uint16_t ttf)
 }
 
 
-static __attribute__((unused)) void
+static void
 __bang(oadt_ctx_t octx, tser_pkt_t pkt, uint8_t idx)
 {
-	udpc_seria_add_secu(octx->sctx, octx->secu);
 	udpc_seria_add_sl1t(octx->sctx, &pkt->t[idx]);
 	return;
 }
 
 static void
-__bang_nexist(oadt_ctx_t octx, time_t refts, uint16_t ttf)
+__bang_nexist(oadt_ctx_t octx, time32_t refts, uint16_t ttf)
 {
 	struct sl1t_s tgt[1];
 	scom_thdr_t th = (void*)tgt;
@@ -297,7 +295,6 @@ __bang_nexist(oadt_ctx_t octx, time_t refts, uint16_t ttf)
 	scom_thdr_set_ttf(th, ttf);
 	scom_thdr_set_tblidx(th, 0);
 
-	udpc_seria_add_secu(octx->sctx, octx->secu);
 	udpc_seria_add_sl1t(octx->sctx, tgt);
 	return;
 }
@@ -358,43 +355,6 @@ __bang_all_onhold(oadt_ctx_t octx, time_t refts)
 	return;
 }
 
-#if 0
-static void
-proc_one(oadt_ctx_t octx, time_t ts)
-{
-	tseries_t tser;
-	tser_pkt_t pkt;
-	uint8_t idx;
-
-	/* this is the 10-ticks per 2 weeks fragment, so dont bother
-	 * looking up saturdays and sundays */
-#define TICKS_PER_FORTNIGHT	10
-	if ((idx = index_in_pkt(ts)) >= TICKS_PER_FORTNIGHT) {
-		/* leave a note in the packet? */
-		UD_DEBUG_TSER("week end tick (%s %s)\n",
-			      secbugger(octx->secu), tsbugger(ts));
-		__bang_all_nexist(octx, ts);
-
-	} else if ((tser = tscoll_find_series(octx->coll, ts)) == NULL) {
-		/* no way of obtaining ticks */
-		UD_DEBUG_TSER("No suitable URN found (%s %s)\n",
-			      secbugger(octx->secu), tsbugger(ts));
-		__bang_all_nexist(octx, ts);
-
-	} else if ((pkt = tseries_find_pkt(tser, ts)) == NULL) {
-		UD_DEBUG_TSER("URN not cached, deferring (%s %s)\n",
-			      secbugger(octx->secu), tsbugger(ts));
-		defer_frob(tser, time_to_dse(ts) - idx, false);
-		__bang_all_onhold(octx, ts);
-
-	} else {
-		/* bother the cache */
-		UD_DEBUG("yay, cached\n");
-		__bang(octx, pkt, idx);
-	}
-	return;
-}
-#else
 static void
 proc_one(oadt_ctx_t octx, time32_t ts)
 {
@@ -411,12 +371,20 @@ proc_one(oadt_ctx_t octx, time32_t ts)
 
 	ntk = tsc_find1(pkt->t, countof(pkt->t), gcube, &k);
 	UD_DEBUG("found %zu for secu %s\n", ntk, secbugger(octx->secu));
+	if (ntk == 0) {
+		return;
+	}
+	/* assume ascending order */
 	for (index_t i = 0; i < ntk; i++) {
-		udpc_seria_add_sl1t(octx->sctx, &pkt->t[i]);
+		__bang(octx, pkt, i);
+	}
+	/* now if the last tick is not exactly our timestamp,
+	 * issue a nexist as well */
+	if (sl1t_stmp_sec(&pkt->t[ntk - 1]) < ts) {
+		__bang_nexist(octx, ts, sl1t_ttf(&pkt->t[ntk - 1]));
 	}
 	return;
 }
-#endif
 
 static inline bool
 one_moar_p(oadt_ctx_t octx)

@@ -130,7 +130,7 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 	char tss[32];
 
 	print_ts_into(tss, sizeof(tss), ts);
-	fprintf(stdout, "tick storm, ticks:1 ii:%u/%i@%hu tt:%c  ts:%s.%03u",
+	fprintf(stdout, "tick storm, ticks:1 ii:%u/%i@%hu tt:%c  ts:%s.%03hu",
 		qd, qt, p, ttf, tss, ms);
 
 	if (scom_thdr_nexist_p(t)) {

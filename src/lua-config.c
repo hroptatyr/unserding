@@ -49,6 +49,7 @@
 #include <lauxlib.h>
 
 #include "lua-config.h"
+#include "module.h"
 
 
 /* inlines */
@@ -143,9 +144,6 @@ lc_globcfg_lookup_b(void *L, const char *name)
 }
 
 
-/* i'm too lazy to include module.h */
-extern void ud_defer_dso(const char *name, void *cfgset);
-
 static int
 lc_load_module(lua_State *L)
 {

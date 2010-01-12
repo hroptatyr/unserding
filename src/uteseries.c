@@ -117,7 +117,7 @@ struct tblister_s {
 static void
 tbl_set(tblister_t tbl, uint16_t idx, uint16_t ttf)
 {
-	tbl->ttfbs[idx] |= (1UL << ttf);
+	tbl->ttfbs[idx] = (uint16_t)(tbl->ttfbs[idx] | (uint16_t)(1UL << ttf));
 	tbl->cnt[idx]++;
 	return;
 }
@@ -205,7 +205,7 @@ __print(tblister_t tbl)
 	return;
 }
 
-static void
+static inline void
 tblister_print(tblister_t tbl)
 {
 	for (; tbl; tbl = tbl->next) {
@@ -342,7 +342,7 @@ __find_blister_by_ts(tblister_t tbl, time_t ts)
 /**
  * Given the details in TGTSRC (time, tblidx and ttf will be eval'd) find
  * the nearest match in the blister TBL. */
-static const_sl1t_t
+static __attribute__((unused)) const_sl1t_t
 __find_tk(ute_ctx_t ctx, tblister_t tbl, sl1t_t tgtsrc)
 {
 	const_scom_thdr_t src = (const void*)tgtsrc;
@@ -403,7 +403,7 @@ main(int argc, const char *argv[])
 		uint16_t idx = 1;
 
 		if (argc > 3) {
-			idx = strtoul(argv[3], NULL, 10);
+			idx = (uint16_t)strtoul(argv[3], NULL, 10);
 		}
 
 		if (tmp) {
@@ -417,10 +417,12 @@ main(int argc, const char *argv[])
 				m30_t v0 = ffff_m30_get_ui32(t->v[0]);
 				m30_t v1 = ffff_m30_get_ui32(t->v[1]);
 				char stmp[32];
+				double v0d = ffff_m30_d(v0);
+				double v1d = ffff_m30_d(v1);
 
 				__prts(stmp, sizeof(stmp), sl1t_stmp_sec(t));
 				fprintf(stderr, "%s %2.4f %2.4f\n",
-					stmp, ffff_m30_d(v0), ffff_m30_d(v1));
+					stmp, v0d, v1d);
 			}
 		}
 	} else {

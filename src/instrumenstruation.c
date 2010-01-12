@@ -478,14 +478,13 @@ static const struct poptOption my_opts[] = {
 static const char *const*
 parse_cl(size_t argc, const char *argv[])
 {
-        int rc;
         poptContext opt_ctx;
 
         opt_ctx = poptGetContext(NULL, argc, argv, my_opts, 0);
         poptSetOtherOptionHelp(opt_ctx, "[-d] [-o outfile] contracts");
 
         /* auto-do */
-        while ((rc = poptGetNextOpt(opt_ctx)) > 0) {
+        while (poptGetNextOpt(opt_ctx) > 0) {
                 /* Read all the options ... */
                 ;
         }

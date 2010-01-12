@@ -383,7 +383,7 @@ static struct poptOption help_opts[] = {
 	POPT_TABLEEND
 };
 
-static const struct poptOption const ud_opts[] = {
+static const struct poptOption ud_opts[] = {
         {NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
 	 "Server Options", NULL},
 	{NULL, '\0', POPT_ARG_INCLUDE_TABLE, help_opts, 0,

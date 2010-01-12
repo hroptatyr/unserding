@@ -124,7 +124,6 @@ handle_el(char *line)
 }
 
 /* dirty */
-extern void _rl_erase_entire_line(void);
 void
 stdin_print_async(const char *buf, size_t UNUSED(len))
 {
@@ -138,8 +137,6 @@ stdin_print_async(const char *buf, size_t UNUSED(len))
 }
 
 /* completers */
-extern char *cmd_generator(const char *text, int state);
-
 /* Attempt to complete on the contents of TEXT.  START and END
    bound the region of rl_line_buffer that contains the word to
    complete.  TEXT is the word to complete.  We can use the entire

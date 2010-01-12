@@ -8,7 +8,7 @@
 
 static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
-static bool xmlp;
+static bool UNUSED(xmlp);
 
 static void
 t_cb(su_secu_t s, scom_t th, void *UNUSED(clo))

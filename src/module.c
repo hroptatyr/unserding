@@ -68,12 +68,13 @@
 
 typedef struct ud_mod_s *ud_mod_t;
 typedef struct ud_deferred_s *ud_deferred_t;
+typedef void(*lt_f)(void*);
 
 struct ud_mod_s {
 	void *handle;
-	void (*initf)(void*);
-	void (*finif)(void*);
-	void (*relof)(void*);
+	lt_f initf;
+	lt_f finif;
+	lt_f relof;
 	ud_mod_t next;
 };
 
@@ -143,7 +144,7 @@ add_myself(void)
 	return;
 }
 
-lt_dlhandle
+static lt_dlhandle
 my_dlopen(const char *filename)
 {
 	lt_dlhandle handle = 0;
@@ -179,17 +180,17 @@ open_aux(const char *name, void *clo)
 		goto reinit;
 	}
 
-	if ((tmpmod.initf = lt_dlsym(tmpmod.handle, minit)) == NULL) {
+	if ((tmpmod.initf = (lt_f)lt_dlsym(tmpmod.handle, minit)) == NULL) {
 		lt_dlclose(tmpmod.handle);
 		perror("unserding: cannot open module, init() not found");
 		return NULL;
 	}
 
-	if ((tmpmod.finif = lt_dlsym(tmpmod.handle, mdeinit)) == NULL) {
+	if ((tmpmod.finif = (lt_f)lt_dlsym(tmpmod.handle, mdeinit)) == NULL) {
 		;
 	}
 
-	if ((tmpmod.relof = lt_dlsym(tmpmod.handle, mreinit)) == NULL) {
+	if ((tmpmod.relof = (lt_f)lt_dlsym(tmpmod.handle, mreinit)) == NULL) {
 		;
 	}
 

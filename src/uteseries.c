@@ -88,6 +88,7 @@ open_ute_file(const char *fn)
 		close(fd);
 		return NULL;
 	}
+	res->tbl = NULL;
 	return res;
 }
 
@@ -132,7 +133,10 @@ struct tblister_s {
 static void
 tbl_set(tblister_t tbl, uint16_t idx, uint16_t ttf)
 {
-	tbl->ttfbs[idx] = (uint16_t)(tbl->ttfbs[idx] | (uint16_t)(1UL << ttf));
+	/* mask linked-mode candles */
+	uint16_t ttfcl = (uint16_t)(ttf & 0x0f);
+	/* obtain new bitset */
+	tbl->ttfbs[idx] = (uint16_t)(tbl->ttfbs[idx] | (uint16_t)(1 << ttfcl));
 	tbl->cnt[idx]++;
 	return;
 }
@@ -299,8 +303,15 @@ __inspect_tk(tblister_t t, const_sl1t_t tk, size_t ntk)
 		uint16_t idx = sl1t_tblidx(tk);
 		uint16_t ttf = sl1t_ttf(tk);
 		tbl_set(t, idx, ttf);
+		if (scom_thdr_linked((const void*)tk)) {
+			tk++;
+		}
 	}
-	t->ets = sl1t_stmp_sec(tk - 1);
+	if (scom_thdr_linked((const void*)(tk - 2))) {
+		t->ets = sl1t_stmp_sec(tk - 2);
+	} else {
+		t->ets = sl1t_stmp_sec(tk - 1);
+	}
 	return t;
 }
 

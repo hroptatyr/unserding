@@ -61,26 +61,38 @@
 #define DEFAULT_PER		600
 #define DEFAULT_TKSZ		262144
 
-typedef sl1t_fio_t ute_ctx_t;
 #if !defined time32_t
 typedef int32_t time32_t;
 #define time32_t	time32_t
 #endif	/* !time32_t */
 
+typedef struct ute_ctx_s *ute_ctx_t;
+typedef struct tblister_s *tblister_t;
+
+struct ute_ctx_s {
+	/** the io guts */
+	sl1t_fio_t fio;
+	/** points to the inspection blister */
+	tblister_t tbl;
+};
+
 static ute_ctx_t
 open_ute_file(const char *fn)
 {
 	int fd;
-	ute_ctx_t res;
+	ute_ctx_t res = xnew(*res);
 
 	if ((fd = open(fn, O_RDONLY, 0644)) < 0) {
 		return NULL;
-	} else if ((res = make_sl1t_reader(fd)) == NULL) {
+	} else if ((res->fio = make_sl1t_reader(fd)) == NULL) {
 		close(fd);
 		return NULL;
 	}
 	return res;
 }
+
+/* forw decl */
+static void free_tblister(tblister_t t);
 
 static void
 close_ute_file(ute_ctx_t ctx)
@@ -89,15 +101,18 @@ close_ute_file(ute_ctx_t ctx)
 	if (ctx == NULL) {
 		return;
 	}
-	fd = sl1t_fio_fd(ctx);
-	free_sl1t_reader(ctx);
-	close(fd);
+	if (ctx->fio != NULL) {
+		fd = sl1t_fio_fd(ctx->fio);
+		free_sl1t_reader(ctx->fio);
+		close(fd);
+	}
+	if (ctx->tbl != NULL) {
+		free_tblister(ctx->tbl);
+	}
 	return;
 }
 
 
-typedef struct tblister_s *tblister_t;
-
 struct tblister_s {
 	time32_t bts;
 	time32_t ets;
@@ -298,22 +313,26 @@ __inspect_tk(tblister_t t, const_sl1t_t tk, size_t ntk)
 #endif
 
 /* roughly look at what's in the file, keep track of secus and times */
-static tblister_t
+static void
 ute_inspect(ute_ctx_t ctx)
 {
 	const_sl1t_t t;
-	tblister_t res = NULL;
 
-	if (ctx == NULL) {
-		return NULL;
+	if (ctx == NULL || ctx->fio == NULL) {
+		return;
 	}
 
+	/* look if there's a thing in there already */
+	if (ctx->tbl != NULL) {
+		free_tblister(ctx->tbl);
+		ctx->tbl = NULL;
+	}
 	for (size_t tidx = 0, nt;
-	     (nt = sl1t_fio_read_ticks(ctx, &t, tidx, UPPER_FETCH)) > 0;
+	     (nt = sl1t_fio_read_ticks(ctx->fio, &t, tidx, UPPER_FETCH)) > 0;
 	     tidx += nt) {
-		res = __inspect(res, t, nt);
+		ctx->tbl = __inspect(ctx->tbl, t, nt);
 	}
-	return res;
+	return;
 }
 
 #if 0
@@ -359,7 +378,7 @@ __find_tk(ute_ctx_t ctx, tblister_t tbl, sl1t_t tgtsrc)
 	}
 
 	/* get the corresponding tick block */
-	nt = sl1t_fio_read_ticks(ctx, &t, tbl->btk, tbl->etk);
+	nt = sl1t_fio_read_ticks(ctx->fio, &t, tbl->btk, tbl->etk);
 	/* assume ascending order */
 	for (const_sl1t_t tk = &t[nt - 1]; tk >= t; tk--) {
 		uint16_t tkidx = sl1t_tblidx(tk);
@@ -389,17 +408,16 @@ int
 main(int argc, const char *argv[])
 {
 	ute_ctx_t ctx = NULL;
-	tblister_t res;
 
 	if (argc > 1) {
 		ctx = open_ute_file(argv[1]);
 	}
 
-	res = ute_inspect(ctx);
+	ute_inspect(ctx);
 
 	if (argc > 2) {
 		time_t ts = __parse_ts(argv[2]);
-		tblister_t tmp = __find_blister_by_ts(res, ts);
+		tblister_t tmp = __find_blister_by_ts(ctx->tbl, ts);
 		uint16_t idx = 1;
 
 		if (argc > 3) {
@@ -427,10 +445,9 @@ main(int argc, const char *argv[])
 		}
 	} else {
 		/* otherwise just print the bugger */
-		tblister_print(res);
+		tblister_print(ctx->tbl);
 	}
 
-	free_tblister(res);
 	close_ute_file(ctx);
 	return 0;
 }

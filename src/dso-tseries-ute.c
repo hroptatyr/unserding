@@ -68,13 +68,6 @@
 #include "uteseries.c"
 
 
-typedef struct my_ctx_s *my_ctx_t;
-struct my_ctx_s {
-	ute_ctx_t ctx;
-	tblister_t tbl;
-	
-};
-
 static inline uint16_t
 __fhdr_nsecs(utehdr_t fhdr)
 {
@@ -85,10 +78,10 @@ __fhdr_nsecs(utehdr_t fhdr)
 }
 
 static uint16_t
-find_secu_idx(my_ctx_t ctx, su_secu_t sec)
+find_secu_idx(ute_ctx_t ctx, su_secu_t sec)
 {
 /* hardcoded as fuck */
-	utehdr_t fhdr = ((sl1t_fio_t)ctx->ctx)->fhdr;
+	utehdr_t fhdr = ctx->fio->fhdr;
 	for (index_t i = UTEHDR_FIRST_SECIDX;
 	     i < __fhdr_nsecs(fhdr) + UTEHDR_FIRST_SECIDX; i++) {
 		if (fhdr->sec[i].mux == sec.mux) {
@@ -100,7 +93,7 @@ find_secu_idx(my_ctx_t ctx, su_secu_t sec)
 
 /* belongs in uteseries.c? */
 static size_t
-__cp_tk(const_sl1t_t *tgt, my_ctx_t ctx, sl1t_t src)
+__cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 {
 	const_scom_thdr_t scsrc = (const void*)src;
 	time32_t ts = scom_thdr_sec(scsrc);
@@ -117,7 +110,7 @@ __cp_tk(const_sl1t_t *tgt, my_ctx_t ctx, sl1t_t src)
 	}
 
 	/* get the corresponding tick block */
-	nt = sl1t_fio_read_ticks(ctx->ctx, &t, tbl->btk, tbl->etk);
+	nt = sl1t_fio_read_ticks(ctx->fio, &t, tbl->btk, tbl->etk);
 	/* assume ascending order */
 	for (const_sl1t_t tk = &t[nt - 1]; tk >= t; tk--) {
 		uint16_t tkidx = sl1t_tblidx(tk);
@@ -137,7 +130,7 @@ fetch_tick(
 	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
 	time32_t beg, time32_t end)
 {
-	my_ctx_t ctx = uval;
+	ute_ctx_t ctx = uval;
 	uint16_t idx = find_secu_idx(ctx, k->secu);
 	const_sl1t_t t[1];
 	size_t nt, res = 0;
@@ -189,7 +182,7 @@ static struct tsc_ops_s ute_ops[1] = {{
 
 struct cb_clo_s {
 	tscube_t c;
-	my_ctx_t ctx;
+	ute_ctx_t ctx;
 };
 
 static void
@@ -198,7 +191,7 @@ fill_cube_cb(uint16_t UNUSED(idx), su_secu_t sec, void *clo)
 /* hardcoded as fuck */
 	struct cb_clo_s *fcclo = clo;
 	tscube_t c = fcclo->c;
-	my_ctx_t ctx = fcclo->ctx;
+	ute_ctx_t ctx = fcclo->ctx;
 	struct tsc_ce_s ce = {
 		.key = {{
 				.beg = 915148800,
@@ -216,7 +209,7 @@ fill_cube_cb(uint16_t UNUSED(idx), su_secu_t sec, void *clo)
 }
 
 
-static struct my_ctx_s my_ctx[1];
+static ute_ctx_t my_ctx;
 static const char my_hardcoded_file[] = "/home/freundt/.unserding/eur.ute";
 
 void
@@ -225,9 +218,9 @@ dso_tseries_ute_LTX_init(void *UNUSED(clo))
 	struct cb_clo_s cbclo = {.c = gcube, .ctx = my_ctx};
 
 	UD_DEBUG("mod/tseries-ute: loading ...");
-	my_ctx->ctx = open_ute_file(my_hardcoded_file);
-	my_ctx->tbl = ute_inspect(my_ctx->ctx);
-	sl1t_fio_trav_stbl(my_ctx->ctx, fill_cube_cb, NULL, &cbclo);
+	my_ctx = open_ute_file(my_hardcoded_file);
+	ute_inspect(my_ctx);
+	sl1t_fio_trav_stbl(my_ctx->fio, fill_cube_cb, NULL, &cbclo);
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -236,12 +229,8 @@ void
 dso_tseries_ute_LTX_deinit(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: unloading ...");
-	if (my_ctx->tbl != NULL) {
-		free_tblister(my_ctx->tbl);
-	}
-	if (my_ctx->ctx != NULL) {
-		close_ute_file(my_ctx->ctx);
-	}
+	close_ute_file(my_ctx);
+	my_ctx = NULL;
 	UD_DBGCONT("done\n");
 	return;
 }

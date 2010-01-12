@@ -82,13 +82,49 @@ find_secu_idx(ute_ctx_t ctx, su_secu_t sec)
 {
 /* hardcoded as fuck */
 	utehdr_t fhdr = ctx->fio->fhdr;
+	size_t nsecs = __fhdr_nsecs(fhdr);
 	for (index_t i = UTEHDR_FIRST_SECIDX;
-	     i < __fhdr_nsecs(fhdr) + UTEHDR_FIRST_SECIDX; i++) {
+	     i < nsecs + UTEHDR_FIRST_SECIDX; i++) {
 		if (fhdr->sec[i].mux == sec.mux) {
 			return i;
 		}
 	}
 	return 0;
+}
+
+static su_secu_t
+find_idx_secu(ute_ctx_t ctx, uint16_t idx)
+{
+/* hardcoded as fuck */
+	utehdr_t fhdr = ctx->fio->fhdr;
+	return fhdr->sec[idx];
+}
+
+static const_sl1t_t
+__find_bb(const_sl1t_t t, size_t nt, time32_t ts)
+{
+	/* assume ascending order and that once linked mode is used, it's
+	 * always used throughout the blister */
+	index_t i, hi = nt, lo = 0;
+	int fiddle = (scom_thdr_linked((const void*)(t))) ? 2 : 1;
+
+	do {
+		/* make sure i is even to cope with candles */
+		i = ((hi + lo) / 2 & -fiddle);
+
+		if (sl1t_stmp_sec(t + i) <= ts &&
+		    sl1t_stmp_sec(t + i + fiddle) > ts) {
+			/* was: return ar + i; so i points to the right index */
+			return t + i;
+		} else if (sl1t_stmp_sec(t + i) > ts) {
+			/* prefer lower half */
+			hi = i - fiddle;
+		} else {
+			/* strictly less, prefer upper half */
+			lo = i + fiddle;
+		}
+	} while (true);
+	/* not reached */
 }
 
 /* belongs in uteseries.c? */
@@ -101,28 +137,24 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	uint16_t ttf = scom_thdr_ttf(scsrc);
 	tblister_t tbl = __find_blister_by_ts(ctx->tbl, ts);
 	size_t nt;
-	const_sl1t_t t;
+	const_sl1t_t t, res;
 
+	UD_DEBUG("fetching %hu  msk %x\n", ttf, tbl->ttfbs[idx]);
 	if (UNLIKELY(tbl == NULL)) {
 		return 0;
-	} else if (!(tbl->ttfbs[idx] & (1 << ttf))) {
+	} else if (!(tbl->ttfbs[idx] & (1 << (ttf & 0x0f)))) {
 		return 0;
 	}
 
+	UD_DEBUG("fetching %u to %u\n", tbl->btk, tbl->etk);
 	/* get the corresponding tick block */
 	nt = sl1t_fio_read_ticks(ctx->fio, &t, tbl->btk, tbl->etk);
-	/* assume ascending order */
-	for (const_sl1t_t tk = &t[nt - 1]; tk >= t; tk--) {
-		uint16_t tkidx = sl1t_tblidx(tk);
-		uint16_t tkttf = sl1t_ttf(tk);
-
-		if (tkidx == idx && tkttf == ttf && sl1t_stmp_sec(tk) <= ts) {
-			/* not thread-safe */
-			*tgt = tk;
-			return t + nt - tk;
-		}
+	/* this will give us a tick that is before the tick in question */
+	if ((res = __find_bb(t, nt, ts)) == NULL) {
+		return 0;
 	}
-	return 0;
+	*tgt = res;
+	return t + nt - res;
 }
 
 static size_t
@@ -131,31 +163,42 @@ fetch_tick(
 	time32_t beg, time32_t end)
 {
 	ute_ctx_t ctx = uval;
-	uint16_t idx = find_secu_idx(ctx, k->secu);
+	uint16_t idx;
 	const_sl1t_t t[1];
 	size_t nt, res = 0;
+	int inc;
 
+	UD_DEBUG("fetching %i %i %x\n", beg, end, k->ttf);
 	/* different keying now */
 	sl1t_set_stmp_sec(tgt, beg);
 	/* use the global secu -> tblidx map */
+	idx = find_secu_idx(ctx, k->secu);
 	sl1t_set_tblidx(tgt, idx);
 	sl1t_set_ttf(tgt, k->ttf);
 
 	if ((nt = __cp_tk(t, ctx, tgt)) == 0) {
 		return 0;
 	}
+	UD_DEBUG("fine-grain over %zu ticks t[0]->ts %u\n", nt, sl1t_stmp_sec(t[0]));
 	/* otherwise iterate */
-	for (const_sl1t_t tp = t[0]; tp < t[0] + nt && res < tsz; tp++) {
+	inc = (scom_thdr_linked((const void*)(t[0]))) ? 2 : 1;
+	for (const_sl1t_t tp = t[0]; tp < t[0] + nt && res < tsz; ) {
 		uint16_t tkidx = sl1t_tblidx(tp);
-		uint16_t tkttf = sl1t_ttf(tp);
+		uint16_t tkttf = sl1t_ttf(tp) & 0x0f;
 
 		/* assume ascending order */
 		if (sl1t_stmp_sec(tp) > end) {
 			break;
 		} else if (tkidx == idx && tkttf == k->ttf) {
 			/* not thread-safe */
-			*tgt++ = *tp;
+			*tgt++ = *tp++;
 			res++;
+			if (inc == 2) {
+				*tgt++ = *tp++;
+				res++;
+			}
+		} else {
+			tp += inc;
 		}
 	}
 	return res;
@@ -208,19 +251,56 @@ fill_cube_cb(uint16_t UNUSED(idx), su_secu_t sec, void *clo)
 	return;
 }
 
+static void
+fill_cube_by_bl(tscube_t c, tblister_t bl, ute_ctx_t ctx)
+{
+	struct tsc_ce_s ce;
+
+	for (uint16_t i = 0; i < countof(bl->ttfbs); i++) {
+		su_secu_t sec;
+		if (bl->ttfbs[i] == 0 ||
+		    bl->ttfbs[i] & (1 << SL1T_TTF_BID) == 0) {
+			continue;
+		}
+		/* otherwise */
+		sec = find_idx_secu(ctx, i);
+		ce.key->beg = bl->bts;
+		ce.key->end = bl->ets;
+		ce.key->ttf = SL1T_TTF_BID;
+		ce.key->msk = 1 | 2 | 4 | 8 | 16;
+		ce.key->secu = sec;
+		ce.ops = ute_ops;
+		ce.uval = ctx;
+		tsc_add(c, &ce);
+	}
+	return;
+}
+
 
 static ute_ctx_t my_ctx;
 static const char my_hardcoded_file[] = "/home/freundt/.unserding/eur.ute";
 
+static ute_ctx_t my_ctx2;
+static const char my_hardcoded_file2[] =
+	"/home/freundt/.unserding/ute_IBk200.2009.5m.scdl";
+
 void
 dso_tseries_ute_LTX_init(void *UNUSED(clo))
 {
-	struct cb_clo_s cbclo = {.c = gcube, .ctx = my_ctx};
+	struct cb_clo_s cbclo = {.c = gcube};
 
 	UD_DEBUG("mod/tseries-ute: loading ...");
 	my_ctx = open_ute_file(my_hardcoded_file);
 	ute_inspect(my_ctx);
+	cbclo.ctx = my_ctx;
 	sl1t_fio_trav_stbl(my_ctx->fio, fill_cube_cb, NULL, &cbclo);
+
+	my_ctx2 = open_ute_file(my_hardcoded_file2);
+	ute_inspect(my_ctx2);
+	/* travel along the blister list and fill the cube */
+	for (tblister_t tmp = my_ctx2->tbl; tmp; tmp = tmp->next) {
+		fill_cube_by_bl(gcube, tmp, my_ctx2);
+	}
 	UD_DBGCONT("done\n");
 	return;
 }

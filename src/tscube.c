@@ -176,18 +176,21 @@ tsc_box_find_best_before(tsc_box_t b, time32_t ts)
 {
 	sl1t_t ar = (void*)b;
 	index_t i, hi = tsc_box_nticks(b), lo = 0;
+	int fiddle = (scom_thdr_linked((const void*)(ar))) ? 2 : 1;
 
 	do {
-		i = (hi + lo) / 2;
-		if (sl1t_stmp_sec(ar + i) <= ts &&
-		    sl1t_stmp_sec(ar + i + 1) > ts) {
+		i = (hi + lo) / 2 & -fiddle;
+		if (hi == lo) {
+			return NULL;
+		} else if (sl1t_stmp_sec(ar + i) <= ts &&
+			   sl1t_stmp_sec(ar + i + fiddle) > ts) {
 			return ar + i;
 		} else if (sl1t_stmp_sec(ar + i) > ts) {
 			/* prefer lower half */
-			hi = i - 1;
+			hi = i - fiddle;
 		} else {
 			/* strictly less, prefer upper half */
-			lo = i + 1;
+			lo = i + fiddle;
 		}
 	} while (true);
 	/* not reached */
@@ -434,7 +437,7 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 	return true;
 }
 
-static time32_t
+static __attribute__((unused)) time32_t
 last_monday_midnight(time32_t ts)
 {
 	dow_t dow = __dayofweek(ts);
@@ -468,6 +471,12 @@ last_monday_midnight(time32_t ts)
 	return ts - sub;
 }
 
+static __attribute__((unused)) time32_t
+todays_latenight(time32_t ts)
+{
+	return ts - (ts % 86400) + 86399;
+}
+
 #define utsc		UNUSED(tsc)
 #define utsz		UNUSED(tsz)
 
@@ -481,14 +490,21 @@ bother_cube(sl1t_t tgt, size_t utsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 	/* bother the interval trees first */
 	assert(kv->intv != NULL);
 	if ((box = tsc_itr_find(kv->intv, key->beg))) {
-		fprintf(stderr, "cached %p\n", box);
+		sl1t_t bb;
 	hmpf:
+		fprintf(stderr, "cached %p\n", box);
 		/* yummy NULL pointer dereferencing */
-		*tgt = *tsc_box_find_best_before(box, key->beg);
-		res = 1;
+		if ((bb = tsc_box_find_best_before(box, key->beg))) {
+			res = (scom_thdr_linked((const void*)(bb))) ? 2 : 1;
+			memcpy(tgt, bb, sizeof(*tgt) * res);
+		} else {
+			res = 0;
+		}
 
 	} else if (kv->ce->ops && kv->ce->ops->fetch_cb) {
-		time32_t beg = last_monday_midnight(key->beg);
+		time32_t beg = key->beg - key->beg % 86400;
+		//time32_t beg = todays_latenight(key->beg);
+		//time32_t beg = last_monday_midnight(key->beg);
 		time32_t end = 0x7fffffff;
 
 		fprintf(stderr, "uncached\n");

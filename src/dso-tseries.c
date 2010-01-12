@@ -555,10 +555,7 @@ dso_tseries_LTX_init(void *clo)
 
 	/* now kick off a fetch-URN job, dont bother about the
 	 * job slot, it's unused anyway */
-#if 0
-/* it's too fast */
-	wpool_enq(gwpool, (wpool_work_f)fetch_urn_svc, NULL, true);
-#endif
+	wpool_enq(gwpool, (wpool_work_f)fetch_urn_svc, NULL, false);
 	return;
 }
 

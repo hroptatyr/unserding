@@ -586,6 +586,9 @@ main(int argc, const char *argv[])
 	/* static modules */
 	ud_init_statmods(&__ctx);
 
+	/* rock the wpool queue to trigger anything on there */
+	wpool_trigger(gwpool);
+
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 

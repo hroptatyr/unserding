@@ -168,12 +168,12 @@ main(int argc, const char *argv[])
 	su_secu_t cid;
 	int n = 0;
 	time_t ts[argc-1];
-	uint32_t bs = \
-		SL1T_TTF_BID | \
-		SL1T_TTF_ASK | \
-		SL1T_TTF_TRA | \
-		SL1T_TTF_STL | \
-		SL1T_TTF_FIX;
+	uint32_t bs =
+		(1 << SL1T_TTF_BID) |
+		(1 << SL1T_TTF_ASK) |
+		(1 << SL1T_TTF_TRA) |
+		(1 << SL1T_TTF_STL) |
+		(1 << SL1T_TTF_FIX);
 
 	if (argc <= 1) {
 		fprintf(stderr, "Usage: ud-tick instr [date] [date] ...\n");

@@ -276,26 +276,37 @@ fill_cube_cb(uint16_t UNUSED(idx), su_secu_t sec, void *clo)
 }
 
 static void
-fill_cube_by_bl(tscube_t c, tblister_t bl, ute_ctx_t ctx)
+fill_cube_by_bl_ttf(tscube_t c, tblister_t bl, ute_ctx_t ctx, uint16_t idx)
 {
+	uint64_t bs = bl->ttfbs[idx] >> 1;
 	struct tsc_ce_s ce;
 
-	for (uint16_t i = 0; i < countof(bl->ttfbs); i++) {
-		su_secu_t sec;
-		if (bl->ttfbs[i] == 0 ||
-		    bl->ttfbs[i] & (1 << SL1T_TTF_BID) == 0) {
-			continue;
+	if (bs == 0) {
+		return;
+	}
+	/* otherwise */
+	ce.key->beg = bl->bts;
+	ce.key->end = bl->ets;
+	ce.key->msk = 1 | 2 | 4 | 8 | 16;
+	ce.key->secu = find_idx_secu(ctx, idx);
+	ce.ops = ute_ops;
+	ce.uval = ctx;
+	/* go over all the tick types in the bitset BS */
+	for (int j = 1; j < SL1T_TTF_VOL; j++, bs >>= 1) {
+		if (bs & 1) {
+			/* means tick type j is set */
+			ce.key->ttf = j;
+			tsc_add(c, &ce);
 		}
-		/* otherwise */
-		sec = find_idx_secu(ctx, i);
-		ce.key->beg = bl->bts;
-		ce.key->end = bl->ets;
-		ce.key->ttf = SL1T_TTF_BID;
-		ce.key->msk = 1 | 2 | 4 | 8 | 16;
-		ce.key->secu = sec;
-		ce.ops = ute_ops;
-		ce.uval = ctx;
-		tsc_add(c, &ce);
+	}
+	return;
+}
+
+static void
+fill_cube_by_bl(tscube_t c, tblister_t bl, ute_ctx_t ctx)
+{
+	for (uint16_t i = 0; i < countof(bl->ttfbs); i++) {
+		fill_cube_by_bl_ttf(c, bl, ctx, i);
 	}
 	return;
 }

@@ -100,7 +100,7 @@ find_idx_secu(ute_ctx_t ctx, uint16_t idx)
 	return fhdr->sec[idx];
 }
 
-static const_sl1t_t
+static __attribute__((unused)) const_sl1t_t
 __find_bb(const_sl1t_t t, size_t nt, time32_t ts)
 {
 	/* assume ascending order and that once linked mode is used, it's
@@ -137,7 +137,8 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	uint16_t ttf = scom_thdr_ttf(scsrc);
 	tblister_t tbl = __find_blister_by_ts(ctx->tbl, ts);
 	size_t nt;
-	const_sl1t_t t, res;
+	const_sl1t_t t, res, tmp;
+	int fiddle;
 
 	UD_DEBUG("fetching %hu msk %x\n", ttf, tbl->ttfbs[idx]);
 	if (UNLIKELY(tbl == NULL)) {
@@ -146,15 +147,28 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 		return 0;
 	}
 
-	UD_DEBUG("fetching %u to %u\n", tbl->btk, tbl->etk);
-	/* get the corresponding tick block */
-	nt = sl1t_fio_read_ticks(ctx->fio, &t, tbl->btk, tbl->etk);
+	UD_DEBUG("fetching %u to %u for %i\n", tbl->btk, tbl->etk, ts);
+#if 0
 	/* this will give us a tick that is before the tick in question */
 	if ((res = __find_bb(t, nt, ts)) == NULL) {
 		return 0;
 	}
+#elif 1
+	/* get the corresponding tick block */
+	nt = sl1t_fio_read_ticks(ctx->fio, &t, tbl->btk, tbl->etk);
+	fiddle = scom_thdr_linked((const void*)(t)) ? 2 : 1;
+	/* look for the last tick of IDX and tick type TTF before TS */
+	for (res = NULL, tmp = t; tmp < t + nt - fiddle; tmp += fiddle) {
+		if (sl1t_stmp_sec(tmp) > ts) {
+			break;
+		}
+		if (sl1t_tblidx(tmp) == idx && sl1t_ttf(tmp) == ttf) {
+			res = tmp;
+		}
+	}
+#endif
 	*tgt = res;
-	return t + nt - res;
+	return res ? t + nt - res : 0;
 }
 
 static size_t
@@ -179,7 +193,8 @@ fetch_tick(
 	if ((nt = __cp_tk(t, ctx, sl1key)) == 0) {
 		return 0;
 	}
-	UD_DEBUG("fine-grain over %zu ticks t[0]->ts %u\n", nt, sl1t_stmp_sec(t[0]));
+	UD_DEBUG("fine-grain over %zu ticks t[0]->ts %u\n",
+		 nt, sl1t_stmp_sec(t[0]));
 	/* otherwise iterate */
 	if (!scom_thdr_linked((const void*)(t[0]))) {
 		tgt->pad = 1;

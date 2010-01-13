@@ -51,37 +51,58 @@
 static struct ud_handle_s __hdl;
 static ud_handle_t hdl = &__hdl;
 
+static char
+ttc(scom_t t)
+{
+	switch (scom_thdr_ttf(t)) {
+	case SCOM_FLAG_LM | SL1T_TTF_BID:
+	case SL1T_TTF_BID:
+		return 'b';
+	case SCOM_FLAG_LM | SL1T_TTF_ASK:
+	case SL1T_TTF_ASK:
+		return 'a';
+	case SCOM_FLAG_LM | SL1T_TTF_TRA:
+	case SL1T_TTF_TRA:
+		return 't';
+	case SCOM_FLAG_LM | SL1T_TTF_STL:
+	case SL1T_TTF_STL:
+		return 'x';
+	case SCOM_FLAG_LM | SL1T_TTF_FIX:
+	case SL1T_TTF_FIX:
+		return 'f';
+	default:
+		return 'u';
+	}
+}
+
 static void
 t1(scom_t t)
 {
 	const_sl1t_t tv = (const void*)t;
+	double v0 = ffff_m30_d(ffff_m30_get_ui32(tv->v[0]));
+	double v1 = ffff_m30_d(ffff_m30_get_ui32(tv->v[1]));
 
 	fputc(' ', stdout);
 	fputc(' ', stdout);
-	switch (scom_thdr_ttf(t)) {
-	case SL1T_TTF_BID:
-		fputc('b', stdout);
-		break;
-	case SL1T_TTF_ASK:
-		fputc('a', stdout);
-		break;
-	case SL1T_TTF_TRA:
-		fputc('t', stdout);
-		break;
-	case SL1T_TTF_STL:
-		fputc('x', stdout);
-		break;
-	case SL1T_TTF_FIX:
-		fputc('f', stdout);
-		break;
-	case SL1T_TTF_UNK:
-	default:
-		fputc('@', stdout);
-		break;
-	}
+	fputc(ttc(t), stdout);
 
-	fprintf(stdout, ":%2.4f\n",
-		ffff_m30_d(ffff_m30_get_ui32(tv->v[0])));
+	fprintf(stdout, ":%2.4f %2.4f\n", v0, v1);
+	return;
+}
+
+static void
+t1c(scom_t t)
+{
+	const_scdl_t tv = (const void*)t;
+	double o = ffff_m30_d(ffff_m30_get_ui32(tv->o));
+	double h = ffff_m30_d(ffff_m30_get_ui32(tv->h));
+	double l = ffff_m30_d(ffff_m30_get_ui32(tv->l));
+	double c = ffff_m30_d(ffff_m30_get_ui32(tv->c));
+	int32_t v = tv->cnt;
+	int32_t ets = tv->end_ts;
+
+	fprintf(stdout, " o:%2.4f h:%2.4f l:%2.4f c:%2.4f v:%i  e:%i\n",
+		o, h, l, c, v, ets);
 	return;
 }
 
@@ -97,25 +118,6 @@ oh(scom_t UNUSED(t))
 {
 	fputs("  v:deferred\n", stdout);
 	return;
-}
-
-static char
-ttc(scom_t t)
-{
-	switch (scom_thdr_ttf(t)) {
-	case SL1T_TTF_BID:
-		return 'b';
-	case SL1T_TTF_ASK:
-		return 'a';
-	case SL1T_TTF_TRA:
-		return 't';
-	case SL1T_TTF_STL:
-		return 'x';
-	case SL1T_TTF_FIX:
-		return 'f';
-	default:
-		return 'u';
-	}
 }
 
 static void
@@ -137,8 +139,10 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 		ne(t);
 	} else if (scom_thdr_onhold_p(t)) {
 		oh(t);
-	} else {
+	} else if (!scom_thdr_linked(t)) {
 		t1(t);
+	} else {
+		t1c(t);
 	}
 	return;
 }

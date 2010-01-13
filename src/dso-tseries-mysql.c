@@ -133,7 +133,7 @@ get_m30(const char *s)
 struct qrclo_s {
 	uint32_t cnt;
 	uint32_t max;
-	sl1t_t box;
+	tsc_box_t box;
 };
 
 static void
@@ -161,8 +161,8 @@ qry_rowf(void **row, size_t nflds, void *clo)
 		scom_thdr_set_msec(th, 0);
 		scom_thdr_set_ttf(th, SL1T_TTF_FIX);
 		scom_thdr_set_tblidx(th, 0);
-		qrclo->box[cnt].v[0] = ffff_m30_ui32(p);
-		qrclo->box[cnt].v[1] = ffff_m30_ui32(q);
+		qrclo->box->sl1t[cnt].v[0] = ffff_m30_ui32(p);
+		qrclo->box->sl1t[cnt].v[1] = ffff_m30_ui32(q);
 
 	} else {
 		abort();
@@ -288,7 +288,7 @@ print_qry(char *tgt, size_t len, tsc_key_t k, urn_t urn, time32_t b, time32_t e)
 /* tick fetching revised */
 static size_t
 fetch_tick(
-	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
+	tsc_box_t tgt, size_t tsz, tsc_key_t k, void *uval,
 	time32_t beg, time32_t end)
 {
 	char qry[480];

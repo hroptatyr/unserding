@@ -42,6 +42,7 @@
 #include <sushi/secu.h>
 #include <sushi/scommon.h>
 #include <sushi/sl1t.h>
+#include <sushi/scdl.h>
 #include "ud-time.h"
 
 typedef void *tscube_t;
@@ -53,11 +54,15 @@ typedef struct tsc_ce_s *tsc_ce_t;
 /* cube operations (or methods if you will) */
 typedef struct tsc_ops_s *tsc_ops_t;
 
+typedef struct tsc_box_s *tsc_box_t;
+
 /**
  * The idea of the fetch function is to fetch (a subseries of) the time
- * series specified by K (from BEG till END). */
+ * series specified by K (from BEG till END).
+ * Callbacks must fill in TGT correctly, i.e. the number of ticks, the
+ * beginning and the end time stamps. */
 typedef size_t(*fetch_f)(
-	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
+	tsc_box_t tgt, size_t tsz, tsc_key_t k, void *uval,
 	time32_t beg, time32_t end);
 
 /**
@@ -96,6 +101,25 @@ struct tsc_ops_s {
 	/** callback fun to call when ticks are to be fetched */
 	fetch_f fetch_cb;
 	urn_refetch_f urn_refetch_cb;
+};
+
+struct tsc_box_s {
+	/* keep track how large this is */
+	size_t nt;
+	/* also keep track which ticks are supposed to be in here */
+	time32_t beg, end;
+	/* padding */
+	uint64_t pad;
+	/* 4 * 64 = 2 * 4 * 32 = 2 sl1t */
+#if 0
+/* grrr, fucking gcc chokes on this */
+	union {
+		struct sl1t_s sl1t[];
+		struct scdl_s scdl[];
+	};
+#else
+	struct sl1t_s sl1t[];
+#endif
 };
 
 

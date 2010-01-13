@@ -139,7 +139,7 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	size_t nt;
 	const_sl1t_t t, res;
 
-	UD_DEBUG("fetching %hu  msk %x\n", ttf, tbl->ttfbs[idx]);
+	UD_DEBUG("fetching %hu msk %x\n", ttf, tbl->ttfbs[idx]);
 	if (UNLIKELY(tbl == NULL)) {
 		return 0;
 	} else if (!(tbl->ttfbs[idx] & (1 << (ttf & 0x0f)))) {
@@ -159,49 +159,73 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 
 static size_t
 fetch_tick(
-	sl1t_t tgt, size_t tsz, tsc_key_t k, void *uval,
+	tsc_box_t tgt, size_t tsz, tsc_key_t k, void *uval,
 	time32_t beg, time32_t end)
 {
 	ute_ctx_t ctx = uval;
 	uint16_t idx;
 	const_sl1t_t t[1];
-	size_t nt, res = 0;
-	int inc;
+	size_t nt, res = 0, i;
+	struct sl1t_s sl1key[1];
 
 	UD_DEBUG("fetching %i %i %x\n", beg, end, k->ttf);
 	/* different keying now */
-	sl1t_set_stmp_sec(tgt, beg);
+	sl1t_set_stmp_sec(sl1key, beg);
 	/* use the global secu -> tblidx map */
 	idx = find_secu_idx(ctx, k->secu);
-	sl1t_set_tblidx(tgt, idx);
-	sl1t_set_ttf(tgt, k->ttf);
+	sl1t_set_tblidx(sl1key, idx);
+	sl1t_set_ttf(sl1key, k->ttf);
 
-	if ((nt = __cp_tk(t, ctx, tgt)) == 0) {
+	if ((nt = __cp_tk(t, ctx, sl1key)) == 0) {
 		return 0;
 	}
 	UD_DEBUG("fine-grain over %zu ticks t[0]->ts %u\n", nt, sl1t_stmp_sec(t[0]));
 	/* otherwise iterate */
-	inc = (scom_thdr_linked((const void*)(t[0]))) ? 2 : 1;
-	for (const_sl1t_t tp = t[0]; tp < t[0] + nt && res < tsz; ) {
-		uint16_t tkidx = sl1t_tblidx(tp);
-		uint16_t tkttf = sl1t_ttf(tp) & 0x0f;
+	if (!scom_thdr_linked((const void*)(t[0]))) {
+		tgt->pad = 1;
+	} else {
+		tsz /= (tgt->pad = 2);
+	}
+
+	for (i = res = 0; i < nt && res < tsz; i += tgt->pad) {
+		uint16_t tkidx = sl1t_tblidx(&t[0][i]);
+		uint16_t tkttf = sl1t_ttf(&t[0][i]) & 0x0f;
+		time32_t tkts = sl1t_stmp_sec(&t[0][i]);
 
 		/* assume ascending order */
-		if (sl1t_stmp_sec(tp) > end) {
+		if (UNLIKELY(tkts > end)) {
+			/* dont know if this is a good idea */
+			tgt->end = tkts - 1;
 			break;
 		} else if (tkidx == idx && tkttf == k->ttf) {
 			/* not thread-safe */
-			*tgt++ = *tp++;
-			res++;
-			if (inc == 2) {
-				*tgt++ = *tp++;
-				res++;
+#if 0
+			switch (tgt->pad) {
+			case 1:
+				tgt->sl1t[res] = t[0][i];
+				break;
+			case 2:
+				tgt->scdl[res] = *(const_scdl_t)(&t[0][i]);
+				break;
+			default:
+				break;
 			}
-		} else {
-			tp += inc;
+#else
+			memcpy(&tgt->sl1t[res * tgt->pad], &t[0][i],
+			       sizeof(struct sl1t_s) * tgt->pad);
+#endif
+			res++;
 		}
 	}
-	return res;
+	if (tgt->end == 0) {
+		tgt->end = sl1t_stmp_sec(&tgt->sl1t[(res - 1) * tgt->pad]);
+	}
+	/* absolute count, candles or sl1t's */
+	tgt->nt = res;
+	tgt->beg = sl1t_stmp_sec(tgt->sl1t);
+	UD_DEBUG("srch %u: tgt->beg %i  tgt->end %i\n",
+		 sl1t_stmp_sec(sl1key), tgt->beg, tgt->end);
+	return res * tgt->pad;
 }
 
 static void

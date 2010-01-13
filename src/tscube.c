@@ -112,12 +112,6 @@ struct tscube_s {
 /* for one bunch of ticks */
 /* we'll just use the whole allocation for ticks */
 #define TSC_BOX_SZ	4096
-typedef void *tsc_box_t;
-struct tsc_box_s {
-	size_t nt;
-
-	struct sl1t_s t[];
-};
 
 #define MAP_MEMMAP	(MAP_PRIVATE | MAP_ANONYMOUS)
 #define PROT_MEMMAP	(PROT_READ | PROT_WRITE)
@@ -135,56 +129,63 @@ free_tsc_box(tsc_box_t b)
 }
 
 static inline size_t
-tsc_box_nticks(tsc_box_t UNUSED(b))
+tsc_box_maxticks(tsc_box_t b)
 {
-	return TSC_BOX_SZ / sizeof(struct sl1t_s);
+	/* either 254 ticks or 127 candles */
+	return TSC_BOX_SZ / sizeof(*b->sl1t) - (b->sl1t - (sl1t_t)b);
 }
 
-static time32_t
-tsc_box_frstts(tsc_box_t b)
+static inline size_t
+tsc_box_nticks(tsc_box_t b)
 {
-	return sl1t_stmp_sec((void*)b);
+	return b->nt;
 }
 
-static time32_t
-tsc_box_lastts(tsc_box_t b)
+static inline __attribute__((unused)) time32_t
+tsc_box_beg(tsc_box_t b)
 {
-	sl1t_t ar = (void*)b;
-	size_t max = tsc_box_nticks(b);
+	return b->beg;
+}
 
-	if (sl1t_stmp_sec(ar + max - 1)) {
-		return sl1t_stmp_sec(ar + max - 1);
-	} else if (sl1t_stmp_sec(ar + (max / 2) - 1)) {
-		for (index_t i = max / 2; i < max; i++) {
-			if (!sl1t_stmp_sec(ar + i)) {
-				return sl1t_stmp_sec(ar + i - 1);
-			}
-		}
-	} else {
-		for (index_t i = 1; i < max / 2; i++) {
-			if (!sl1t_stmp_sec(ar + i)) {
-				return sl1t_stmp_sec(ar + i - 1);
-			}
-		}
+static inline time32_t
+tsc_box_end(tsc_box_t b)
+{
+	if (b->end) {
+		return b->end;
 	}
-	/* not reached */
-	return 0;
+	/* grrr, look at the last index */
+#if 0
+	switch (b->pad) {
+	case 1:
+		/* sl1t */
+		return b->end = sl1t_stmp_sec(&b->sl1t[b->nt - 1]);
+	case 2:
+		/* scdl */
+		return b->end = scdl_stmp_sec(&b->scdl[b->nt - 1]);
+	default:
+		/* bullshit */
+		return 0;
+	}
+#else
+	return b->end = sl1t_stmp_sec(&b->sl1t[(b->nt - 1) * b->pad]);
+#endif
 }
 
 static sl1t_t
-tsc_box_find_best_before(tsc_box_t b, time32_t ts)
+tsc_box_find_bb(tsc_box_t b, time32_t ts)
 {
-	sl1t_t ar = (void*)b;
-	index_t i, hi = tsc_box_nticks(b), lo = 0;
-	int fiddle = (scom_thdr_linked((const void*)(ar))) ? 2 : 1;
+	sl1t_t ar = b->sl1t;
+	int fiddle = b->pad;
+	index_t i, hi = tsc_box_nticks(b) * fiddle, lo = 0;
 
 	do {
 		i = (hi + lo) / 2 & -fiddle;
-		if (hi == lo) {
-			return NULL;
-		} else if (sl1t_stmp_sec(ar + i) <= ts &&
-			   sl1t_stmp_sec(ar + i + fiddle) > ts) {
+		//fprintf(stderr, "%zu %zu %zu %u\n", i, lo, hi, sl1t_stmp_sec(ar + i));
+		if (sl1t_stmp_sec(ar + i) <= ts &&
+		    sl1t_stmp_sec(ar + i + fiddle) > ts) {
 			return ar + i;
+		} else if (hi == lo) {
+			return NULL;
 		} else if (sl1t_stmp_sec(ar + i) > ts) {
 			/* prefer lower half */
 			hi = i - fiddle;
@@ -472,9 +473,15 @@ last_monday_midnight(time32_t ts)
 }
 
 static __attribute__((unused)) time32_t
-todays_latenight(time32_t ts)
+today_midnight(time32_t ts)
 {
-	return ts - (ts % 86400) + 86399;
+	return ts - (ts % 86400);
+}
+
+static __attribute__((unused)) time32_t
+today_latenight(time32_t ts)
+{
+	return today_midnight(ts) + 86399;
 }
 
 #define utsc		UNUSED(tsc)
@@ -486,48 +493,49 @@ bother_cube(sl1t_t tgt, size_t utsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 /* sig subject to change */
 	size_t res = 0;
 	tsc_box_t box;
+	sl1t_t bb;
 
 	/* bother the interval trees first */
 	assert(kv->intv != NULL);
-	if ((box = tsc_itr_find(kv->intv, key->beg))) {
-		sl1t_t bb;
-	hmpf:
-		fprintf(stderr, "cached %p\n", box);
-		/* yummy NULL pointer dereferencing */
-		if ((bb = tsc_box_find_best_before(box, key->beg))) {
-			res = (scom_thdr_linked((const void*)(bb))) ? 2 : 1;
-			memcpy(tgt, bb, sizeof(*tgt) * res);
-		} else {
-			res = 0;
-		}
 
-	} else if (kv->ce->ops && kv->ce->ops->fetch_cb) {
-		time32_t beg = key->beg - key->beg % 86400;
+	if ((box = tsc_itr_find(kv->intv, key->beg)) == NULL &&
+	    kv->ce->ops && kv->ce->ops->fetch_cb != NULL) {
+		time32_t beg = today_midnight(key->beg);
 		//time32_t beg = todays_latenight(key->beg);
 		//time32_t beg = last_monday_midnight(key->beg);
+		/* open end */
 		time32_t end = 0x7fffffff;
 
 		fprintf(stderr, "uncached\n");
 		box = make_tsc_box();
 		res = kv->ce->ops->fetch_cb(
-			box, tsc_box_nticks(box),
+			box, tsc_box_maxticks(box),
 			kv->ce->key, kv->ce->uval,
 			/* check if it's eligible to actually go back to
 			 * the monday before!!! */
 			beg, end);
 
-		if (res == 0) {
-			/* what a waste of time */
-			free_tsc_box(box);
-		} else {
-			beg = tsc_box_frstts(box);
-			end = tsc_box_lastts(box);
+		if (LIKELY(res != 0)) {
+			end = tsc_box_end(box);
 			/* add the box to our interval tree */
 			tsc_itr_add(kv->intv, beg, end, box);
-			/* try and find the tick again */
-			goto hmpf;
+
+		} else {
+			/* what a waste of time */
+			free_tsc_box(box);
+			box = NULL;
 		}
 	}
+
+	if (UNLIKELY(box == NULL ||
+		     (bb = tsc_box_find_bb(box, key->beg)) == NULL)) {
+		fprintf(stderr, "no way of fetching %i\n", key->beg);
+		return 0;
+	}
+
+	fprintf(stderr, "cached %p\n", box);
+	res = box->pad;
+	memcpy(tgt, bb, sizeof(*tgt) * res);
 	return res;
 }
 

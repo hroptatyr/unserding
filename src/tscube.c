@@ -154,7 +154,7 @@ tsc_box_end(tsc_box_t b)
 		return b->end;
 	}
 	/* grrr, look at the last index */
-#if 0
+#if defined CUBE_ENTRY_PER_TTF
 	switch (b->pad) {
 	case 1:
 		/* sl1t */
@@ -166,9 +166,9 @@ tsc_box_end(tsc_box_t b)
 		/* bullshit */
 		return 0;
 	}
-#else
+#else  /* !CUBE_ENTRY_PER_TTF */
 	return b->end = sl1t_stmp_sec(&b->sl1t[(b->nt - 1) * b->pad]);
-#endif
+#endif	/* CUBE_ENTRY_PER_TTF */
 }
 
 static sl1t_t
@@ -206,7 +206,13 @@ __key_equal_p(tsc_key_t id1, tsc_key_t id2)
 		id1->beg == id2->beg &&
 		id1->end == id2->end &&
 		id1->secu.mux == id2->secu.mux &&
-		id1->ttf == id2->ttf;
+#if defined CUBE_ENTRY_PER_TTF
+/* try ttf-less approach */
+		id1->ttf == id2->ttf
+#else  /* !CUBE_ENTRY_PER_TTF */
+		true
+#endif	/* CUBE_ENTRY_PER_TTF */
+		;
 }
 
 static inline bool
@@ -414,9 +420,15 @@ __key_matches_p(tsc_key_t matchee, tsc_key_t matcher)
 	if ((matcher->msk & 8) == 0) {
 		/* bingo, user doesnt care */
 		;
+#if defined CUBE_ENTRY_PER_TTF
 	} else if (matchee->ttf != matcher->ttf) {
 		/* ttf's do not match */
 		return false;
+#else  /* !CUBE_ENTRY_PER_TTF */
+	} else if ((matchee->ttf & matcher->ttf) == 0) {
+		/* ttf's do not match */
+		return false;
+#endif	/* CUBE_ENTRY_PER_TTF */
 	}
 
 	if ((matcher->msk & 4) == 0) {
@@ -506,7 +518,8 @@ bother_cube(sl1t_t tgt, size_t utsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 		/* open end */
 		time32_t end = 0x7fffffff;
 
-		fprintf(stderr, "uncached\n");
+		size_t mt = tsc_box_maxticks(box);
+		fprintf(stderr, "uncached %zu\n", mt);
 		box = make_tsc_box();
 		res = kv->ce->ops->fetch_cb(
 			box, tsc_box_maxticks(box),

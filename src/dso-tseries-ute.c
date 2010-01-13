@@ -100,6 +100,16 @@ find_idx_secu(ute_ctx_t ctx, uint16_t idx)
 	return fhdr->sec[idx];
 }
 
+static bool
+ttf_coincide_p(uint16_t tick_ttf, uint16_t blst_ttf)
+{
+#if defined CUBE_ENTRY_PER_TTF
+	return (tick_ttf & 0x0f) == blst_ttf;
+#else  /* !CUBE_ENTRY_PER_TTF */
+	return (1 << (tick_ttf & 0x0f)) & blst_ttf;
+#endif	/* CUBE_ENTRY_PER_TTF */
+}
+
 static __attribute__((unused)) const_sl1t_t
 __find_bb(const_sl1t_t t, size_t nt, time32_t ts)
 {
@@ -143,7 +153,7 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	UD_DEBUG("fetching %hu msk %x\n", ttf, tbl->ttfbs[idx]);
 	if (UNLIKELY(tbl == NULL)) {
 		return 0;
-	} else if (!(tbl->ttfbs[idx] & (1 << (ttf & 0x0f)))) {
+	} else if (!(tbl->ttfbs[idx] & ttf)) {
 		return 0;
 	}
 
@@ -159,10 +169,13 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	fiddle = scom_thdr_linked((const void*)(t)) ? 2 : 1;
 	/* look for the last tick of IDX and tick type TTF before TS */
 	for (res = NULL, tmp = t; tmp < t + nt - fiddle; tmp += fiddle) {
-		if (sl1t_stmp_sec(tmp) > ts) {
+		time32_t tkts = sl1t_stmp_sec(tmp);
+		uint16_t tkttf = sl1t_ttf(tmp);
+		uint16_t tkidx = sl1t_tblidx(tmp);
+
+		if (tkts > ts) {
 			break;
-		}
-		if (sl1t_tblidx(tmp) == idx && sl1t_ttf(tmp) == ttf) {
+		} else if (tkidx == idx && ttf_coincide_p(tkttf, ttf)) {
 			res = tmp;
 		}
 	}
@@ -212,7 +225,7 @@ fetch_tick(
 			/* dont know if this is a good idea */
 			tgt->end = tkts - 1;
 			break;
-		} else if (tkidx == idx && tkttf == k->ttf) {
+		} else if (tkidx == idx && ttf_coincide_p(tkttf, k->ttf)) {
 			/* not thread-safe */
 #if 0
 			switch (tgt->pad) {
@@ -278,7 +291,7 @@ fill_cube_cb(uint16_t UNUSED(idx), su_secu_t sec, void *clo)
 		.key = {{
 				.beg = 915148800,
 				.end = 0x7fffffff,
-				.ttf = SL1T_TTF_FIX,
+				.ttf = 1 << SL1T_TTF_FIX,
 				.msk = 1 | 2 | 4 | 8 | 16,
 				.secu = sec,
 			}},
@@ -293,7 +306,7 @@ fill_cube_cb(uint16_t UNUSED(idx), su_secu_t sec, void *clo)
 static void
 fill_cube_by_bl_ttf(tscube_t c, tblister_t bl, ute_ctx_t ctx, uint16_t idx)
 {
-	uint64_t bs = bl->ttfbs[idx] >> 1;
+	uint64_t bs = bl->ttfbs[idx];
 	struct tsc_ce_s ce;
 
 	if (bs == 0) {
@@ -306,6 +319,8 @@ fill_cube_by_bl_ttf(tscube_t c, tblister_t bl, ute_ctx_t ctx, uint16_t idx)
 	ce.key->secu = find_idx_secu(ctx, idx);
 	ce.ops = ute_ops;
 	ce.uval = ctx;
+#if defined CUBE_ENTRY_PER_TTF
+	bs >>= 1;
 	/* go over all the tick types in the bitset BS */
 	for (int j = 1; j < SL1T_TTF_VOL; j++, bs >>= 1) {
 		if (bs & 1) {
@@ -314,6 +329,11 @@ fill_cube_by_bl_ttf(tscube_t c, tblister_t bl, ute_ctx_t ctx, uint16_t idx)
 			tsc_add(c, &ce);
 		}
 	}
+#else  /* !CUBE_ENTRY_PER_TTF */
+/* try a ttf-less approach */
+	ce.key->ttf = bs;
+	tsc_add(c, &ce);
+#endif	/* CUBE_ENTRY_PER_TTF */
 	return;
 }
 

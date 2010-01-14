@@ -278,13 +278,6 @@ __tbs_has_p(tbs_t tbs, uint16_t ttf)
 
 
 static void
-__bang(oadt_ctx_t octx, tser_pkt_t pkt, uint8_t idx)
-{
-	udpc_seria_add_sl1t(octx->sctx, &pkt->t[idx]);
-	return;
-}
-
-static void
 __bang_nexist(oadt_ctx_t octx, time32_t refts, uint16_t ttf)
 {
 	struct sl1t_s tgt[1];
@@ -366,22 +359,28 @@ proc_one(oadt_ctx_t octx, time32_t ts)
 		/* make sure we let the system know what we want */
 		.msk = 1 | 2 | 4,
 	};
-	struct tser_pkt_s pkt[1];
+	struct sl1t_s t[16];
 	size_t ntk;
+	time32_t last_seen;
 
-	ntk = tsc_find1(pkt->t, countof(pkt->t), gcube, &k);
+	ntk = tsc_find1(t, countof(t), gcube, &k);
 	UD_DEBUG("found %zu for secu %s\n", ntk, secbugger(octx->secu));
 	if (ntk == 0) {
 		return;
 	}
 	/* assume ascending order */
 	for (index_t i = 0; i < ntk; i++) {
-		__bang(octx, pkt, i);
+		last_seen = sl1t_stmp_sec(t + i);
+		if (!scom_thdr_linked((const void*)(t + i))) {
+			udpc_seria_add_sl1t(octx->sctx, t + i);
+		} else {
+			udpc_seria_add_scdl(octx->sctx, (const void*)(t + i++));
+		}
 	}
 	/* now if the last tick is not exactly our timestamp,
 	 * issue a nexist as well */
-	if (sl1t_stmp_sec(&pkt->t[ntk - 1]) < ts) {
-		__bang_nexist(octx, ts, sl1t_ttf(&pkt->t[ntk - 1]));
+	if (last_seen < ts) {
+		__bang_nexist(octx, ts, SL1T_TTF_UNK);
 	}
 	return;
 }

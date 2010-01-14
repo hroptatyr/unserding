@@ -203,11 +203,7 @@ udpc_seria_des_tbs(udpc_seria_t sctx)
 static inline void
 udpc_seria_add_sl1t(udpc_seria_t sctx, const_sl1t_t t)
 {
-	if (!scom_thdr_linked((const void*)t)) {
-		udpc_seria_add_data(sctx, t, sizeof(*t));
-	} else {
-		udpc_seria_add_data(sctx, t, sizeof(struct scdl_s));
-	}
+	udpc_seria_add_data(sctx, t, sizeof(*t));
 	return;
 }
 
@@ -216,6 +212,20 @@ udpc_seria_des_sl1t(sl1t_t t, udpc_seria_t sctx)
 {
 	/* have to use a bigger size here */
 	return udpc_seria_des_data_into(t, sizeof(struct scdl_s), sctx) > 0;
+}
+
+static inline void
+udpc_seria_add_scdl(udpc_seria_t sctx, const_scdl_t t)
+{
+	udpc_seria_add_data(sctx, t, sizeof(*t));
+	return;
+}
+
+static inline bool
+udpc_seria_des_scdl(scdl_t t, udpc_seria_t sctx)
+{
+	/* have to use a bigger size here */
+	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
 }
 
 /* Attention, a tseries_t object gets transferred as tslab_t,

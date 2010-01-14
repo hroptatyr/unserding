@@ -171,7 +171,7 @@ tsc_box_end(tsc_box_t b)
 #endif	/* CUBE_ENTRY_PER_TTF */
 }
 
-static sl1t_t
+static __attribute__((unused)) sl1t_t
 tsc_box_find_bb(tsc_box_t b, time32_t ts)
 {
 	sl1t_t ar = b->sl1t;
@@ -195,6 +195,50 @@ tsc_box_find_bb(tsc_box_t b, time32_t ts)
 		}
 	} while (true);
 	/* not reached */
+}
+
+static inline bool
+ttf_coincide_p(uint16_t tick_ttf, tsc_key_t key)
+{
+#if defined CUBE_ENTRY_PER_TTF
+	return (tick_ttf & 0x0f) == key->ttf;
+#else  /* !CUBE_ENTRY_PER_TTF */
+	return (1 << (tick_ttf & 0x0f)) & key->ttf || (key->msk & 8) == 0;
+#endif	/* CUBE_ENTRY_PER_TTF */
+}
+
+static size_t
+tsc_box_find_bbs(sl1t_t tgt, size_t tsz, tsc_box_t b, tsc_key_t key)
+{
+	/* to store the last seen ticks of each tick type 0 to 7 */
+	const_sl1t_t lst[8] = {0};
+	size_t res = 0;
+	const_sl1t_t lim, t;
+
+	if (b == NULL) {
+		return 0;
+	}
+
+	/* sequential scan */
+	lim = b->sl1t + b->nt * b->pad;
+	for (t = b->sl1t; t < lim && sl1t_stmp_sec(t) <= key->beg; ) {
+		uint16_t tkttf = sl1t_ttf(t);
+		/* keep track */
+		fprintf(stderr, "key->msk %hx key->ttf %hx tkttf %hx\n",
+			key->msk, key->ttf, tkttf);
+		if (ttf_coincide_p(tkttf, key)) {
+			lst[(tkttf & 0x0f)] = t;
+		}
+		t += b->pad;
+	}
+	for (int i = 0; i < countof(lst) && res < tsz; i++) {
+		if (lst[i]) {
+			memcpy(tgt, lst[i], b->pad * sizeof(*b->sl1t));
+			res += b->pad;
+			tgt += b->pad;
+		}
+	}
+	return res;
 }
 
 
@@ -500,12 +544,11 @@ today_latenight(time32_t ts)
 #define utsz		UNUSED(tsz)
 
 static size_t
-bother_cube(sl1t_t tgt, size_t utsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
+bother_cube(sl1t_t tgt, size_t tsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 {
 /* sig subject to change */
 	size_t res = 0;
 	tsc_box_t box;
-	sl1t_t bb;
 
 	/* bother the interval trees first */
 	assert(kv->intv != NULL);
@@ -539,17 +582,8 @@ bother_cube(sl1t_t tgt, size_t utsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 			box = NULL;
 		}
 	}
-
-	if (UNLIKELY(box == NULL ||
-		     (bb = tsc_box_find_bb(box, key->beg)) == NULL)) {
-		fprintf(stderr, "no way of fetching %i\n", key->beg);
-		return 0;
-	}
-
-	fprintf(stderr, "cached %p\n", box);
-	res = box->pad;
-	memcpy(tgt, bb, sizeof(*tgt) * res);
-	return res;
+	/* just let the box do the work */
+	return tsc_box_find_bbs(tgt, tsz, box, key);
 }
 
 size_t

@@ -45,6 +45,9 @@
 #include <sushi/scdl.h>
 #include "ud-time.h"
 
+/* tuning */
+#undef CUBE_ENTRY_PER_TTF
+
 typedef void *tscube_t;
 
 /** Cube entry keys. */
@@ -137,8 +140,5 @@ extern size_t tsc_find1(sl1t_t tgt, size_t tsz, tscube_t c, tsc_key_t key);
 /* nother quick hack, used to traverse over all cube entries in TSC based
  * on a query KEY, calling CB with the ce and CLO for each match. */
 extern void tsc_trav(tscube_t tsc, tsc_key_t key, tsc_trav_f cb, void *clo);
-
-/* tuning */
-#undef CUBE_ENTRY_PER_TTF
 
 #endif	/* !INCLUDED_tscube_h_ */

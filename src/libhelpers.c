@@ -393,7 +393,8 @@ struct ftbi_ctx_s {
 	uint8_t rcvd;
 	ud_convo_t cno;
 	char buf[UDPC_PKTLEN];
-	struct sl1t_s sl1t[1];
+	/* leave a bit of space here */
+	struct sl1t_s sl1t[4];
 	struct udpc_seria_s sctx[1];
 	su_secu_t secu;
 	tbs_t tbs;

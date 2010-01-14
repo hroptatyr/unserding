@@ -110,45 +110,47 @@ ttf_coincide_p(uint16_t tick_ttf, uint16_t blst_ttf)
 #endif	/* CUBE_ENTRY_PER_TTF */
 }
 
-static __attribute__((unused)) const_sl1t_t
-__find_bb(const_sl1t_t t, size_t nt, time32_t ts)
+static const_sl1t_t
+__find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
 {
-	/* assume ascending order and that once linked mode is used, it's
-	 * always used throughout the blister */
-	index_t i, hi = nt, lo = 0;
-	int fiddle = (scom_thdr_linked((const void*)(t))) ? 2 : 1;
+	time32_t ts = scom_thdr_sec(key);
+	uint16_t idx = scom_thdr_tblidx(key);
+	uint16_t ttf = scom_thdr_ttf(key);
+	/* to store the last seen ticks of each tick type 0 to 7 */
+	const_sl1t_t lst[8] = {0};
+	const_sl1t_t res;
 
-	do {
-		/* make sure i is even to cope with candles */
-		i = ((hi + lo) / 2 & -fiddle);
+	for (const_sl1t_t tmp = t; tmp < t + nt && sl1t_stmp_sec(tmp) <= ts; ) {
+		uint16_t tkttf = sl1t_ttf(tmp);
+		uint16_t tkidx = sl1t_tblidx(tmp);
 
-		if (sl1t_stmp_sec(t + i) <= ts &&
-		    sl1t_stmp_sec(t + i + fiddle) > ts) {
-			/* was: return ar + i; so i points to the right index */
-			return t + i;
-		} else if (sl1t_stmp_sec(t + i) > ts) {
-			/* prefer lower half */
-			hi = i - fiddle;
-		} else {
-			/* strictly less, prefer upper half */
-			lo = i + fiddle;
+		if (tkidx == idx && ttf_coincide_p(tkttf, ttf)) {
+			/* keep track */
+			lst[(tkttf & 0x0f)] = tmp;
 		}
-	} while (true);
-	/* not reached */
+		tmp += scom_thdr_linked((const void*)(tmp)) ? 2 : 1;
+	}
+	/* find the minimum stamp out of the remaining ones */
+	res = NULL;
+	for (int i = 0; i < countof(lst); i++) {
+		if ((volatile void*)(lst[i] - 1) < (volatile void*)(res - 1)) {
+			res = lst[i];
+		}
+	}
+	return res;
 }
 
 /* belongs in uteseries.c? */
 static size_t
 __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 {
-	const_scom_thdr_t scsrc = (const void*)src;
-	time32_t ts = scom_thdr_sec(scsrc);
-	uint16_t idx = scom_thdr_tblidx(scsrc);
-	uint16_t ttf = scom_thdr_ttf(scsrc);
+	const_scom_thdr_t key = (const void*)src;
+	time32_t ts = scom_thdr_sec(key);
+	uint16_t idx = scom_thdr_tblidx(key);
+	uint16_t ttf = scom_thdr_ttf(key);
 	tblister_t tbl = __find_blister_by_ts(ctx->tbl, ts);
 	size_t nt;
-	const_sl1t_t t, res, tmp;
-	int fiddle;
+	const_sl1t_t t;
 
 	UD_DEBUG("fetching %hu msk %x\n", ttf, tbl->ttfbs[idx]);
 	if (UNLIKELY(tbl == NULL)) {
@@ -158,30 +160,11 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	}
 
 	UD_DEBUG("fetching %u to %u for %i\n", tbl->btk, tbl->etk, ts);
-#if 0
-	/* this will give us a tick that is before the tick in question */
-	if ((res = __find_bb(t, nt, ts)) == NULL) {
-		return 0;
-	}
-#elif 1
 	/* get the corresponding tick block */
 	nt = sl1t_fio_read_ticks(ctx->fio, &t, tbl->btk, tbl->etk);
-	fiddle = scom_thdr_linked((const void*)(t)) ? 2 : 1;
-	/* look for the last tick of IDX and tick type TTF before TS */
-	for (res = NULL, tmp = t; tmp < t + nt - fiddle; tmp += fiddle) {
-		time32_t tkts = sl1t_stmp_sec(tmp);
-		uint16_t tkttf = sl1t_ttf(tmp);
-		uint16_t tkidx = sl1t_tblidx(tmp);
-
-		if (tkts > ts) {
-			break;
-		} else if (tkidx == idx && ttf_coincide_p(tkttf, ttf)) {
-			res = tmp;
-		}
-	}
-#endif
-	*tgt = res;
-	return res ? t + nt - res : 0;
+	/* this will give us a tick which is before the tick in question */
+	*tgt = __find_bb(t, nt, key);
+	return *tgt ? t + nt - *tgt : 0;
 }
 
 static size_t

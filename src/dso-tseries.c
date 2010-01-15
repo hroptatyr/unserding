@@ -408,7 +408,7 @@ instr_tick_by_instr_svc(job_t j)
 {
 	struct udpc_seria_s sctx[1];
 	struct udpc_seria_s rplsctx[1];
-	struct oadt_ctx_s oadtctx[1];
+	struct oadt_ctx_s octx[1];
 	struct job_s rplj;
 	/* in args */
 	su_secu_t sec;
@@ -423,24 +423,24 @@ instr_tick_by_instr_svc(job_t j)
 	sec = udpc_seria_des_secu(sctx);
 	tbs = udpc_seria_des_tbs(sctx);
 	/* get all the timestamps */
-	if ((nfilt = snarf_times(sctx, oadtctx->filt, NFILT)) == 0) {
+	if ((nfilt = snarf_times(sctx, octx->filt, NFILT)) == 0) {
 		return;
 	}
 	UD_DEBUG("0x%04x (UD_SVC_TICK_BY_INSTR): %s for %u stamps, %x mask\n",
 		 UD_SVC_TICK_BY_INSTR, secbugger(sec), nfilt, tbs);
 
 	/* initialise our context */
-	oadtctx->sctx = rplsctx;
-	oadtctx->secu = sec;
-	oadtctx->nfilt = nfilt;
-	oadtctx->tbs = tbs;
+	octx->sctx = rplsctx;
+	octx->secu = sec;
+	octx->nfilt = nfilt;
+	octx->tbs = tbs;
 
 	for (index_t i = 0; moarp;) {
 		/* prepare the reply packet ... */
 		copy_pkt(&rplj, j);
 		clear_pkt(rplsctx, &rplj);
 		/* process some time stamps, this fills the packet */
-		moarp = (i = proc_some(oadtctx, i)) < oadtctx->nfilt;
+		moarp = (i = proc_some(octx, i)) < octx->nfilt;
 		/* send what we've got so far */
 		send_pkt(rplsctx, &rplj);
 	} while (moarp);

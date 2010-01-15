@@ -131,9 +131,8 @@ get_m30(const char *s)
 
 
 struct qrclo_s {
-	uint32_t cnt;
-	uint32_t max;
 	tsc_box_t box;
+	uint32_t max;
 };
 
 static void
@@ -141,21 +140,19 @@ qry_rowf(void **row, size_t nflds, void *clo)
 {
 	struct qrclo_s *qrclo = clo;
 	time_t ts = parse_time(row[0]);
-	uint32_t cnt;
+	uint32_t cnt = qrclo->box->nt;
 
-	if (UNLIKELY(qrclo->cnt >= qrclo->max)) {
+	if (UNLIKELY(cnt >= qrclo->max)) {
 		/* stop caching */
 		return;
 	}
-	cnt = qrclo->cnt++;
 	/* brilliantly hard-coded bollocks */
 	if (nflds == 2 || nflds == 3) {
 		m30_t p = get_m30(row[1]);
 		m30_t q = nflds == 3 ? get_m30(row[2]) : ffff_m30_get_ui32(0);
-		scom_thdr_t th = (void*)(qrclo->box + cnt);
+		sl1t_t tv = qrclo->box->sl1t + cnt;
+		scom_thdr_t th = (void*)tv;
 
-		UD_DEBUG("putting %s %2.4f into slot %u\n",
-			 (char*)row[0], ffff_m30_d(p), cnt);
 		/* bang bang */
 		scom_thdr_set_sec(th, ts);
 		scom_thdr_set_msec(th, 0);
@@ -163,6 +160,7 @@ qry_rowf(void **row, size_t nflds, void *clo)
 		scom_thdr_set_tblidx(th, 0);
 		qrclo->box->sl1t[cnt].v[0] = ffff_m30_ui32(p);
 		qrclo->box->sl1t[cnt].v[1] = ffff_m30_ui32(q);
+		qrclo->box->nt += (qrclo->box->pad = 1);
 
 	} else {
 		abort();
@@ -300,10 +298,9 @@ fetch_tick(
 	UD_DEBUG_SQL("querying: %s\n", qry);
 	qrclo->box = tgt;
 	qrclo->max = tsz;
-	qrclo->cnt = 0;
 	nres = uddb_qry(conn, qry, len, qry_rowf, qrclo);
-	UD_DEBUG("got %u/%zu prices\n", qrclo->cnt, nres);
-	return qrclo->cnt;
+	UD_DEBUG("got %u/%zu prices\n", qrclo->box->nt, nres);
+	return qrclo->box->nt;
 }
 
 

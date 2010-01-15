@@ -224,8 +224,6 @@ tsc_box_find_bbs(sl1t_t tgt, size_t tsz, tsc_box_t b, tsc_key_t key)
 	for (t = b->sl1t; t < lim && sl1t_stmp_sec(t) <= key->beg; ) {
 		uint16_t tkttf = sl1t_ttf(t);
 		/* keep track */
-		fprintf(stderr, "key->msk %hx key->ttf %hx tkttf %hx\n",
-			key->msk, key->ttf, tkttf);
 		if (ttf_coincide_p(tkttf, key)) {
 			lst[(tkttf & 0x0f)] = t;
 		}

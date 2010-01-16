@@ -210,21 +210,8 @@ fetch_tick(
 			break;
 		} else if (tkidx == idx && ttf_coincide_p(tkttf, k->ttf)) {
 			/* not thread-safe */
-#if 0
-			switch (tgt->pad) {
-			case 1:
-				tgt->sl1t[res] = t[0][i];
-				break;
-			case 2:
-				tgt->scdl[res] = *(const_scdl_t)(&t[0][i]);
-				break;
-			default:
-				break;
-			}
-#else
 			memcpy(&tgt->sl1t[res * tgt->pad], &t[0][i],
 			       sizeof(struct sl1t_s) * tgt->pad);
-#endif
 			res++;
 		}
 	}
@@ -257,34 +244,6 @@ static struct tsc_ops_s ute_ops[1] = {{
 		.fetch_cb = fetch_tick,
 		.urn_refetch_cb = fetch_urn,
 	}};
-
-struct cb_clo_s {
-	tscube_t c;
-	ute_ctx_t ctx;
-};
-
-static void
-fill_cube_cb(uint16_t UNUSED(idx), su_secu_t sec, void *clo)
-{
-/* hardcoded as fuck */
-	struct cb_clo_s *fcclo = clo;
-	tscube_t c = fcclo->c;
-	ute_ctx_t ctx = fcclo->ctx;
-	struct tsc_ce_s ce = {
-		.key = {{
-				.beg = 915148800,
-				.end = 0x7fffffff,
-				.ttf = 1 << SL1T_TTF_FIX,
-				.msk = 1 | 2 | 4 | 8 | 16,
-				.secu = sec,
-			}},
-		.ops = ute_ops,
-	};
-
-	ce.uval = ctx;
-	tsc_add(c, &ce);
-	return;
-}
 
 static void
 fill_cube_by_bl_ttf(tscube_t c, tblister_t bl, ute_ctx_t ctx, uint16_t idx)
@@ -340,19 +299,21 @@ static const char my_hardcoded_file2[] =
 void
 dso_tseries_ute_LTX_init(void *UNUSED(clo))
 {
-	struct cb_clo_s cbclo = {.c = gcube};
-
 	UD_DEBUG("mod/tseries-ute: loading ...");
-	my_ctx = open_ute_file(my_hardcoded_file);
-	ute_inspect(my_ctx);
-	cbclo.ctx = my_ctx;
-	sl1t_fio_trav_stbl(my_ctx->fio, fill_cube_cb, NULL, &cbclo);
+	if ((my_ctx = open_ute_file(my_hardcoded_file))) {
+		ute_inspect(my_ctx);
+		/* travel along the blister list and fill the cube */
+		for (tblister_t tmp = my_ctx->tbl; tmp; tmp = tmp->next) {
+			fill_cube_by_bl(gcube, tmp, my_ctx);
+		}
+	}		
 
-	my_ctx2 = open_ute_file(my_hardcoded_file2);
-	ute_inspect(my_ctx2);
-	/* travel along the blister list and fill the cube */
-	for (tblister_t tmp = my_ctx2->tbl; tmp; tmp = tmp->next) {
-		fill_cube_by_bl(gcube, tmp, my_ctx2);
+	if ((my_ctx2 = open_ute_file(my_hardcoded_file2))) {
+		ute_inspect(my_ctx2);
+		/* travel along the blister list and fill the cube */
+		for (tblister_t tmp = my_ctx2->tbl; tmp; tmp = tmp->next) {
+			fill_cube_by_bl(gcube, tmp, my_ctx2);
+		}
 	}
 	UD_DBGCONT("done\n");
 	return;

@@ -589,7 +589,7 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 {
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
-	size_t ntk = 0;
+	size_t res = 0;
 
 	/* filter out stupidity */
 	if (UNLIKELY(tsz == 0)) {
@@ -602,13 +602,15 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 		if (!__key_valid_p(m->tbl[i].ce->key)) {
 			continue;
 		} else if (__key_matches_p(m->tbl[i].ce->key, key)) {
+			size_t ntk;
 			ntk = bother_cube(tgt, tsz, tsc, key, &m->tbl[i]);
 			fprintf(stderr, "bothered cube, yielded %zu\n", ntk);
-			break;
+			tgt += ntk;
+			res += ntk;
 		}
 	}
 	pthread_mutex_unlock(&m->mtx);
-	return ntk;
+	return res;
 }
 
 void

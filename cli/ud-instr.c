@@ -99,6 +99,27 @@ pcb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 }
 
 static void
+cb(const void *d)
+{
+	const struct tsc_ce_s *ce = d;
+	su_secu_t s = ce->key->secu;
+	char los[32], his[32];
+	/* secu dismantling */
+	uint32_t qd = su_secu_quodi(s);
+	int32_t qt = su_secu_quoti(s);
+	uint16_t p = su_secu_pot(s);
+	/* ttf */
+	uint16_t ttf = ce->key->ttf;
+
+	/* debugging mumbo jumbo */
+	print_ts_into(los, sizeof(los), ce->key->beg);
+	print_ts_into(his, sizeof(his), ce->key->end);
+	fprintf(stdout, "  tslab %u/%i@%hu %hu %s..%s\n",
+		qd, qt, p, ttf, los, his);
+	return;
+}
+
+static void
 find_one_instr(ud_handle_t hdl, const char *uii)
 {
 	uint32_t cid;
@@ -122,25 +143,10 @@ find_one_instr(ud_handle_t hdl, const char *uii)
 	}
 	/* now use the gaii of the instr(s) fetched */
 	cid = instr_gaid(in);
-	if ((len = ud_find_one_tslab(hdl, &data, su_secu(cid, 0, 0))) > 0) {
-		/* data hereby points to a tseries object */
-		const struct tsc_ce_s *s = data;
-		char los[32], his[32];
-		/* secu dismantling */
-		uint32_t qd = su_secu_quodi(s->key->secu);
-		int32_t qt = su_secu_quoti(s->key->secu);
-		uint16_t p = su_secu_pot(s->key->secu);
-		/* ttf */
-		uint16_t ttf = s->key->ttf;
-
-		/* debugging mumbo jumbo */
-		print_ts_into(los, sizeof(los), s->key->beg);
-		print_ts_into(his, sizeof(his), s->key->end);
-		fprintf(stdout, "  tslab %u/%i@%hu %hu %s..%s\n",
-			qd, qt, p, ttf, los, his);
-	} else {
+	if (ud_find_tslabs(hdl, su_secu(cid, 0, 0), cb) == 0) {
 		fputs("  no tslabs yet\n", stdout);
 	}
+	return;
 }
 
 static void

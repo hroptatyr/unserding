@@ -186,29 +186,40 @@ struct f1tsl_clo_s {
 	ud_convo_t cno;
 	size_t len;
 	const void **tgt;
+	void(*cb)(const void *d);
 };
 
 static bool
 __f1tsl_cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 {
-	struct f1i_clo_s *bc = clo;
+	struct f1tsl_clo_s *bc = clo;
 	struct udpc_seria_s sctx;
+	const void *tgt[1];
 
 	if (UDPC_PKT_INVALID_P(pkt)) {
-		bc->len = 0;
+		/* finish the subscription */
 		return false;
 	} else if (udpc_pkt_cno(pkt) != bc->cno) {
 		/* we better ask for another packet */
-		bc->len = 0;
 		return true;
 	}
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	if ((bc->len = udpc_seria_des_data(&sctx, bc->tgt)) == 0) {
-		/* what? just wait a bit */
-		return true;
+	if (bc->cb == NULL) {
+		/* old behaviour, subject to disappear */
+		if ((bc->len = udpc_seria_des_data(&sctx, bc->tgt)) == 0) {
+			/* what? just wait a bit */
+			return true;
+		}
+		/* no more packets please */
+		return false;
 	}
-	/* no more packets please */
-	return false;
+	/* otherwise */
+	while (udpc_seria_des_data(&sctx, tgt)) {
+		/* tgt[0] should be cast to const struct tsc_ce_s* */
+		bc->cb(tgt[0]);
+		bc->len++;
+	}
+	return true;
 }
 
 size_t
@@ -218,7 +229,7 @@ ud_find_one_tslab(ud_handle_t hdl, const void **tgt, su_secu_t s)
 	char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = BUF_PACKET(buf);
 	ud_convo_t cno = hdl->convo++;
-	struct f1tsl_clo_s __f1t_clo;
+	struct f1tsl_clo_s __f1t_clo[1];
 
 	memset(buf, 0, sizeof(buf));
 	udpc_make_pkt(pkt, cno, 0, UD_SVC_GET_URN);
@@ -230,10 +241,37 @@ ud_find_one_tslab(ud_handle_t hdl, const void **tgt, su_secu_t s)
 	ud_send_raw(hdl, pkt);
 
 	/* use timeout of 0, letting the mart system decide */
-	__f1t_clo.cno = cno;
-	__f1t_clo.tgt = tgt;
-	ud_subscr_raw(hdl, 0, __f1tsl_cb, &__f1t_clo);
-	return __f1t_clo.len;
+	__f1t_clo->cno = cno;
+	__f1t_clo->tgt = tgt;
+	__f1t_clo->len = 0;
+	ud_subscr_raw(hdl, 0, __f1tsl_cb, __f1t_clo);
+	return __f1t_clo->len;
+}
+
+size_t
+ud_find_tslabs(ud_handle_t hdl, su_secu_t s, void(*cb)(const void*))
+{
+	struct udpc_seria_s sctx;
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = BUF_PACKET(buf);
+	ud_convo_t cno = hdl->convo++;
+	struct f1tsl_clo_s __f1t_clo[1];
+
+	memset(buf, 0, sizeof(buf));
+	udpc_make_pkt(pkt, cno, 0, UD_SVC_GET_URN);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	/* dispatch the secu */
+	udpc_seria_add_secu(&sctx, s);
+	/* prepare packet for sending im off */
+	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+	ud_send_raw(hdl, pkt);
+
+	/* use timeout of 0, letting the mart system decide */
+	__f1t_clo->cno = cno;
+	__f1t_clo->cb = cb;
+	__f1t_clo->len = 0;
+	ud_subscr_raw(hdl, 0, __f1tsl_cb, __f1t_clo);
+	return __f1t_clo->len;
 }
 
 

@@ -644,6 +644,11 @@ tsc_find(sl1t_t tgt, su_secu_t *sv, size_t tsz, tscube_t tsc, tsc_key_t key)
 		return 0;
 	}
 
+	if (key->secu.mux == 0) {
+		fprintf(stderr, "looking for 0-secu\n");
+		return 0;
+	}
+
 	pthread_mutex_lock(&m->mtx);
 	/* perform sequential scan */
 	for (uint32_t i = 0; i < m->alloc_sz; i++) {

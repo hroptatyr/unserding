@@ -213,16 +213,15 @@ ttf_coincide_p(uint16_t tick_ttf, tsc_key_t key)
 #endif	/* CUBE_ENTRY_PER_TTF */
 }
 
-static size_t
+static void
 tsc_box_find_bbs(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 {
 	/* to store the last seen ticks of each tick type 0 to 7 */
 	const_sl1t_t lst[8] = {0};
-	size_t res = 0;
 	const_sl1t_t lim, t;
 
 	if (b == NULL) {
-		return 0;
+		return;
 	}
 
 	/* sequential scan */
@@ -235,17 +234,16 @@ tsc_box_find_bbs(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 		}
 		t += b->pad;
 	}
-	for (int i = 0; i < countof(lst) && res < clo->tsz; i++) {
+	for (int i = 0; i < countof(lst) && clo->ntk < clo->tsz; i++) {
 		if (lst[i]) {
 			sl1t_t tgt = clo->tgt + clo->ntk;
 			uint16_t new_idx = __bbs_find_idx(clo, clo->s);
 			memcpy(tgt, lst[i], b->pad * sizeof(*b->sl1t));
 			scom_thdr_set_tblidx(tgt->hdr, new_idx);
-			res += b->pad;
+			clo->ntk += b->pad;
 		}
 	}
-	clo->ntk += res;
-	return res;
+	return;
 }
 
 
@@ -598,12 +596,12 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 {
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
-	size_t res = 0;
 	struct __bbs_s clo = {
 		.tgt = tgt,
 		.tsz = tsz,
 		.sv = NULL,
 		.si = 0,
+		.ntk = 0,
 	};
 
 	/* filter out stupidity */
@@ -620,12 +618,12 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 		} else if (__key_matches_p(ce->key, key)) {
 			tsc_box_t box;
 			box = bother_cube(tsc, key, &m->tbl[i]);
-			res = tsc_box_find_bbs(&clo, box, key);
+			tsc_box_find_bbs(&clo, box, key);
 			break;
 		}
 	}
 	pthread_mutex_unlock(&m->mtx);
-	return res;
+	return clo.ntk;
 }
 
 size_t

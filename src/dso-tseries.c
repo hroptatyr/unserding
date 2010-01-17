@@ -288,6 +288,7 @@ __bang_nexist(oadt_ctx_t octx, time32_t refts, uint16_t ttf)
 	scom_thdr_set_ttf(th, ttf);
 	scom_thdr_set_tblidx(th, 0);
 
+	udpc_seria_add_secu(octx->sctx, octx->secu);
 	udpc_seria_add_sl1t(octx->sctx, tgt);
 	return;
 }

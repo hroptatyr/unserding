@@ -239,7 +239,6 @@ tsc_box_find_bbs(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 		if (lst[i]) {
 			sl1t_t tgt = clo->tgt + clo->ntk;
 			uint16_t new_idx = __bbs_find_idx(clo, clo->s);
-			fprintf(stderr, "new_idx %hu\n", new_idx);
 			memcpy(tgt, lst[i], b->pad * sizeof(*b->sl1t));
 			scom_thdr_set_tblidx(tgt->hdr, new_idx);
 			res += b->pad;
@@ -622,7 +621,6 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 			tsc_box_t box;
 			box = bother_cube(tsc, key, &m->tbl[i]);
 			res = tsc_box_find_bbs(&clo, box, key);
-			fprintf(stderr, "bothered cube, yielded %zu\n", res);
 			break;
 		}
 	}

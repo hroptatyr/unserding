@@ -290,6 +290,7 @@ fill_cube_by_bl(tscube_t c, tblister_t bl, ute_ctx_t ctx)
 
 
 #include <fts.h>
+#include <fnmatch.h>
 
 /* soft-code me */
 static char ute_dir[] = "/home/freundt/.unserding/";
@@ -298,6 +299,41 @@ static char *const ute_dirs[] = {ute_dir, NULL};
 
 static size_t nf;
 static ute_ctx_t all[1024];
+
+static bool
+ute_file_p(const char *n)
+{
+/* only allow *.sl1t *.ssnp *.scdl and *.ute */
+	size_t nsz = strlen(n);
+	if (n[nsz - 4] == '.' &&
+	    n[nsz - 3] == 'u' &&
+	    n[nsz - 2] == 't' &&
+	    n[nsz - 1] == 'e') {
+		/* matched .ute */
+		return true;
+	} else if (n[nsz - 5] == '.' &&
+		   n[nsz - 4] == 's') {
+		if (n[nsz - 3] == 'l' &&
+		    n[nsz - 2] == '1' &&
+		    n[nsz - 1] == 't') {
+			/* matched .sl1t */
+			return true;
+		}
+		if (n[nsz - 3] == 's' &&
+		    n[nsz - 2] == 'n' &&
+		    n[nsz - 1] == 'p') {
+			/* matched .ssnp */
+			return true;
+		}
+		if (n[nsz - 3] == 'c' &&
+		    n[nsz - 2] == 'd' &&
+		    n[nsz - 1] == 'l') {
+			/* matched .scdl */
+			return true;
+		}
+	}
+	return false;
+}
 
 static void
 fetch_urn_ute(job_t UNUSED(j))
@@ -314,7 +350,8 @@ fetch_urn_ute(job_t UNUSED(j))
 
 	while ((ent = fts_read(fts)) != NULL) {
 		ute_ctx_t my_ctx;
-		if (ent->fts_info != FTS_F) {
+		if (ent->fts_info != FTS_F ||
+		    !ute_file_p(ent->fts_path)) {
 			continue;
 		}
 

@@ -62,8 +62,6 @@
 
 /* tseries stuff, to be replaced with ffff */
 #include "tscube.h"
-#include "tscache.h"
-#include "tscoll.h"
 #include "tseries.h"
 #include "tseries-private.h"
 

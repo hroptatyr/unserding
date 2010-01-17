@@ -58,8 +58,6 @@
 #include "ud-time.h"
 
 #include "urn.h"
-#include "tscache.h"
-#include "tscoll.h"
 #include "tseries-private.h"
 
 #if defined HAVE_MYSQL

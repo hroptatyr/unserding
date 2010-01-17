@@ -58,7 +58,7 @@ typedef struct frobq_s *frobq_t;
 typedef struct frobjob_s *frobjob_t;
 
 struct frobjob_s {
-	tseries_t tser;
+	tsc_box_t box;
 	dse16_t beg;
 	dse16_t end;
 };
@@ -129,9 +129,9 @@ frobq_deq(frobjob_t j, frobq_t q)
 }
 
 static bool
-frobq_enq(frobq_t q, tseries_t tser, dse16_t refds)
+frobq_enq(frobq_t q, tsc_box_t tbox, dse16_t refds)
 {
-	struct frobjob_s j = {.tser = tser, .beg = refds, .end = refds + 13};
+	struct frobjob_s j = {.box = tbox, .beg = refds, .end = refds + 13};
 
 	return fsarrpq_enq_ifnot(q->q, &j);
 }
@@ -182,10 +182,10 @@ frobnicate(void)
 	return;
 }
 
-void
-defer_frob(tseries_t tser, dse16_t refds, bool immediatep)
+static __attribute__((unused)) void
+defer_frob(tsc_box_t tbox, dse16_t refds, bool immediatep)
 {
-	frobq_enq(gfrobq, tser, refds);
+	frobq_enq(gfrobq, tbox, refds);
 	if (immediatep) {
 		frobnicate();
 	}

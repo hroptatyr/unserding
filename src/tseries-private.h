@@ -39,11 +39,6 @@
 #define INCLUDED_tseries_private_h_
 
 #include "tscube.h"
-#if !defined NO_LEGACY
-#include "tseries.h"
-#include "tscoll.h"
-#include "tscache.h"
-#endif
 
 extern tscube_t gcube;
 
@@ -62,26 +57,7 @@ extern void dso_tseries_ute_LTX_deinit(void*);
 
 
 /* frob queue mumbo jumbo */
-#if !defined NO_LEGACY
-extern void defer_frob(tseries_t tser, dse16_t refds, bool immediatep);
-#endif
 extern void frobnicate(void);
-
-
-#if !defined NO_LEGACY
-static inline uint8_t
-index_in_pkt(time_t ts)
-{
-/* find the index of the date encoded in dse inside a tick bouquet */
-	dse16_t dse = time_to_dse(ts);
-	dse16_t anchor = time_to_dse(442972800);
-	uint8_t res = (dse - anchor) % 14;
-	static uint8_t offs[14] = {
-		-1, 0, 1, 2, 3, 4, -1, -1, 5, 6, 7, 8, 9, -1
-	};
-	return offs[res];
-}
-#endif	/* !NO_LEGACY */
 
 
 /* hooks */

@@ -137,6 +137,11 @@ extern void tsc_add(tscube_t c, tsc_ce_t ce);
 /* quick hack, find the first entry in tsc that matches key */
 extern size_t tsc_find1(sl1t_t tgt, size_t tsz, tscube_t c, tsc_key_t key);
 
+/* quick hack, find all entries in tsc that matches key,
+ * sv should have TSZ entries */
+extern size_t
+tsc_find(sl1t_t tgt, su_secu_t *sv, size_t tsz, tscube_t c, tsc_key_t key);
+
 /* nother quick hack, used to traverse over all cube entries in TSC based
  * on a query KEY, calling CB with the ce and CLO for each match. */
 extern void tsc_trav(tscube_t tsc, tsc_key_t key, tsc_trav_f cb, void *clo);

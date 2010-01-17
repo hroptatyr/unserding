@@ -108,6 +108,16 @@ struct tscube_s {
 	 * exist given a time stamp or time range. */
 };
 
+typedef struct __bbs_s {
+	sl1t_t tgt;
+	size_t tsz;
+	su_secu_t *sv;
+	index_t si;
+	/* bit ugly but this slot holds the secu we're talking about */
+	su_secu_t s;
+	index_t ntk;
+} *__bbs_t;
+
 
 /* for one bunch of ticks */
 /* we'll just use the whole allocation for ticks */
@@ -135,7 +145,7 @@ tsc_box_maxticks(tsc_box_t b)
 	return TSC_BOX_SZ / sizeof(*b->sl1t) - (b->sl1t - (sl1t_t)b);
 }
 
-static inline size_t
+static inline __attribute__((unused)) size_t
 tsc_box_nticks(tsc_box_t b)
 {
 	return b->nt;
@@ -171,30 +181,26 @@ tsc_box_end(tsc_box_t b)
 #endif	/* CUBE_ENTRY_PER_TTF */
 }
 
-static __attribute__((unused)) sl1t_t
-tsc_box_find_bb(tsc_box_t b, time32_t ts)
+
+/* finders */
+static uint16_t
+__bbs_find_idx(__bbs_t clo, su_secu_t s)
 {
-	sl1t_t ar = b->sl1t;
-	int fiddle = b->pad;
-	index_t i, hi = tsc_box_nticks(b) * fiddle, lo = 0;
+/* behave a bit like the utehdr */
+	uint16_t i;
 
-	do {
-		i = (hi + lo) / 2 & -fiddle;
-		//fprintf(stderr, "%zu %zu %zu %u\n", i, lo, hi, sl1t_stmp_sec(ar + i));
-		if (sl1t_stmp_sec(ar + i) <= ts &&
-		    sl1t_stmp_sec(ar + i + fiddle) > ts) {
-			return ar + i;
-		} else if (hi == lo) {
-			return NULL;
-		} else if (sl1t_stmp_sec(ar + i) > ts) {
-			/* prefer lower half */
-			hi = i - fiddle;
-		} else {
-			/* strictly less, prefer upper half */
-			lo = i + fiddle;
+	if (clo->sv == NULL) {
+		return 0;
+	}
+	for (i = 0; i < clo->si; i++) {
+		if (clo->sv[i].mux == s.mux) {
+			return i;
 		}
-	} while (true);
-	/* not reached */
+	}
+	if (i < clo->tsz) {
+		clo->sv[clo->si++].mux = s.mux;
+	}
+	return i;
 }
 
 static inline bool
@@ -208,7 +214,7 @@ ttf_coincide_p(uint16_t tick_ttf, tsc_key_t key)
 }
 
 static size_t
-tsc_box_find_bbs(sl1t_t tgt, size_t tsz, tsc_box_t b, tsc_key_t key)
+tsc_box_find_bbs(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 {
 	/* to store the last seen ticks of each tick type 0 to 7 */
 	const_sl1t_t lst[8] = {0};
@@ -229,13 +235,17 @@ tsc_box_find_bbs(sl1t_t tgt, size_t tsz, tsc_box_t b, tsc_key_t key)
 		}
 		t += b->pad;
 	}
-	for (int i = 0; i < countof(lst) && res < tsz; i++) {
+	for (int i = 0; i < countof(lst) && res < clo->tsz; i++) {
 		if (lst[i]) {
+			sl1t_t tgt = clo->tgt + clo->ntk;
+			uint16_t new_idx = __bbs_find_idx(clo, clo->s);
+			fprintf(stderr, "new_idx %hu\n", new_idx);
 			memcpy(tgt, lst[i], b->pad * sizeof(*b->sl1t));
+			scom_thdr_set_tblidx(tgt->hdr, new_idx);
 			res += b->pad;
-			tgt += b->pad;
 		}
 	}
+	clo->ntk += res;
 	return res;
 }
 
@@ -541,8 +551,8 @@ today_latenight(time32_t ts)
 #define utsc		UNUSED(tsc)
 #define utsz		UNUSED(tsz)
 
-static size_t
-bother_cube(sl1t_t tgt, size_t tsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
+static tsc_box_t
+bother_cube(tscube_t utsc, tsc_key_t key, keyval_t kv)
 {
 /* sig subject to change */
 	size_t res = 0;
@@ -580,8 +590,8 @@ bother_cube(sl1t_t tgt, size_t tsz, tscube_t utsc, tsc_key_t key, keyval_t kv)
 			box = NULL;
 		}
 	}
-	/* just let the box do the work */
-	return tsc_box_find_bbs(tgt, tsz, box, key);
+	/* return to who called us, they'll sort the box out */
+	return box;
 }
 
 size_t
@@ -590,6 +600,12 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
 	size_t res = 0;
+	struct __bbs_s clo = {
+		.tgt = tgt,
+		.tsz = tsz,
+		.sv = NULL,
+		.si = 0,
+	};
 
 	/* filter out stupidity */
 	if (UNLIKELY(tsz == 0)) {
@@ -599,18 +615,55 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 	pthread_mutex_lock(&m->mtx);
 	/* perform sequential scan */
 	for (uint32_t i = 0; i < m->alloc_sz; i++) {
-		if (!__key_valid_p(m->tbl[i].ce->key)) {
+		tsc_ce_t ce = m->tbl[i].ce;
+		if (!__key_valid_p(ce->key)) {
 			continue;
-		} else if (__key_matches_p(m->tbl[i].ce->key, key)) {
-			size_t ntk;
-			ntk = bother_cube(tgt, tsz, tsc, key, &m->tbl[i]);
-			fprintf(stderr, "bothered cube, yielded %zu\n", ntk);
-			tgt += ntk;
-			res += ntk;
+		} else if (__key_matches_p(ce->key, key)) {
+			tsc_box_t box;
+			box = bother_cube(tsc, key, &m->tbl[i]);
+			res = tsc_box_find_bbs(&clo, box, key);
+			fprintf(stderr, "bothered cube, yielded %zu\n", res);
+			break;
 		}
 	}
 	pthread_mutex_unlock(&m->mtx);
 	return res;
+}
+
+size_t
+tsc_find(sl1t_t tgt, su_secu_t *sv, size_t tsz, tscube_t tsc, tsc_key_t key)
+{
+	__tscube_t c = tsc;
+	hmap_t m = c->hmap;
+	struct __bbs_s clo = {
+		.tgt = tgt,
+		.tsz = tsz,
+		.sv = sv,
+		.si = 0,
+		.ntk = 0,
+	};
+
+	/* filter out stupidity */
+	if (UNLIKELY(tsz == 0)) {
+		return 0;
+	}
+
+	pthread_mutex_lock(&m->mtx);
+	/* perform sequential scan */
+	for (uint32_t i = 0; i < m->alloc_sz; i++) {
+		tsc_ce_t ce = m->tbl[i].ce;
+		if (!__key_valid_p(ce->key)) {
+			continue;
+		} else if (__key_matches_p(ce->key, key)) {
+			tsc_box_t box;
+			box = bother_cube(tsc, key, &m->tbl[i]);
+			/* tell tsc_box bout our secu */
+			clo.s = ce->key->secu,
+			tsc_box_find_bbs(&clo, box, key);
+		}
+	}
+	pthread_mutex_unlock(&m->mtx);
+	return clo.ntk;
 }
 
 void

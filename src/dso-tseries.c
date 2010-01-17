@@ -360,21 +360,26 @@ proc_one(oadt_ctx_t octx, time32_t ts)
 		.msk = 1 | 2 | 4,
 	};
 	struct sl1t_s t[16];
+	su_secu_t s[countof(t)];
 	size_t ntk;
 	time32_t last_seen;
 
-	ntk = tsc_find1(t, countof(t), gcube, &k);
+	ntk = tsc_find(t, s, countof(t), gcube, &k);
 	UD_DEBUG("found %zu for secu %s\n", ntk, secbugger(octx->secu));
 	if (ntk == 0) {
 		return;
 	}
 	/* assume ascending order */
 	for (index_t i = 0; i < ntk; i++) {
-		last_seen = sl1t_stmp_sec(t + i);
-		if (!scom_thdr_linked((const void*)(t + i))) {
-			udpc_seria_add_sl1t(octx->sctx, t + i);
+		sl1t_t this = t + i;
+		scom_thdr_t hdr = this->hdr;
+		last_seen = scom_thdr_sec(hdr);
+		udpc_seria_add_secu(octx->sctx, s[scom_thdr_tblidx(hdr)]);
+		if (!scom_thdr_linked(hdr)) {
+			udpc_seria_add_sl1t(octx->sctx, this);
 		} else {
-			udpc_seria_add_scdl(octx->sctx, (const void*)(t + i++));
+			udpc_seria_add_scdl(octx->sctx, (const void*)this);
+			i++;
 		}
 	}
 	/* now if the last tick is not exactly our timestamp,
@@ -396,7 +401,6 @@ one_moar_p(oadt_ctx_t octx)
 static index_t
 proc_some(oadt_ctx_t octx, index_t i)
 {
-	udpc_seria_add_secu(octx->sctx, octx->secu);
 	for (; i < octx->nfilt && one_moar_p(octx); i++) {
 		proc_one(octx, octx->filt[i]);
 	}

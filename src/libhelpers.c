@@ -541,8 +541,8 @@ __recv_tick_cb(const ud_packet_t pkt, ud_const_sockaddr_t usa, void *clo)
 	}
 	udpc_seria_init(
 		bc->sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	udpc_seria_des_secu(bc->sctx);
-	while (udpc_seria_des_sl1t(bc->sl1t, bc->sctx)) {
+	while ((bc->secu = udpc_seria_des_secu(bc->sctx)).mux &&
+	       udpc_seria_des_sl1t(bc->sl1t, bc->sctx)) {
 		index_t where;
 		if ((where = whereis(bc->sl1t, bc->ts, bc->nts)) < bc->nts) {
 			if (!sl1t_onhold_p(bc->sl1t)) {

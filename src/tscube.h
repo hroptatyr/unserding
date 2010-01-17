@@ -111,8 +111,10 @@ struct tsc_box_s {
 	size_t nt;
 	/* also keep track which ticks are supposed to be in here */
 	time32_t beg, end;
+	/* time stamp when we added the box (cache-add time-stamp) */
+	time32_t cats;
 	/* padding */
-	uint64_t pad;
+	uint32_t pad;
 	/* 4 * 64 = 2 * 4 * 32 = 2 sl1t */
 #if 0
 /* grrr, fucking gcc chokes on this */

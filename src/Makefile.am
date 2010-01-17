@@ -74,7 +74,7 @@ dso_xdr_instr_la_SOURCES += dso-xdr-instr-file.c
 
 ## the time series module
 dso_tseries_la_LDFLAGS = -module $(PFACK_LIBS) -export-dynamic
-dso_tseries_la_CPPFLAGS = $(PFACK_CFLAGS)
+dso_tseries_la_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
 dso_tseries_la_LIBADD = $(PFACK_LIBS)
 dso_tseries_la_SOURCES = dso-tseries.c
 dso_tseries_la_SOURCES += intvtree.c tscube.c

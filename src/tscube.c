@@ -600,6 +600,8 @@ bother_cube(tscube_t utsc, tsc_key_t key, keyval_t kv)
 			 * the true nature of the time series obviously */
 			beg = tsc_box_beg(box);
 			end = tsc_box_end(box);
+			/* care about the cache-add time stamp */
+			box->cats = __stamp().tv_sec;
 			/* add the box to our interval tree */
 			tsc_itr_add(kv->intv, beg, end, box);
 
@@ -707,6 +709,18 @@ tsc_trav(tscube_t tsc, tsc_key_t key, tsc_trav_f cb, void *clo)
 	return;
 }
 
+
+/* administrative bollocks */
+static void
+list_box(uint32_t lo, uint32_t hi, void *data, void *UNUSED(clo))
+{
+	tsc_box_t b = data;
+	time32_t age = __stamp().tv_sec - b->cats;
+
+	fprintf(stderr, "%u %u  age %i\n", lo, hi, age);
+	return;
+}
+
 void
 tsc_list_boxes(tscube_t tsc)
 {
@@ -718,7 +732,7 @@ tsc_list_boxes(tscube_t tsc)
 	for (uint32_t i = 0; i < m->alloc_sz; i++) {
 		tsc_ce_t ce = m->tbl[i].ce;
 		if (__key_valid_p(ce->key)) {
-			itree_print(m->tbl[i].intv);
+			itree_trav_in_order(m->tbl[i].intv, list_box, NULL);
 		}
 	}
 	pthread_mutex_unlock(&m->mtx);

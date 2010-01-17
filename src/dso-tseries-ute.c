@@ -289,32 +289,55 @@ fill_cube_by_bl(tscube_t c, tblister_t bl, ute_ctx_t ctx)
 }
 
 
-static ute_ctx_t my_ctx;
-static const char my_hardcoded_file[] = "/home/freundt/.unserding/eur.ute";
+#include <fts.h>
 
-static ute_ctx_t my_ctx2;
-static const char my_hardcoded_file2[] =
-	"/home/freundt/.unserding/ute_IBk200.2009.5m.scdl";
+/* soft-code me */
+static char ute_dir[] = "/home/freundt/.unserding/";
+/* hardcoded too */
+static char *const ute_dirs[] = {ute_dir, NULL};
+
+static size_t nf;
+static ute_ctx_t all[1024];
+
+static void
+fetch_urn_ute(job_t UNUSED(j))
+{
+	FTS *fts;
+	FTSENT *ent;
+
+	UD_DEBUG("inspecting directories ...");
+
+	if (!(fts = fts_open(ute_dirs, FTS_LOGICAL, NULL))) {
+		UD_DBGCONT("failed\n");
+		return;
+	}
+
+	while ((ent = fts_read(fts)) != NULL) {
+		ute_ctx_t my_ctx;
+		if (ent->fts_info != FTS_F) {
+			continue;
+		}
+
+		if ((my_ctx = open_ute_file(ent->fts_path))) {
+			ute_inspect(my_ctx);
+			all[nf++] = my_ctx;
+			/* travel along the blister list and fill the cube */
+			for (tblister_t t = my_ctx->tbl; t; t = t->next) {
+				fill_cube_by_bl(gcube, t, my_ctx);
+			}
+		}
+	}
+	fts_close(fts);
+	UD_DBGCONT("done\n");
+	return;
+}
 
 void
 dso_tseries_ute_LTX_init(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: loading ...");
-	if ((my_ctx = open_ute_file(my_hardcoded_file))) {
-		ute_inspect(my_ctx);
-		/* travel along the blister list and fill the cube */
-		for (tblister_t tmp = my_ctx->tbl; tmp; tmp = tmp->next) {
-			fill_cube_by_bl(gcube, tmp, my_ctx);
-		}
-	}		
-
-	if ((my_ctx2 = open_ute_file(my_hardcoded_file2))) {
-		ute_inspect(my_ctx2);
-		/* travel along the blister list and fill the cube */
-		for (tblister_t tmp = my_ctx2->tbl; tmp; tmp = tmp->next) {
-			fill_cube_by_bl(gcube, tmp, my_ctx2);
-		}
-	}
+	/* announce our hook fun */
+	add_hook(fetch_urn_hook, fetch_urn_ute);
 	UD_DBGCONT("done\n");
 	return;
 }
@@ -323,8 +346,9 @@ void
 dso_tseries_ute_LTX_deinit(void *UNUSED(clo))
 {
 	UD_DEBUG("mod/tseries-ute: unloading ...");
-	close_ute_file(my_ctx);
-	my_ctx = NULL;
+	for (index_t i = 0; i < nf; i++) {
+		close_ute_file(all[i]);
+	}
 	UD_DBGCONT("done\n");
 	return;
 }

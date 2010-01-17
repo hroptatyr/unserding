@@ -154,7 +154,11 @@ tsc_box_nticks(tsc_box_t b)
 static inline __attribute__((unused)) time32_t
 tsc_box_beg(tsc_box_t b)
 {
-	return b->beg;
+	if (b->beg) {
+		return b->beg;
+	}
+	/* look at the first tick in B */
+	return b->beg = scom_thdr_sec(b->sl1t[0].hdr);
 }
 
 static inline time32_t
@@ -177,7 +181,7 @@ tsc_box_end(tsc_box_t b)
 		return 0;
 	}
 #else  /* !CUBE_ENTRY_PER_TTF */
-	return b->end = sl1t_stmp_sec(&b->sl1t[(b->nt - 1) * b->pad]);
+	return b->end = scom_thdr_sec(b->sl1t[(b->nt - 1) * b->pad].hdr);
 #endif	/* CUBE_ENTRY_PER_TTF */
 }
 
@@ -548,6 +552,18 @@ today_latenight(time32_t ts)
 #define utsc		UNUSED(tsc)
 #define utsz		UNUSED(tsz)
 
+/* the main problem with the cube is how far we can go back before
+ * the timestamp in question, and secondarily how many ticks to leech.
+ * in the resulting box we want to be able to find the last tick
+ * before the key stamp in question but also want to allow for as
+ * many ticks after that for caching purposes.
+ * In other words, we're fucked, tick files these days cover different
+ * orders of magnitudes of time stamps, from end-of-month data
+ * covering many centuries, to high-volume intraday tick data where
+ * hundreds of quotes/trades occur within a second.
+ * So, the upshot is we must not arrogate to fiddle with the keying
+ * timestamp ourselves, instead we should let the underlying data
+ * source decide on how far back to go. */
 static tsc_box_t
 bother_cube(tscube_t utsc, tsc_key_t key, keyval_t kv)
 {
@@ -560,23 +576,29 @@ bother_cube(tscube_t utsc, tsc_key_t key, keyval_t kv)
 
 	if ((box = tsc_itr_find(kv->intv, key->beg)) == NULL &&
 	    kv->ce->ops && kv->ce->ops->fetch_cb != NULL) {
-		time32_t beg = today_midnight(key->beg);
-		//time32_t beg = todays_latenight(key->beg);
-		//time32_t beg = last_monday_midnight(key->beg);
+		time32_t beg = key->beg;
 		/* open end */
 		time32_t end = 0x7fffffff;
 
+#if 0
+/* not even worth printing in debugging mode */
 		size_t mt = tsc_box_maxticks(box);
-		fprintf(stderr, "uncached %zu\n", mt);
+		fprintf(stderr, "uncached %zu %i %i\n", mt, beg, key->beg);
+		itree_print(kv->intv);
+#endif
+
 		box = make_tsc_box();
 		res = kv->ce->ops->fetch_cb(
 			box, tsc_box_maxticks(box),
 			kv->ce->key, kv->ce->uval,
-			/* check if it's eligible to actually go back to
-			 * the monday before!!! */
 			beg, end);
 
 		if (LIKELY(res != 0)) {
+			/* we highly encourage for any data source connected
+			 * to set these values lest we compute them
+			 * ourselves losing some valuable information about
+			 * the true nature of the time series obviously */
+			beg = tsc_box_beg(box);
 			end = tsc_box_end(box);
 			/* add the box to our interval tree */
 			tsc_itr_add(kv->intv, beg, end, box);

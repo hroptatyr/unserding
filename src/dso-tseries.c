@@ -506,6 +506,14 @@ fetch_urn_svc(job_t j)
 	return;
 }
 
+static void
+list_boxes_svc(job_t UNUSED(j))
+{
+	UD_DEBUG("0x%04x (UD_SVC_LIST_BOXES)\n", UD_SVC_LIST_BOXES);
+	tsc_list_boxes(gcube);
+	return;
+}
+
 
 void
 dso_tseries_LTX_init(void *clo)
@@ -518,6 +526,8 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	ud_set_service(UD_SVC_GET_URN, instr_urn_svc, NULL);
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
+	/* administrative services */
+	ud_set_service(UD_SVC_LIST_BOXES, list_boxes_svc, NULL);
 	UD_DBGCONT("done\n");
 
 	/* have the frobq initialised */

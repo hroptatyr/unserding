@@ -110,6 +110,10 @@
 #define UD_SVC_FETCH_URN	0x4226
 
 
+/**
+ * Adminstrative service 3f02.  List all cached boxes in the cube. */
+#define UD_SVC_LIST_BOXES	0x3f02
+
 /* migrate to ffff tseries */
 typedef struct tser_pkt_s *tser_pkt_t;
 

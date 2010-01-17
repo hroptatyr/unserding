@@ -146,4 +146,7 @@ tsc_find(sl1t_t tgt, su_secu_t *sv, size_t tsz, tscube_t c, tsc_key_t key);
  * on a query KEY, calling CB with the ce and CLO for each match. */
 extern void tsc_trav(tscube_t tsc, tsc_key_t key, tsc_trav_f cb, void *clo);
 
+/* administrative stuff */
+extern void tsc_list_boxes(tscube_t tsc);
+
 #endif	/* !INCLUDED_tscube_h_ */

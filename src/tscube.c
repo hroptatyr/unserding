@@ -707,4 +707,22 @@ tsc_trav(tscube_t tsc, tsc_key_t key, tsc_trav_f cb, void *clo)
 	return;
 }
 
+void
+tsc_list_boxes(tscube_t tsc)
+{
+	__tscube_t c = tsc;
+	hmap_t m = c->hmap;
+
+	pthread_mutex_lock(&m->mtx);
+	/* perform sequential scan */
+	for (uint32_t i = 0; i < m->alloc_sz; i++) {
+		tsc_ce_t ce = m->tbl[i].ce;
+		if (__key_valid_p(ce->key)) {
+			itree_print(m->tbl[i].intv);
+		}
+	}
+	pthread_mutex_unlock(&m->mtx);
+	return;
+}
+
 /* tscube.c ends here */

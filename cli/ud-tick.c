@@ -107,6 +107,24 @@ t1c(scom_t t)
 }
 
 static void
+t1s(scom_t t)
+{
+	const_ssnap_t tv = (const void*)t;
+	double bp = ffff_m30_d(ffff_m30_get_ui32(tv->bp));
+	double ap = ffff_m30_d(ffff_m30_get_ui32(tv->ap));
+	double bq = ffff_m30_d(ffff_m30_get_ui32(tv->bq));
+	double aq = ffff_m30_d(ffff_m30_get_ui32(tv->aq));
+	double tvpr = ffff_m30_d(ffff_m30_get_ui32(tv->tvpr));
+	double tq = ffff_m30_d(ffff_m30_get_ui32(tv->tq));
+
+	fprintf(stdout,
+		" b:%2.4f bs:%2.4f  a:%2.4f as:%2.4f "
+		" tvpr:%2.4f tq:%2.4f\n",
+		bp, bq, ap, aq, tvpr, tq);
+	return;
+}
+
+static void
 ne(scom_t UNUSED(t))
 {
 	fputs("  v:does not exist\n", stdout);
@@ -126,14 +144,15 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
-	char ttf = ttc(t);
+	uint16_t ttf = scom_thdr_ttf(t);
+	char ttfc = ttc(t);
 	int32_t ts = scom_thdr_sec(t);
 	uint16_t ms = scom_thdr_msec(t);
 	char tss[32];
 
 	print_ts_into(tss, sizeof(tss), ts);
 	fprintf(stdout, "tick storm, ticks:1 ii:%u/%i@%hu tt:%c  ts:%s.%03hu",
-		qd, qt, p, ttf, tss, ms);
+		qd, qt, p, ttfc, tss, ms);
 
 	if (scom_thdr_nexist_p(t)) {
 		ne(t);
@@ -141,7 +160,9 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 		oh(t);
 	} else if (!scom_thdr_linked(t)) {
 		t1(t);
-	} else {
+	} else if (ttf == SSNP_FLAVOUR) {
+		t1s(t);
+	} else if (ttf > SCDL_FLAVOUR) {
 		t1c(t);
 	}
 	return;

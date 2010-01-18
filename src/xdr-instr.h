@@ -40,10 +40,14 @@
 
 #include <stdbool.h>
 #include <time.h>
+#include <sushi/secu.h>
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"
-#include <sushi/secu.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /**
  * Service 421a:
@@ -103,5 +107,9 @@ ud_find_many_instrs(
 	ud_handle_t hdl,
 	void(*cb)(const char *tgt, size_t len, void *clo), void *clo,
 	uint32_t cont_id[], size_t len);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_xdr_instr_h_ */

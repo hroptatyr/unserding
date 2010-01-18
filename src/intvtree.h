@@ -43,7 +43,13 @@
 
 typedef struct itree_s *itree_t;
 typedef struct it_node_s *it_node_t;
-typedef void(*it_trav_f)(uint32_t lo, uint32_t hi, void *data, void *clo);
+typedef void(*it_trav_f)(it_node_t, void *clo);
+
+/* public node structure */
+struct it_node_s {
+	int32_t lo, hi;
+	void *data;
+};
 
 /**
  * Create an itree. */

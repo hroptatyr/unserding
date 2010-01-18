@@ -55,6 +55,7 @@
 #include "unserding-dbg.h"
 #include "unserding-ctx.h"
 
+#define GORY_STUFF
 #include <pfack/instruments.h>
 #include "catalogue.h"
 #include "xdr-instr-private.h"
@@ -174,14 +175,14 @@ parse_multiplier(const char *data)
 	return 1.0;
 }
 
-static m32_t
+static m30_t
 parse_strike(const char *data)
 {
 	if (LIKELY(data != NULL)) {
-		return ffff_monetary32_get_s(data);
+		return ffff_m30_get_s(&data);
 	}
 	/* grrr */
-	return 0;
+	return ffff_m30_get_ui32(0);
 }
 
 static uint32_t
@@ -198,7 +199,7 @@ make_option(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 	char right = cfi[1];
 	char exer = cfi[2];
 	double multpl_dbl = parse_multiplier(rows[OPT_MULTPL]);
-	monetary32_t strike = parse_strike(rows[OPT_STRIKE]);
+	m30_t strike = parse_strike(rows[OPT_STRIKE]);
 	ratio17_t multpl = ffff_ratio17((uint32_t)multpl_dbl, 1);
 	instr_t undl = find_instr_by_gaid(instrs, undl_id);
 

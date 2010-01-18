@@ -47,8 +47,8 @@
 #include <popt.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
-#include <ffff/monetary.h>
 #include <pfack/instruments.h>
+#include <pfack/m30.h>
 #include "protocore.h"
 
 typedef struct ictx_s *ictx_t;
@@ -252,7 +252,7 @@ dump_option(ictx_t ctx, ga_spec_t sp)
 		/* option right */
 		sp->right == -1 ? 'P' : (sp->right == 1 ? 'C' : 'X'),
 		/* exer style */ 'E',
-		ffff_monetary32_get_d(sp->strike), r);
+		ffff_m30_get_d(sp->strike), r);
 
 	/* fiddle with the delivery group ... it's a joke anyway at the mo */
 	{

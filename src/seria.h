@@ -41,6 +41,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* old shit, to be deleted */
 #define UDPC_TYPE_SEQ	'a'
 #define UDPC_TYPE_VAR	'v'
@@ -362,5 +366,9 @@ udpc_seria_des_asn1(udpc_seria_t sctx, const void **s)
 extern uint16_t udpc_msg_size(const char *sig);
 extern void udpc_sig_string(char *restrict out, const char *sig);
 #endif
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_seria_h_ */

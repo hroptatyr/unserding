@@ -49,6 +49,10 @@
 #include <sushi/sl1t.h>
 #include <sushi/scdl.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* tick services */
 #if !defined index_t
 # define index_t	size_t
@@ -230,7 +234,7 @@ scom_thdr_onhold_p(const_scom_thdr_t h)
 static inline __attribute__((pure)) bool
 sl1t_onhold_p(const_sl1t_t h)
 {
-	return scom_thdr_onhold_p((const void*)h);
+	return scom_thdr_onhold_p(h->hdr);
 }
 
 static inline void
@@ -307,5 +311,9 @@ spDute_bang_tser(
 	return;
 }
 #endif	/* INCLUDED_uterus_h_ */
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_tseries_h_ */

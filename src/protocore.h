@@ -43,6 +43,10 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /***
  * The unserding protocol in detail:
  *
@@ -110,15 +114,15 @@ enum udpc_pktsched_e {
 static inline uint16_t
 udpc_pkt_flags(const ud_packet_t pkt)
 {
-	const uint16_t *tmp = (const void*)pkt.pbuf;
-	return ntohs(tmp[3]);
+	return ntohs(((const uint16_t*)pkt.pbuf)[3]);
 }
 
 static inline void
 udpc_pkt_set_flags(ud_packet_t pkt, uint16_t flags)
 {
-	uint16_t *tmp = (void*)pkt.pbuf;
-	tmp[3] = htons(flags);
+	/* grrr, fucking C++ cant cast char* to uint16_t* unless
+	 * you use reinterpret_cast<>() */
+	((uint16_t*)pkt.pbuf)[3] = htons(flags);
 	return;
 }
 
@@ -331,12 +335,9 @@ __interleave_cno_pno(ud_convo_t cno, ud_pkt_no_t pno)
 static inline void __attribute__((always_inline))
 udpc_make_pkt(ud_packet_t p, ud_convo_t cno, ud_pkt_no_t pno, ud_pkt_cmd_t cmd)
 {
-	uint16_t *restrict tmp = (void*)p.pbuf;
-	uint32_t *restrict tm2 = (void*)p.pbuf;
-
 	memset(p.pbuf, 0, UDPC_PKTLEN);
-	tm2[0] = htonl(__interleave_cno_pno(cno, pno));
-	tmp[2] = htons(cmd);
+	((uint32_t*)p.pbuf)[0] = htonl(__interleave_cno_pno(cno, pno));
+	((uint16_t*)p.pbuf)[2] = htons(cmd);
 	/* just to have a default */
 	udpc_set_immed_fina_pkt(p);
 	return;
@@ -364,16 +365,15 @@ udpc_reply_cmd_ns(ud_pkt_cmd_t cmd)
 static inline void __attribute__((always_inline))
 udpc_make_rpl_pkt(ud_packet_t p)
 {
-	uint16_t *restrict tmp = (void*)p.pbuf;
-	uint32_t *restrict tm2 = (void*)p.pbuf;
-	uint32_t all = ntohl(tm2[0]);
+	uint16_t t2 = ((uint16_t*)p.pbuf)[2];
+	uint32_t all = ntohl(((uint32_t*)p.pbuf)[0]);
 
 	/* wipe out past sins */
 	memset(UDPC_PAYLOAD(p.pbuf), 0, UDPC_PLLEN);
 	/* increment the pkt number */
-	tm2[0] = htonl(all+1);
+	((uint32_t*)p.pbuf)[0] = htonl(all+1);
 	/* construct the reply packet type */
-	tmp[2] = udpc_reply_cmd_ns(tmp[2]);
+	((uint16_t*)p.pbuf)[2] = udpc_reply_cmd_ns(t2);
 	/* just to have a default */
 	udpc_set_immed_fina_pkt(p);
 	return;
@@ -382,8 +382,7 @@ udpc_make_rpl_pkt(ud_packet_t p)
 static inline ud_convo_t __attribute__((always_inline))
 udpc_pkt_cno(const ud_packet_t pkt)
 {
-	const uint32_t *tmp = (void*)pkt.pbuf;
-	uint32_t all = ntohl(tmp[0]);
+	uint32_t all = ntohl(((const uint32_t*)pkt.pbuf)[0]);
 	/* yes ntoh conversion!!! */
 	return (ud_convo_t)(all >> 24);
 }
@@ -391,8 +390,7 @@ udpc_pkt_cno(const ud_packet_t pkt)
 static inline ud_pkt_no_t __attribute__((always_inline))
 udpc_pkt_pno(const ud_packet_t pkt)
 {
-	const uint32_t *tmp = (void*)pkt.pbuf;
-	uint32_t all = ntohl(tmp[0]);
+	uint32_t all = ntohl(((const uint32_t*)pkt.pbuf)[0]);
 	/* yes ntoh conversion!!! */
 	return (ud_pkt_no_t)(all & (0xffffff));
 }
@@ -400,18 +398,16 @@ udpc_pkt_pno(const ud_packet_t pkt)
 static inline void __attribute__((always_inline))
 udpc_pkt_set_cmd(ud_packet_t pkt, ud_pkt_cmd_t cmd)
 {
-	uint16_t *tmp = (void*)pkt.pbuf;
 	/* yes ntoh conversion!!! */
-	tmp[2] = htons(cmd);
+	((uint16_t*)pkt.pbuf)[2] = htons(cmd);
 	return;
 }
 
 static inline ud_pkt_cmd_t __attribute__((always_inline))
 udpc_pkt_cmd(const ud_packet_t pkt)
 {
-	const uint16_t *tmp = (void*)pkt.pbuf;
 	/* yes ntoh conversion!!! */
-	return ntohs(tmp[2]);
+	return ntohs(((const uint16_t*)pkt.pbuf)[2]);
 }
 
 static inline uint8_t __attribute__((always_inline))
@@ -433,5 +429,9 @@ ud_set_service(ud_pkt_cmd_t cmd, ud_pktwrk_f fun, ud_pktwrk_f rpl);
 
 extern ud_pktwrk_f
 ud_get_service(ud_pkt_cmd_t cmd);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_protocore_h_ */

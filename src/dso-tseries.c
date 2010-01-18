@@ -514,6 +514,14 @@ list_boxes_svc(job_t UNUSED(j))
 	return;
 }
 
+static void
+sched_prune_caches(void *clo)
+{
+	UD_DEBUG("pruning caches\n");
+	tsc_prune_caches(clo);
+	return;
+}
+
 
 void
 dso_tseries_LTX_init(void *clo)
@@ -528,6 +536,8 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	/* administrative services */
 	ud_set_service(UD_SVC_LIST_BOXES, list_boxes_svc, NULL);
+	/* cache cleaning */
+	schedule_timer_every(clo, sched_prune_caches, gcube, 60.0);
 	UD_DBGCONT("done\n");
 
 	/* have the frobq initialised */

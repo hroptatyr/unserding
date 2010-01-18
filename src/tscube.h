@@ -150,5 +150,6 @@ extern void tsc_trav(tscube_t tsc, tsc_key_t key, tsc_trav_f cb, void *clo);
 
 /* administrative stuff */
 extern void tsc_list_boxes(tscube_t tsc);
+extern void tsc_prune_caches(tscube_t tsc);
 
 #endif	/* !INCLUDED_tscube_h_ */

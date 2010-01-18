@@ -720,11 +720,11 @@ box_age(tsc_box_t b)
 }
 
 static void
-list_box(uint32_t lo, uint32_t hi, void *data, void *UNUSED(clo))
+list_box(it_node_t nd, void *UNUSED(clo))
 {
-	time32_t age = box_age(data);
+	time32_t age = box_age(nd->data);
 
-	fprintf(stderr, "%u %u  age %i\n", lo, hi, age);
+	fprintf(stderr, "%i %i  age %i\n", nd->lo, nd->hi, age);
 	return;
 }
 
@@ -748,10 +748,10 @@ tsc_list_boxes(tscube_t tsc)
 
 /* cache pruning */
 static void
-prune_box(uint32_t lo, uint32_t hi, void *data, void *clo)
+prune_box(it_node_t nd, void *clo)
 {
 	tsc_itr_t tr = clo;
-	tsc_box_t b = data;
+	tsc_box_t b = nd->data;
 	if (box_age(b) >= 60) {
 		fprintf(stderr, "kicking box %p\n", b);
 	}

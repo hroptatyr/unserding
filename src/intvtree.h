@@ -68,6 +68,7 @@ extern void *itree_satellite(itree_t it);
 
 extern it_node_t itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data);
 extern void *itree_del_node(itree_t it, it_node_t z);
+extern void *itree_del_node_nl(itree_t it, it_node_t z);
 extern it_node_t itree_succ_of(itree_t it, it_node_t x);
 extern it_node_t itree_pred_of(itree_t it, it_node_t x);
 

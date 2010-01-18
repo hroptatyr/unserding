@@ -390,12 +390,12 @@ itree_add(itree_t it, uint32_t lo, uint32_t hi, void *data)
 	return (it_node_t)res;
 }
 
-it_node_t
-itree_succ_of(itree_t it, it_node_t _x)
+/* lockless */
+static __node_t
+__succ_of(itree_t it, __node_t x)
 { 
-	__node_t y, x = (__node_t)_x;
+	__node_t y;
 
-	pthread_mutex_lock(&it->mtx);
 	if (!nil_node_p((y = x->right))) {
 		/* get the minimum of the right subtree of x */
 		while (!nil_node_p(y->left)) {
@@ -415,16 +415,26 @@ itree_succ_of(itree_t it, it_node_t _x)
 		goto out;
 	}
 out:
+	return y;
+}
+
+it_node_t
+itree_succ_of(itree_t it, it_node_t _x)
+{ 
+	__node_t y, x = (__node_t)_x;
+
+	pthread_mutex_lock(&it->mtx);
+	y = __succ_of(it, x);
 	pthread_mutex_unlock(&it->mtx);
 	return (it_node_t)y;
 }
 
-it_node_t
-itree_pred_of(itree_t it, it_node_t _x)
+/* lockless */
+static __node_t
+__pred_of(itree_t it, __node_t x)
 {
-	__node_t y, x = (__node_t)_x;
+	__node_t y;
 
-	pthread_mutex_lock(&it->mtx);
 	if (!nil_node_p((y = x->left))) {
 		while (!nil_node_p(y->right)) {
 			/* returns the maximum of the left subtree of x */
@@ -444,6 +454,16 @@ itree_pred_of(itree_t it, it_node_t _x)
 		goto out;
 	}
 out:
+	return y;
+}
+
+it_node_t
+itree_pred_of(itree_t it, it_node_t _x)
+{
+	__node_t y, x = (__node_t)_x;
+
+	pthread_mutex_lock(&it->mtx);
+	y = __pred_of(it, x);
 	pthread_mutex_unlock(&it->mtx);
 	return (it_node_t)y;
 }
@@ -453,7 +473,6 @@ itree_del_fixup(itree_t it, __node_t x)
 {
 	__node_t rl;
 
-	pthread_mutex_lock(&it->mtx);
 	rl = itree_left_root(it);
 	while ((!x->redp) && (rl != x)) {
 		__node_t w;
@@ -510,21 +529,19 @@ itree_del_fixup(itree_t it, __node_t x)
 		}
 	}
 	x->redp = false;
-	pthread_mutex_unlock(&it->mtx);
 	return;
 }
 
 void*
-itree_del_node(itree_t it, it_node_t _z)
+itree_del_node_nl(itree_t it, it_node_t _z)
 {
 	__node_t y, x, z = (__node_t)_z;
 	void *res = _z->data;
 
-	pthread_mutex_lock(&it->mtx);
 	if (!inner_node_p(z)) {
 		y = z;
 	} else {
-		y = (__node_t)itree_succ_of(it, _z);
+		y = __succ_of(it, z);
 	}
 	x = nil_node_p(y->left)
 		? y->right
@@ -570,6 +587,15 @@ itree_del_node(itree_t it, it_node_t _z)
 		}
 		free_node(y);
 	}
+	return res;
+}
+
+void*
+itree_del_node(itree_t it, it_node_t nd)
+{
+	void *res;
+	pthread_mutex_lock(&it->mtx);
+	res = itree_del_node_nl(it, nd);
 	pthread_mutex_unlock(&it->mtx);
 	return res;
 }
@@ -705,12 +731,15 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 			/* we just work off the shite, knowing there's
 			 * a balance and the subtree consists of only
 			 * one node */
-			if (!nil_node_p(curr->left)) {
-				proc(curr->left);
+			__node_t l = curr->left;
+			__node_t r = curr->right;
+
+			if (!nil_node_p(l)) {
+				proc(l);
 			}
 			proc(curr);
-			if (!nil_node_p(curr->right)) {
-				proc(curr->right);
+			if (!nil_node_p(r)) {
+				proc(r);
 			}
 			proc(stack_pop(stk));
 			curr = stack_pop(stk);

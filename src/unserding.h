@@ -43,6 +43,10 @@
 #include <stdbool.h>
 #include "mcast.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /**
  * Flags. */
 typedef long unsigned int ud_flags_t;
@@ -186,5 +190,9 @@ ud_handle_set_4svc(ud_handle_t hdl)
 /* more of them */
 #include "xdr-instr.h"
 #include "tseries.h"
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_unserding_h_ */

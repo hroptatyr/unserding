@@ -43,6 +43,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #define UD_NETWORK_SERVICE	8653
 #define UD_NETWORK_SERVSTR	"8653"
 /* 239.0.0.0/8 are organisational solicited v4 mcast addrs */
@@ -154,5 +158,9 @@ ud_sockaddr_ntop(char *restrict buf, size_t len, ud_const_sockaddr_t sa)
 	(void)inet_ntop(fam, saa, buf, len);
 	return;
 }
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_mcast_h_ */

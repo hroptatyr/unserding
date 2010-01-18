@@ -537,7 +537,7 @@ dso_tseries_LTX_init(void *clo)
 	/* administrative services */
 	ud_set_service(UD_SVC_LIST_BOXES, list_boxes_svc, NULL);
 	/* cache cleaning */
-	schedule_timer_every(clo, sched_prune_caches, gcube, 60.0);
+	schedule_timer_every(clo, sched_prune_caches, gcube, TSC_BOX_TTL);
 	UD_DBGCONT("done\n");
 
 	/* have the frobq initialised */

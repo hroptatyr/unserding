@@ -600,8 +600,6 @@ bother_cube(tscube_t utsc, tsc_key_t key, keyval_t kv)
 			 * the true nature of the time series obviously */
 			beg = tsc_box_beg(box);
 			end = tsc_box_end(box);
-			/* care about the cache-add time stamp */
-			box->cats = __stamp().tv_sec;
 			/* add the box to our interval tree */
 			tsc_itr_add(kv->intv, beg, end, box);
 
@@ -641,8 +639,11 @@ tsc_find1(sl1t_t tgt, size_t tsz, tscube_t tsc, tsc_key_t key)
 			continue;
 		} else if (__key_matches_p(ce->key, key)) {
 			tsc_box_t box;
-			box = bother_cube(tsc, key, &m->tbl[i]);
-			tsc_box_find_bbs(&clo, box, key);
+			if ((box = bother_cube(tsc, key, &m->tbl[i]))) {
+				tsc_box_find_bbs(&clo, box, key);
+				/* update the cache-add stamp */
+				box->cats = __stamp().tv_sec;
+			}
 			break;
 		}
 	}
@@ -685,6 +686,8 @@ tsc_find(sl1t_t tgt, su_secu_t *sv, size_t tsz, tscube_t tsc, tsc_key_t key)
 			/* tell tsc_box bout our secu */
 			clo.s = ce->key->secu,
 			tsc_box_find_bbs(&clo, box, key);
+			/* update the cache-add stamp */
+			box->cats = __stamp().tv_sec;
 		}
 	}
 	pthread_mutex_unlock(&m->mtx);

@@ -297,7 +297,7 @@ fetch_tick(
 	qrclo->box = tgt;
 	qrclo->max = tsz;
 	nres = uddb_qry(conn, qry, len, qry_rowf, qrclo);
-	UD_DEBUG("got %u/%zu prices\n", qrclo->box->nt, nres);
+	UD_DEBUG("got %zu/%zu prices\n", qrclo->box->nt, nres);
 	return qrclo->box->nt;
 }
 

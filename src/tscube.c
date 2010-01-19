@@ -263,7 +263,7 @@ __key_equal_p(tsc_key_t id1, tsc_key_t id2)
 /* try ttf-less approach */
 		id1->ttf == id2->ttf
 #else  /* !CUBE_ENTRY_PER_TTF */
-		true
+		id1->ttf == id2->ttf
 #endif	/* CUBE_ENTRY_PER_TTF */
 		;
 }
@@ -452,6 +452,13 @@ tsc_add(tscube_t tsc, tsc_ce_t ce)
 		m->tbl[ks].intv = make_tsc_itr();
 		/* assign user's idea of this */
 		m->nseries++;
+#if 0
+	} else {
+		fprintf(stderr, "%u/%i@%hu already known\n",
+			su_secu_quodi(ce->key->secu),
+			su_secu_quoti(ce->key->secu),
+			su_secu_pot(ce->key->secu));
+#endif
 	}
 	pthread_mutex_unlock(&m->mtx);
 	return;

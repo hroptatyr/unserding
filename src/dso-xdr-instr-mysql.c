@@ -55,7 +55,6 @@
 #include "unserding-dbg.h"
 #include "unserding-ctx.h"
 
-#define GORY_STUFF
 #include <pfack/instruments.h>
 #include "catalogue.h"
 #include "xdr-instr-private.h"

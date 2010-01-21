@@ -366,6 +366,7 @@ proc_one(oadt_ctx_t octx, time32_t ts)
 	ntk = tsc_find(t, s, countof(t), gcube, &k);
 	UD_DEBUG("found %zu for secu %s\n", ntk, secbugger(octx->secu));
 	if (ntk == 0) {
+		__bang_nexist(octx, ts, SL1T_TTF_UNK);
 		return;
 	}
 	/* assume ascending order */

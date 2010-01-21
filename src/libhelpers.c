@@ -491,6 +491,13 @@ seenp(ftbi_ctx_t bictx, index_t i)
 	return bictx->seen & (1 << i);
 }
 
+static inline bool
+seen_all_p(ftbi_ctx_t bc)
+{
+	uint64_t msk = (1 << bc->nts) - 1;
+	return (bc->seen & msk) == msk;
+}
+
 static inline void
 set_seen(ftbi_ctx_t bictx, index_t i)
 {
@@ -498,7 +505,7 @@ set_seen(ftbi_ctx_t bictx, index_t i)
 	return;
 }
 
-static void
+static __attribute__((noinline)) void
 feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 {
 #define FILL(X)	(48 / max_num_ticks(X))
@@ -556,7 +563,7 @@ __recv_tick_cb(const ud_packet_t pkt, ud_const_sockaddr_t usa, void *clo)
 		bc->retry = NRETRIES;
 	}
 	/* ask for more */
-	return true;
+	return !seen_all_p(bc);
 }
 
 static void
@@ -627,7 +634,7 @@ ud_find_ticks_by_instr(
 	time_t *ts, size_t tslen)
 {
 /* fixme, the retry cruft should be a parameter? */
-	struct ftbi_ctx_s __bictx, *bictx = &__bictx;
+	struct ftbi_ctx_s bictx[1];
 
 	init_bictx(bictx, hdl);
 	lodge_ihdr(bictx, s, bs);

@@ -95,7 +95,7 @@
 
 /**
  * Timeout in milliseconds. */
-#define UD_SENDRECV_TIMEOUT	10
+#define UD_SENDRECV_TIMEOUT	1
 #define UDP_MULTICAST_TTL	16
 #define SOCK_INVALID		(int)0xffffff
 

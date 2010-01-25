@@ -1,3 +1,40 @@
+/*** ud-snap.c -- convenience tool to obtain a market snapshot at a given time
+ *
+ * Copyright (C) 2009, 2010 Sebastian Freundt
+ *
+ * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ *
+ * This file is part of unserding.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the author nor the names of any contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ ***/
+
 #include <stdio.h>
 #include <stdbool.h>
 #include "unserding.h"
@@ -6,9 +43,10 @@
 #include "tseries.h"
 #include <sushi/m30.h>
 
-static struct ud_handle_s __hdl;
-static ud_handle_t hdl = &__hdl;
-static bool UNUSED(xmlp);
+#include "ud-time.h"
+#include "clihelper.c"
+
+static struct ud_handle_s hdl[1];
 
 static void
 t_cb(su_secu_t s, scom_t th, void *UNUSED(clo))
@@ -27,33 +65,69 @@ t_cb(su_secu_t s, scom_t th, void *UNUSED(clo))
 	return;
 }
 
+static time_t
+parse_time(const char *t)
+{
+	struct tm tm;
+	char *on;
+
+	memset(&tm, 0, sizeof(tm));
+	on = strptime(t, "%Y-%m-%d", &tm);
+	if (on == NULL) {
+		return 0;
+	}
+	if (on[0] == ' ' || on[0] == 'T' || on[0] == '\t') {
+		on++;
+	}
+	(void)strptime(on, "%H:%M:%S", &tm);
+	return timegm(&tm);
+}
+
 int
 main(int argc, const char *argv[])
 {
 	/* vla */
-	su_secu_t cid[argc];
-	int n = 0;
-	time_t ts = time(NULL);
-	uint32_t bs = ~0;
+	su_secu_t cid;
+	time_t ts;
+	uint32_t bs =
+		(1 << SL1T_TTF_BID) |
+		(1 << SL1T_TTF_ASK) |
+		(1 << SL1T_TTF_TRA) |
+		(1 << SL1T_TTF_STL) |
+		(1 << SL1T_TTF_FIX);
+	/* ud nonsense */
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = {.pbuf = buf, .plen = sizeof(buf)};
+	struct udpc_seria_s sctx[1];
 
-	for (int i = 1; i < argc; i++) {
-		uint32_t qd = strtol(argv[i], NULL, 10);
-		if (qd) {
-			cid[n] = su_secu(qd, 0, 0);
-			n++;
-		} else if (strcmp(argv[i], "--xml") == 0) {
-			xmlp = true;
-		}
+	if (argc <= 1) {
+		fprintf(stderr, "Usage: ud-snap instr [date]\n");
+		exit(1);
 	}
-	if (n == 0) {
-		return 0;
+
+	if (argc == 2) {
+		ts = time(NULL);
+	} else if ((ts = parse_time(argv[2])) == 0) {
+		fprintf(stderr, "invalid date format \"%s\", "
+			"must be YYYY-MM-DDThh:mm:ss\n", argv[2]);
+		exit(1);
 	}
 	/* obtain us a new handle */
 	init_unserding_handle(hdl, PF_INET6, true);
+	/* just a test */
+	cid = secu_from_str(hdl, argv[1]);
 	/* now kick off the finder */
-	ud_find_ticks_by_ts(hdl, t_cb, NULL, cid, n, bs, ts);
+	udpc_make_pkt(pkt, 0, 0, UD_SVC_MKTSNP);
+	udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	/* ts first */
+	udpc_seria_add_ui32(sctx, ts);
+	/* secu and bs */
+	udpc_seria_add_secu(sctx, cid);
+	udpc_seria_add_tbs(sctx, bs);
+	pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
+	ud_send_raw(hdl, pkt);
 	/* and lose the handle again */
-	free_unserding_handle(&__hdl);
+	free_unserding_handle(hdl);
 	return 0;
 }
 

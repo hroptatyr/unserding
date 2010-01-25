@@ -430,8 +430,6 @@ instr_tick_by_instr_svc(job_t j)
 	if ((nfilt = snarf_times(sctx, octx->filt, NFILT)) == 0) {
 		return;
 	}
-	UD_DEBUG("0x%04x (UD_SVC_TICK_BY_INSTR): %s for %u stamps, %x mask\n",
-		 UD_SVC_TICK_BY_INSTR, secbugger(sec), nfilt, tbs);
 
 	/* initialise our context */
 	octx->sctx = rplsctx;
@@ -451,6 +449,43 @@ instr_tick_by_instr_svc(job_t j)
 
 	/* we cater for any frobnication desires now */
 	frobnicate();
+	return;
+}
+
+
+/* mktsnp getter */
+static void
+mktsnp_cb(su_secu_t s, const_sl1t_t t, void *UNUSED(clo))
+{
+	uint32_t qd = su_secu_quodi(s);
+	int32_t qt = su_secu_quoti(s);
+	uint16_t p = su_secu_pot(s);
+	fprintf(stderr, "found match %u/%i@%hu %p\n", qd, qt, p, t);
+	return;
+}
+
+static void
+fetch_mktsnp_svc(job_t j)
+{
+	struct udpc_seria_s sctx[1];
+	/* the key we need */
+	struct tsc_key_s key = {
+		/* make sure we let the system know what we want */
+		.msk = 1 | 2 | 4,
+	};
+
+	/* prepare the iterator for the incoming packet */
+	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	/* read the timestamp */
+	key.beg = key.end = udpc_seria_des_ui32(sctx);
+	/* read the key secu */
+	key.secu = udpc_seria_des_secu(sctx);
+	/* read the types */
+	key.ttf = udpc_seria_des_tbs(sctx);
+	UD_DEBUG("0x%04x (UD_SVC_MKTSNP): %s at %i, %x mask\n",
+		 UD_SVC_MKTSNP, secbugger(key.secu), key.beg, key.ttf);
+
+	tsc_find_cb(gcube, &key, mktsnp_cb, NULL);
 	return;
 }
 
@@ -535,6 +570,7 @@ dso_tseries_LTX_init(void *clo)
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	ud_set_service(UD_SVC_GET_URN, instr_urn_svc, NULL);
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
+	ud_set_service(UD_SVC_MKTSNP, fetch_mktsnp_svc, NULL);
 	/* administrative services */
 	ud_set_service(UD_SVC_LIST_BOXES, list_boxes_svc, NULL);
 	/* cache cleaning */

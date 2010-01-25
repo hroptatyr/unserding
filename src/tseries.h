@@ -104,9 +104,6 @@ extern "C" {
  *
  * The answer will be a rpl4224_s object, which is a tseries_s in disguise. */
 #define UD_SVC_GET_URN		0x4224
-/* just a convenience thingie */
-#define rpl4224_t	tseries_t
-#define rpl4224_s	tseries_s
 
 /**
  * Service 4226:
@@ -115,11 +112,20 @@ extern "C" {
 
 
 /**
+ * Service 4228:
+ * Find ticks for one point in time given an instrument filter.
+ * EXPERIMENTAL
+ *
+ * sig: 4228(ui32 ts [, ui64 susecu [, ui32 types]])
+ *   As a wildcard for all funds or all exchanges 0x00000000 can be used.
+ *
+ * The TYPES parameter is a bitset made up of SL1T_TTF_* values as specified
+ * in sushi/sl1t.h */
+#define UD_SVC_MKTSNP		0x4228
+
+/**
  * Adminstrative service 3f02.  List all cached boxes in the cube. */
 #define UD_SVC_LIST_BOXES	0x3f02
-
-/* migrate to ffff tseries */
-typedef struct tser_pkt_s *tser_pkt_t;
 
 typedef struct tslab_s *tslab_t;
 
@@ -264,72 +270,8 @@ scom_thdr_mark_onhold(scom_thdr_t t)
 }
 
 
-/* MEH! */
-/* packet of 16 sparse level1 ticks, still fuck ugly */
-struct tser_pkt_s {
-	struct sl1t_s t[16];
-};
+/* our sl1tfile like (de)serialiser */
 
-/* gathered bullshit */
-#if defined INCLUDED_uterus_h_ && 0
-/* super-auxiliary, where does this belong? */
-static inline uint8_t
-index_in_pkt(dse16_t dse)
-{
-/* find the index of the date encoded in dse inside a tick bouquet */
-	dse16_t anchor = time_to_dse(442972800);
-	uint8_t res = (dse - anchor) % 14;
-	static uint8_t offs[14] = {
-		-1, 0, 1, 2, 3, 4, -1, -1, 5, 6, 7, 8, 9, -1
-	};
-	return offs[res];
-}
-
-static inline dse16_t
-tser_pkt_beg_dse(dse16_t dse)
-{
-	uint8_t sub = index_in_pkt(dse);
-	return dse - sub;
-}
-
-
-/* although we have stored uterus blocks in our tseries, the stuff that
- * gets sent is slightly different.
- * We send sparsely (ohlcv_p_s + admin) candles where then uterus macros
- * can be used to bang these into uterus blocks again. */
-
-static inline void
-spDute_bang_secu(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t pivot)
-{
-}
-
-static inline void
-spDute_bang_tser(
-	spDute_t tgt, su_secu_t s, tt_t tt,
-	dse16_t t, tser_pkt_t pkt, uint8_t idx)
-{
-	spDute_bang_secu(tgt, s, tt, t);
-#if 0
-	/* pkt should consist of uterus blocks */
-	switch (tt) {
-	case PFTT_BID:
-	case PFTT_ASK:
-	case PFTT_TRA:
-		ute_frob_ohlcv_p(&tgt->ohlcv, tt, &pkt->t[idx]);
-		break;
-	case PFTT_STL:
-		tgt->pri = pkt->t[idx].x.p;
-		break;
-	case PFTT_FIX:
-		tgt->pri = pkt->t[idx].f.p;
-		break;
-	default:
-		break;
-	}
-#endif
-	return;
-}
-#endif	/* INCLUDED_uterus_h_ */
 
 #ifdef __cplusplus
 }

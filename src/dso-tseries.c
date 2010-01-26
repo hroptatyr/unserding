@@ -455,12 +455,12 @@ instr_tick_by_instr_svc(job_t j)
 
 /* mktsnp getter */
 static void
-mktsnp_cb(su_secu_t s, const_sl1t_t t, void *UNUSED(clo))
+mktsnp_cb(tsc_box_t b, su_secu_t s, void *UNUSED(clo))
 {
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
-	fprintf(stderr, "found match %u/%i@%hu %p\n", qd, qt, p, t);
+	fprintf(stderr, "found match %u/%i@%hu %p\n", qd, qt, p, b);
 	return;
 }
 

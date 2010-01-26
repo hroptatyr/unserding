@@ -253,6 +253,7 @@ tsc_box_find_bbs(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 	return;
 }
 
+#if 0
 static void
 tsc_box_find_cb(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 {
@@ -288,6 +289,7 @@ tsc_box_find_cb(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 	}
 	return;
 }
+#endif
 
 
 /* helpers, for hmap */
@@ -753,12 +755,6 @@ tsc_find_cb(tscube_t tsc, tsc_key_t key, tsc_find_f cb, void *clo)
 {
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
-	struct __bbs_s bbclo = {
-		.si = 0,
-		.ntk = 0,
-		.cb = cb,
-		.clo = clo,
-	};
 
 	fprintf(stderr, "%p %p\n", cb, clo);
 	if (key->secu.mux == 0) {
@@ -776,9 +772,13 @@ tsc_find_cb(tscube_t tsc, tsc_key_t key, tsc_find_f cb, void *clo)
 			tsc_box_t box;
 
 			if ((box = bother_cube(tsc, key, &m->tbl[i]))) {
+#if 0
 				/* tell tsc_box bout our secu */
 				bbclo.s = ce->key->secu;
 				tsc_box_find_cb(&bbclo, box, key);
+#else
+				cb(box, ce->key->secu, clo);
+#endif
 				/* update the cache-add stamp */
 				box->cats = __stamp().tv_sec;
 			}

@@ -11,7 +11,7 @@ moddir = $(libdir)/unserding
 bin_PROGRAMS =
 if BUILD_SERVER
 bin_PROGRAMS += unserdingd unsercli
-noinst_PROGRAMS = instrumenstruation
+noinst_PROGRAMS = instrumenstruation uteseries
 endif
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
@@ -46,7 +46,10 @@ mod_LTLIBRARIES =
 mod_LTLIBRARIES += dso-cli.la dso-scscp.la dso-scscp2.la dso-bbdb.la dso-xbbdb.la
 #mod_LTLIBRARIES += dso-instr.la
 mod_LTLIBRARIES += dso-xdr-instr.la
-mod_LTLIBRARIES += dso-tseries.la
+mod_LTLIBRARIES += dso-tseries.la dso-tseries-ute.la
+if USE_MYSQL
+mod_LTLIBRARIES += dso-tseries-mysql.la
+endif
 dso_cli_la_LDFLAGS = -module
 dso_scscp_la_LDFLAGS = -module
 dso_scscp2_la_LDFLAGS = -module
@@ -70,19 +73,29 @@ endif
 dso_xdr_instr_la_SOURCES += dso-xdr-instr-file.c
 
 ## the time series module
-dso_tseries_la_LDFLAGS = -module $(PFACK_LIBS)
-dso_tseries_la_CPPFLAGS = $(PFACK_CFLAGS)
+dso_tseries_la_LDFLAGS = -module $(PFACK_LIBS) -export-dynamic
+dso_tseries_la_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
 dso_tseries_la_LIBADD = $(PFACK_LIBS)
-if USE_MYSQL
-dso_tseries_la_CPPFLAGS += $(MYSQL_CPPFLAGS)
-dso_tseries_la_LDFLAGS += $(MYSQL_LDFLAGS) -lmysqlclient
-endif
 dso_tseries_la_SOURCES = dso-tseries.c
-dso_tseries_la_SOURCES += intvtree.c tscache.c tscoll.c tseries.c
-if USE_MYSQL
-dso_tseries_la_SOURCES += dso-tseries-mysql.c
-endif
+dso_tseries_la_SOURCES += intvtree.c tscube.c
 dso_tseries_la_SOURCES += dso-tseries-frobq.c
+dso_tseries_la_LIBADD += -luterus
+
+if USE_MYSQL
+dso_tseries_mysql_la_SOURCES = dso-tseries-mysql.c
+dso_tseries_mysql_la_CPPFLAGS = $(MYSQL_CPPFLAGS)
+dso_tseries_mysql_la_LDFLAGS = -module
+dso_tseries_mysql_la_LDFLAGS += $(MYSQL_LDFLAGS) -lmysqlclient
+endif
+
+dso_tseries_ute_la_LDFLAGS = -module
+dso_tseries_ute_la_SOURCES = dso-tseries-ute.c
+dso_tseries_ute_la_LIBADD = -luterus
+
+## stuff we develop here but that will go eventually to sushi
+uteseries_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_MODE
+uteseries_LDFLAGS = -static
+uteseries_LDADD = -luterus -lpopt
 
 ## to fiddle with option chains and other instruments
 instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)

@@ -91,6 +91,11 @@ struct phone_s {
 	char number[32];
 };
 
+#if defined __INTEL_COMPILER
+/* args are eval'd in unspecified order */
+#pragma warning (disable:981)
+#endif	/* __INTEL_COMPILER */
+
 
 static void sta(void*, const xmlChar*, const xmlChar**);
 static void end(void*, const xmlChar*);

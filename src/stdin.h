@@ -55,4 +55,8 @@ extern void ud_reset_stdin(EV_P);
  * Asynchronously print the contents of BUF to stdout. */
 extern void stdin_print_async(const char *buf, size_t len);
 
+/* readline nonsense */
+extern void _rl_erase_entire_line(void);
+extern char *cmd_generator(const char *text, int state);
+
 #endif	/* INCLUDED_stdin_h_ */

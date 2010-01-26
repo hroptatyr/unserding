@@ -38,19 +38,9 @@
 #if !defined INCLUDED_tseries_private_h_
 #define INCLUDED_tseries_private_h_
 
-#include "tseries.h"
-#include "tscoll.h"
-#include "tscache.h"
+#include "tscube.h"
 
-/* the main one used in dso-tseries.c */
-extern tscache_t tscache;
-
-#if defined HAVE_MYSQL
-extern size_t
-fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t b, dse16_t e);
-extern void
-fetch_urn_mysql(void);
-#endif	/* HAVE_MYSQL */
+extern tscube_t gcube;
 
 
 /* module like helpers */
@@ -60,10 +50,32 @@ extern void dso_tseries_mysql_LTX_init(void*);
 extern void dso_tseries_mysql_LTX_deinit(void*);
 extern void dso_tseries_frobq_LTX_init(void*);
 extern void dso_tseries_frobq_LTX_deinit(void*);
+extern void dso_tseries_sl1t_LTX_init(void*);
+extern void dso_tseries_sl1t_LTX_deinit(void*);
+extern void dso_tseries_ute_LTX_init(void*);
+extern void dso_tseries_ute_LTX_deinit(void*);
 
 
 /* frob queue mumbo jumbo */
-extern void defer_frob(tseries_t tser, dse16_t refds, bool immediatep);
 extern void frobnicate(void);
+
+
+/* hooks */
+typedef struct hook_s *hook_t;
+typedef void(*hook_f)(job_t);
+
+struct hook_s {
+	size_t nf;
+	hook_f f[16];
+};
+
+extern hook_t fetch_urn_hook;
+
+static inline void
+add_hook(hook_t h, hook_f f)
+{
+	h->f[h->nf++] = f;
+	return;
+}
 
 #endif	/* INCLUDED_tseries_private_h_ */

@@ -46,7 +46,7 @@
 #include "unserding-nifty.h"
 #include "protocore.h"
 #include "ud-time.h"
-#include "tscoll.h"
+#include "tscube.h"
 
 static bool xmlp;
 static bool tslabp;
@@ -99,6 +99,57 @@ pcb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 }
 
 static void
+cb(const void *d)
+{
+	const struct tsc_ce_s *ce = d;
+	su_secu_t s = ce->key->secu;
+	char los[32], his[32];
+	/* secu dismantling */
+	uint32_t qd = su_secu_quodi(s);
+	int32_t qt = su_secu_quoti(s);
+	uint16_t p = su_secu_pot(s);
+	/* ttf */
+	uint16_t ttf = ce->key->ttf;
+
+	/* debugging mumbo jumbo */
+	print_ts_into(los, sizeof(los), ce->key->beg);
+	print_ts_into(his, sizeof(his), ce->key->end);
+	fprintf(stdout, "  tslab %u/%i@%hu %hu %s..%s\n",
+		qd, qt, p, ttf, los, his);
+	return;
+}
+
+static void
+find_one_instr(ud_handle_t hdl, const char *uii)
+{
+	uint32_t cid;
+	const void *data;
+	size_t len;
+	struct instr_s in[1];
+
+	if ((cid = strtol(uii, NULL, 10)) == 0) {
+		len = ud_find_one_isym(hdl, &data, uii, strlen(uii));
+	} else {
+		len = ud_find_one_instr(hdl, &data, cid);
+	}
+	if (len > 0) {
+		/* data here points to an xdr-encoded instr */
+		deser_instrument_into(in, data, len);
+		print_instr(stdout, in);
+		fputc('\n', stdout);
+	} else {
+		fprintf(stdout, "%s unknown\n", uii);
+		return;
+	}
+	/* now use the gaii of the instr(s) fetched */
+	cid = instr_gaid(in);
+	if (ud_find_tslabs(hdl, su_secu(cid, 0, 0), cb) == 0) {
+		fputs("  no tslabs yet\n", stdout);
+	}
+	return;
+}
+
+static void
 porno_mode(ud_handle_t hdl)
 {
 	char buf[UDPC_PKTLEN];
@@ -126,35 +177,7 @@ find_them_instrs(ud_handle_t hdl, const char *const *insv)
 	}
 	/* read the UII's from the command line */
 	for (const char *const *uii = insv; *uii; uii++) {
-		uint32_t cid = strtol(*uii, NULL, 10);
-		const void *data;
-		size_t len;
-
-		if (cid == 0) {
-			continue;
-		}
-		if ((len = ud_find_one_instr(hdl, &data, cid)) > 0) {
-			struct instr_s in;
-			/* data here points to an xdr-encoded instr */
-			deser_instrument_into(&in, data, len);
-			print_instr(stdout, &in);
-			fputc('\n', stdout);
-		} else {
-			fprintf(stdout, "%u unknown\n", cid);
-		}
-		if ((len = ud_find_one_tslab(hdl, &data, cid)) > 0) {
-			/* data hereby points to a tseries object */
-			const struct tslab_s *s = data;
-			char los[32], his[32];
-			/* debugging mumbo jumbo */
-			print_ts_into(los, sizeof(los), s->from);
-			print_ts_into(his, sizeof(his), s->till);
-			fprintf(stdout, "  tslab %u/%u@%hu %u %s..%s\n",
-				s->secu.instr, s->secu.unit, s->secu.pot,
-				s->types, los, his);
-		} else {
-			fputs("  no tslabs yet\n", stdout);
-		}
+		find_one_instr(hdl, *uii);
 	}
 	return;
 }

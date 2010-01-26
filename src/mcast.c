@@ -182,8 +182,8 @@ ud_retx(job_t j)
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	cno = udpc_seria_des_si32(&sctx);
-	pno = udpc_seria_des_si32(&sctx);
+	cno = udpc_seria_des_ui32(&sctx);
+	pno = udpc_seria_des_ui32(&sctx);
 
 	slot = find_packet(cno, pno);
 	memcpy(j->buf, &pktq[slot].buf, j->blen = pktq[slot].len);

@@ -47,7 +47,6 @@
 #include <fcntl.h>
 #include <pthread.h>
 
-#include <pfack/uterus.h>
 #include <pfack/instruments.h>
 /* our master include */
 #include "unserding.h"
@@ -59,8 +58,6 @@
 #include "ud-time.h"
 
 #include "urn.h"
-#include "tscache.h"
-#include "tscoll.h"
 #include "tseries-private.h"
 
 #if defined HAVE_MYSQL
@@ -73,6 +70,8 @@
 /* some common routines */
 #include "mysql-helpers.h"
 #include "tseries.h"
+#define DEFINE_GORY_STUFF
+#include <sushi/m30.h>
 
 #if !defined countof
 # define countof(x)	(sizeof(x) / sizeof(*x))
@@ -88,11 +87,6 @@
 
 /* mysql conn, kept open */
 static void *conn = NULL;
-
-struct tser_pkt_idx_s {
-	uint32_t i;
-	tser_pkt_t pkt;
-};
 
 static time_t
 parse_time(const char *t)
@@ -124,46 +118,51 @@ dupfld(const char *r)
 	return res;
 }
 
-static m32_t
-get_m32(const char *s)
+static m30_t
+get_m30(const char *s)
 {
 	if (UNLIKELY(s == NULL)) {
-		return UTE_NEXIST;
+		return ffff_m30_get_ui32(0);
 	}
-	return ffff_monetary32_get_s(s);
+	return ffff_m30_get_s(&s);
 }
 
 
+struct qrclo_s {
+	tsc_box_t box;
+	uint32_t max;
+};
+
 static void
 qry_rowf(void **row, size_t nflds, void *clo)
 {
-	dse16_t ds = time_to_dse(parse_time(row[0]));
-	tser_pkt_t pkt = clo;
-	uint8_t iip = index_in_pkt(ds);
+	struct qrclo_s *qrclo = clo;
+	time_t ts = parse_time(row[0]);
+	uint32_t cnt = qrclo->box->nt;
 
-	if (UNLIKELY(iip >= countof(pkt->t))) {
-		/* do not cache weekend `prices' */
+	if (UNLIKELY(cnt >= qrclo->max)) {
+		/* stop caching */
 		return;
 	}
 	/* brilliantly hard-coded bollocks */
-	if (nflds == 2) {
-		m32_t p = get_m32(row[1]);
-		UD_DEBUG("putting %s %2.4f into slot %d\n",
-			 (char*)row[0], ffff_monetary32_d(p), iip);
-		pkt->t[iip].f.p = p;
+	if (nflds == 2 || nflds == 3) {
+		m30_t p = get_m30(row[1]);
+		m30_t q = nflds == 3 ? get_m30(row[2]) : ffff_m30_get_ui32(0);
+		sl1t_t tv = qrclo->box->sl1t + cnt;
+		scom_thdr_t th = (void*)tv;
 
-	} else if (nflds == 5 || nflds == 6) {
-		/* just a spot-OHLCV */
-		struct ohlcv_p_s cdl = {
-			.o = get_m32(row[1]),
-			.h = get_m32(row[2]),
-			.l = get_m32(row[3]),
-			.c = get_m32(row[4]),
-		};
-		UD_DEBUG("putting %s OHLC candle into slot %d\n",
-			 (char*)row[0], iip);
-		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_TRA, ds, &cdl);
+		/* bang bang */
+		scom_thdr_set_sec(th, ts);
+		scom_thdr_set_msec(th, 0);
+		scom_thdr_set_ttf(th, SL1T_TTF_FIX);
+		scom_thdr_set_tblidx(th, 0);
+		qrclo->box->sl1t[cnt].v[0] = ffff_m30_ui32(p);
+		qrclo->box->sl1t[cnt].v[1] = ffff_m30_ui32(q);
+		qrclo->box->nt += (qrclo->box->pad = 1);
+
 	} else {
+		abort();
+#if 0
 		/* full BATOMCFX candles */
 		struct ohlcv_p_s cdl;
 
@@ -193,40 +192,44 @@ qry_rowf(void **row, size_t nflds, void *clo)
 		UD_DEBUG("putting %s T-OHLC candle into slot %d\n",
 			 (char*)row[0], iip);
 		ute_bang_ohlcv_p(&pkt->t[iip], PFTT_TRA, ds, &cdl);
+#endif
 	}
 	return;
 }
 
 static inline size_t
-print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
+print_qry(char *tgt, size_t len, tsc_key_t k, urn_t urn, time32_t b, time32_t e)
 {
 	char begs[16], ends[16];
 
-	print_ds_into(begs, sizeof(begs), dse_to_time(b));
-	print_ds_into(ends, sizeof(ends), dse_to_time(e));
+	print_ds_into(begs, sizeof(begs), b);
+	print_ds_into(ends, sizeof(ends), e);
 
-	switch (urn_type(tser->urn)) {
+#if defined __INTEL_COMPILER
+# pragma warning	(disable:981)
+#endif	/* __INTEL_COMPILER */
+	switch (urn_type(urn)) {
 	case URN_OAD_C:
 	case URN_OAD_OHLC:
 	case URN_OAD_OHLCV:
 		len = snprintf(
 			tgt, len,
-			"SELECT %s AS `stamp`, "
-			"%s AS `o`, %s AS `h`, %s AS `l`, %s AS `c`, %s AS `v` "
+			"SELECT "
+			"%s AS `stamp`, "
+			"%s AS `c`, %s AS `v` "
 			"FROM %s "
 			"WHERE %s = %u AND %s BETWEEN '%s' AND '%s' "
 			"ORDER BY 1",
-			urn_fld_date(tser->urn),
-			urn_fld_top(tser->urn),
-			urn_fld_thp(tser->urn),
-			urn_fld_tlp(tser->urn),
-			urn_fld_tcp(tser->urn),
-			urn_fld_tv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
-			urn_fld_dbtbl(tser->urn),
-			urn_fld_id(tser->urn), tser->secu->instr,
-			urn_fld_date(tser->urn), begs, ends);
+			urn_fld_date(urn),
+			urn_fld_tcp(urn),
+			urn_fld_tv(urn) ? urn_fld_tv(urn) : "0",
+			urn_fld_dbtbl(urn),
+			urn_fld_id(urn),
+			su_secu_quodi(k->secu),
+			urn_fld_date(urn), begs, ends);
 		break;
 	case URN_UTE_CDL:
+#if 0
 		len = snprintf(
 			tgt, len,
 			"SELECT %s AS `stamp`, "
@@ -257,8 +260,12 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 			urn_fld_tv(tser->urn) ? urn_fld_tv(tser->urn) : "0",
 
 			urn_fld_dbtbl(tser->urn),
-			urn_fld_id(tser->urn), tser->secu->instr,
+			urn_fld_id(tser->urn),
+			su_secu_quodi(tser->secu),
 			urn_fld_date(tser->urn), begs, ends);
+#else
+		len = 0;
+#endif
 		break;
 
 	case URN_L1_TICK:
@@ -268,26 +275,30 @@ print_qry(char *restrict tgt, size_t len, tseries_t tser, dse16_t b, dse16_t e)
 	default:
 		len = 0;
 	}
+#if defined __INTEL_COMPILER
+# pragma warning	(default:981)
+#endif	/* __INTEL_COMPILER */
 	return len;
 }
 
-size_t
-fetch_ticks_intv_mysql(tser_pkt_t pkt, tseries_t tser, dse16_t beg, dse16_t end)
+/* tick fetching revised */
+static size_t
+fetch_tick(
+	tsc_box_t tgt, size_t tsz, tsc_key_t k, void *uval,
+	time32_t beg, time32_t end)
 {
-/* assumes eod ticks for now,
- * i wonder if it's wise to have all the intelligence in here
- * to go through various different tsa's as they are now chained
- * together */
 	char qry[480];
 	size_t len;
 	size_t nres;
+	struct qrclo_s qrclo[1];
 
-	memset(pkt, 0, sizeof(*pkt));
-	len = print_qry(qry, sizeof(qry), tser, beg, end);
+	len = print_qry(qry, sizeof(qry), k, uval, beg, end);
 	UD_DEBUG_SQL("querying: %s\n", qry);
-	nres = uddb_qry(conn, qry, len, qry_rowf, pkt);
-	UD_DEBUG("got %lu prices\n", (long unsigned int)nres);
-	return nres;
+	qrclo->box = tgt;
+	qrclo->max = tsz;
+	nres = uddb_qry(conn, qry, len, qry_rowf, qrclo);
+	UD_DEBUG("got %zu/%zu prices\n", qrclo->box->nt, nres);
+	return qrclo->box->nt;
 }
 
 
@@ -322,6 +333,9 @@ fld_date_p(const char *row_name)
 		return false;						\
 	}
 
+#if defined __INTEL_COMPILER
+# pragma warning	(disable:424)
+#endif
 MAKE_PRED(bo, "bop");
 MAKE_PRED(bh, "bhp");
 MAKE_PRED(bl, "blp");
@@ -346,7 +360,7 @@ MAKE_PRED(x, "x", "set");
 #define fld_close_p	fld_tc_p
 #define fld_volume_p	fld_tv_p
 
-static const_urn_t
+static urn_t
 find_urn(urn_type_t type, const char *urn)
 {
 	index_t idx;
@@ -367,7 +381,7 @@ fill_batfx_ohlcv(urn_t urn, const char *r)
 {
 #define APPEND(_urn, _x, _r)						\
 	if (fld_##_x##_p(_r)) {						\
-		UD_DBGCONT("=> " #_x "\n");				\
+		/*UD_DBGCONT("=> " #_x "\n");*/				\
 		_urn->flds.batfx_ohlcv.fld_##_x = dupfld(_r);		\
 		return;							\
 	}
@@ -389,7 +403,7 @@ fill_batfx_ohlcv(urn_t urn, const char *r)
 	APPEND(urn, tv, r);
 	APPEND(urn, f, r);
 	APPEND(urn, x, r);
-	UD_DBGCONT("unknown column: \"%s\"\n", r);
+	//UD_DBGCONT("unknown column: \"%s\"\n", r);
 #undef APPEND
 	return;
 }
@@ -399,12 +413,12 @@ urnqry_rowf(void **row, size_t UNUSED(nflds), void *clo)
 {
 	urn_t urn = clo;
 
-	UD_DEBUG("column %s %s ... ", urn->dbtbl, (char*)row[0]);
+	//UD_DEBUG("column %s %s ... ", urn->dbtbl, (char*)row[0]);
 	if (urn->flds.unk.fld_id == NULL && fld_id_p(row[0])) {
-		UD_DBGCONT("=> id\n");
+		//UD_DBGCONT("=> id\n");
 		urn->flds.unk.fld_id = dupfld(row[0]);
 	} else if (urn->flds.unk.fld_date == NULL && fld_date_p(row[0])) {
-		UD_DBGCONT("=> stamp\n");
+		//UD_DBGCONT("=> stamp\n");
 		urn->flds.unk.fld_date = dupfld(row[0]);
 	} else {
 		fill_batfx_ohlcv(urn, row[0]);
@@ -461,52 +475,47 @@ static const char ovqry[] =
 /* if TBS_OAD is set, this indicates if there are 5 days in a week */
 #define TBS_5DW		0x02
 
+/* forward decl */
+static void fetch_urn_mysql(job_t UNUSED(j));
+
+static struct tsc_ops_s mysql_ops[1] = {{
+		.fetch_cb = fetch_tick,
+		.urn_refetch_cb = NULL,
+	}};
+
 static void
 ovqry_rowf(void **row, size_t UNUSED(nflds), void *UNUSED(clo))
 {
+	tscube_t c = gcube;
+	time32_t beg = parse_time(row[MIN_DT]);
+	time32_t end = UNLIKELY(row[MAX_DT] == NULL)
+		? 0x7fffffff
+		: parse_time(row[MAX_DT]);
+	uint32_t qd = strtoul(row[QUODI_ID], NULL, 10);
+	int32_t qt = strtol(row[QUOTI_ID], NULL, 10);
+	uint16_t p = strtoul(row[POT_ID], NULL, 10);
+	/* urn voodoo */
 	uint32_t urn_id = strtoul(row[URN_ID], NULL, 10);
-	struct secu_s secu;
-	tscoll_t tsc;
-	struct tseries_s tser;
-	uint32_t tbs = strtoul(row[TYPES_BS], NULL, 10);
-
-	secu.instr = strtoul(row[QUODI_ID], NULL, 10);
-	secu.unit = strtoul(row[QUOTI_ID], NULL, 10);
-	secu.pot = strtoul(row[POT_ID], NULL, 10);
-
-	switch (urn_id) {
-	case 1 ... 3:
-	case 8:
-		/* once-a-day, 5-a-week */
-		UD_DEBUG("OAD/5DW tick for %u/%u@%hu\n",
-			 secu.instr, secu.unit, secu.pot);
-		tsc = find_tscoll_by_secu_crea(tscache, &secu);
-
-		tser.urn = find_urn(urn_id, row[URN]);
-		if (UNLIKELY(row[MIN_DT] == NULL)) {
-			/* i'm not entirely sure about the meaning of this */
-			break;
-		}
-		tser.from = parse_time(row[MIN_DT]);
-		if (UNLIKELY(row[MAX_DT] == NULL)) {
-			/* we agreed on saying that this means up-to-date
-			 * so consequently we assign the maximum key */
-			tser.to = 0x7fffffff;
-		} else {
-			tser.to = parse_time(row[MAX_DT]);
-		}
-		tser.types = tbs;
-		/* add to the collection of time stamps */
-		tscoll_add(tsc, &tser);
-
-	default:
-		break;
-	}
+	urn_t urn = find_urn((urn_type_t)urn_id, row[URN]);
+	/* the final cube entry */
+	struct tsc_ce_s ce = {
+		.key = {{
+				.beg = beg,
+				.end = end,
+				.ttf = SL1T_TTF_FIX,
+				.msk = 1 | 2 | 4 | 8 | 16,
+				.secu = su_secu(qd, qt, p),
+			}},
+		.ops = mysql_ops,
+		.uval = urn,
+	};
+	/* add to the cube */
+	tsc_add(c, &ce);
 	return;
 }
 
-void
-fetch_urn_mysql(void)
+static void
+fetch_urn_mysql(job_t UNUSED(j))
 {
 /* make me thread-safe and declare me */
 	if (conn == NULL) {
@@ -523,18 +532,90 @@ fetch_urn_mysql(void)
 	return;
 }
 
+
+static void*
+cfgspec_get_source(void *ctx, void *spec)
+{
+#define CFG_SOURCE	"source"
+	return udcfg_tbl_lookup(ctx, spec, CFG_SOURCE);
+}
+
+
+typedef enum {
+	CST_UNK,
+	CST_MYSQL,
+} cfgsrc_type_t;
+
+static cfgsrc_type_t
+cfgsrc_type(void *ctx, void *spec)
+{
+#define CFG_TYPE	"type"
+	const char *type = NULL;
+
+	if (spec == NULL) {
+		UD_DEBUG("mod/tseries: no source specified\n");
+		return CST_UNK;
+	}
+	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
+
+	if (type == NULL) {
+		return CST_UNK;
+	} else if (memcmp(type, "mysql", 5) == 0) {
+		return CST_MYSQL;
+	}
+	return CST_UNK;
+}
+
+static void
+load_ticks_fetcher(void *clo, void *spec)
+{
+	void *src;
+
+	if ((src = cfgspec_get_source(clo, spec)) == NULL) {
+		return;
+	}
+
+	/* pass along the src settings */
+	udctx_set_setting(clo, src);
+
+	/* find out about its type */
+	switch (cfgsrc_type(clo, src)) {
+	case CST_MYSQL:
+		if ((conn = uddb_connect(clo, src)) == NULL) {
+			UD_DBGCONT("failed\n");
+		}
+
+	case CST_UNK:
+	default:
+		/* do fuckall */
+		break;
+	}
+
+	/* clean up */
+	udctx_set_setting(clo, NULL);
+	udcfg_tbl_free(clo, src);
+	return;
+}
+
+
 /* initialiser code */
 void
 dso_tseries_mysql_LTX_init(void *clo)
 {
-	void *spec = udctx_get_setting(clo);
+	ud_ctx_t ctx = clo;
+	void *settings;
 
 	UD_DEBUG("mod/tseries-mysql: connecting ...");
-	if ((conn = uddb_connect(clo, spec)) == NULL) {
-		UD_DBGCONT("failed\n");
-		return;
+	if ((settings = udctx_get_setting(ctx)) != NULL) {
+		load_ticks_fetcher(clo, settings);
+		/* be so kind as to unref the settings */
+		udcfg_tbl_free(ctx, settings);
 	}
+	/* clean up */
+	udctx_set_setting(ctx, NULL);
 	UD_DBGCONT("done\n");
+	/* announce our hook fun */
+	add_hook(fetch_urn_hook, fetch_urn_mysql);
 	return;
 }
 

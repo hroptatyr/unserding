@@ -144,7 +144,7 @@ get_val(_cat_t c, gaid_t key)
 	return -1;
 }
 
-static inline void
+static inline __attribute__((unused)) void
 add_key(_cat_t c, gaid_t key, uint32_t idx)
 {
 	uint32_t s = slot(c->keys, c->alloc_sz, key);
@@ -191,7 +191,7 @@ free_keys(_cat_t c)
 	return;
 }
 
-static inline instr_t
+static inline __attribute__((unused)) instr_t
 __by_gaid_nolock(_cat_t c, gaid_t gaid)
 {
 	/* obtain the slot into our instrs array */

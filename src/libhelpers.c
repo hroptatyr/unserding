@@ -55,7 +55,7 @@
 #endif
 
 #define NRETRIES	2
-//#define USE_SUBSCR
+#define USE_SUBSCR
 
 struct f1i_clo_s {
 	ud_convo_t cno;
@@ -98,7 +98,31 @@ ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 	memset(buf, 0, sizeof(buf));
 	udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-	udpc_seria_add_si32(&sctx, cont_id);
+	udpc_seria_add_ui32(&sctx, cont_id);
+	/* prepare packet for sending im off */
+	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+	ud_send_raw(hdl, pkt);
+
+	/* use timeout of 0, letting the mart system decide */
+	__f1i_clo.cno = cno;
+	__f1i_clo.tgt = tgt;
+	ud_subscr_raw(hdl, 0, __f1i_cb, &__f1i_clo);
+	return __f1i_clo.len;
+}
+
+size_t
+ud_find_one_isym(ud_handle_t hdl, const void **tgt, const char *sym, size_t len)
+{
+	struct udpc_seria_s sctx;
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = BUF_PACKET(buf);
+	ud_convo_t cno = hdl->convo++;
+	struct f1i_clo_s __f1i_clo;
+
+	memset(buf, 0, sizeof(buf));
+	udpc_make_pkt(pkt, cno, 0, UD_SVC_INSTR_BY_ATTR);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	udpc_seria_add_str(&sctx, sym, len);
 	/* prepare packet for sending im off */
 	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 	ud_send_raw(hdl, pkt);
@@ -133,7 +157,7 @@ ud_find_many_instrs(
 		udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
 #define FILL	(UDPC_PLLEN / sizeof(struct instr_s))
 		for (index_t j = 0, i = rcvd; j < FILL && i < len; i++, j++) {
-			udpc_seria_add_si32(&sctx, cont_id[i]);
+			udpc_seria_add_ui32(&sctx, cont_id[i]);
 		}
 #undef FILL
 		/* prepare packet for sending im off */
@@ -162,58 +186,92 @@ struct f1tsl_clo_s {
 	ud_convo_t cno;
 	size_t len;
 	const void **tgt;
+	void(*cb)(const void *d);
 };
 
 static bool
 __f1tsl_cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 {
-	struct f1i_clo_s *bc = clo;
+	struct f1tsl_clo_s *bc = clo;
 	struct udpc_seria_s sctx;
+	const void *tgt[1];
 
 	if (UDPC_PKT_INVALID_P(pkt)) {
-		bc->len = 0;
+		/* finish the subscription */
 		return false;
 	} else if (udpc_pkt_cno(pkt) != bc->cno) {
 		/* we better ask for another packet */
-		bc->len = 0;
 		return true;
 	}
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	if ((bc->len = udpc_seria_des_data(&sctx, bc->tgt)) == 0) {
-		/* what? just wait a bit */
-		return true;
+	if (bc->cb == NULL) {
+		/* old behaviour, subject to disappear */
+		if ((bc->len = udpc_seria_des_data(&sctx, bc->tgt)) == 0) {
+			/* what? just wait a bit */
+			return true;
+		}
+		/* no more packets please */
+		return false;
 	}
-	/* no more packets please */
-	return false;
+	/* otherwise */
+	while (udpc_seria_des_data(&sctx, tgt)) {
+		/* tgt[0] should be cast to const struct tsc_ce_s* */
+		bc->cb(tgt[0]);
+		bc->len++;
+	}
+	return true;
 }
 
 size_t
-ud_find_one_tslab(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
+ud_find_one_tslab(ud_handle_t hdl, const void **tgt, su_secu_t s)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = BUF_PACKET(buf);
 	ud_convo_t cno = hdl->convo++;
-	struct f1tsl_clo_s __f1t_clo;
+	struct f1tsl_clo_s __f1t_clo[1];
 
 	memset(buf, 0, sizeof(buf));
 	udpc_make_pkt(pkt, cno, 0, UD_SVC_GET_URN);
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-	/* dispatch the quodi */
-	udpc_seria_add_ui32(&sctx, cont_id);
-	/* all quotis */
-	udpc_seria_add_ui32(&sctx, 0);
-	/* all pots */
-	udpc_seria_add_ui32(&sctx, 0);
+	/* dispatch the secu */
+	udpc_seria_add_secu(&sctx, s);
 	/* prepare packet for sending im off */
 	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
 	ud_send_raw(hdl, pkt);
 
 	/* use timeout of 0, letting the mart system decide */
-	__f1t_clo.cno = cno;
-	__f1t_clo.tgt = tgt;
-	ud_subscr_raw(hdl, 0, __f1tsl_cb, &__f1t_clo);
-	return __f1t_clo.len;
+	__f1t_clo->cno = cno;
+	__f1t_clo->tgt = tgt;
+	__f1t_clo->len = 0;
+	ud_subscr_raw(hdl, 0, __f1tsl_cb, __f1t_clo);
+	return __f1t_clo->len;
+}
+
+size_t
+ud_find_tslabs(ud_handle_t hdl, su_secu_t s, void(*cb)(const void*))
+{
+	struct udpc_seria_s sctx;
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = BUF_PACKET(buf);
+	ud_convo_t cno = hdl->convo++;
+	struct f1tsl_clo_s __f1t_clo[1];
+
+	memset(buf, 0, sizeof(buf));
+	udpc_make_pkt(pkt, cno, 0, UD_SVC_GET_URN);
+	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	/* dispatch the secu */
+	udpc_seria_add_secu(&sctx, s);
+	/* prepare packet for sending im off */
+	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+	ud_send_raw(hdl, pkt);
+
+	/* use timeout of 0, letting the mart system decide */
+	__f1t_clo->cno = cno;
+	__f1t_clo->cb = cb;
+	__f1t_clo->len = 0;
+	ud_subscr_raw(hdl, 0, __f1tsl_cb, __f1t_clo);
+	return __f1t_clo->len;
 }
 
 
@@ -223,7 +281,8 @@ ud_find_one_tslab(ud_handle_t hdl, const void **tgt, uint32_t cont_id)
 
 #if defined USE_TICK_BY_TS
 size_t
-ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
+ud_find_one_price(
+	ud_handle_t hdl, char *tgt, su_secu_t s, uint32_t bs, time_t ts)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
@@ -252,7 +311,8 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 }
 #elif defined USE_TICK_BY_INSTR
 size_t
-ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
+ud_find_one_price(
+	ud_handle_t hdl, char *tgt, su_secu_t s, uint32_t bs, time_t ts)
 {
 	struct udpc_seria_s sctx;
 	char buf[UDPC_PKTLEN];
@@ -265,7 +325,7 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
 	/* 4222(secu, tick_bitset, ts, ts, ts, ...) */
 	udpc_seria_add_secu(&sctx, s);
-	udpc_seria_add_ui32(&sctx, bs);
+	udpc_seria_add_tbs(&sctx, bs);
 	udpc_seria_add_ui32(&sctx, ts);
 	/* prepare packet for sending im off */
 	pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
@@ -282,78 +342,80 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts)
 }
 #endif	/* USE_TICK_BY_TS || USE_TICK_BY_INSTR */
 
+/* for __popcnt */
+#include "aux.h"
+
 static size_t
 max_num_ticks(uint32_t bitset)
 {
-#if defined __SSE4_2__
-	__asm__("popcnt %0\n"
-		: "=r" (bitset) : "rm" (bitset));
-	return bitset;
-#else
-/* stolen from http://www-graphics.stanford.edu/~seander/bithacks.html */
-	/* Magic Binary Numbers */
-	static const int S[] = {1, 2, 4, 8, 16};
-	static const int B[] = {
-		0x55555555, 0x33333333, 0x0F0F0F0F, 0x00FF00FF, 0x0000FFFF};
-	size_t cnt = bitset;
+	return __popcnt(bitset);
+}
 
-	cnt = cnt - ((cnt >> 1) & B[0]);
-	cnt = ((cnt >> S[1]) & B[1]) + (cnt & B[1]);
-	cnt = ((cnt >> S[2]) + cnt) & B[2];
-	cnt = ((cnt >> S[3]) + cnt) & B[3];
-	cnt = ((cnt >> S[4]) + cnt) & B[4];
-	return cnt;
-#endif	/* !SSE */
+static inline void
+udpc_seria_add_tick_by_ts_hdr(udpc_seria_t sctx, time_t ts, tbs_t bs)
+{
+	udpc_seria_add_ui32(sctx, ts);
+	udpc_seria_add_tbs(sctx, bs);
+	return;
+}
+
+static inline void
+udpc_seria_add_tick_by_instr_hdr(udpc_seria_t sctx, su_secu_t s, tbs_t bs)
+{
+	udpc_seria_add_secu(sctx, s);
+	udpc_seria_add_tbs(sctx, bs);
+	return;
 }
 
 void
 ud_find_ticks_by_ts(
 	ud_handle_t hdl,
-	void(*cb)(sl1tick_t, void *clo), void *clo,
-	secu_t s, size_t slen,
-	uint32_t bs, time_t ts)
+	void(*cb)(su_secu_t, scom_t, void *clo), void *clo,
+	su_secu_t *s, size_t slen,
+	tbs_t bs, time_t ts)
 {
 	index_t rcvd = 0;
 	index_t retry = NRETRIES;
-	struct tick_by_ts_hdr_s hdr = {.ts = ts, .types = bs};
 
 	do {
-		struct udpc_seria_s sctx;
-		struct sl1tick_s t;
+		struct udpc_seria_s sctx[1];
+		struct sl1t_s t[1];
 		char buf[UDPC_PKTLEN];
 		ud_packet_t pkt = {.plen = sizeof(buf), .pbuf = buf};
 		ud_convo_t cno = hdl->convo++;
+		su_secu_t sec;
 
 		retry--;
 		memset(buf, 0, sizeof(buf));
 		udpc_make_pkt(pkt, cno, 0, UD_SVC_TICK_BY_TS);
-		udpc_seria_init(&sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+		udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
 /* compute me! */
 #define FILL	(48 / max_num_ticks(bs))
 		/* 4220(ts, tick_bitset, triples-of-instrs) */
-		udpc_seria_add_tick_by_ts_hdr(&sctx, &hdr);
+		udpc_seria_add_tick_by_ts_hdr(sctx, ts, bs);
 		for (index_t j = 0, i = rcvd; j < FILL && i < slen; i++, j++) {
-			udpc_seria_add_secu(&sctx, &s[i]);
+			udpc_seria_add_secu(sctx, s[i]);
 		}
 #undef FILL
 		/* prepare packet for sending im off */
-		pkt.plen = udpc_seria_msglen(&sctx) + UDPC_HDRLEN;
+		pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
 		ud_send_raw(hdl, pkt);
 
 		/* let the mart system decide */
 		pkt.plen = sizeof(buf);
 		ud_recv_convo(hdl, &pkt, 0, cno);
-		udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
+		udpc_seria_init(sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen);
 
 		/* we assume that instrs are sent in the same order as
 		 * requested *inside* the packet */
-		while (udpc_seria_des_sl1tick(&t, &sctx)) {
+		while (su_secu_ui64(sec = udpc_seria_des_secu(sctx)) &&
+		       udpc_seria_des_sl1t(t, sctx)) {
 			/* marking-less approach, so we could make s[] const */
-			if (sl1tick_instr(&t) == s[rcvd].instr) {
+			if (su_secu_match_p(s[rcvd], sec)) {
 				rcvd++;
 			}
 			/* callback */
-			cb(&t, clo);
+			cb(sec, (const void*)t, clo);
 			retry = NRETRIES;
 		}
 	} while (rcvd < slen && retry > 0);
@@ -369,15 +431,16 @@ struct ftbi_ctx_s {
 	uint8_t rcvd;
 	ud_convo_t cno;
 	char buf[UDPC_PKTLEN];
-	struct sparse_Dute_s Dute;
-	struct udpc_seria_s sctx;
-	secu_t secu;
-	uint32_t types;
+	/* leave a bit of space here */
+	struct sl1t_s sl1t[4];
+	struct udpc_seria_s sctx[1];
+	su_secu_t secu;
+	tbs_t tbs;
 	ud_packet_t pkt;
 	/* hope this still works on 32b systems
 	 * oh oh, this implicitly encodes NFILL (which is 64 at the mo) */
 	uint64_t seen;
-	void(*cb)(spDute_t, void *clo);
+	void(*cb)(su_secu_t, scom_t, void *clo);
 	void *clo;
 #if defined USE_SUBSCR
 	time_t *ts;
@@ -396,11 +459,11 @@ init_bictx(ftbi_ctx_t bictx, ud_handle_t hdl)
 }
 
 static index_t
-whereis(spDute_t t, time_t ts[], size_t nts)
+whereis(const_sl1t_t t, time_t ts[], size_t nts)
 {
 /* look if the tick in t has been asked for and return the index */
 	for (index_t i = 0; i < nts; i++) {
-		if (t->pivot == time_to_dse(ts[i])) {
+		if ((time_t)sl1t_stmp_sec(t) == ts[i]) {
 			return i;
 		}
 	}
@@ -416,9 +479,9 @@ new_convo(ftbi_ctx_t bictx)
 
 	bictx->retry--;
 	memset(bictx->buf, 0, sizeof(bictx->buf));
-	memset(&bictx->Dute, 0, sizeof(bictx->Dute));
+	memset(bictx->sl1t, 0, sizeof(*bictx->sl1t));
 	udpc_make_pkt(bictx->pkt, bictx->cno, 0, UD_SVC_TICK_BY_INSTR);
-	udpc_seria_init(&bictx->sctx, UDPC_PAYLOAD(bictx->buf), UDPC_PLLEN);
+	udpc_seria_init(bictx->sctx, UDPC_PAYLOAD(bictx->buf), UDPC_PLLEN);
 	return;
 }
 
@@ -428,6 +491,13 @@ seenp(ftbi_ctx_t bictx, index_t i)
 	return bictx->seen & (1 << i);
 }
 
+static inline bool
+seen_all_p(ftbi_ctx_t bc)
+{
+	uint64_t msk = (1 << bc->nts) - 1;
+	return (bc->seen & msk) == msk;
+}
+
 static inline void
 set_seen(ftbi_ctx_t bictx, index_t i)
 {
@@ -435,15 +505,14 @@ set_seen(ftbi_ctx_t bictx, index_t i)
 	return;
 }
 
-static void
+static __attribute__((noinline)) void
 feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 {
 #define FILL(X)	(48 / max_num_ticks(X))
-	udpc_seria_add_secu(&bictx->sctx, bictx->secu);
-	udpc_seria_add_ui32(&bictx->sctx, bictx->types);
-	for (index_t j = 0, i = 0; j < FILL(bictx->types) && i < nts; i++) {
+	udpc_seria_add_tick_by_instr_hdr(bictx->sctx, bictx->secu, bictx->tbs);
+	for (index_t j = 0, i = 0; j < FILL(bictx->tbs) && i < nts; i++) {
 		if (!seenp(bictx, i)) {
-			udpc_seria_add_ui32(&bictx->sctx, ts[i]);
+			udpc_seria_add_ui32(bictx->sctx, ts[i]);
 			j++;
 		}
 	}
@@ -458,15 +527,16 @@ feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 static void
 send_stamps(ftbi_ctx_t bictx)
 {
-	bictx->pkt.plen = udpc_seria_msglen(&bictx->sctx) + UDPC_HDRLEN;
+	bictx->pkt.plen = udpc_seria_msglen(bictx->sctx) + UDPC_HDRLEN;
 	ud_send_raw(bictx->hdl, bictx->pkt);
 	return;
 }
 
 #if defined USE_SUBSCR
 /* we combine recv_ticks() and frob_ticks() in here */
+#define usa	UNUSED(sa)
 static bool
-__recv_tick_cb(const ud_packet_t pkt, void *clo)
+__recv_tick_cb(const ud_packet_t pkt, ud_const_sockaddr_t usa, void *clo)
 {
 	ftbi_ctx_t bc = clo;
 
@@ -477,22 +547,23 @@ __recv_tick_cb(const ud_packet_t pkt, void *clo)
 		return true;
 	}
 	udpc_seria_init(
-		&bc->sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	while (udpc_seria_des_spDute(&bc->Dute, &bc->sctx)) {
+		bc->sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	while ((bc->secu = udpc_seria_des_secu(bc->sctx)).mux &&
+	       udpc_seria_des_sl1t(bc->sl1t, bc->sctx)) {
 		index_t where;
-		if ((where = whereis(&bc->Dute, bc->ts, bc->nts)) < bc->nts) {
-			if (!spDute_onhold_p(&bc->Dute)) {
+		if ((where = whereis(bc->sl1t, bc->ts, bc->nts)) < bc->nts) {
+			if (!sl1t_onhold_p(bc->sl1t)) {
 				bc->rcvd++;
 				/* mark it, use our mark vector */
 				set_seen(bc, where);
 			}
 		}
 		/* callback */
-		(*bc->cb)(&bc->Dute, bc->clo);
+		bc->cb(bc->secu, (const void*)bc->sl1t, bc->clo);
 		bc->retry = NRETRIES;
 	}
 	/* ask for more */
-	return true;
+	return !seen_all_p(bc);
 }
 
 static void
@@ -513,24 +584,26 @@ recv_ticks(ftbi_ctx_t bc)
 	/* we use a timeout of 0 to let the mart thingie decide */
 	bc->pkt.plen = sizeof(bc->buf);
 	ud_recv_convo(bc->hdl, &bc->pkt, 0, bc->cno);
-	udpc_seria_init(&bc->sctx, UDPC_PAYLOAD(bc->pkt.pbuf), bc->pkt.plen);
+	udpc_seria_init(bc->sctx, UDPC_PAYLOAD(bc->pkt.pbuf), bc->pkt.plen);
 	return;
 }
 
 static void
 frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 {
-	while (udpc_seria_des_spDute(&bictx->Dute, &bictx->sctx)) {
+	/* we don't really need this, do we? */
+	udpc_seria_des_secu(bictx->sctx);
+	while (udpc_seria_des_sl1t(bictx->sl1t, bictx->sctx)) {
 		index_t where;
-		if ((where = whereis(&bictx->Dute, ts, nts)) < nts) {
-			if (!spDute_onhold_p(&bictx->Dute)) {
+		if ((where = whereis(bictx->sl1t, ts, nts)) < nts) {
+			if (!sl1t_onhold_p(bictx->sl1t)) {
 				bictx->rcvd++;
 				/* mark it, use our mark vector */
 				set_seen(bictx, where);
 			}
 		}
 		/* callback */
-		(*bictx->cb)(&bictx->Dute, bictx->clo);
+		bictx->cb(bictx->secu, (const void*)bictx->sl1t, bictx->clo);
 		bictx->retry = NRETRIES;
 	}
 	return;
@@ -538,30 +611,30 @@ frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 #endif	/* USE_SUBSCR */
 
 static inline void
-lodge_closure(ftbi_ctx_t bictx, void(*cb)(spDute_t, void *clo), void *clo)
+lodge_closure(ftbi_ctx_t b, void(*cb)(su_secu_t, scom_t, void *clo), void *clo)
 {
-	bictx->cb = cb;
-	bictx->clo = clo;
+	b->cb = cb;
+	b->clo = clo;
 	return;
 }
 
 static inline void
-lodge_ihdr(ftbi_ctx_t bictx, secu_t secu, uint32_t types)
+lodge_ihdr(ftbi_ctx_t bictx, su_secu_t secu, tbs_t tbs)
 {
 	bictx->secu = secu;
-	bictx->types = types;
+	bictx->tbs = tbs;
 	return;
 }
 
 void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
-	ud_find_ticks_by_instr_cb_f cb, void *clo,
-	secu_t s, uint32_t bs,
+	void(*cb)(su_secu_t, scom_t, void *clo), void *clo,
+	su_secu_t s, tbs_t bs,
 	time_t *ts, size_t tslen)
 {
 /* fixme, the retry cruft should be a parameter? */
-	struct ftbi_ctx_s __bictx, *bictx = &__bictx;
+	struct ftbi_ctx_s bictx[1];
 
 	init_bictx(bictx, hdl);
 	lodge_ihdr(bictx, s, bs);

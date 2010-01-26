@@ -43,6 +43,15 @@
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"
+/* comes from sushi */
+#include <sushi/secu.h>
+#include <sushi/scommon.h>
+#include <sushi/sl1t.h>
+#include <sushi/scdl.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /* tick services */
 #if !defined index_t
@@ -105,194 +114,34 @@
 #define UD_SVC_FETCH_URN	0x4226
 
 
-/* points to the tick-type of the day */
-#define sl1tick_s		sl1tp_s
-#define sl1tick_t		sl1tp_t
-#define fill_sl1tick_shdr	fill_sl1tp_shdr
-#define fill_sl1tick_tick	fill_sl1tp_tick
-#define sl1tick_value		sl1tp_value
-#define sl1tick_set_value	sl1tp_set_value
-#define sl1tick_tick_type	sl1tp_tt
-#define sl1tick_set_tick_type	sl1tp_set_tt
-#define sl1tick_timestamp	sl1tp_ts
-#define sl1tick_set_stamp	sl1tp_set_stamp
-#define sl1tick_msec		sl1tp_msec
-#define sl1tick_instr		sl1tp_inst
-#define sl1tick_set_instr	sl1tp_set_inst
-#define sl1tick_unit		sl1tp_unit
-#define sl1tick_set_unit	sl1tp_set_unit
-#define sl1tick_pot		sl1tp_exch
-#define sl1tick_set_pot		sl1tp_set_exch
+/**
+ * Adminstrative service 3f02.  List all cached boxes in the cube. */
+#define UD_SVC_LIST_BOXES	0x3f02
 
 /* migrate to ffff tseries */
 typedef struct tser_pkt_s *tser_pkt_t;
 
 typedef struct tslab_s *tslab_t;
 
-typedef struct secu_s *secu_t;
-typedef struct tick_by_ts_hdr_s *tick_by_ts_hdr_t;
-typedef struct tick_by_instr_hdr_s *tick_by_instr_hdr_t;
-typedef struct sl1tp_s *sl1tp_t;
-#if defined INCLUDED_uterus_h_
-typedef struct sl1t_s *sl1t_t;
-#endif	/* INCLUDED_uterus_h_ */
-
 typedef uint32_t date_t;
-
-/**
- * Condensed version of:
- *   // upper 10 bits
- *   uint10_t millisec_flags;
- *   // lower 6 bits
- *   uint6_t tick_type;
- * where the millisec_flags slot uses the values 0 to 999 if it
- * is a valid available tick and denotes the milliseconds part
- * of the timestamp and special values 1000 to 1023 if it's not,
- * whereby:
- * - 1023 TICK_NA denotes a tick that is not available, as in it
- *   is unknown to the system whether or not it exists
- * - 1022 TICK_NE denotes a tick that is known not to exist
- * - 1021 TICK_OLD denotes a tick that is too old and hence
- *   meaningless in the current context
- * - 1020 TICK_SOON denotes a tick that is known to exist but
- *   is out of reach at the moment, a packet retransmission will
- *   be necessary
- * In either case the actual timestamp and value slot of the tick
- * structure has become meaningless, therefore it is possible to
- * transfer even shorter, denser versions of the packet in such
- * cases, saving 64 bits, at the price of non-uniformity.
- **/
-typedef uint16_t l1t_auxinfo_t;
 
 #define TICK_NA		((uint16_t)1023)
 #define TICK_NE		((uint16_t)1022)
 #define TICK_OLD	((uint16_t)1021)
 #define TICK_SOON	((uint16_t)1020)
 
-
-/**
- * Sparse level 1 ticks, packed. */
-struct sl1tp_s {
-	uint32_t inst;
-	uint32_t unit;
-	uint16_t exch;
-	l1t_auxinfo_t auxinfo;
-	/* these are actually optional */
-	uint32_t ts;
-	uint32_t val;
-};
+#define SCOM_ONHOLD	(1022)
 
-struct tick_by_ts_hdr_s {
-	time_t ts;
-	uint32_t types;
-};
-
-struct secu_s {
-	uint32_t instr;
-	uint32_t unit;
-	uint16_t pot;
-};
-
-struct tick_by_instr_hdr_s {
-	struct secu_s secu;
-	uint32_t types;
-};
-
-#if defined INCLUDED_uterus_h_
-struct sl1t_s {
-	struct secu_s secu;
-	struct l1tick_s tick;
-};
-#endif	/* INCLUDED_uterus_h_ */
+/* type bitsets */
+typedef uint32_t tbs_t;
 
 /**
  * Tslabs, roughly metadata that describe the slabs of tseries. */
 struct tslab_s {
-	struct secu_s secu;
+	su_secu_t secu;
 	time_t from, till;
-	uint32_t types;
+	tbs_t types;
 };
-
-#if defined INCLUDED_uterus_h_
-/* packet of 10 uterus blocks, still fuck ugly */
-struct tser_pkt_s {
-	uterus_s t[10];
-};
-
-/* although we have stored uterus blocks in our tseries, the stuff that
- * gets sent is slightly different.
- * We send sparsely (ohlcv_p_s + admin) candles where then uterus macros
- * can be used to bang these into uterus blocks again. */
-
-static inline void
-spDute_bang_secu(spDute_t tgt, secu_t s, uint8_t tt, dse16_t pivot)
-{
-	tgt->instr = s->instr;
-	tgt->unit = s->unit;
-	tgt->mux = ((s->pot & 0x3ff) << 6) | (tt & 0x3f);
-	tgt->pivot = pivot;
-	return;
-}
-
-static inline void
-spDute_bang_tser(
-	spDute_t tgt, secu_t s, tt_t tt,
-	dse16_t t, tser_pkt_t pkt, uint8_t idx)
-{
-	spDute_bang_secu(tgt, s, tt, t);
-	/* pkt should consist of uterus blocks */
-	switch (tt) {
-	case PFTT_BID:
-	case PFTT_ASK:
-	case PFTT_TRA:
-		ute_frob_ohlcv_p(&tgt->ohlcv, tt, &pkt->t[idx]);
-		break;
-	case PFTT_STL:
-		tgt->pri = pkt->t[idx].x.p;
-		break;
-	case PFTT_FIX:
-		tgt->pri = pkt->t[idx].f.p;
-		break;
-	default:
-		break;
-	}
-	return;
-}
-
-static inline void
-spDute_bang_nexist(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
-{
-	spDute_bang_secu(tgt, s, tt, t);
-	switch (tt) {
-	case PFTT_BID:
-	case PFTT_ASK:
-	case PFTT_TRA:
-		ute_fill_ohlcv_p_nexist(&tgt->ohlcv);
-		break;
-	default:
-		tgt->pri = UTE_NEXIST;
-		break;
-	}
-	return;
-}
-
-static inline void
-spDute_bang_onhold(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
-{
-	spDute_bang_secu(tgt, s, tt, t);
-	switch (tt) {
-	case PFTT_BID:
-	case PFTT_ASK:
-	case PFTT_TRA:
-		ute_fill_ohlcv_p_onhold(&tgt->ohlcv);
-		break;
-	default:
-		tgt->pri = UTE_ONHOLD;
-		break;
-	}
-	return;
-}
-#endif	/* INCLUDED_uterus_h_ */
 
 
 /**
@@ -306,7 +155,7 @@ spDute_bang_onhold(spDute_t tgt, secu_t s, uint8_t tt, dse16_t t)
  * \return the length of the tick packet
  **/
 extern size_t
-ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
+ud_find_one_price(ud_handle_t h, char *tgt, su_secu_t s, tbs_t bs, time_t ts);
 
 /**
  * Deliver a packet storm of ticks for instruments specified by S at TS.
@@ -314,12 +163,9 @@ ud_find_one_price(ud_handle_t hdl, char *tgt, secu_t s, uint32_t bs, time_t ts);
 extern void
 ud_find_ticks_by_ts(
 	ud_handle_t hdl,
-	void(*cb)(sl1tick_t, void *clo), void *clo,
-	secu_t s, size_t slen,
-	uint32_t bs, time_t ts);
-
-#if defined INCLUDED_uterus_h_
-typedef void(*ud_find_ticks_by_instr_cb_f)(spDute_t, void *clo);
+	void(*cb)(su_secu_t, scom_t, void *clo), void *clo,
+	su_secu_t *s, size_t slen,
+	tbs_t bs, time_t ts);
 
 /**
  * Deliver a packet storm of ticks for S at specified times TS.
@@ -327,168 +173,106 @@ typedef void(*ud_find_ticks_by_instr_cb_f)(spDute_t, void *clo);
 extern void
 ud_find_ticks_by_instr(
 	ud_handle_t hdl,
-	ud_find_ticks_by_instr_cb_f cb, void *clo,
-	secu_t s, uint32_t bs,
+	void(*cb)(su_secu_t, scom_t, void *clo), void *clo,
+	su_secu_t s, tbs_t bs,
 	time_t *ts, size_t tslen);
-#endif	/* INCLUDED_uterus_h_ */
 
 
-/* inlines, type (de)muxers */
-static inline l1t_auxinfo_t
-l1t_auxinfo(uint16_t msec, uint8_t tt)
-{
-	return (msec << 6) | (tt & 0x3f);
-}
-
-static inline l1t_auxinfo_t
-l1t_auxinfo_set_msec(l1t_auxinfo_t src, uint16_t msec)
-{
-	return (src & 0x3f) | (msec << 6);
-}
-
-static inline l1t_auxinfo_t
-l1t_auxinfo_set_tt(l1t_auxinfo_t src, uint8_t tt)
-{
-	return (src & 0xffc0) | (tt & 0x3f);
-}
-
-static inline uint16_t
-l1t_auxinfo_msec(l1t_auxinfo_t ai)
-{
-	return (ai >> 6);
-}
-
-static inline uint8_t
-l1t_auxinfo_tt(l1t_auxinfo_t ai)
-{
-	return (ai & 0x3f);
-}
-
-/* the sl1tp packed tick, consumes 12 or 20 bytes */
+/* (de)serialisers */
 static inline void
-fill_sl1tp_shdr(sl1tp_t l1t, uint32_t secu, uint32_t fund, uint16_t exch)
+udpc_seria_add_secu(udpc_seria_t sctx, su_secu_t secu)
 {
-	l1t->inst = secu;
-	l1t->unit = fund;
-	l1t->exch = exch;
+/* we assume sizeof(su_secu_t) == 8 */
+	udpc_seria_add_ui64(sctx, su_secu_ui64(secu));
 	return;
 }
 
-static inline void
-fill_sl1tp_tick(sl1tp_t l1t, time_t ts, uint16_t msec, uint8_t tt, uint32_t v)
+static inline su_secu_t
+udpc_seria_des_secu(udpc_seria_t sctx)
 {
-	l1t->auxinfo = l1t_auxinfo(msec, tt);
-	l1t->ts = ts;
-	l1t->val = v;
-	return;
-}
-
-static inline uint32_t
-sl1tp_value(sl1tp_t t)
-{
-	return t->val;
+/* we assume sizeof(su_secu_t) == 8 */
+	uint64_t wire = udpc_seria_des_ui64(sctx);
+	return su_secu_set_ui64(wire);
 }
 
 static inline void
-sl1tp_set_value(sl1tp_t tgt, uint32_t v)
+udpc_seria_add_tbs(udpc_seria_t sctx, tbs_t bs)
 {
-	tgt->val = v;
+	udpc_seria_add_ui32(sctx, bs);
 	return;
 }
 
-static inline uint8_t
-sl1tp_tt(sl1tp_t t)
+static inline tbs_t
+udpc_seria_des_tbs(udpc_seria_t sctx)
 {
-	return l1t_auxinfo_tt(t->auxinfo);
+	return udpc_seria_des_ui32(sctx);
 }
 
 static inline void
-sl1tp_set_tt(sl1tp_t t, uint8_t tt)
+udpc_seria_add_sl1t(udpc_seria_t sctx, const_sl1t_t t)
 {
-	l1t_auxinfo_set_tt(t->auxinfo, tt);
+	udpc_seria_add_data(sctx, t, sizeof(*t));
 	return;
 }
 
-static inline uint16_t
-sl1tp_msec(sl1tp_t t)
+static inline bool
+udpc_seria_des_sl1t(sl1t_t t, udpc_seria_t sctx)
 {
-	return l1t_auxinfo_msec(t->auxinfo);
-}
-
-static inline uint32_t
-sl1tp_ts(sl1tp_t t)
-{
-	return t->ts;
+	/* have to use a bigger size here */
+	return udpc_seria_des_data_into(t, sizeof(struct scdl_s), sctx) > 0;
 }
 
 static inline void
-sl1tp_set_stamp(sl1tp_t t, uint32_t ts, uint16_t msec)
+udpc_seria_add_scdl(udpc_seria_t sctx, const_scdl_t t)
 {
-	t->ts = ts;
-	l1t_auxinfo_set_msec(t->auxinfo, msec);
+	udpc_seria_add_data(sctx, t, sizeof(*t));
 	return;
 }
 
-static inline uint32_t
-sl1tp_inst(sl1tp_t t)
+static inline bool
+udpc_seria_des_scdl(scdl_t t, udpc_seria_t sctx)
 {
-	return t->inst;
+	/* have to use a bigger size here */
+	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
+}
+
+/* Attention, a tseries_t object gets transferred as tslab_t,
+ * the corresponding udpc_seria_add_tseries() is in tscoll.h. */
+static inline bool
+udpc_seria_des_tslab(tslab_t ts, udpc_seria_t sctx)
+{
+	return udpc_seria_des_data_into(ts, sizeof(*ts), sctx) > 0;
+}
+
+static inline __attribute__((pure)) bool
+scom_thdr_onhold_p(const_scom_thdr_t h)
+{
+	return scom_thdr_msec(h) == SCOM_ONHOLD;
+}
+
+static inline __attribute__((pure)) bool
+sl1t_onhold_p(const_sl1t_t h)
+{
+	return scom_thdr_onhold_p(h->hdr);
 }
 
 static inline void
-sl1tp_set_inst(sl1tp_t t, uint32_t inst)
+scom_thdr_mark_onhold(scom_thdr_t t)
 {
-	t->inst = inst;
+	scom_thdr_set_msec(t, SCOM_ONHOLD);
 	return;
 }
 
-static inline uint32_t
-sl1tp_unit(sl1tp_t t)
-{
-	return t->unit;
-}
+
+/* MEH! */
+/* packet of 16 sparse level1 ticks, still fuck ugly */
+struct tser_pkt_s {
+	struct sl1t_s t[16];
+};
 
-static inline void
-sl1tp_set_unit(sl1tp_t t, uint32_t unit)
-{
-	t->unit = unit;
-	return;
-}
-
-static inline uint16_t
-sl1tp_exch(sl1tp_t t)
-{
-	return t->exch;
-}
-
-static inline void
-sl1tp_set_exch(sl1tp_t t, uint16_t exch)
-{
-	t->exch = exch;
-	return;
-}
-
-#if defined INCLUDED_uterus_h_
-/* them old sl1t ticks, consumes 28 bytes */
-static inline void
-fill_sl1t_secu(sl1t_t l1t, uint32_t secu, uint32_t fund, uint16_t exch)
-{
-	l1t->secu.instr = secu;
-	l1t->secu.unit = fund;
-	l1t->secu.pot = exch;
-	return;
-}
-
-static inline void
-fill_sl1t_tick(sl1t_t l1t, time_t ts, uint16_t msec, tt_t tt, uint32_t v)
-{
-	l1t->tick.ts = ts;
-	l1t->tick.nsec = msec * 1000000;
-	l1t->tick.tt = tt;
-	l1t->tick.value = v;
-	return;
-}
-
+/* gathered bullshit */
+#if defined INCLUDED_uterus_h_ && 0
+/* super-auxiliary, where does this belong? */
 static inline uint8_t
 index_in_pkt(dse16_t dse)
 {
@@ -507,101 +291,48 @@ tser_pkt_beg_dse(dse16_t dse)
 	uint8_t sub = index_in_pkt(dse);
 	return dse - sub;
 }
-#endif	/* INCLUDED_uterus_h_ */
 
-
-/* (de)serialisers */
+
+/* although we have stored uterus blocks in our tseries, the stuff that
+ * gets sent is slightly different.
+ * We send sparsely (ohlcv_p_s + admin) candles where then uterus macros
+ * can be used to bang these into uterus blocks again. */
+
 static inline void
-udpc_seria_add_tick_by_ts_hdr(udpc_seria_t sctx, tick_by_ts_hdr_t t)
+spDute_bang_secu(spDute_t tgt, su_secu_t s, uint8_t tt, dse16_t pivot)
 {
-	udpc_seria_add_ui32(sctx, t->ts);
-	udpc_seria_add_ui32(sctx, t->types);
-	return;
 }
 
 static inline void
-udpc_seria_des_tick_by_ts_hdr(tick_by_ts_hdr_t t, udpc_seria_t sctx)
+spDute_bang_tser(
+	spDute_t tgt, su_secu_t s, tt_t tt,
+	dse16_t t, tser_pkt_t pkt, uint8_t idx)
 {
-	t->ts = udpc_seria_des_ui32(sctx);
-	t->types = udpc_seria_des_ui32(sctx);
-	return;
-}
-
-static inline void
-udpc_seria_add_secu(udpc_seria_t sctx, secu_t secu)
-{
-	udpc_seria_add_ui32(sctx, secu->instr);
-	udpc_seria_add_ui32(sctx, secu->unit);
-	udpc_seria_add_ui32(sctx, secu->pot);
-	return;
-}
-
-static inline bool
-udpc_seria_des_secu(secu_t t, udpc_seria_t sctx)
-{
-	if ((t->instr = udpc_seria_des_ui32(sctx)) == 0) {
-		/* no gaid? fuck off early */
-		t->unit = 0;
-		t->pot = 0;
-		return false;
+	spDute_bang_secu(tgt, s, tt, t);
+#if 0
+	/* pkt should consist of uterus blocks */
+	switch (tt) {
+	case PFTT_BID:
+	case PFTT_ASK:
+	case PFTT_TRA:
+		ute_frob_ohlcv_p(&tgt->ohlcv, tt, &pkt->t[idx]);
+		break;
+	case PFTT_STL:
+		tgt->pri = pkt->t[idx].x.p;
+		break;
+	case PFTT_FIX:
+		tgt->pri = pkt->t[idx].f.p;
+		break;
+	default:
+		break;
 	}
-	/* currency */
-	t->unit = udpc_seria_des_ui32(sctx);
-	/* exchange */	
-	t->pot = udpc_seria_des_ui32(sctx);
-	return true;
-}
-
-static inline void
-udpc_seria_add_tick_by_instr_hdr(udpc_seria_t sctx, tick_by_instr_hdr_t h)
-{
-	udpc_seria_add_secu(sctx, &h->secu);
-	udpc_seria_add_ui32(sctx, h->types);
+#endif
 	return;
-}
-
-static inline void
-udpc_seria_des_tick_by_instr_hdr(tick_by_instr_hdr_t h, udpc_seria_t sctx)
-{
-	udpc_seria_des_secu(&h->secu, sctx);
-	h->types = udpc_seria_des_ui32(sctx);
-	return;
-}
-
-static inline void
-udpc_seria_add_sl1tick(udpc_seria_t sctx, sl1tick_t t)
-{
-	udpc_seria_add_data(sctx, t, sizeof(*t));
-	return;
-}
-
-static inline bool
-udpc_seria_des_sl1tick(sl1tick_t t, udpc_seria_t sctx)
-{
-	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
-}
-
-#if defined INCLUDED_uterus_h_
-static inline void
-udpc_seria_add_spDute(udpc_seria_t sctx, spDute_t t)
-{
-	udpc_seria_add_data(sctx, t, sizeof(*t));
-	return;
-}
-
-static inline bool
-udpc_seria_des_spDute(spDute_t t, udpc_seria_t sctx)
-{
-	return udpc_seria_des_data_into(t, sizeof(*t), sctx) > 0;
 }
 #endif	/* INCLUDED_uterus_h_ */
 
-/* Attention, a tseries_t object gets transferred as tslab_t,
- * the corresponding udpc_seria_add_tseries() is in tscoll.h. */
-static inline bool
-udpc_seria_des_tslab(tslab_t ts, udpc_seria_t sctx)
-{
-	return udpc_seria_des_data_into(ts, sizeof(*ts), sctx) > 0;
+#ifdef __cplusplus
 }
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_tseries_h_ */

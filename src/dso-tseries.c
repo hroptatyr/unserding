@@ -60,21 +60,13 @@
 /* for higher level packet handling */
 #include "seria-proto-glue.h"
 
-/* later to be decoupled from the actual source */
-#if defined HAVE_MYSQL
-# if defined HAVE_MYSQL_MYSQL_H
-#  include <mysql/mysql.h>
-# elif defined HAVE_MYSQL_H
-#  include <mysql.h>
-# endif
-#endif	/* HAVE_MYSQL */
 /* tseries stuff, to be replaced with ffff */
-#include "tscache.h"
-#include "tscoll.h"
+#include "tscube.h"
 #include "tseries.h"
 #include "tseries-private.h"
 
-tscache_t tscache = NULL;
+tscube_t gcube = NULL;
+struct hook_s __fetch_urn_hook[1], *fetch_urn_hook = __fetch_urn_hook;
 
 #if defined DEBUG_FLAG
 # define UD_DEBUG_TSER(args...)			\
@@ -82,11 +74,13 @@ tscache_t tscache = NULL;
 #endif	/* DEBUG_FLAG */
 
 
+#if 0
+/* deactivated for a mo */
 typedef struct spitfire_ctx_s *spitfire_ctx_t;
 typedef enum spitfire_res_e spitfire_res_t;
 
 struct spitfire_ctx_s {
-	secu_t secu;
+	su_secu_t *secu;
 	size_t slen;
 	index_t idx;
 	time_t ts;
@@ -108,22 +102,26 @@ spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
 	/* start out with one tick per instr */
 	while (sfctx->idx < sfctx->slen &&
 	       sctx->msgoff < sctx->len - /*yuck*/7*8) {
-		secu_t s = &sfctx->secu[sfctx->idx];
+		su_secu_t s = sfctx->secu[sfctx->idx];
 
 		if (trick && (1 << (PFTT_EOD))/* bollocks */ & sfctx->types) {
-			gaid_t i = s->instr;
-			gaid_t u = s->unit ? s->unit : 73380;
-			gaid_t p = s->pot ? s->pot : 4;
+			gaid_t i = su_secu_quodi(s);
+			gaid_t u = su_secu_quoti(s);
+			gaid_t p = su_secu_pot(s);
 
+			u = u ? u : 73380;
+			p = p ? p : 4;
 			fill_sl1tick_shdr(&t, i, u, p);
 			fill_sl1tick_tick(&t, sfctx->ts, 0, PFTT_EOD, 10000);
 			udpc_seria_add_sl1tick(sctx, &t);
 		}
 		if (!trick && (1 << (PFTT_STL))/* bollocks */ & sfctx->types) {
-			gaid_t i = s->instr;
-			gaid_t u = s->unit ? s->unit : 73380;
-			gaid_t p = s->pot ? s->pot : 4;
+			gaid_t i = su_secu_quodi(s);
+			gaid_t u = su_secu_quoti(s);
+			gaid_t p = su_secu_pot(s);
 
+			u = u ? u : 73380;
+			p = p ? p : 4;
 			fill_sl1tick_shdr(&t, i, u, p);
 			fill_sl1tick_tick(&t, sfctx->ts, 0, PFTT_STL, 15000);
 			udpc_seria_add_sl1tick(sctx, &t);
@@ -135,7 +133,8 @@ spitfire(spitfire_ctx_t sfctx, udpc_seria_t sctx)
 }
 
 static void
-init_spitfire(spitfire_ctx_t ctx, secu_t secu, size_t slen, tick_by_ts_hdr_t t)
+init_spitfire(
+	spitfire_ctx_t ctx, su_secu_t *secu, size_t slen, tick_by_ts_hdr_t t)
 {
 	ctx->secu = secu;
 	ctx->slen = slen;
@@ -148,23 +147,25 @@ init_spitfire(spitfire_ctx_t ctx, secu_t secu, size_t slen, tick_by_ts_hdr_t t)
 static void
 instr_tick_by_ts_svc(job_t j)
 {
-	struct udpc_seria_s sctx;
+	struct udpc_seria_s sctx[1];
 	struct udpc_seria_s rplsctx;
 	struct job_s rplj;
 	/* in args */
-	struct tick_by_ts_hdr_s hdr;
+	uint32_t ts;
+	tbs_t tbs;
 	/* allow to filter for 64 instruments at once */
-	struct secu_s filt[64];
+	su_secu_t filt[64];
 	unsigned int nfilt = 0;
 	struct spitfire_ctx_s sfctx;
 
 	/* prepare the iterator for the incoming packet */
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the header off of the wire */
-	udpc_seria_des_tick_by_ts_hdr(&hdr, &sctx);
+	ts = udpc_seria_des_ui32(sctx);
+	tbs = udpc_seria_des_tbs(sctx);
 
 	/* triples of instrument identifiers */
-	while (udpc_seria_des_secu(&filt[nfilt], &sctx) &&
+	while ((filt[nfilt].mux = udpc_seria_des_secu(&sctx).mux) &&
 	       ++nfilt < countof(filt));
 
 	UD_DEBUG("0x4220: ts:%d filtered for %u instrs\n", (int)hdr.ts, nfilt);
@@ -183,6 +184,7 @@ instr_tick_by_ts_svc(job_t j)
 	}
 	return;
 }
+#endif
 
 
 /* number of stamps we can process at once */
@@ -191,15 +193,15 @@ instr_tick_by_ts_svc(job_t j)
 typedef struct oadt_ctx_s *oadt_ctx_t;
 struct oadt_ctx_s {
 	udpc_seria_t sctx;
-	secu_t secu;
-	tscoll_t coll;
-	time_t filt[NFILT];
+	su_secu_t secu;
+	time32_t filt[NFILT];
 	size_t nfilt;
+	tbs_t tbs;
 };
 
 /* we sort the list of requested time stamps to collapse contiguous ones */
 static index_t
-selsort_minidx(time_t arr[], size_t narr, index_t offs)
+selsort_minidx(time32_t arr[], size_t narr, index_t offs)
 {
 	index_t minidx = offs;
 
@@ -212,9 +214,9 @@ selsort_minidx(time_t arr[], size_t narr, index_t offs)
 }
 
 static inline void
-selsort_swap(time_t arr[], index_t i1, index_t i2)
+selsort_swap(time32_t arr[], index_t i1, index_t i2)
 {
-	time_t tmp;
+	time32_t tmp;
 	tmp = arr[i1];
 	arr[i1] = arr[i2];
 	arr[i2] = tmp;
@@ -222,7 +224,7 @@ selsort_swap(time_t arr[], index_t i1, index_t i2)
 }
 
 static void
-selsort_in_situ(time_t arr[], size_t narr)
+selsort_in_situ(time32_t arr[], size_t narr)
 {
 	for (index_t i = 0; i < narr-1; i++) {
 		index_t minidx;
@@ -233,7 +235,7 @@ selsort_in_situ(time_t arr[], size_t narr)
 }
 
 static size_t
-snarf_times(udpc_seria_t sctx, time_t ts[], size_t nts)
+snarf_times(udpc_seria_t sctx, time32_t ts[], size_t nts)
 {
 	size_t nfilt = 0;
 	while ((ts[nfilt] = udpc_seria_des_ui32(sctx)) && ++nfilt < nts);
@@ -243,7 +245,7 @@ snarf_times(udpc_seria_t sctx, time_t ts[], size_t nts)
 	return nfilt;
 }
 
-static const char*
+static __attribute__((unused)) const char*
 tsbugger(time_t ts)
 {
 	static char buf[32];
@@ -254,96 +256,136 @@ tsbugger(time_t ts)
 	return buf;
 }
 
-static void
-spDute_bang_all(oadt_ctx_t octx, dse16_t refts, tser_pkt_t pkt, uint8_t idx)
+static __attribute__((unused)) const char*
+secbugger(su_secu_t s)
 {
-	struct sparse_Dute_s tgt;
+	static char buf[64];
+	uint32_t qd = su_secu_quodi(s);
+	int32_t qt = su_secu_quoti(s);
+	uint16_t p = su_secu_pot(s);
 
-	spDute_bang_tser(&tgt, octx->secu, PFTT_BID, refts, pkt, idx);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	spDute_bang_tser(&tgt, octx->secu, PFTT_ASK, refts, pkt, idx);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	spDute_bang_tser(&tgt, octx->secu, PFTT_TRA, refts, pkt, idx);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
+	snprintf(buf, sizeof(buf), "%u/%i@%hu", qd, qt, p);
+	return buf;
+}
 
-	spDute_bang_tser(&tgt, octx->secu, PFTT_STL, refts, pkt, idx);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	spDute_bang_tser(&tgt, octx->secu, PFTT_FIX, refts, pkt, idx);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
+static inline bool
+__tbs_has_p(tbs_t tbs, uint16_t ttf)
+{
+	return tbs & (1UL << ttf);
+}
+
+
+static void
+__bang_nexist(oadt_ctx_t octx, time32_t refts, uint16_t ttf)
+{
+	struct sl1t_s tgt[1];
+	scom_thdr_t th = (void*)tgt;
+
+	scom_thdr_set_sec(th, refts);
+	scom_thdr_mark_nexist(th);
+	scom_thdr_set_ttf(th, ttf);
+	scom_thdr_set_tblidx(th, 0);
+
+	udpc_seria_add_secu(octx->sctx, octx->secu);
+	udpc_seria_add_sl1t(octx->sctx, tgt);
 	return;
 }
 
 static void
-spDute_bang_all_nexist(oadt_ctx_t octx, dse16_t refts)
+__bang_onhold(oadt_ctx_t octx, time_t refts, uint16_t ttf)
 {
-	struct sparse_Dute_s tgt;
+	struct sl1t_s tgt[1];
+	scom_thdr_t th = (void*)tgt;
 
-	spDute_bang_nexist(&tgt, octx->secu, PFTT_BID, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	spDute_bang_nexist(&tgt, octx->secu, PFTT_ASK, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	spDute_bang_nexist(&tgt, octx->secu, PFTT_TRA, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
+	scom_thdr_set_sec(th, refts);
+	scom_thdr_mark_onhold(th);
+	scom_thdr_set_ttf(th, ttf);
+	scom_thdr_set_tblidx(th, 0);
 
-	spDute_bang_nexist(&tgt, octx->secu, PFTT_STL, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	spDute_bang_nexist(&tgt, octx->secu, PFTT_FIX, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
+	udpc_seria_add_secu(octx->sctx, octx->secu);
+	udpc_seria_add_sl1t(octx->sctx, tgt);
+	return;
+}
+
+static __attribute__((unused)) void
+__bang_all_nexist(oadt_ctx_t octx, time_t refts)
+{
+	tbs_t tbs = octx->tbs;
+
+#define BANG_IF_TBS_HAS(_x)				\
+	if (__tbs_has_p(tbs, (_x))) {			\
+		__bang_nexist(octx, refts, (_x));	\
+	} else
+
+	BANG_IF_TBS_HAS(SL1T_TTF_BID);
+	BANG_IF_TBS_HAS(SL1T_TTF_ASK);
+	BANG_IF_TBS_HAS(SL1T_TTF_TRA);
+	BANG_IF_TBS_HAS(SL1T_TTF_FIX);
+	BANG_IF_TBS_HAS(SL1T_TTF_STL);
+
+#undef BANG_IF_TBS_HAS
+	return;
+}
+
+static __attribute__((unused)) void
+__bang_all_onhold(oadt_ctx_t octx, time_t refts)
+{
+	tbs_t tbs = octx->tbs;
+
+#define BANG_IF_TBS_HAS(_x)				\
+	if (__tbs_has_p(tbs, (_x))) {			\
+		__bang_onhold(octx, refts, (_x));	\
+	} else
+
+	BANG_IF_TBS_HAS(SL1T_TTF_BID);
+	BANG_IF_TBS_HAS(SL1T_TTF_ASK);
+	BANG_IF_TBS_HAS(SL1T_TTF_TRA);
+	BANG_IF_TBS_HAS(SL1T_TTF_FIX);
+	BANG_IF_TBS_HAS(SL1T_TTF_STL);
+
+#undef BANG_IF_TBS_HAS
 	return;
 }
 
 static void
-spDute_bang_all_onhold(oadt_ctx_t octx, dse16_t refts)
+proc_one(oadt_ctx_t octx, time32_t ts)
 {
-	struct sparse_Dute_s tgt;
+	struct tsc_key_s k = {
+		.secu = octx->secu,
+		.beg = ts, .end = ts,
+		/* just noughtify the rest */
+		.ttf = 0,
+		/* make sure we let the system know what we want */
+		.msk = 1 | 2 | 4,
+	};
+	struct sl1t_s t[16];
+	su_secu_t s[countof(t)];
+	size_t ntk;
+	time32_t last_seen;
 
-	spDute_bang_onhold(&tgt, octx->secu, PFTT_BID, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	spDute_bang_onhold(&tgt, octx->secu, PFTT_ASK, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	spDute_bang_onhold(&tgt, octx->secu, PFTT_TRA, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-
-	spDute_bang_onhold(&tgt, octx->secu, PFTT_STL, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	spDute_bang_onhold(&tgt, octx->secu, PFTT_FIX, refts);
-	udpc_seria_add_spDute(octx->sctx, &tgt);
-	return;
-}
-
-static void
-proc_one(oadt_ctx_t octx, time_t ts)
-{
-	tseries_t tser;
-	tser_pkt_t pkt;
-	dse16_t refts = time_to_dse(ts);
-	uint8_t idx;
-
-	/* this is the 10-ticks per 2 weeks fragment, so dont bother
-	 * looking up saturdays and sundays */
-#define TICKS_PER_FORTNIGHT	10
-	if ((idx = index_in_pkt(refts)) >= TICKS_PER_FORTNIGHT) {
-		/* leave a note in the packet? */
-		UD_DEBUG_TSER("week end tick (%u %s)\n",
-			      octx->secu->instr, tsbugger(ts));
-		spDute_bang_all_nexist(octx, refts);
-
-	} else if ((tser = tscoll_find_series(octx->coll, ts)) == NULL) {
-		/* no way of obtaining ticks */
-		UD_DEBUG_TSER("No suitable URN found (%u %s)\n",
-			      octx->secu->instr, tsbugger(ts));
-		spDute_bang_all_nexist(octx, refts);
-
-	} else if ((pkt = tseries_find_pkt(tser, refts)) == NULL) {
-		UD_DEBUG_TSER("URN not cached, deferring (%u %s)\n",
-			      octx->secu->instr, tsbugger(ts));
-		defer_frob(tser, refts - idx, false);
-		spDute_bang_all_onhold(octx, refts);
-
-	} else {
-		/* bother the cache */
-		UD_DEBUG("yay, cached\n");
-		spDute_bang_all(octx, refts, pkt, idx);
+	ntk = tsc_find(t, s, countof(t), gcube, &k);
+	UD_DEBUG("found %zu for secu %s\n", ntk, secbugger(octx->secu));
+	if (ntk == 0) {
+		__bang_nexist(octx, ts, SL1T_TTF_UNK);
+		return;
+	}
+	/* assume ascending order */
+	for (index_t i = 0; i < ntk; i++) {
+		sl1t_t this = t + i;
+		scom_thdr_t hdr = this->hdr;
+		last_seen = scom_thdr_sec(hdr);
+		udpc_seria_add_secu(octx->sctx, s[scom_thdr_tblidx(hdr)]);
+		if (!scom_thdr_linked(hdr)) {
+			udpc_seria_add_sl1t(octx->sctx, this);
+		} else {
+			udpc_seria_add_scdl(octx->sctx, (const void*)this);
+			i++;
+		}
+	}
+	/* now if the last tick is not exactly our timestamp,
+	 * issue a nexist as well */
+	if (last_seen < ts) {
+		__bang_nexist(octx, ts, SL1T_TTF_UNK);
 	}
 	return;
 }
@@ -352,7 +394,7 @@ static inline bool
 one_moar_p(oadt_ctx_t octx)
 {
 	size_t cur = udpc_seria_msglen(octx->sctx);
-	size_t add = (sizeof(struct sparse_Dute_s) + 2) * 5;
+	size_t add = (sizeof(struct sl1t_s) + 2) * 5;
 	return cur + add < UDPC_PLLEN;
 }
 
@@ -368,50 +410,43 @@ proc_some(oadt_ctx_t octx, index_t i)
 static void
 instr_tick_by_instr_svc(job_t j)
 {
-	struct udpc_seria_s sctx;
-	struct udpc_seria_s rplsctx;
-	struct oadt_ctx_s oadtctx;
+	struct udpc_seria_s sctx[1];
+	struct udpc_seria_s rplsctx[1];
+	struct oadt_ctx_s octx[1];
 	struct job_s rplj;
 	/* in args */
-	struct tick_by_instr_hdr_s hdr;
+	su_secu_t sec;
+	tbs_t tbs;
 	/* allow to filter for 64 time stamps at once */
 	unsigned int nfilt = 0;
-	tscoll_t tsc;
 	bool moarp = true;
 
 	/* prepare the iterator for the incoming packet */
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the header off of the wire */
-	udpc_seria_des_tick_by_instr_hdr(&hdr, &sctx);
+	sec = udpc_seria_des_secu(sctx);
+	tbs = udpc_seria_des_tbs(sctx);
 	/* get all the timestamps */
-	if ((nfilt = snarf_times(&sctx, oadtctx.filt, NFILT)) == 0) {
+	if ((nfilt = snarf_times(sctx, octx->filt, NFILT)) == 0) {
 		return;
 	}
-	UD_DEBUG("0x4222: %u/%u@%hu filtered for %u time stamps\n",
-		 hdr.secu.instr, hdr.secu.unit, hdr.secu.pot, nfilt);
-
-	/* get us the tseries we're talking about */
-	if ((tsc = find_tscoll_by_secu(tscache, &hdr.secu)) == NULL) {
-		/* means we have no means of fetching */
-		/* we could issue a packet saying so */
-		UD_DEBUG("No way of fetching stuff\n");
-		return;
-	}
+	UD_DEBUG("0x%04x (UD_SVC_TICK_BY_INSTR): %s for %u stamps, %x mask\n",
+		 UD_SVC_TICK_BY_INSTR, secbugger(sec), nfilt, tbs);
 
 	/* initialise our context */
-	oadtctx.sctx = &rplsctx;
-	oadtctx.secu = &hdr.secu;
-	oadtctx.coll = tsc;
-	oadtctx.nfilt = nfilt;
+	octx->sctx = rplsctx;
+	octx->secu = sec;
+	octx->nfilt = nfilt;
+	octx->tbs = tbs;
 
 	for (index_t i = 0; moarp;) {
 		/* prepare the reply packet ... */
 		copy_pkt(&rplj, j);
-		clear_pkt(&rplsctx, &rplj);
+		clear_pkt(rplsctx, &rplj);
 		/* process some time stamps, this fills the packet */
-		moarp = (i = proc_some(&oadtctx, i)) < oadtctx.nfilt;
+		moarp = (i = proc_some(octx, i)) < octx->nfilt;
 		/* send what we've got so far */
-		send_pkt(&rplsctx, &rplj);
+		send_pkt(rplsctx, &rplj);
 	} while (moarp);
 
 	/* we cater for any frobnication desires now */
@@ -422,129 +457,69 @@ instr_tick_by_instr_svc(job_t j)
 
 /* urn getter */
 static void
-get_urn_cb(uint32_t UNUSED(lo), uint32_t UNUSED(hi), void *data, void *clo)
+get_urn_cb(tsc_ce_t ce, void *clo)
 {
-	tseries_t tser = data;
-	udpc_seria_add_tseries(clo, tser);
+	udpc_seria_t sctx = clo;
+	UD_DEBUG("series for %s from %i till %i\n",
+		 secbugger(ce->key->secu), ce->key->beg, ce->key->end);
+	udpc_seria_add_data(sctx, ce, sizeof(*ce));
 	return;
 }
 
 static void
 instr_urn_svc(job_t j)
 {
-	struct udpc_seria_s sctx;
+	struct udpc_seria_s sctx[1];
 	/* in args */
-	struct secu_s secu;
-	tscoll_t tsc;
+	su_secu_t secu;
+	/* to query the cube */
+	struct tsc_key_s k;
 
 	/* prepare the iterator for the incoming packet */
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
+	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the header off of the wire */
-	udpc_seria_des_secu(&secu, &sctx);
-	UD_DEBUG("0x%04x (UD_SVC_GET_URN): %u/%u@%hu\n",
-		 UD_SVC_GET_URN, secu.instr, secu.unit, secu.pot);
+	secu = udpc_seria_des_secu(sctx);
+	UD_DEBUG("0x%04x (UD_SVC_GET_URN): %s\n",
+		 UD_SVC_GET_URN, secbugger(secu));
 
-	/* get us the tseries we're talking about */
-	if ((tsc = find_tscoll_by_secu(tscache, &secu)) == NULL) {
-		/* means we have no means of fetching */
-		/* we could issue a packet saying so */
-		UD_DEBUG("No way of fetching stuff\n");
-		return;
-	}
-	/* reuse buf and sctx, just traverse tscoll and send off the bugger */
-	clear_pkt(&sctx, j);
-	tscoll_trav_series(tsc, get_urn_cb, &sctx);
-	send_pkt(&sctx, j);
+	/* prepare the key */
+	k.secu = secu;
+	k.msk = 4 /* only secu is set */;
+
+	/* reuse buf and sctx, just traverse the cube and send the bugger */
+	clear_pkt(sctx, j);
+	tsc_trav(gcube, &k, get_urn_cb, sctx);
+	send_pkt(sctx, j);
 	return;
 }
 
 
 /* fetch urn svc */
 static void
-fetch_urn_svc(job_t UNUSED(j))
+fetch_urn_svc(job_t j)
 {
 	UD_DEBUG("0x%04x (UD_SVC_FETCH_URN)\n", UD_SVC_FETCH_URN);
 	ud_set_service(UD_SVC_FETCH_URN, NULL, NULL);
-#if defined HAVE_MYSQL
-	fetch_urn_mysql();
-#endif	/* HAVE_MYSQL */
+	for (index_t i = 0; i < fetch_urn_hook->nf; i++) {
+		fetch_urn_hook->f[i](j);
+	}
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
 	return;
 }
 
-
-static void*
-cfgspec_get_source(void *ctx, void *spec)
-{
-#define CFG_SOURCE	"source"
-	return udcfg_tbl_lookup(ctx, spec, CFG_SOURCE);
-}
-
-typedef enum {
-	CST_UNK,
-	CST_MYSQL,
-} cfgsrc_type_t;
-
-static cfgsrc_type_t
-cfgsrc_type(void *ctx, void *spec)
-{
-#define CFG_TYPE	"type"
-	const char *type = NULL;
-
-	if (spec == NULL) {
-		UD_DEBUG("mod/tseries: no source specified\n");
-		return CST_UNK;
-	}
-	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
-
-	UD_DEBUG("type %s %p\n", type, spec);
-	if (type == NULL) {
-		return CST_UNK;
-	} else if (memcmp(type, "mysql", 5) == 0) {
-		return CST_MYSQL;
-	}
-	return CST_UNK;
-}
-
 static void
-load_ticks_fetcher(void *clo, void *spec)
+list_boxes_svc(job_t UNUSED(j))
 {
-	void *src = cfgspec_get_source(clo, spec);
-
-	/* pass along the src settings */
-	udctx_set_setting(clo, src);
-
-	/* find out about its type */
-	switch (cfgsrc_type(clo, src)) {
-	case CST_MYSQL:
-#if defined HAVE_MYSQL
-		/* fetch some instruments by sql */
-		dso_tseries_mysql_LTX_init(clo);
-#endif	/* HAVE_MYSQL */
-		break;
-
-	case CST_UNK:
-	default:
-		/* do fuckall */
-		break;
-	}
-
-	/* also load the frobber in this case */
-	dso_tseries_frobq_LTX_init(clo);
-
-	/* clean up */
-	udctx_set_setting(clo, NULL);
-	udcfg_tbl_free(clo, src);
+	UD_DEBUG("0x%04x (UD_SVC_LIST_BOXES)\n", UD_SVC_LIST_BOXES);
+	tsc_list_boxes(gcube);
 	return;
 }
 
 static void
-unload_ticks_fetcher(void *UNUSED(clo))
+sched_prune_caches(void *clo)
 {
-#if defined HAVE_MYSQL
-	/* fetch some instruments by sql */
-	dso_tseries_mysql_LTX_deinit(clo);
-#endif	/* HAVE_MYSQL */
+	UD_DEBUG("pruning caches\n");
+	tsc_prune_caches(clo);
 	return;
 }
 
@@ -552,38 +527,35 @@ unload_ticks_fetcher(void *UNUSED(clo))
 void
 dso_tseries_LTX_init(void *clo)
 {
-	ud_ctx_t ctx = clo;
-	void *settings;
-
 	UD_DEBUG("mod/tseries: loading ...");
 	/* create the catalogue */
-	tscache = make_tscache();
+	gcube = make_tscube();
 	/* tick service */
-	ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
+	//ud_set_service(UD_SVC_TICK_BY_TS, instr_tick_by_ts_svc, NULL);
 	ud_set_service(UD_SVC_TICK_BY_INSTR, instr_tick_by_instr_svc, NULL);
 	ud_set_service(UD_SVC_GET_URN, instr_urn_svc, NULL);
 	ud_set_service(UD_SVC_FETCH_URN, fetch_urn_svc, NULL);
+	/* administrative services */
+	ud_set_service(UD_SVC_LIST_BOXES, list_boxes_svc, NULL);
+	/* cache cleaning */
+	schedule_timer_every(clo, sched_prune_caches, gcube, 60.0);
 	UD_DBGCONT("done\n");
 
-	if ((settings = udctx_get_setting(ctx)) != NULL) {
-		load_ticks_fetcher(clo, settings);
-		/* be so kind as to unref the settings */
-		udcfg_tbl_free(ctx, settings);
-	}
-	/* clean up */
-	udctx_set_setting(ctx, NULL);
+	/* have the frobq initialised */
+	dso_tseries_frobq_LTX_init(clo);
 
 	/* now kick off a fetch-URN job, dont bother about the
 	 * job slot, it's unused anyway */
-	wpool_enq(gwpool, (wpool_work_f)fetch_urn_svc, NULL, true);
+	wpool_enq(gwpool, (wpool_work_f)fetch_urn_svc, NULL, false);
 	return;
 }
 
 void
 dso_tseries_LTX_deinit(void *clo)
 {
-	free_tscache(tscache);
-	unload_ticks_fetcher(clo);
+	/* have the frobq initialised */
+	dso_tseries_frobq_LTX_deinit(clo);
+	free_tscube(gcube);
 	return;
 }
 

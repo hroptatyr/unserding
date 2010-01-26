@@ -547,7 +547,7 @@ TOK_UI64H {
 } |
 TOK_INT {
 	int32_t val = (int32_t)parse_int(yylval.sval, yylval.slen);
-	udpc_seria_add_si32(&sctx, val);
+	udpc_seria_add_ui32(&sctx, val);
 } |
 TOK_UINT {
 	int32_t val = (int32_t)parse_int(yylval.sval, yylval.slen);

@@ -41,6 +41,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 /* old shit, to be deleted */
 #define UDPC_TYPE_SEQ	'a'
 #define UDPC_TYPE_VAR	'v'
@@ -61,11 +65,8 @@
 #define UDPC_TYPE_UNK	0x00
 #define UDPC_TYPE_BYTE	0x01
 #define UDPC_TYPE_UI16	0x02
-#define UDPC_TYPE_SI16	(UDPC_TYPE_UI16 | UDPC_SGN_MASK)
 #define UDPC_TYPE_UI32	0x04
-#define UDPC_TYPE_SI32	(UDPC_TYPE_UI32 | UDPC_SGN_MASK)
 #define UDPC_TYPE_UI64	0x08
-#define UDPC_TYPE_SI64	(UDPC_TYPE_UI64 | UDPC_SGN_MASK)
 
 #define UDPC_TYPE_FLTH	(UDPC_TYPE_UI16 | UDPC_FLT_MASK)
 #define UDPC_TYPE_FLTS	(UDPC_TYPE_UI32 | UDPC_FLT_MASK)
@@ -199,11 +200,8 @@ udpc_seria_tag(udpc_seria_t sctx)
 
 UDPC_NEW_SERIA(byte, BYTE, uint8_t);
 UDPC_NEW_SERIA(ui16, UI16, uint16_t);
-UDPC_NEW_SERIA(si16, SI16, int16_t);
 UDPC_NEW_SERIA(ui32, UI32, uint32_t);
-UDPC_NEW_SERIA(si32, SI32, int32_t);
 UDPC_NEW_SERIA(ui64, UI64, uint64_t);
-UDPC_NEW_SERIA(si64, SI64, int64_t);
 /* floats */
 UDPC_NEW_SERIA(flts, FLTS, float);
 UDPC_NEW_SERIA(fltd, FLTD, double);
@@ -368,5 +366,9 @@ udpc_seria_des_asn1(udpc_seria_t sctx, const void **s)
 extern uint16_t udpc_msg_size(const char *sig);
 extern void udpc_sig_string(char *restrict out, const char *sig);
 #endif
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_seria_h_ */

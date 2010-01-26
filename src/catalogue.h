@@ -58,12 +58,6 @@ struct keyval_s {
 };
 
 /**
- * Annotation structure for annotated instruments. */
-typedef struct cat_anno_s {
-	;
-} *cat_anno_t;
-
-/**
  * Use annotated instruments, this is the class to do so.  Actually,
  * libpfack provides this already in form of URNs, however we are
  * not overly certain of how the API shall look like.
@@ -71,7 +65,6 @@ typedef struct cat_anno_s {
  * directly. */
 struct anno_instr_s {
 	struct instr_s instr;
-	struct cat_anno_s anno;
 };
 
 /**

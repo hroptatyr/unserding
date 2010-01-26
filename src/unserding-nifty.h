@@ -38,6 +38,7 @@
 #if !defined INCLUDED_unserding_nifty_h_
 #define INCLUDED_unserding_nifty_h_
 
+#include <stdlib.h>
 #include <unistd.h>
 
 #if !defined index_t

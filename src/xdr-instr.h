@@ -40,9 +40,14 @@
 
 #include <stdbool.h>
 #include <time.h>
+#include <sushi/secu.h>
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /**
  * Service 421a:
@@ -66,21 +71,34 @@
  * with libpfack's deser_instrument().
  **/
 extern size_t
-ud_find_one_instr(ud_handle_t hdl, const void **tgt, uint32_t inst_id);
+ud_find_one_instr(ud_handle_t h, const void **tgt, uint32_t inst_id);
+/* same but for symbols */
+extern size_t
+ud_find_one_isym(ud_handle_t h, const void **tgt, const char *sym, size_t len);
 
 /**
  * Deliver a list of tslabs known to the network for the instrument
- * specified by CONT_ID.
+ * specified by S.
  * \param hdl the unserding handle to use
  * \param tgt a pointer which will point to a tseries_s object.
  *   Do not dereference pointers from this structure.
- * \param inst_id the GA instrument identifier
+ * \param s the GA instrument identifier
  * \return the length of the tseries buffer.
- * The instrument is delivered in encoded form and can be decoded
- * with libpfack's deser_instrument().
  **/
 extern size_t
-ud_find_one_tslab(ud_handle_t hdl, const void **tgt, uint32_t inst_id);
+ud_find_one_tslab(ud_handle_t hdl, const void **tgt, su_secu_t s);
+
+/**
+ * Deliver a list of tslabs known to the network for the instrument
+ * specified by S.
+ * \param hdl the unserding handle to use
+ * \param s the GA instrument identifier
+ * \param cb callback called for each tslab found, the const void*
+ *   should be cast to a const struct tsc_ce_s*
+ * \return the number of tslabs found in total
+ **/
+extern size_t
+ud_find_tslabs(ud_handle_t hdl, su_secu_t s, void(*cb)(const void*));
 
 /**
  * Query a bunch of instruments at once, calling CB() on each result. */
@@ -89,5 +107,9 @@ ud_find_many_instrs(
 	ud_handle_t hdl,
 	void(*cb)(const char *tgt, size_t len, void *clo), void *clo,
 	uint32_t cont_id[], size_t len);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_xdr_instr_h_ */

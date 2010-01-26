@@ -73,6 +73,9 @@
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
 
+/* for the mo, we don't need debugging output here */
+#define UD_DEBUG_XDR(args...)
+
 static void *conn = NULL;
 
 
@@ -134,7 +137,7 @@ make_currency(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
 	uint16_t co = strtoul(rows[CCY_CODE], NULL, 10);
 	make_tcnxxx_into(in, id, co);
-	UD_DEBUG("made currency %s (%u)\n", instr_name(in), id);
+	UD_DEBUG_XDR("made currency %s (%u)\n", instr_name(in), id);
 	return;
 }
 
@@ -142,7 +145,7 @@ static void
 make_index(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
 	make_tixxxx_into(in, id, rows[IDENT_GA]);
-	UD_DEBUG("made index %s (%u)\n", instr_name(in), id);
+	UD_DEBUG_XDR("made index %s (%u)\n", instr_name(in), id);
 	return;
 }
 
@@ -171,14 +174,14 @@ parse_multiplier(const char *data)
 	return 1.0;
 }
 
-static m32_t
+static m30_t
 parse_strike(const char *data)
 {
 	if (LIKELY(data != NULL)) {
-		return ffff_monetary32_get_s(data);
+		return ffff_m30_get_s(&data);
 	}
 	/* grrr */
-	return 0;
+	return ffff_m30_get_ui32(0);
 }
 
 static uint32_t
@@ -195,7 +198,7 @@ make_option(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 	char right = cfi[1];
 	char exer = cfi[2];
 	double multpl_dbl = parse_multiplier(rows[OPT_MULTPL]);
-	monetary32_t strike = parse_strike(rows[OPT_STRIKE]);
+	m30_t strike = parse_strike(rows[OPT_STRIKE]);
 	ratio17_t multpl = ffff_ratio17((uint32_t)multpl_dbl, 1);
 	instr_t undl = find_instr_by_gaid(instrs, undl_id);
 
@@ -259,12 +262,12 @@ get_annu(const char *val)
 static void
 make_interest_rate(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
-	uint16_t mmat = get_mmat(rows[FRA_MMAT]);
-	uint16_t annu = get_annu(rows[FRA_ANNU]);
+	mmaturity_t mmat = (mmaturity_t)get_mmat(rows[FRA_MMAT]);
+	annuity_t annu = (annuity_t)get_annu(rows[FRA_ANNU]);
 	uint16_t ccy = strtoul(rows[FRA_CCY], NULL, 10);
 
 	make_trxxxx_into(in, id, rows[IDENT_GA], mmat, annu, ccy);
-	UD_DEBUG("made irate %s (%u)\n", instr_name(in), id);
+	UD_DEBUG_XDR("made irate %s (%u)\n", instr_name(in), id);
 	return;
 }
 

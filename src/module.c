@@ -68,12 +68,13 @@
 
 typedef struct ud_mod_s *ud_mod_t;
 typedef struct ud_deferred_s *ud_deferred_t;
+typedef void(*lt_f)(void*);
 
 struct ud_mod_s {
 	void *handle;
-	void (*initf)(void*);
-	void (*finif)(void*);
-	void (*relof)(void*);
+	lt_f initf;
+	lt_f finif;
+	lt_f relof;
 	ud_mod_t next;
 };
 
@@ -84,7 +85,7 @@ struct ud_deferred_s {
 };
 
 static ud_mod_t ud_mods = NULL;
-static ud_deferred_t ud_defs = NULL;
+static ud_deferred_t ud_defs = NULL, curr = NULL;
 
 void
 ud_defer_dso(const char *name, void *cfgset)
@@ -92,8 +93,15 @@ ud_defer_dso(const char *name, void *cfgset)
 	ud_deferred_t res = xnew(*res);
 	res->fn = name;
 	res->cfgset = cfgset;
-	res->next = ud_defs;
-	ud_defs = res;
+	res->next = NULL;
+
+	/* fiddle with the global list */
+	if (curr) {
+		curr->next = res;
+	} else {
+		ud_defs = res;
+	}
+	curr = res;
 	return;
 }
 
@@ -136,6 +144,21 @@ add_myself(void)
 	return;
 }
 
+static lt_dlhandle
+my_dlopen(const char *filename)
+{
+	lt_dlhandle handle = 0;
+	lt_dladvise advice[1];
+
+	if (!lt_dladvise_init(advice) &&
+	    !lt_dladvise_ext(advice) &&
+	    !lt_dladvise_global(advice)) {
+		handle = lt_dlopenadvise(filename, advice[0]);
+	}
+	lt_dladvise_destroy(advice);
+	return handle;
+}
+
 /**
  * Open NAME, call `init(CLO)' there. */
 void*
@@ -147,7 +170,7 @@ open_aux(const char *name, void *clo)
 	struct ud_mod_s tmpmod;
 	ud_mod_t m;
 
-	tmpmod.handle = lt_dlopenext(name);
+	tmpmod.handle = my_dlopen(name);
 	if (tmpmod.handle == NULL) {
 		perror("unserding: cannot open module");
 		return NULL;
@@ -157,17 +180,17 @@ open_aux(const char *name, void *clo)
 		goto reinit;
 	}
 
-	if ((tmpmod.initf = lt_dlsym(tmpmod.handle, minit)) == NULL) {
+	if ((tmpmod.initf = (lt_f)lt_dlsym(tmpmod.handle, minit)) == NULL) {
 		lt_dlclose(tmpmod.handle);
 		perror("unserding: cannot open module, init() not found");
 		return NULL;
 	}
 
-	if ((tmpmod.finif = lt_dlsym(tmpmod.handle, mdeinit)) == NULL) {
+	if ((tmpmod.finif = (lt_f)lt_dlsym(tmpmod.handle, mdeinit)) == NULL) {
 		;
 	}
 
-	if ((tmpmod.relof = lt_dlsym(tmpmod.handle, mreinit)) == NULL) {
+	if ((tmpmod.relof = (lt_f)lt_dlsym(tmpmod.handle, mreinit)) == NULL) {
 		;
 	}
 

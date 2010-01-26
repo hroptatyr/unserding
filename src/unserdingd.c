@@ -383,7 +383,7 @@ static struct poptOption help_opts[] = {
 	POPT_TABLEEND
 };
 
-static const struct poptOption const ud_opts[] = {
+static const struct poptOption ud_opts[] = {
         {NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
 	 "Server Options", NULL},
 	{NULL, '\0', POPT_ARG_INCLUDE_TABLE, help_opts, 0,
@@ -586,6 +586,9 @@ main(int argc, const char *argv[])
 
 	/* static modules */
 	ud_init_statmods(&__ctx);
+
+	/* rock the wpool queue to trigger anything on there */
+	wpool_trigger(gwpool);
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);

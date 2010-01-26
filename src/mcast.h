@@ -43,14 +43,23 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #define UD_NETWORK_SERVICE	8653
 #define UD_NETWORK_SERVSTR	"8653"
 /* 239.0.0.0/8 are organisational solicited v4 mcast addrs */
 #define UD_MCAST4_ADDR		"239.86.53.1"
 #define UD_MCAST4S2S_ADDR	"239.86.53.3"
-/* ff3x::8000:0-ff3x::ffff:ffff - dynamically allocated by hosts when needed */
-#define UD_MCAST6_ADDR		"ff38::8653:1"
-#define UD_MCAST6S2S_ADDR	"ff38::8653:3"
+/* http://www.iana.org/assignments/ipv6-multicast-addresses/ lists us 
+ * as ff0x:0:0:0:0:0:0:134 */
+/* link-local */
+#define UD_MCAST6_LINK_LOCAL	"ff02::134"
+/* site-local */
+#define UD_MCAST6_SITE_LOCAL	"ff05::134"
+
+#define UD_MCAST6_ADDR		UD_MCAST6_SITE_LOCAL
 
 /* our grand unified sockaddr thingie */
 typedef union ud_sockaddr_u ud_sockaddr_u;
@@ -149,5 +158,9 @@ ud_sockaddr_ntop(char *restrict buf, size_t len, ud_const_sockaddr_t sa)
 	(void)inet_ntop(fam, saa, buf, len);
 	return;
 }
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* INCLUDED_mcast_h_ */

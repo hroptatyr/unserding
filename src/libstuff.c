@@ -301,7 +301,7 @@ fiddle_with_timeout(ud_handle_t hdl, int timeout)
 	if (timeout > 0) {
 		return timeout;
 	}
-	return hdl->mart;
+	return 2 * hdl->mart;
 }
 
 

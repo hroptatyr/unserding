@@ -243,6 +243,16 @@ __seria_instr(udpc_seria_t sctx, instr_t in)
 }
 
 static void
+instr_dump_name(udpc_seria_t sctx, const char *sym)
+{
+	instr_t in = find_instr_by_name(instrs, sym);
+
+	/* serialise what we've got */
+	__seria_instr(sctx, in);
+	return;
+}
+
+static void
 instr_dump_gaid(udpc_seria_t sctx, gaid_t gaid)
 {
 	instr_t in = find_instr_by_gaid(instrs, gaid);
@@ -268,12 +278,16 @@ instr_dump_svc(job_t j)
 
 	do {
 		switch (udpc_seria_tag(&sctx)) {
-		case UDPC_TYPE_STR:
+		case UDPC_TYPE_STR: {
 			/* find by name */
+			const char *s;
+			udpc_seria_des_str(&sctx, &s);
+			instr_dump_name(&rplsctx, s);
 			break;
-		case UDPC_TYPE_SI32: {
+		}
+		case UDPC_TYPE_UI32: {
 			/* find by gaid */
-			int32_t id = udpc_seria_des_si32(&sctx);
+			int32_t id = udpc_seria_des_ui32(&sctx);
 			instr_dump_gaid(&rplsctx, id);
 			break;
 		}
@@ -299,10 +313,12 @@ fetch_instr_svc(job_t UNUSED(j))
 {
 	UD_DEBUG("0x%04x (UD_SVC_FETCH_INSTR)\n", UD_SVC_FETCH_INSTR);
 	ud_set_service(UD_SVC_FETCH_INSTR, NULL, NULL);
+	/* fetch from cache first */
+	fetch_instr_file();
 #if defined HAVE_MYSQL
+	/* if mysql is connected fetch from here too */
 	fetch_instr_mysql();
 #endif	/* HAVE_MYSQL */
-	fetch_instr_file();
 	ud_set_service(UD_SVC_FETCH_INSTR, fetch_instr_svc, NULL);
 	return;
 }
@@ -312,8 +328,15 @@ fetch_instr_svc(job_t UNUSED(j))
 static void*
 cfgspec_get_source(ud_ctx_t ctx, ud_cfgset_t spec)
 {
-#define CFG_SOURCE	"source"
-	return udcfg_tbl_lookup(ctx, spec, CFG_SOURCE);
+	static const char Q_cfg_source[] = "source";
+	return udcfg_tbl_lookup(ctx, spec, Q_cfg_source);
+}
+
+static void*
+cfgspec_get_cache(ud_ctx_t ctx, ud_cfgset_t spec)
+{
+	static const char Q_cfg_cache[] = "cache";
+	return udcfg_tbl_lookup(ctx, spec, Q_cfg_cache);
 }
 
 typedef enum {
@@ -325,14 +348,14 @@ typedef enum {
 static cfgsrc_type_t
 cfgsrc_type(void *ctx, void *spec)
 {
-#define CFG_TYPE	"type"
+	static const char Q_cfg_type[] = "type";
 	const char *type = NULL;
 
 	if (spec == NULL) {
 		UD_DEBUG("no source specified\n");
 		return CST_UNK;
 	}
-	udcfg_tbl_lookup_s(&type, ctx, spec, CFG_TYPE);
+	udcfg_tbl_lookup_s(&type, ctx, spec, Q_cfg_type);
 
 	UD_DEBUG("type %s %p\n", type, spec);
 	if (type == NULL) {
@@ -379,8 +402,36 @@ load_instr_fetcher(void *clo, void *spec)
 }
 
 static void
+load_instr_cacher(void *clo, void *spec)
+{
+	void *cac = cfgspec_get_cache(clo, spec);
+
+	/* prepare source settings to be passed along */
+	udctx_set_setting(clo, cac);
+	
+	/* find out about its type */
+	switch (cfgsrc_type(clo, cac)) {
+	case CST_XDRFILE:
+		dso_xdr_instr_file_LTX_init(clo);
+		break;
+
+	case CST_MYSQL:
+	case CST_UNK:
+	default:
+		/* do fuckall */
+		break;
+	}
+
+	/* clean up */
+	udctx_set_setting(clo, NULL);
+	udcfg_tbl_free(clo, cac);
+	return;
+}
+
+static void
 unload_instr_fetcher(void *UNUSED(clo))
 {
+/* just unload everything, if they requested it or not */
 #if defined HAVE_MYSQL
 	dso_xdr_instr_mysql_LTX_deinit(clo);
 #endif	/* HAVE_MYSQL */
@@ -407,6 +458,8 @@ dso_xdr_instr_LTX_init(void *clo)
 	if ((settings = udctx_get_setting(ctx)) != NULL) {
 		/* we are configured, load the instrs */
 		load_instr_fetcher(clo, settings);
+		/* make sure we've seen the cache settigns */
+		load_instr_cacher(clo, settings);
 		/* be so kind as to unref the settings */
 		udcfg_tbl_free(ctx, settings);
 	}
@@ -421,6 +474,8 @@ dso_xdr_instr_LTX_init(void *clo)
 void
 dso_xdr_instr_LTX_deinit(void *clo)
 {
+	/* pollute our caches, if any */
+	dump_instr_file();
 	/* unload the fetchers, they possibly need the catalogue */
 	unload_instr_fetcher(clo);
 	/* unload the instrs now */

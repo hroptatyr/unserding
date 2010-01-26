@@ -357,8 +357,7 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 	size_t res = 0;
 
 	switch (tag) {
-	case UDPC_TYPE_UI16:
-	case UDPC_TYPE_SI16: {
+	case UDPC_TYPE_UI16: {
 		const uint16_t *v;
 		size_t len = udpc_seria_des_sequi16(sctx, &v);
 		res = sprintf(buf, "seqof(xi16) * %d:\n", (int)len);
@@ -368,8 +367,7 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		break;
 	}
 
-	case UDPC_TYPE_UI32:
-	case UDPC_TYPE_SI32: {
+	case UDPC_TYPE_UI32: {
 		const uint32_t *v;
 		size_t len = udpc_seria_des_sequi32(sctx, &v);
 		res = sprintf(buf, "seqof(xi32) * %d:\n", (int)len);
@@ -380,8 +378,7 @@ __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		break;
 	}
 
-	case UDPC_TYPE_UI64:
-	case UDPC_TYPE_SI64: {
+	case UDPC_TYPE_UI64: {
 		const uint64_t *v;
 		size_t len = udpc_seria_des_sequi64(sctx, &v);
 		res = sprintf(buf, "seqof(xi64) * %d:\n", (int)len);
@@ -483,20 +480,11 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		uint16_t v = udpc_seria_des_ui16(sctx);
 		return sprintf(buf, "(ui16)0x%04x (%hu)\n", v, v);
 	}
-	case UDPC_TYPE_SI16: {
-		int16_t v = udpc_seria_des_si16(sctx);
-		return sprintf(buf, "(si16)0x%04x (%d)\n", v, v);
-	}
 
 	case UDPC_TYPE_UI32: {
 		uint32_t v = udpc_seria_des_ui32(sctx);
 		return sprintf(buf, "(ui32)0x%08x (%u)\n", v, v);
 	}
-	case UDPC_TYPE_SI32: {
-		int32_t v = udpc_seria_des_si32(sctx);
-		return sprintf(buf, "(si32)0x%08x (%d)\n", v, v);
-	}
-
 
 	case UDPC_TYPE_UI64: {
 		uint64_t v = udpc_seria_des_ui64(sctx);
@@ -504,13 +492,6 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 			       (long long unsigned int)v,
 			       (long long unsigned int)v);
 	}
-	case UDPC_TYPE_SI64: {
-		uint64_t v = udpc_seria_des_si64(sctx);
-		return sprintf(buf, "(si64)0x%16llx (%lld)\n",
-			       (long long int)v,
-			       (long long int)v);
-	}
-
 		
 	case UDPC_TYPE_FLTS: {
 		float v = udpc_seria_des_flts(sctx);

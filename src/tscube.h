@@ -154,4 +154,8 @@ extern void tsc_prune_caches(tscube_t tsc);
 
 #define TSC_BOX_TTL	1800
 
+typedef void(*tsc_find_f)(su_secu_t, const_sl1t_t, void*);
+extern void
+tsc_find_cb(tscube_t tsc, tsc_key_t key, tsc_find_f cb, void *clo);
+
 #endif	/* !INCLUDED_tscube_h_ */

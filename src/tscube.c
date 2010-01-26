@@ -116,6 +116,9 @@ typedef struct __bbs_s {
 	/* bit ugly but this slot holds the secu we're talking about */
 	su_secu_t s;
 	index_t ntk;
+	/* for the callback approach */
+	tsc_find_f cb;
+	void *clo;
 } *__bbs_t;
 
 
@@ -245,6 +248,42 @@ tsc_box_find_bbs(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 			memcpy(tgt, lst[i], b->pad * sizeof(*b->sl1t));
 			scom_thdr_set_tblidx(tgt->hdr, new_idx);
 			clo->ntk += b->pad;
+		}
+	}
+	return;
+}
+
+static void
+tsc_box_find_cb(__bbs_t clo, tsc_box_t b, tsc_key_t key)
+{
+	/* to store the last seen ticks of each tick type 0 to 7 */
+	const_sl1t_t lst[8][2] = {0};
+	const_sl1t_t lim, t;
+
+	if (b == NULL) {
+		return;
+	}
+	if (clo->cb == NULL) {
+		return;
+	}
+
+	/* sequential scan */
+	lim = b->sl1t + b->nt * b->pad;
+	for (t = b->sl1t; t < lim && sl1t_stmp_sec(t) <= key->beg; ) {
+		uint16_t tkttf = sl1t_ttf(t);
+		/* keep track */
+		if (ttf_coincide_p(tkttf, key)) {
+			lst[(tkttf & 0x0f)][1] = lst[(tkttf & 0x0f)][0];
+			lst[(tkttf & 0x0f)][0] = t;
+		}
+		t += b->pad;
+	}
+	for (int i = 0; i < countof(lst); i++) {
+		if (lst[i][1]) {
+			clo->cb(clo->s, lst[i][1], clo->clo);
+		}
+		if (lst[i][0]) {
+			clo->cb(clo->s, lst[i][0], clo->clo);
 		}
 	}
 	return;
@@ -707,6 +746,46 @@ tsc_find(sl1t_t tgt, su_secu_t *sv, size_t tsz, tscube_t tsc, tsc_key_t key)
 	}
 	pthread_mutex_unlock(&m->mtx);
 	return clo.ntk;
+}
+
+void
+tsc_find_cb(tscube_t tsc, tsc_key_t key, tsc_find_f cb, void *clo)
+{
+	__tscube_t c = tsc;
+	hmap_t m = c->hmap;
+	struct __bbs_s bbclo = {
+		.si = 0,
+		.ntk = 0,
+		.cb = cb,
+		.clo = clo,
+	};
+
+	fprintf(stderr, "%p %p\n", cb, clo);
+	if (key->secu.mux == 0) {
+		fprintf(stderr, "looking for 0-secu\n");
+		return;
+	}
+
+	pthread_mutex_lock(&m->mtx);
+	/* perform sequential scan */
+	for (uint32_t i = 0; i < m->alloc_sz; i++) {
+		tsc_ce_t ce = m->tbl[i].ce;
+		if (!__key_valid_p(ce->key)) {
+			continue;
+		} else if (__key_matches_p(ce->key, key)) {
+			tsc_box_t box;
+
+			if ((box = bother_cube(tsc, key, &m->tbl[i]))) {
+				/* tell tsc_box bout our secu */
+				bbclo.s = ce->key->secu;
+				tsc_box_find_cb(&bbclo, box, key);
+				/* update the cache-add stamp */
+				box->cats = __stamp().tv_sec;
+			}
+		}
+	}
+	pthread_mutex_unlock(&m->mtx);
+	return;
 }
 
 void

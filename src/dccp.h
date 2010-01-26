@@ -39,11 +39,12 @@
 #define INCLUDED_dccp_h_
 
 #include <stdbool.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <stdint.h>
+#include "mcast.h"
 
-extern void init_dccp(void *clo);
-extern void deinit_dccp(void *clo);
+extern int dccp_open(void); 
+extern int dccp_accept(int socket, uint16_t port);
+extern int dccp_connect(int socket, ud_sockaddr_u *host);
+extern void dccp_close(int socket);
 
 #endif	/* INCLUDED_dccp_h_ */

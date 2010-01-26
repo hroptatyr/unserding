@@ -582,7 +582,6 @@ main(int argc, const char *argv[])
 	 * events has already been injected into our precious queue
 	 * causing the libev main loop to crash. */
 	ud_attach_mcast(EV_A_ prefer6p);
-	init_dccp(&__ctx);
 
 	/* static modules */
 	ud_init_statmods(&__ctx);
@@ -600,7 +599,6 @@ main(int argc, const char *argv[])
 	ud_deinit_statmods(&__ctx);
 
 	/* close the socket */
-	deinit_dccp(&__ctx);
 	ud_detach_mcast(EV_A);
 
 	/* destroy the default evloop */

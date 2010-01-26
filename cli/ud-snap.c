@@ -45,6 +45,7 @@
 
 #include "ud-time.h"
 #include "clihelper.c"
+#include "dccp.h"
 
 static struct ud_handle_s hdl[1];
 
@@ -124,8 +125,20 @@ main(int argc, const char *argv[])
 	/* secu and bs */
 	udpc_seria_add_secu(sctx, cid);
 	udpc_seria_add_tbs(sctx, bs);
+	/* the dccp port we expect */
+	udpc_seria_add_ui16(sctx, UD_NETWORK_SERVICE);
 	pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
-	ud_send_raw(hdl, pkt);
+	{
+		int s = dccp_open(), res;
+
+		fprintf(stderr, "socket %i\n", s);
+		ud_send_raw(hdl, pkt);
+		/* listen for traffic */
+		res = dccp_accept(s, UD_NETWORK_SERVICE);
+		fprintf(stderr, "listen %i\n", res);
+		dccp_close(res);
+		dccp_close(s);
+	}
 	/* and lose the handle again */
 	free_unserding_handle(hdl);
 	return 0;

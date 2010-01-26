@@ -144,7 +144,7 @@ endif
 
 if BUILD_LIBRARY
 ## the lib
-libunserding_la_SOURCES = libstuff.c libhelpers.c
+libunserding_la_SOURCES = libstuff.c libhelpers.c dccp.c
 libunserding_la_SOURCES += svc-pong.c
 libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS) $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt

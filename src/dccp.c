@@ -49,10 +49,9 @@
 #endif	/* HAVE_ARPA_INET_H */
 #include <errno.h>
 /* our main goodness */
-#include "unserding.h"
-#include "unserding-ctx.h"
 #include "unserding-dbg.h"
 #include "unserding-nifty.h"
+#include "mcast.h"
 #include "dccp.h"
 
 #if !defined SOCK_DCCP
@@ -71,66 +70,67 @@
 # define MAX_DCCP_CONNECTION_BACK_LOG	5
 #endif	/* !MAX_DCCP_CONNECTION_BACK_LOG */
 
-static uint32_t cnt = 0;
-
-static void
-__req_dccp(void)
+int
+dccp_open(void)
 {
-	ud_sockaddr_u sa, remo_sa;
-	socklen_t remo_sa_len;
 	int s;
 	/* turn off bind address checking, and allow port numbers to be reused -
 	 * otherwise the TIME_WAIT phenomenon will prevent binding to these
 	 * address.port combinations for (2 * MSL) seconds. */
-	int on = 1;
-	int res;
+	uint32_t on;
 
-	s = socket(PF_INET6, SOCK_DCCP, IPPROTO_DCCP);
-	cnt++;
+	if ((s = socket(PF_INET6, SOCK_DCCP, IPPROTO_DCCP)) < 0) {
+		return s;
+	}
+	/* mark the address as reusable */
+	on = 1;
 	setsockopt(s, SOL_DCCP, SO_REUSEADDR, &on, sizeof(on));
-	setsockopt(s, SOL_DCCP, DCCP_SOCKOPT_SERVICE, &cnt, sizeof(cnt));
+	/* impose a sockopt service */
+	on = 1;
+	setsockopt(s, SOL_DCCP, DCCP_SOCKOPT_SERVICE, &on, sizeof(on));
 	/* make a timeout for the accept call below */
-	on = 10000 /* milliseconds */;
+	on = 2000 /* milliseconds */;
 	setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &on, sizeof(on));
+	return s;
+}
 
+int
+dccp_accept(int s, uint16_t port)
+{
+	ud_sockaddr_u sa;
+	ud_sockaddr_u remo_sa;
+	socklen_t remo_sa_len;
+	int res = 0;
+
+	if (s < 0) {
+		return s;
+	}
 	memset(&sa, 0, sizeof(sa));
 	sa.sa6.sin6_family = AF_INET6;
 	sa.sa6.sin6_addr = in6addr_any;
-	sa.sa6.sin6_port = htons(UD_NETWORK_SERVICE);
+	sa.sa6.sin6_port = htons(port);
 	/* bind the socket to the local address and port. salocal is sockaddr
 	 * of local IP and port */
-	res = bind(s, &sa.sa, sizeof(sa));
+	res |= bind(s, &sa.sa, sizeof(sa));
 	/* listen on that port for incoming connections */
-	res = listen(s, MAX_DCCP_CONNECTION_BACK_LOG);
+	res |= listen(s, MAX_DCCP_CONNECTION_BACK_LOG);
+	if (res == 0) {
+		/* accept connections */
+		return accept(s, &remo_sa.sa, &remo_sa_len);
+	}
+	return res;
+}
 
-	res = accept(s, &remo_sa.sa, &remo_sa_len);
-	UD_DEBUG("finally %d\n", res);
-	close(res);
+int
+dccp_connect(int s, ud_sockaddr_u *host)
+{
+	return connect(s, &host->sa, sizeof(*host));
+}
+
+void
+dccp_close(int s)
+{
 	close(s);
-	return;
-}
-
-
-/* jobs */
-static void
-req_dccp(job_t UNUSED(j))
-{
-	__req_dccp();
-	return;
-}
-
-
-void
-init_dccp(void *UNUSED(clo))
-{
-	ud_set_service(0x000a, req_dccp, NULL);
-	return;
-}
-
-void
-deinit_dccp(void *UNUSED(clo))
-{
-	ud_set_service(0x000a, req_dccp, NULL);
 	return;
 }
 

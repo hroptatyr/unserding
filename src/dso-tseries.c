@@ -454,6 +454,8 @@ instr_tick_by_instr_svc(job_t j)
 
 
 /* mktsnp getter */
+#include "dccp.h"
+
 static void
 mktsnp_cb(tsc_box_t b, su_secu_t s, void *UNUSED(clo))
 {
@@ -473,6 +475,7 @@ fetch_mktsnp_svc(job_t j)
 		/* make sure we let the system know what we want */
 		.msk = 1 | 2 | 4,
 	};
+	uint16_t port;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -482,10 +485,22 @@ fetch_mktsnp_svc(job_t j)
 	key.secu = udpc_seria_des_secu(sctx);
 	/* read the types */
 	key.ttf = udpc_seria_des_tbs(sctx);
-	UD_DEBUG("0x%04x (UD_SVC_MKTSNP): %s at %i, %x mask\n",
-		 UD_SVC_MKTSNP, secbugger(key.secu), key.beg, key.ttf);
+	port = udpc_seria_des_ui16(sctx);
+	UD_DEBUG("0x%04x (UD_SVC_MKTSNP): %s at %i, %x mask (->%hu)\n",
+		 UD_SVC_MKTSNP, secbugger(key.secu), key.beg, key.ttf, port);
 
+	int s = dccp_open();
+	int res;
+	for (int i = 0; i < 1000; i++) {
+		usleep(10000);
+		if ((res = dccp_connect(s, &j->sa)) >= 0) {
+			break;
+		}
+		fprintf(stderr, "tried a connect %i\n", res);
+	}
+	fprintf(stderr, "s %i res %i\n", s, res);
 	tsc_find_cb(gcube, &key, mktsnp_cb, NULL);
+	dccp_close(s);
 	return;
 }
 

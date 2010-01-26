@@ -56,6 +56,7 @@
 #if defined HAVE_UNISTD_H
 # include <unistd.h>
 #endif
+#include <stdio.h>
 
 
 /* logging */

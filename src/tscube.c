@@ -184,7 +184,7 @@ tsc_box_end(tsc_box_t b)
 		return 0;
 	}
 #else  /* !CUBE_ENTRY_PER_TTF */
-	return b->end = scom_thdr_sec(b->sl1t[(b->nt - 1) * b->pad].hdr);
+	return b->end = scom_thdr_sec(b->sl1t[(b->nt - 1) * b->skip].hdr);
 #endif	/* CUBE_ENTRY_PER_TTF */
 }
 
@@ -232,22 +232,22 @@ tsc_box_find_bbs(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 	}
 
 	/* sequential scan */
-	lim = b->sl1t + b->nt * b->pad;
-	for (t = b->sl1t; t < lim && sl1t_stmp_sec(t) <= key->beg; ) {
+	lim = b->sl1t + b->nt * b->skip;
+	for (t = b->sl1t; t < lim && (time32_t)sl1t_stmp_sec(t) <= key->beg; ) {
 		uint16_t tkttf = sl1t_ttf(t);
 		/* keep track */
 		if (ttf_coincide_p(tkttf, key)) {
 			lst[(tkttf & 0x0f)] = t;
 		}
-		t += b->pad;
+		t += b->skip;
 	}
 	for (int i = 0; i < countof(lst) && clo->ntk < clo->tsz; i++) {
 		if (lst[i]) {
 			sl1t_t tgt = clo->tgt + clo->ntk;
 			uint16_t new_idx = __bbs_find_idx(clo, clo->s);
-			memcpy(tgt, lst[i], b->pad * sizeof(*b->sl1t));
+			memcpy(tgt, lst[i], b->skip * sizeof(*b->sl1t));
 			scom_thdr_set_tblidx(tgt->hdr, new_idx);
-			clo->ntk += b->pad;
+			clo->ntk += b->skip;
 		}
 	}
 	return;
@@ -653,6 +653,7 @@ bother_cube(tscube_t utsc, tsc_key_t key, keyval_t kv)
 
 		} else {
 			/* what a waste of time */
+			fprintf(stderr, "nothing found\n");
 			free_tsc_box(box);
 			box = NULL;
 		}
@@ -771,7 +772,9 @@ tsc_find_cb(tscube_t tsc, tsc_key_t key, tsc_find_f cb, void *clo)
 		} else if (__key_matches_p(ce->key, key)) {
 			tsc_box_t box;
 
+			fprintf(stderr, "bothering cube\n");
 			if ((box = bother_cube(tsc, key, &m->tbl[i]))) {
+				fprintf(stderr, "nifty\n");
 #if 0
 				/* tell tsc_box bout our secu */
 				bbclo.s = ce->key->secu;

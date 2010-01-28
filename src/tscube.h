@@ -108,14 +108,18 @@ struct tsc_ops_s {
 
 struct tsc_box_s {
 	/* keep track how large this is */
-	size_t nt;
-	/* also keep track which ticks are supposed to be in here */
-	time32_t beg, end;
+	uint16_t nt, skip;
 	/* time stamp when we added the box (cache-add time-stamp) */
 	time32_t cats;
-	/* padding */
-	uint32_t pad;
-	/* 4 * 64 = 2 * 4 * 32 = 2 sl1t */
+
+	/* offset 0x08 */
+	/* also keep track which ticks are supposed to be in here */
+	time32_t beg, end;
+
+	/* offset 0x10 */
+	uint64_t secu[2];
+
+	/* offset 0x20, 4 * 64 = 2 * 4 * 32 = 2 sl1t = 1 scdl */
 #if 0
 /* grrr, fucking gcc chokes on this */
 	union {

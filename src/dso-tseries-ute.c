@@ -132,8 +132,9 @@ __find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
 	}
 	/* find the minimum stamp out of the remaining ones */
 	res = NULL;
-	for (int i = 0; i < countof(lst); i++) {
-		if ((volatile void*)(lst[i] - 1) < (volatile void*)(res - 1)) {
+	for (unsigned int i = 0; i < countof(lst); i++) {
+		if ((volatile const void*)(lst[i] - 1) <
+		    (volatile const void*)(res - 1)) {
 			res = lst[i];
 		}
 	}
@@ -152,7 +153,7 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	size_t nt;
 	const_sl1t_t t;
 
-	UD_DEBUG("fetching %hu msk %x\n", ttf, tbl->ttfbs[idx]);
+	UD_DEBUG("fetching %hu msk %x\n", ttf, tbl ? tbl->ttfbs[idx] : 0);
 	if (UNLIKELY(tbl == NULL)) {
 		return 0;
 	} else if (!(tbl->ttfbs[idx] & ttf)) {
@@ -174,7 +175,7 @@ fetch_tick(
 {
 	ute_ctx_t ctx = uval;
 	uint16_t idx;
-	const_sl1t_t t[1];
+	const_sl1t_t t[8];
 	size_t nt, res = 0, i;
 	struct sl1t_s sl1key[1];
 
@@ -193,12 +194,12 @@ fetch_tick(
 		 nt, sl1t_stmp_sec(t[0]));
 	/* otherwise iterate */
 	if (!scom_thdr_linked((const void*)(t[0]))) {
-		tgt->pad = 1;
+		tgt->skip = 1;
 	} else {
-		tsz /= (tgt->pad = 2);
+		tsz /= (tgt->skip = 2);
 	}
 
-	for (i = res = 0; i < nt && res < tsz; i += tgt->pad) {
+	for (i = res = 0; i < nt && res < tsz; i += tgt->skip) {
 		uint16_t tkidx = sl1t_tblidx(&t[0][i]);
 		uint16_t tkttf = sl1t_ttf(&t[0][i]) & 0x0f;
 		time32_t tkts = sl1t_stmp_sec(&t[0][i]);
@@ -210,20 +211,20 @@ fetch_tick(
 			break;
 		} else if (tkidx == idx && ttf_coincide_p(tkttf, k->ttf)) {
 			/* not thread-safe */
-			memcpy(&tgt->sl1t[res * tgt->pad], &t[0][i],
-			       sizeof(struct sl1t_s) * tgt->pad);
+			memcpy(&tgt->sl1t[res * tgt->skip], &t[0][i],
+			       sizeof(struct sl1t_s) * tgt->skip);
 			res++;
 		}
 	}
 	if (tgt->end == 0) {
-		tgt->end = sl1t_stmp_sec(&tgt->sl1t[(res - 1) * tgt->pad]);
+		tgt->end = sl1t_stmp_sec(&tgt->sl1t[(res - 1) * tgt->skip]);
 	}
 	/* absolute count, candles or sl1t's */
 	tgt->nt = res;
 	tgt->beg = sl1t_stmp_sec(tgt->sl1t);
 	UD_DEBUG("srch %u: tgt->beg %i  tgt->end %i\n",
 		 sl1t_stmp_sec(sl1key), tgt->beg, tgt->end);
-	return res * tgt->pad;
+	return res * tgt->skip;
 }
 
 static void

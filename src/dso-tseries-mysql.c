@@ -158,7 +158,7 @@ qry_rowf(void **row, size_t nflds, void *clo)
 		scom_thdr_set_tblidx(th, 0);
 		qrclo->box->sl1t[cnt].v[0] = ffff_m30_ui32(p);
 		qrclo->box->sl1t[cnt].v[1] = ffff_m30_ui32(q);
-		qrclo->box->nt += (qrclo->box->pad = 1);
+		qrclo->box->nt += (qrclo->box->skip = 1);
 
 	} else {
 		abort();

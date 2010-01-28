@@ -455,14 +455,18 @@ instr_tick_by_instr_svc(job_t j)
 
 /* mktsnp getter */
 #include "dccp.h"
+#define NRETRIES	3
 
 static void
-mktsnp_cb(tsc_box_t b, su_secu_t s, void *UNUSED(clo))
+mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 {
+	int sock = (int)(long int)clo;
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
-	fprintf(stderr, "found match %u/%i@%hu %p\n", qd, qt, p, b);
+	fprintf(stderr, "found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
+	b->secu[0] = su_secu_ui64(s);
+	write(sock, b, 4096);
 	return;
 }
 
@@ -476,6 +480,7 @@ fetch_mktsnp_svc(job_t j)
 		.msk = 1 | 2 | 4,
 	};
 	uint16_t port;
+	int s, res;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -489,17 +494,17 @@ fetch_mktsnp_svc(job_t j)
 	UD_DEBUG("0x%04x (UD_SVC_MKTSNP): %s at %i, %x mask (->%hu)\n",
 		 UD_SVC_MKTSNP, secbugger(key.secu), key.beg, key.ttf, port);
 
-	int s = dccp_open();
-	int res;
-	for (int i = 0; i < 1000; i++) {
-		usleep(10000);
-		if ((res = dccp_connect(s, &j->sa)) >= 0) {
+	s = dccp_open();
+	for (int i = 0; i < NRETRIES; i++) {
+		if ((res = dccp_connect(s, j->sa, port)) >= 0) {
 			break;
 		}
-		fprintf(stderr, "tried a connect %i\n", res);
+		usleep(10);
 	}
-	fprintf(stderr, "s %i res %i\n", s, res);
-	tsc_find_cb(gcube, &key, mktsnp_cb, NULL);
+	if (res >= 0) {
+		fprintf(stderr, "s %i res %i\n", s, res);
+		tsc_find_cb(gcube, &key, mktsnp_cb, (void*)(long int)s);
+	}
 	dccp_close(s);
 	return;
 }

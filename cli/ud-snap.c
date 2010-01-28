@@ -46,6 +46,7 @@
 #include "ud-time.h"
 #include "clihelper.c"
 #include "dccp.h"
+#include "tscube.h"
 
 static struct ud_handle_s hdl[1];
 
@@ -136,6 +137,13 @@ main(int argc, const char *argv[])
 		/* listen for traffic */
 		res = dccp_accept(s, UD_NETWORK_SERVICE);
 		fprintf(stderr, "listen %i\n", res);
+		{
+			char b[4096];
+
+			while ((read(res, b, sizeof(b))) > 0) {
+				fprintf(stderr, "box\n");
+			}
+		}
 		dccp_close(res);
 		dccp_close(s);
 	}

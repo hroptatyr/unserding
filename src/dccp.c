@@ -122,9 +122,10 @@ dccp_accept(int s, uint16_t port)
 }
 
 int
-dccp_connect(int s, ud_sockaddr_u *host)
+dccp_connect(int s, ud_sockaddr_u host, uint16_t port)
 {
-	return connect(s, &host->sa, sizeof(*host));
+	host.sa4.sin_port = htons(port);
+	return connect(s, &host.sa, sizeof(host));
 }
 
 void

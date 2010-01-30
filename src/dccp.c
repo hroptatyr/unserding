@@ -69,6 +69,9 @@
 #if !defined MAX_DCCP_CONNECTION_BACK_LOG
 # define MAX_DCCP_CONNECTION_BACK_LOG	5
 #endif	/* !MAX_DCCP_CONNECTION_BACK_LOG */
+#if !defined DCCP_SOCKOPT_PACKET_SIZE
+# define DCCP_SOCKOPT_PACKET_SIZE 1
+#endif	/* !DCCP_SOCKOPT_PACKET_SIZE */
 
 int
 dccp_open(void)
@@ -85,6 +88,9 @@ dccp_open(void)
 	/* mark the address as reusable */
 	on = 1;
 	setsockopt(s, SOL_DCCP, SO_REUSEADDR, &on, sizeof(on));
+	/* make our packet size known */
+	on = 1280 /* in bytes */;
+	setsockopt(s, SOL_DCCP, DCCP_SOCKOPT_PACKET_SIZE, &on, sizeof(on));
 	/* impose a sockopt service */
 	on = 1;
 	setsockopt(s, SOL_DCCP, DCCP_SOCKOPT_SERVICE, &on, sizeof(on));
@@ -116,7 +122,9 @@ dccp_accept(int s, uint16_t port)
 	res |= listen(s, MAX_DCCP_CONNECTION_BACK_LOG);
 	if (res == 0) {
 		/* accept connections */
-		return accept(s, &remo_sa.sa, &remo_sa_len);
+		memset(&remo_sa, 0, sizeof(remo_sa));
+		remo_sa_len = sizeof(remo_sa);
+		res = accept(s, &remo_sa.sa, &remo_sa_len);
 	}
 	return res;
 }

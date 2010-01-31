@@ -138,10 +138,11 @@ main(int argc, const char *argv[])
 		res = dccp_accept(s, UD_NETWORK_SERVICE);
 		fprintf(stderr, "listen %i\n", res);
 		{
-			char b[4096];
+			char b[8192];
+			ssize_t sz;
 
-			while ((read(res, b, sizeof(b))) > 0) {
-				fprintf(stderr, "box\n");
+			while ((sz = read(res, b, sizeof(b))) > 0) {
+				fprintf(stderr, "box %zu\n", sz);
 			}
 		}
 		dccp_close(res);

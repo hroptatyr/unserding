@@ -88,9 +88,6 @@ dccp_open(void)
 	/* mark the address as reusable */
 	on = 1;
 	setsockopt(s, SOL_DCCP, SO_REUSEADDR, &on, sizeof(on));
-	/* make our packet size known */
-	on = 1280 /* in bytes */;
-	setsockopt(s, SOL_DCCP, DCCP_SOCKOPT_PACKET_SIZE, &on, sizeof(on));
 	/* impose a sockopt service */
 	on = 1;
 	setsockopt(s, SOL_DCCP, DCCP_SOCKOPT_SERVICE, &on, sizeof(on));

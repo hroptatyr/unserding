@@ -72,6 +72,7 @@
 #include "mcast.h"
 #include "protocore.h"
 #include "protocore-private.h"
+#include "ud-sock.h"
 
 /**
  * Rate used for keep-alive pings to neighbours in seconds. */
@@ -196,41 +197,24 @@ ud_retx(job_t j)
 static inline void
 __reuse_sock(int sock)
 {
-	const int one = 1;
-
-#if defined SO_REUSEADDR
 	UD_DEBUG_MCAST("setting option SO_REUSEADDR for sock %d\n", sock);
-	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0) {
+	if (setsock_reuseaddr(sock) < 0) {
 		UD_CRITICAL_MCAST("setsockopt(SO_REUSEADDR) failed\n");
 	}
-#else
-# error "Go away!"
-#endif
-#if defined SO_REUSEPORT
 	UD_DEBUG_MCAST("setting option SO_REUSEPORT for sock %d\n", sock);
-	if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &one, sizeof(one)) < 0) {
+	if (setsock_reuseport(sock) < 0) {
 		UD_CRITICAL_MCAST("setsockopt(SO_REUSEPORT) failed\n");
 	}
-#endif
 	return;
 }
 
 static inline void
 __linger_sock(int sock)
 {
-#if defined SO_LINGER
-	struct linger lng;
-
-	lng.l_onoff = 1;	/* 1 == on */
-	lng.l_linger = 1;	/* linger time in seconds */
-
 	UD_DEBUG_MCAST("setting option SO_LINGER for sock %d\n", sock);
-	if (setsockopt(sock, SOL_SOCKET, SO_LINGER, &lng, sizeof(lng)) < 0) {
+	if (setsock_linger(sock, 1) < 0) {
 		UD_CRITICAL_MCAST("setsockopt(SO_LINGER) failed\n");
 	}
-#else
-# error "Go away"
-#endif
 	return;
 }
 

@@ -53,6 +53,7 @@
 #include "unserding-nifty.h"
 #include "mcast.h"
 #include "dccp.h"
+#include "ud-sock.h"
 
 #if !defined SOCK_DCCP
 # define SOCK_DCCP		6
@@ -73,27 +74,27 @@
 # define DCCP_SOCKOPT_PACKET_SIZE 1
 #endif	/* !DCCP_SOCKOPT_PACKET_SIZE */
 
+static inline void
+set_dccp_service(int s, int service)
+{
+	(void)setsockopt_int(s, SOL_DCCP, DCCP_SOCKOPT_SERVICE, service);
+	return;
+}
+
 int
 dccp_open(void)
 {
 	int s;
-	/* turn off bind address checking, and allow port numbers to be reused -
-	 * otherwise the TIME_WAIT phenomenon will prevent binding to these
-	 * address.port combinations for (2 * MSL) seconds. */
-	uint32_t on;
 
 	if ((s = socket(PF_INET6, SOCK_DCCP, IPPROTO_DCCP)) < 0) {
 		return s;
 	}
 	/* mark the address as reusable */
-	on = 1;
-	setsockopt(s, SOL_DCCP, SO_REUSEADDR, &on, sizeof(on));
-	/* impose a sockopt service */
-	on = 1;
-	setsockopt(s, SOL_DCCP, DCCP_SOCKOPT_SERVICE, &on, sizeof(on));
+	setsock_reuseaddr(s);
+	/* impose a sockopt service, we just use 1 for now */
+	set_dccp_service(s, 1);
 	/* make a timeout for the accept call below */
-	on = 2000 /* milliseconds */;
-	setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &on, sizeof(on));
+	setsock_rcvtimeo(s, 2000);
 	return s;
 }
 

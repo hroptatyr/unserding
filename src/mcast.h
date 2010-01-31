@@ -61,6 +61,9 @@ extern "C" {
 /* site-local */
 #define UD_MCAST6_SITE_LOCAL	"ff05::134"
 
+/* just offer a default address for some tools */
+#define UD_MCAST6_ADDR		UD_MCAST6_LINK_LOCAL
+
 /* our grand unified sockaddr thingie */
 typedef union ud_sockaddr_u ud_sockaddr_u;
 typedef union ud_sockaddr_u *ud_sockaddr_t;

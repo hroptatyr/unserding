@@ -40,6 +40,7 @@
 
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
 
 static inline int
 getsockopt_int(int s, int level, int optname)
@@ -102,6 +103,42 @@ static inline int
 setsock_rcvtimeo(int s, int timeo)
 {
 	return setsockopt_int(s, SOL_SOCKET, SO_RCVTIMEO, timeo);
+}
+
+/**
+ * Do not delay packets, send them right off. */
+static inline int
+setsock_nodelay(int s)
+{
+#if defined TCP_NODELAY && defined SOL_TCP
+	return setsockopt_int(s, SOL_TCP, TCP_NODELAY, 1);
+#else  /* !TCP_NODELAY */
+	return 0;
+#endif	/* TCP_NODELAY */
+}
+
+static inline int
+tcp_cork(int s)
+{
+#if defined TCP_CORK && defined SOL_TCP
+	return setsockopt_int(s, SOL_TCP, TCP_CORK, 1);
+#else  /* !TCP_CORK */
+	/* be tough, if someone wants a cork and it's not
+	 * supported we're fucked, so return failure here */
+	return -1;
+#endif	/* TCP_CORK */
+}
+
+static inline int
+tcp_uncork(int s)
+{
+#if defined TCP_CORK && defined SOL_TCP
+	return setsockopt_int(s, SOL_TCP, TCP_CORK, 0);
+#else  /* !TCP_CORK */
+	/* be tough, if someone wants a cork and it's not
+	 * supported we're fucked, so return failure here */
+	return -1;
+#endif	/* TCP_CORK */
 }
 
 #endif	/* INCLUDED_ud_sock_h_ */

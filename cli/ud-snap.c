@@ -85,6 +85,12 @@ parse_time(const char *t)
 	return timegm(&tm);
 }
 
+struct boxpkt_s {
+	uint32_t boxno;
+	uint32_t chunkno;
+	char box[];
+};
+
 int
 main(int argc, const char *argv[])
 {
@@ -139,11 +145,13 @@ main(int argc, const char *argv[])
 		fprintf(stderr, "listen %i\n", res);
 		dccp_close(s);
 		{
-			char b[8192];
+			char b[UDPC_PKTLEN];
 			ssize_t sz;
 
 			while ((sz = read(res, b, sizeof(b))) > 0) {
-				fprintf(stderr, "box %zu\n", sz);
+				struct boxpkt_s *bp = b;
+				fprintf(stderr, "box %u %u (%zu)\n",
+					bp->boxno, bp->chunkno, sz);
 			}
 		}
 		dccp_close(res);

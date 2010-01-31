@@ -65,6 +65,9 @@
 #include "tseries.h"
 #include "tseries-private.h"
 
+/* corking/uncorking */
+#include "ud-sock.h"
+
 tscube_t gcube = NULL;
 struct hook_s __fetch_urn_hook[1], *fetch_urn_hook = __fetch_urn_hook;
 
@@ -456,6 +459,18 @@ instr_tick_by_instr_svc(job_t j)
 /* mktsnp getter */
 #include "dccp.h"
 #define NRETRIES	3
+#define BOX_CHUNK_SIZE	1024
+
+static size_t
+chunk_box(char *restrict tgt, tsc_box_t b, uint32_t boxno, uint32_t partno)
+{
+	/* i was thinking, 4 bytes for the boxno, 4 bytes for the partno */
+	((uint32_t*)tgt)[0] = boxno;
+	((uint32_t*)tgt)[1] = partno;
+	memcpy(tgt + sizeof(boxno) + sizeof(partno),
+	       b + partno * BOX_CHUNK_SIZE, BOX_CHUNK_SIZE);
+	return sizeof(boxno) + sizeof(partno) + BOX_CHUNK_SIZE;
+}
 
 static void
 mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
@@ -464,12 +479,24 @@ mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
+	int pno = 0;
+	static __thread char pkt[UDPC_PKTLEN];
+	size_t psz;
+
 	fprintf(stderr, "found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
 	b->secu[0] = su_secu_ui64(s);
-	write(sock, b, 1024);
-	write(sock, b + 1024, 1024);
-	write(sock, b + 2048, 1024);
-	write(sock, b + 3072, 1024);
+
+	psz = chunk_box(pkt, b, 0, pno++);
+	write(sock, pkt, psz);
+
+	psz = chunk_box(pkt, b, 0, pno++);
+	write(sock, pkt, psz);
+
+	psz = chunk_box(pkt, b, 0, pno++);
+	write(sock, pkt, psz);
+
+	psz = chunk_box(pkt, b, 0, pno++);
+	write(sock, pkt, psz);
 	return;
 }
 

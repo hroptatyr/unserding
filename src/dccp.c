@@ -131,6 +131,8 @@ int
 dccp_connect(int s, ud_sockaddr_u host, uint16_t port)
 {
 	host.sa4.sin_port = htons(port);
+	/* turn off nagle'ing of data */
+	setsock_nodelay(s);
 	return connect(s, &host.sa, sizeof(host));
 }
 

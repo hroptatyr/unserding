@@ -526,7 +526,7 @@ fetch_mktsnp_svc(job_t j)
 
 	s = dccp_open();
 	for (int i = 0; i < NRETRIES; i++) {
-		if ((res = dccp_connect(s, j->sa, port)) >= 0) {
+		if ((res = dccp_connect(s, j->sa, port, 0)) >= 0) {
 			break;
 		}
 		usleep(10);

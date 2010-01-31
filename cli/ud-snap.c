@@ -42,6 +42,7 @@
 #include "protocore.h"
 #include "tseries.h"
 #include <sushi/m30.h>
+#include <errno.h>
 
 #include "ud-time.h"
 #include "clihelper.c"
@@ -135,14 +136,15 @@ main(int argc, const char *argv[])
 	/* the dccp port we expect */
 	udpc_seria_add_ui16(sctx, UD_NETWORK_SERVICE);
 	pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
+
 	{
 		int s = dccp_open(), res;
 
 		fprintf(stderr, "socket %i\n", s);
 		ud_send_raw(hdl, pkt);
 		/* listen for traffic */
-		res = dccp_accept(s, UD_NETWORK_SERVICE);
-		fprintf(stderr, "listen %i\n", res);
+		res = dccp_accept(s, UD_NETWORK_SERVICE, 1000);
+		fprintf(stderr, "listen %i %s\n", res, strerror(errno));
 		dccp_close(s);
 		{
 			char b[UDPC_PKTLEN];

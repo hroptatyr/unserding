@@ -48,6 +48,8 @@
 # include <arpa/inet.h>
 #endif	/* HAVE_ARPA_INET_H */
 #include <errno.h>
+#include <sys/epoll.h>
+#include <fcntl.h>
 /* our main goodness */
 #include "unserding-dbg.h"
 #include "unserding-nifty.h"
@@ -74,6 +76,14 @@
 # define DCCP_SOCKOPT_PACKET_SIZE 1
 #endif	/* !DCCP_SOCKOPT_PACKET_SIZE */
 
+struct epguts_s {
+	struct epoll_event ev[1];
+	int sock;
+};
+
+/* sure? */
+static struct epguts_s gepg[1] = {{.sock = -1}};
+
 static inline void
 set_dccp_service(int s, int service)
 {
@@ -81,6 +91,91 @@ set_dccp_service(int s, int service)
 	return;
 }
 
+static void
+__set_nonblck(int sock)
+{
+	int opts;
+
+	/* get former options */
+	opts = fcntl(sock, F_GETFL);
+	if (opts < 0) {
+		return;
+	}
+	opts |= O_NONBLOCK;
+	(void)fcntl(sock, F_SETFL, opts);
+	return;
+}
+
+/* epoll guts */
+static void
+init_epoll_guts(struct epguts_s *epg)
+{
+	struct epoll_event *ev = epg->ev;
+
+	if (epg->sock != -1) {
+		return;
+	}
+
+	/* obtain an epoll handle and make it non-blocking*/
+#if 0
+/* too new, needs >= 2.6.30 */
+	epg->sock = epoll_create1(0);
+#else
+	epg->sock = epoll_create(1);
+#endif
+	__set_nonblck(epg->sock);
+
+	/* register for input, oob, error and hangups */
+	ev->events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
+	/* register our data */
+	ev->data.ptr = epg;
+	return;
+}
+
+static void
+free_epoll_guts(struct epguts_s *epg)
+{
+	if (LIKELY(epg->sock >= 0)) {
+		/* close the epoll socket */
+		close(epg->sock);
+		/* wipe */
+		epg->sock = -1;
+	}
+	return;
+}
+
+static void
+ud_ep_prep(struct epguts_s *epg, int s)
+{
+	int epfd = epg->sock;
+	struct epoll_event *ev = epg->ev;
+
+	/* add S to the epoll descriptor EPFD */
+	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, ev);
+	return;
+}
+
+static int
+ud_ep_wait(struct epguts_s *epg, int timeout)
+{
+	struct epoll_event ev[1];
+	int epfd = epg->sock;
+	/* wait and return */
+	return epoll_wait(epfd, ev, 1, timeout);
+}
+
+static void
+ud_ep_fini(struct epguts_s *epg, int s)
+{
+	int epfd = epg->sock;
+	struct epoll_event *ev = epg->ev;
+
+	/* remove S from the epoll descriptor EPFD */
+	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, ev);
+	return;
+}
+
+
 int
 dccp_open(void)
 {
@@ -95,16 +190,20 @@ dccp_open(void)
 	set_dccp_service(s, 1);
 	/* make a timeout for the accept call below */
 	setsock_rcvtimeo(s, 2000);
+
+	/* create our global epoll guts, maybe malloc me and put me in a hdl */
+	init_epoll_guts(gepg);
 	return s;
 }
 
 int
-dccp_accept(int s, uint16_t port)
+dccp_accept(int s, uint16_t port, int timeout)
 {
 	ud_sockaddr_u sa;
 	ud_sockaddr_u remo_sa;
 	socklen_t remo_sa_len;
 	int res = 0;
+	struct epguts_s *epg = gepg;
 
 	if (s < 0) {
 		return s;
@@ -118,17 +217,25 @@ dccp_accept(int s, uint16_t port)
 	res |= bind(s, &sa.sa, sizeof(sa));
 	/* listen on that port for incoming connections */
 	res |= listen(s, MAX_DCCP_CONNECTION_BACK_LOG);
-	if (res == 0) {
+	if (res != 0) {
+		return res;
+	}
+	/* otherwise bother our epoll structure */
+	ud_ep_prep(epg, s);
+	if (ud_ep_wait(epg, timeout) > 0) {
 		/* accept connections */
 		memset(&remo_sa, 0, sizeof(remo_sa));
 		remo_sa_len = sizeof(remo_sa);
 		res = accept(s, &remo_sa.sa, &remo_sa_len);
+	} else {
+		res = -1;
 	}
+	ud_ep_fini(epg, s);
 	return res;
 }
 
 int
-dccp_connect(int s, ud_sockaddr_u host, uint16_t port)
+dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 {
 	host.sa4.sin_port = htons(port);
 	/* turn off nagle'ing of data */
@@ -139,6 +246,7 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port)
 void
 dccp_close(int s)
 {
+	free_epoll_guts(gepg);
 	close(s);
 	return;
 }

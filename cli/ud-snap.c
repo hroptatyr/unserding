@@ -137,6 +137,7 @@ main(int argc, const char *argv[])
 		/* listen for traffic */
 		res = dccp_accept(s, UD_NETWORK_SERVICE);
 		fprintf(stderr, "listen %i\n", res);
+		dccp_close(s);
 		{
 			char b[8192];
 			ssize_t sz;

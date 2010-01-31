@@ -466,7 +466,10 @@ mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 	uint16_t p = su_secu_pot(s);
 	fprintf(stderr, "found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
 	b->secu[0] = su_secu_ui64(s);
-	write(sock, b, 4096);
+	write(sock, b, 1024);
+	write(sock, b + 1024, 1024);
+	write(sock, b + 2048, 1024);
+	write(sock, b + 3072, 1024);
 	return;
 }
 

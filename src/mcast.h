@@ -54,12 +54,12 @@ extern "C" {
 #define UD_MCAST4S2S_ADDR	"239.86.53.3"
 /* http://www.iana.org/assignments/ipv6-multicast-addresses/ lists us 
  * as ff0x:0:0:0:0:0:0:134 */
+/* node-local */
+#define UD_MCAST6_NODE_LOCAL	"ff01::134"
 /* link-local */
 #define UD_MCAST6_LINK_LOCAL	"ff02::134"
 /* site-local */
 #define UD_MCAST6_SITE_LOCAL	"ff05::134"
-
-#define UD_MCAST6_ADDR		UD_MCAST6_SITE_LOCAL
 
 /* our grand unified sockaddr thingie */
 typedef union ud_sockaddr_u ud_sockaddr_u;

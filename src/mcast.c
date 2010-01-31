@@ -102,7 +102,10 @@ static ud_sockaddr_u __sa4 = {
 /* dual-stack v6 stuff */
 #if defined IPPROTO_IPV6
 static ev_io ALGN16(__srv6_watcher);
-static struct ipv6_mreq ALGN16(mreq6);
+/* node local, site local and link local */
+static struct ipv6_mreq ALGN16(mreq6_nolo);
+static struct ipv6_mreq ALGN16(mreq6_silo);
+static struct ipv6_mreq ALGN16(mreq6_lilo);
 /* server to client goodness */
 static ud_sockaddr_u __sa6 = {
 	.sa6.sin6_addr = IN6ADDR_ANY_INIT
@@ -380,9 +383,11 @@ mcast6_listener_init(void)
 	}
 
 	/* join the mcast group */
-	__mcast6_join_group(s, UD_MCAST6_ADDR, &mreq6);
+	__mcast6_join_group(s, UD_MCAST6_NODE_LOCAL, &mreq6_nolo);
+	__mcast6_join_group(s, UD_MCAST6_LINK_LOCAL, &mreq6_lilo);
+	__mcast6_join_group(s, UD_MCAST6_SITE_LOCAL, &mreq6_silo);
 	/* endow our s2c and s2s structs */
-	__sa6.sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+	//__sa6.sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
 
 	/* return the socket we've got */
 	/* succeeded if > 0 */
@@ -399,7 +404,9 @@ mcast_listener_deinit(int sock)
 	/* drop multicast group membership */
 	__mcast4_leave_group(sock, &mreq4);
 #if defined IPPROTO_IPV6
-	__mcast6_leave_group(sock, &mreq6);
+	__mcast6_leave_group(sock, &mreq6_silo);
+	__mcast6_leave_group(sock, &mreq6_lilo);
+	__mcast6_leave_group(sock, &mreq6_nolo);
 #endif	/* IPPROTO_IPV6 */
 	/* linger the sink sock */
 	__linger_sock(sock);

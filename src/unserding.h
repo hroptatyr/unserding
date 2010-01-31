@@ -168,7 +168,8 @@ static inline void
 ud_handle_set_6svc(ud_handle_t hdl)
 {
 	hdl->sa.sa6.sin6_family = AF_INET6;
-	inet_pton(AF_INET6, UD_MCAST6_ADDR, &hdl->sa.sa6.sin6_addr);
+	/* we pick link-local here for simplicity */
+	inet_pton(AF_INET6, UD_MCAST6_LINK_LOCAL, &hdl->sa.sa6.sin6_addr);
 	return;
 }
 

@@ -531,7 +531,8 @@ fetch_mktsnp_svc(job_t j)
 
 	boxno = 0;
 	s = dccp_open();
-	if ((res = dccp_connect(s, j->sa, port, 4000)) >= 0) {
+	errno = 0;
+	if ((res = dccp_connect(s, j->sa, port, 16000)) >= 0) {
 		fprintf(stderr, "s %i res %i\n", s, res);
 		tsc_find_cb(gcube, &key, mktsnp_cb, (void*)(long int)s);
 	} else {

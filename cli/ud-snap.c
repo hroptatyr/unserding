@@ -144,7 +144,7 @@ main(int argc, const char *argv[])
 		ud_send_raw(hdl, pkt);
 		/* listen for traffic */
 		errno = 0;
-		if ((res = dccp_accept(s, UD_NETWORK_SERVICE, 1000)) > 0) {
+		if ((res = dccp_accept(s, UD_NETWORK_SERVICE, 16000)) > 0) {
 			char b[UDPC_PKTLEN];
 			ssize_t sz;
 			fprintf(stderr, "listen %i %s\n", res, strerror(errno));

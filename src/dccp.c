@@ -164,7 +164,7 @@ ud_ep_wait(struct epguts_s *epg, int timeout)
 	int epfd = epg->sock, res;
 	/* wait and return */
 	res = epoll_wait(epfd, ev, 1, timeout);
-	return res;
+	return res == 1 ? ev->events : res;
 }
 
 static void
@@ -226,13 +226,17 @@ dccp_accept(int s, uint16_t port, int timeout)
 	}
 	/* otherwise bother our epoll structure */
 	ud_ep_prep(epg, s, EPOLLIN);
-	if (ud_ep_wait(epg, timeout) > 0) {
+	if ((res = ud_ep_wait(epg, timeout)) <= 0) {
+		res = -1;
+		fprintf(stderr, "dccp accept() timed out\n");
+	} else if ((res & EPOLLERR) && (res & EPOLLHUP)) {
+		fprintf(stderr, "epoll error %x\n", res);
+		res = -1;
+	} else {
 		/* accept connections */
 		memset(&remo_sa, 0, sizeof(remo_sa));
 		remo_sa_len = sizeof(remo_sa);
 		res = accept(s, &remo_sa.sa, &remo_sa_len);
-	} else {
-		res = -1;
 	}
 	ud_ep_fini(epg, s);
 	return res;
@@ -247,6 +251,7 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 	host.sa4.sin_port = htons(port);
 	/* turn off nagle'ing of data */
 	setsock_nodelay(s);
+	errno = 0;
 	if ((res = connect(s, &host.sa, sizeof(host))) == 0) {
 		/* oh, nifty, connect worked right away */
 		return res;
@@ -263,9 +268,16 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 	if ((res = ud_ep_wait(epg, timeout)) <= 0) {
 		/* means we've timed out */
 		res = -1;
+		fprintf(stderr, "dccp connect() timed out\n");
+	} else if ((res & EPOLLERR) && (res & EPOLLHUP)) {
+		fprintf(stderr, "epoll error %x\n", res);
+		res = -1;
 	} else {
 		/* ah, must be our connect */
+#if 0
+		errno = 0;
 		res = connect(s, &host.sa, sizeof(host));
+#endif
 	}
 	ud_ep_fini(epg, s);
 	return res;

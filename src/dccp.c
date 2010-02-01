@@ -126,7 +126,7 @@ init_epoll_guts(struct epguts_s *epg)
 	setsock_nonblock(epg->sock);
 
 	/* register for input, oob, error and hangups */
-	ev->events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
+	ev->events = EPOLLIN | EPOLLOUT | EPOLLPRI | EPOLLERR | EPOLLHUP;
 	/* register our data */
 	ev->data.ptr = epg;
 	return;
@@ -244,14 +244,26 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 	host.sa4.sin_port = htons(port);
 	/* turn off nagle'ing of data */
 	setsock_nodelay(s);
+	if ((res = connect(s, &host.sa, sizeof(host))) == 0) {
+		/* oh, nifty, connect worked right away */
+		return res;
+	}
+	/* otherwise assume res == -1 and errno == EINPROGRESS */
+	if (errno != EINPROGRESS) {
+		return res;
+	}
+
 	/* prepare, connect and wait for the magic to happen */
 	ud_ep_prep(epg, s);
-	res = connect(s, &host.sa, sizeof(host));
+
 	/* let's see */
-	if (ud_ep_wait(epg, timeout) <= 0) {
+	if ((res = ud_ep_wait(epg, 10000)) <= 0) {
 		/* means we've timed out */
-		printf("timed out\n");
+		printf("timed out %i\n", res);
 		res = -1;
+	} else {
+		/* ah, must be our connect */
+		printf("connect() ready  %i\n", res);
 	}
 	ud_ep_fini(epg, s);
 	return res;

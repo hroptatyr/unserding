@@ -473,6 +473,8 @@ chunk_box(char *restrict tgt, tsc_box_t b, uint32_t boxno, uint32_t partno)
 	return sizeof(boxno) + sizeof(partno) + BOX_CHUNK_SIZE;
 }
 
+static int boxno;
+
 static void
 mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 {
@@ -487,17 +489,19 @@ mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 	fprintf(stderr, "found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
 	b->secu[0] = su_secu_ui64(s);
 
-	psz = chunk_box(pkt, b, 0, pno++);
+	psz = chunk_box(pkt, b, boxno, pno++);
 	write(sock, pkt, psz);
 
-	psz = chunk_box(pkt, b, 0, pno++);
+	psz = chunk_box(pkt, b, boxno, pno++);
 	write(sock, pkt, psz);
 
-	psz = chunk_box(pkt, b, 0, pno++);
+	psz = chunk_box(pkt, b, boxno, pno++);
 	write(sock, pkt, psz);
 
-	psz = chunk_box(pkt, b, 0, pno++);
+	psz = chunk_box(pkt, b, boxno, pno++);
 	write(sock, pkt, psz);
+
+	boxno++;
 	return;
 }
 
@@ -525,6 +529,7 @@ fetch_mktsnp_svc(job_t j)
 	UD_DEBUG("0x%04x (UD_SVC_MKTSNP): %s at %i, %x mask (->%hu)\n",
 		 UD_SVC_MKTSNP, secbugger(key.secu), key.beg, key.ttf, port);
 
+	boxno = 0;
 	s = dccp_open();
 	if ((res = dccp_connect(s, j->sa, port, 1000)) >= 0) {
 		fprintf(stderr, "s %i res %i\n", s, res);

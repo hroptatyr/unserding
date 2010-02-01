@@ -92,7 +92,7 @@ set_dccp_service(int s, int service)
 }
 
 static void
-__set_nonblck(int sock)
+setsock_nonblock(int sock)
 {
 	int opts;
 
@@ -123,7 +123,7 @@ init_epoll_guts(struct epguts_s *epg)
 #else
 	epg->sock = epoll_create(1);
 #endif
-	__set_nonblck(epg->sock);
+	setsock_nonblock(epg->sock);
 
 	/* register for input, oob, error and hangups */
 	ev->events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
@@ -190,7 +190,8 @@ dccp_open(void)
 	set_dccp_service(s, 1);
 	/* make a timeout for the accept call below */
 	setsock_rcvtimeo(s, 2000);
-
+	/* make socket non blocking */
+	setsock_nonblock(s);
 	/* create our global epoll guts, maybe malloc me and put me in a hdl */
 	init_epoll_guts(gepg);
 	return s;
@@ -237,10 +238,23 @@ dccp_accept(int s, uint16_t port, int timeout)
 int
 dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 {
+	int res = 0;
+	struct epguts_s *epg = gepg;
+
 	host.sa4.sin_port = htons(port);
 	/* turn off nagle'ing of data */
 	setsock_nodelay(s);
-	return connect(s, &host.sa, sizeof(host));
+	/* prepare, connect and wait for the magic to happen */
+	ud_ep_prep(epg, s);
+	res = connect(s, &host.sa, sizeof(host));
+	/* let's see */
+	if (ud_ep_wait(epg, timeout) <= 0) {
+		/* means we've timed out */
+		printf("timed out\n");
+		res = -1;
+	}
+	ud_ep_fini(epg, s);
+	return res;
 }
 
 void

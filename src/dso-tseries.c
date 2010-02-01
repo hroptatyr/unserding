@@ -67,6 +67,7 @@
 
 /* corking/uncorking */
 #include "ud-sock.h"
+#include <errno.h>
 
 tscube_t gcube = NULL;
 struct hook_s __fetch_urn_hook[1], *fetch_urn_hook = __fetch_urn_hook;
@@ -525,15 +526,11 @@ fetch_mktsnp_svc(job_t j)
 		 UD_SVC_MKTSNP, secbugger(key.secu), key.beg, key.ttf, port);
 
 	s = dccp_open();
-	for (int i = 0; i < NRETRIES; i++) {
-		if ((res = dccp_connect(s, j->sa, port, 0)) >= 0) {
-			break;
-		}
-		usleep(10);
-	}
-	if (res >= 0) {
+	if ((res = dccp_connect(s, j->sa, port, 1000)) >= 0) {
 		fprintf(stderr, "s %i res %i\n", s, res);
 		tsc_find_cb(gcube, &key, mktsnp_cb, (void*)(long int)s);
+	} else {
+		fprintf(stderr, "res %i: %s\n", res, strerror(errno));
 	}
 	dccp_close(s);
 	return;

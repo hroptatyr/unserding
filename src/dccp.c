@@ -126,7 +126,7 @@ init_epoll_guts(struct epguts_s *epg)
 	setsock_nonblock(epg->sock);
 
 	/* register for input, oob, error and hangups */
-	ev->events = EPOLLIN | EPOLLOUT | EPOLLPRI | EPOLLERR | EPOLLHUP;
+	ev->events = EPOLLPRI | EPOLLERR | EPOLLHUP;
 	/* register our data */
 	ev->data.ptr = epg;
 	return;
@@ -145,13 +145,15 @@ free_epoll_guts(struct epguts_s *epg)
 }
 
 static void
-ud_ep_prep(struct epguts_s *epg, int s)
+ud_ep_prep(struct epguts_s *epg, int s, int addflags)
 {
 	int epfd = epg->sock;
-	struct epoll_event *ev = epg->ev;
+	struct epoll_event ev = *epg->ev;
 
+	/* add additional ADDFLAGS */
+	ev.events |= addflags;
 	/* add S to the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, ev);
+	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ev);
 	return;
 }
 
@@ -159,9 +161,10 @@ static int
 ud_ep_wait(struct epguts_s *epg, int timeout)
 {
 	struct epoll_event ev[1];
-	int epfd = epg->sock;
+	int epfd = epg->sock, res;
 	/* wait and return */
-	return epoll_wait(epfd, ev, 1, timeout);
+	res = epoll_wait(epfd, ev, 1, timeout);
+	return res;
 }
 
 static void
@@ -222,7 +225,7 @@ dccp_accept(int s, uint16_t port, int timeout)
 		return res;
 	}
 	/* otherwise bother our epoll structure */
-	ud_ep_prep(epg, s);
+	ud_ep_prep(epg, s, EPOLLIN);
 	if (ud_ep_wait(epg, timeout) > 0) {
 		/* accept connections */
 		memset(&remo_sa, 0, sizeof(remo_sa));
@@ -254,16 +257,15 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 	}
 
 	/* prepare, connect and wait for the magic to happen */
-	ud_ep_prep(epg, s);
+	ud_ep_prep(epg, s, EPOLLOUT);
 
 	/* let's see */
-	if ((res = ud_ep_wait(epg, 10000)) <= 0) {
+	if ((res = ud_ep_wait(epg, timeout)) <= 0) {
 		/* means we've timed out */
-		printf("timed out %i\n", res);
 		res = -1;
 	} else {
 		/* ah, must be our connect */
-		printf("connect() ready  %i\n", res);
+		res = connect(s, &host.sa, sizeof(host));
 	}
 	ud_ep_fini(epg, s);
 	return res;
@@ -275,6 +277,38 @@ dccp_close(int s)
 	free_epoll_guts(gepg);
 	close(s);
 	return;
+}
+
+#define ESUCCESS	0
+
+ssize_t
+dccp_send(int s, const char *buf, size_t bsz)
+{
+	struct epguts_s *epg = gepg;
+	ssize_t res = 0;
+
+	/* add s to the list of observed sockets */
+	ud_ep_prep(epg, s, EPOLLOUT);
+	if ((res = ud_ep_wait(epg, 1000)) > 0) {
+		res = send(s, buf, bsz, 0);
+	}
+	ud_ep_fini(epg, s);
+	return res;
+}
+
+ssize_t
+dccp_recv(int s, char *restrict buf, size_t bsz)
+{
+	struct epguts_s *epg = gepg;
+	ssize_t res = 0;
+
+	/* add s to the list of observed sockets */
+	ud_ep_prep(epg, s, EPOLLIN);
+	if ((res = ud_ep_wait(epg, 1000)) > 0) {
+		res = recv(s, buf, bsz, 0);
+	}
+	ud_ep_fini(epg, s);
+	return res;
 }
 
 /* dccp.c ends here */

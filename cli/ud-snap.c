@@ -143,20 +143,19 @@ main(int argc, const char *argv[])
 		fprintf(stderr, "socket %i\n", s);
 		ud_send_raw(hdl, pkt);
 		/* listen for traffic */
-		res = dccp_accept(s, UD_NETWORK_SERVICE, 1000);
-		fprintf(stderr, "listen %i %s\n", res, strerror(errno));
-		dccp_close(s);
-		{
+		errno = 0;
+		if ((res = dccp_accept(s, UD_NETWORK_SERVICE, 1000)) > 0) {
 			char b[UDPC_PKTLEN];
 			ssize_t sz;
+			fprintf(stderr, "listen %i %s\n", res, strerror(errno));
 
-			while ((sz = read(res, b, sizeof(b))) > 0) {
-				struct boxpkt_s *bp = b;
-				fprintf(stderr, "box %u %u (%zu)\n",
+			while ((sz = dccp_recv(res, b, sizeof(b))) > 0) {
+				struct boxpkt_s *bp = (void*)b;
+				fprintf(stderr, "box %u %u (%zd)\n",
 					bp->boxno, bp->chunkno, sz);
 			}
+			dccp_close(res);
 		}
-		dccp_close(res);
 		dccp_close(s);
 	}
 	/* and lose the handle again */

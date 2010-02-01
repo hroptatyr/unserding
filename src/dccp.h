@@ -40,11 +40,15 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <unistd.h>
 #include "mcast.h"
 
 extern int dccp_open(void); 
 extern int dccp_accept(int socket, uint16_t port, int timeout);
 extern int dccp_connect(int socket, ud_sockaddr_u host, uint16_t port, int to);
 extern void dccp_close(int socket);
+
+extern ssize_t dccp_recv(int s, char *restrict buf, size_t bsz);
+extern ssize_t dccp_send(int s, const char *buf, size_t bsz);
 
 #endif	/* INCLUDED_dccp_h_ */

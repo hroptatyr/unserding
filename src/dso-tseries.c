@@ -490,16 +490,16 @@ mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 	b->secu[0] = su_secu_ui64(s);
 
 	psz = chunk_box(pkt, b, boxno, pno++);
-	write(sock, pkt, psz);
+	dccp_send(sock, pkt, psz);
 
 	psz = chunk_box(pkt, b, boxno, pno++);
-	write(sock, pkt, psz);
+	dccp_send(sock, pkt, psz);
 
 	psz = chunk_box(pkt, b, boxno, pno++);
-	write(sock, pkt, psz);
+	dccp_send(sock, pkt, psz);
 
 	psz = chunk_box(pkt, b, boxno, pno++);
-	write(sock, pkt, psz);
+	dccp_send(sock, pkt, psz);
 
 	boxno++;
 	return;
@@ -531,7 +531,7 @@ fetch_mktsnp_svc(job_t j)
 
 	boxno = 0;
 	s = dccp_open();
-	if ((res = dccp_connect(s, j->sa, port, 1000)) >= 0) {
+	if ((res = dccp_connect(s, j->sa, port, 4000)) >= 0) {
 		fprintf(stderr, "s %i res %i\n", s, res);
 		tsc_find_cb(gcube, &key, mktsnp_cb, (void*)(long int)s);
 	} else {

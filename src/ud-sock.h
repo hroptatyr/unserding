@@ -46,7 +46,7 @@ static inline int
 getsockopt_int(int s, int level, int optname)
 {
 	int res[1];
-	size_t rsz = sizeof(*res);
+	socklen_t rsz = sizeof(*res);
 	if (getsockopt(s, level, optname, res, &rsz) >= 0) {
 		return *res;
 	}

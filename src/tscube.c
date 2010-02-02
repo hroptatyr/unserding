@@ -237,7 +237,7 @@ tsc_box_find_bbs(__bbs_t clo, tsc_box_t b, tsc_key_t key)
 		}
 		t += b->skip;
 	}
-	for (int i = 0; i < countof(lst) && clo->ntk < clo->tsz; i++) {
+	for (int i = 0; i < (int)countof(lst) && clo->ntk < clo->tsz; i++) {
 		if (lst[i]) {
 			sl1t_t tgt = clo->tgt + clo->ntk;
 			uint16_t new_idx = __bbs_find_idx(clo, clo->s);

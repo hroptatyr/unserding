@@ -458,7 +458,7 @@ instr_tick_by_instr_svc(job_t j)
 
 
 /* mktsnp getter */
-#include "dccp.h"
+#include "tcp.h"
 #define NRETRIES	3
 #define BOX_CHUNK_SIZE	1024
 
@@ -490,16 +490,16 @@ mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 	b->secu[0] = su_secu_ui64(s);
 
 	psz = chunk_box(pkt, b, boxno, pno++);
-	dccp_send(sock, pkt, psz);
+	tcp_send(sock, pkt, psz);
 
 	psz = chunk_box(pkt, b, boxno, pno++);
-	dccp_send(sock, pkt, psz);
+	tcp_send(sock, pkt, psz);
 
 	psz = chunk_box(pkt, b, boxno, pno++);
-	dccp_send(sock, pkt, psz);
+	tcp_send(sock, pkt, psz);
 
 	psz = chunk_box(pkt, b, boxno, pno++);
-	dccp_send(sock, pkt, psz);
+	tcp_send(sock, pkt, psz);
 
 	boxno++;
 	return;
@@ -530,15 +530,15 @@ fetch_mktsnp_svc(job_t j)
 		 UD_SVC_MKTSNP, secbugger(key.secu), key.beg, key.ttf, port);
 
 	boxno = 0;
-	s = dccp_open();
+	s = tcp_open();
 	errno = 0;
-	if ((res = dccp_connect(s, j->sa, port, 16000)) >= 0) {
+	if ((res = tcp_connect(s, j->sa, port, 16000)) >= 0) {
 		fprintf(stderr, "s %i res %i\n", s, res);
 		tsc_find_cb(gcube, &key, mktsnp_cb, (void*)(long int)s);
 	} else {
 		fprintf(stderr, "res %i: %s\n", res, strerror(errno));
 	}
-	dccp_close(s);
+	tcp_close(s);
 	return;
 }
 

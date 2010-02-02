@@ -57,21 +57,6 @@ struct boxpkt_s {
 	char box[];
 };
 
-/* AAAAAAAAAARGH */
-struct boxhdr_s {
-	/* keep track how large this is */
-	uint16_t nt, skip;
-	/* time stamp when we added the box (cache-add time-stamp) */
-	time32_t cats;
-
-	/* offset 0x08 */
-	/* also keep track which ticks are supposed to be in here */
-	time32_t beg, end;
-
-	/* offset 0x10 */
-	uint64_t secu[2];
-};
-
 static char
 ttc(scom_t t)
 {
@@ -160,9 +145,7 @@ oh(scom_t UNUSED(t))
 }
 
 
-static struct boxhdr_s last[1];
-
-static void
+static size_t
 t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 {
 	uint32_t qd = su_secu_quodi(s);
@@ -174,51 +157,93 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 	uint16_t ms = scom_thdr_msec(t);
 	char tss[32];
 
+	/* cock off early if it's obviously crap */
+	if (ts == 0) {
+		return scom_thdr_linked(t) ? 2 : 1;
+	}
+
 	print_ts_into(tss, sizeof(tss), ts);
 	fprintf(stdout, "tick storm, ticks:1 ii:%u/%i@%hu tt:%c  ts:%s.%03hu",
 		qd, qt, p, ttfc, tss, ms);
 
 	if (scom_thdr_nexist_p(t)) {
 		ne(t);
+		return 1;
 	} else if (scom_thdr_onhold_p(t)) {
 		oh(t);
+		return 1;
 	} else if (!scom_thdr_linked(t)) {
 		t1(t);
+		return 1;
 	} else if (ttf == SSNP_FLAVOUR) {
 		t1s(t);
+		return 2;
 	} else if (ttf > SCDL_FLAVOUR) {
 		t1c(t);
+		return 2;
 	}
-	return;
+	return 0;
 }
 
 static void
-unwrap_box(const struct boxpkt_s *bp, size_t bpsz, void *clo)
+unwrap_box(const struct tsc_box_s *box, void *clo)
 {
-	tsc_box_t box = (void*)bp->box;
-	size_t cnt = offsetof(struct boxpkt_s, box) +
-		offsetof(struct tsc_box_s, sl1t);
-	size_t tcnt = 0;
+	size_t cnt = offsetof(struct tsc_box_s, sl1t) / sizeof(*box->sl1t);
+	const_sl1t_t t = (const void*)box;
 
-	fprintf(stderr, "box %u %u (%zu)\n", bp->boxno, bp->chunkno, bpsz);
-	if (bp->chunkno == 0) {
-		*last = *((struct boxhdr_s*)box);
-	}
-	while (cnt < bpsz) {
-		const void *tmp = bp->chunkno == 0
-			? box->sl1t + tcnt : ((const_sl1t_t)box) + tcnt;
-		size_t inc = scom_thdr_linked(tmp) ? 2 : 1;
-
-		t_cb(last->secu[0], tmp, clo);
-		tcnt += inc;
-		cnt += inc * sizeof(struct sl1t_s);
-	}
-	if (bp->chunkno == 3) {
-		memset(last, 0, sizeof(*last));
+	while (cnt < TSC_BOX_SZ / sizeof(*box->sl1t)) {
+		cnt += t_cb(box->secu[0], (const void*)(t + cnt), clo);
 	}
 	return;
 }
 
+/* currently assembled box */
+#define CHUNK_SIZE	1024
+static char cbox[TSC_BOX_SZ];
+
+/* return true when the currently reassembled box is complete */
+static tsc_box_t
+reass_box(const struct boxpkt_s *bp, size_t bpsz)
+{
+	if (bp->chunkno == 0) {
+		/* give the current box a proper rinse */
+		memset(cbox, 0, TSC_BOX_SZ);
+	}
+	memcpy(cbox + bp->chunkno * CHUNK_SIZE,
+	       bp->box, bpsz - offsetof(struct boxpkt_s, box));
+
+	if (bp->chunkno == 3) {
+		return (tsc_box_t)cbox;
+	}
+	return NULL;
+}
+
+static void
+recv_mktsnp(void)
+{
+	int s = dccp_open(), res;
+
+	fprintf(stderr, "socket %i\n", s);
+	/* listen for traffic */
+	if ((res = dccp_accept(s, UD_NETWORK_SERVICE, 16000)) > 0) {
+		char b[UDPC_PKTLEN];
+		ssize_t sz;
+
+		while ((sz = dccp_recv(res, b, sizeof(b))) > 0) {
+			tsc_box_t box;
+			if ((box = reass_box((void*)b, sz)) != NULL) {
+				/* box has been assembled, we magically know
+				 * about the box, so just unwrap it with CLO */
+				unwrap_box(box, NULL);
+			}
+		}
+		dccp_close(res);
+	}
+	dccp_close(s);
+	return;
+}
+
+
 static time_t
 parse_time(const char *t)
 {
@@ -282,25 +307,11 @@ main(int argc, const char *argv[])
 	udpc_seria_add_ui16(sctx, UD_NETWORK_SERVICE);
 	pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
 
-	{
-		int s = dccp_open(), res;
+	/* send the packet */
+	ud_send_raw(hdl, pkt);
+	/* ... and receive the answers */
+	recv_mktsnp();
 
-		fprintf(stderr, "socket %i\n", s);
-		ud_send_raw(hdl, pkt);
-#if 1
-		/* listen for traffic */
-		if ((res = dccp_accept(s, UD_NETWORK_SERVICE, 16000)) > 0) {
-			char b[UDPC_PKTLEN];
-			ssize_t sz;
-
-			while ((sz = dccp_recv(res, b, sizeof(b))) > 0) {
-				unwrap_box((void*)b, sz, NULL);
-			}
-			dccp_close(res);
-		}
-#endif
-		dccp_close(s);
-	}
 	/* and lose the handle again */
 	free_unserding_handle(hdl);
 	return 0;

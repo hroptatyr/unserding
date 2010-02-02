@@ -469,7 +469,7 @@ chunk_box(char *restrict tgt, tsc_box_t b, uint32_t boxno, uint32_t partno)
 	((uint32_t*)tgt)[0] = boxno;
 	((uint32_t*)tgt)[1] = partno;
 	memcpy(tgt + sizeof(boxno) + sizeof(partno),
-	       b + partno * BOX_CHUNK_SIZE, BOX_CHUNK_SIZE);
+	       (char*)b + partno * BOX_CHUNK_SIZE, BOX_CHUNK_SIZE);
 	return sizeof(boxno) + sizeof(partno) + BOX_CHUNK_SIZE;
 }
 

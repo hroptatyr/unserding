@@ -51,20 +51,171 @@
 
 static struct ud_handle_s hdl[1];
 
-static void
-t_cb(su_secu_t s, scom_t th, void *UNUSED(clo))
+struct boxpkt_s {
+	uint32_t boxno;
+	uint32_t chunkno;
+	char box[];
+};
+
+/* AAAAAAAAAARGH */
+struct boxhdr_s {
+	/* keep track how large this is */
+	uint16_t nt, skip;
+	/* time stamp when we added the box (cache-add time-stamp) */
+	time32_t cats;
+
+	/* offset 0x08 */
+	/* also keep track which ticks are supposed to be in here */
+	time32_t beg, end;
+
+	/* offset 0x10 */
+	uint64_t secu[2];
+};
+
+static char
+ttc(scom_t t)
 {
-	const_sl1t_t t = (const void*)th;
+	switch (scom_thdr_ttf(t)) {
+	case SCOM_FLAG_LM | SL1T_TTF_BID:
+	case SL1T_TTF_BID:
+		return 'b';
+	case SCOM_FLAG_LM | SL1T_TTF_ASK:
+	case SL1T_TTF_ASK:
+		return 'a';
+	case SCOM_FLAG_LM | SL1T_TTF_TRA:
+	case SL1T_TTF_TRA:
+		return 't';
+	case SCOM_FLAG_LM | SL1T_TTF_STL:
+	case SL1T_TTF_STL:
+		return 'x';
+	case SCOM_FLAG_LM | SL1T_TTF_FIX:
+	case SL1T_TTF_FIX:
+		return 'f';
+	default:
+		return 'u';
+	}
+}
+
+static void
+t1(scom_t t)
+{
+	const_sl1t_t tv = (const void*)t;
+	double v0 = ffff_m30_d(ffff_m30_get_ui32(tv->v[0]));
+	double v1 = ffff_m30_d(ffff_m30_get_ui32(tv->v[1]));
+
+	fputc(' ', stdout);
+	fputc(' ', stdout);
+	fputc(ttc(t), stdout);
+
+	fprintf(stdout, ":%2.4f %2.4f\n", v0, v1);
+	return;
+}
+
+static void
+t1c(scom_t t)
+{
+	const_scdl_t tv = (const void*)t;
+	double o = ffff_m30_d(ffff_m30_get_ui32(tv->o));
+	double h = ffff_m30_d(ffff_m30_get_ui32(tv->h));
+	double l = ffff_m30_d(ffff_m30_get_ui32(tv->l));
+	double c = ffff_m30_d(ffff_m30_get_ui32(tv->c));
+	int32_t v = tv->cnt;
+	int32_t ets = tv->end_ts;
+
+	fprintf(stdout, " o:%2.4f h:%2.4f l:%2.4f c:%2.4f v:%i  e:%i\n",
+		o, h, l, c, v, ets);
+	return;
+}
+
+static void
+t1s(scom_t t)
+{
+	const_ssnap_t tv = (const void*)t;
+	double bp = ffff_m30_d(ffff_m30_get_ui32(tv->bp));
+	double ap = ffff_m30_d(ffff_m30_get_ui32(tv->ap));
+	double bq = ffff_m30_d(ffff_m30_get_ui32(tv->bq));
+	double aq = ffff_m30_d(ffff_m30_get_ui32(tv->aq));
+	double tvpr = ffff_m30_d(ffff_m30_get_ui32(tv->tvpr));
+	double tq = ffff_m30_d(ffff_m30_get_ui32(tv->tq));
+
+	fprintf(stdout,
+		" b:%2.4f bs:%2.4f  a:%2.4f as:%2.4f "
+		" tvpr:%2.4f tq:%2.4f\n",
+		bp, bq, ap, aq, tvpr, tq);
+	return;
+}
+
+static void
+ne(scom_t UNUSED(t))
+{
+	fputs("  v:does not exist\n", stdout);
+	return;
+}
+
+static void
+oh(scom_t UNUSED(t))
+{
+	fputs("  v:deferred\n", stdout);
+	return;
+}
+
+
+static struct boxhdr_s last[1];
+
+static void
+t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
+{
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
-	uint16_t ttf = scom_thdr_ttf(th);
-	time_t ts = scom_thdr_sec(th);
-	uint16_t ms = scom_thdr_msec(th);
-	double v = ffff_m30_d(ffff_m30_get_ui32(t->v[0]));
+	uint16_t ttf = scom_thdr_ttf(t);
+	char ttfc = ttc(t);
+	int32_t ts = scom_thdr_sec(t);
+	uint16_t ms = scom_thdr_msec(t);
+	char tss[32];
 
-	fprintf(stdout, "ii:%u/%i@%hu  tt:%d ts:%ld.%03hd v:%2.4f\n",
-		qd, qt, p, ttf, ts, ms, v);
+	print_ts_into(tss, sizeof(tss), ts);
+	fprintf(stdout, "tick storm, ticks:1 ii:%u/%i@%hu tt:%c  ts:%s.%03hu",
+		qd, qt, p, ttfc, tss, ms);
+
+	if (scom_thdr_nexist_p(t)) {
+		ne(t);
+	} else if (scom_thdr_onhold_p(t)) {
+		oh(t);
+	} else if (!scom_thdr_linked(t)) {
+		t1(t);
+	} else if (ttf == SSNP_FLAVOUR) {
+		t1s(t);
+	} else if (ttf > SCDL_FLAVOUR) {
+		t1c(t);
+	}
+	return;
+}
+
+static void
+unwrap_box(const struct boxpkt_s *bp, size_t bpsz, void *clo)
+{
+	tsc_box_t box = (void*)bp->box;
+	size_t cnt = offsetof(struct boxpkt_s, box) +
+		offsetof(struct tsc_box_s, sl1t);
+	size_t tcnt = 0;
+
+	fprintf(stderr, "box %u %u (%zu)\n", bp->boxno, bp->chunkno, bpsz);
+	if (bp->chunkno == 0) {
+		*last = *((struct boxhdr_s*)box);
+	}
+	while (cnt < bpsz) {
+		const void *tmp = bp->chunkno == 0
+			? box->sl1t + tcnt : ((const_sl1t_t)box) + tcnt;
+		size_t inc = scom_thdr_linked(tmp) ? 2 : 1;
+
+		t_cb(last->secu[0], tmp, clo);
+		tcnt += inc;
+		cnt += inc * sizeof(struct sl1t_s);
+	}
+	if (bp->chunkno == 3) {
+		memset(last, 0, sizeof(*last));
+	}
 	return;
 }
 
@@ -85,12 +236,6 @@ parse_time(const char *t)
 	(void)strptime(on, "%H:%M:%S", &tm);
 	return timegm(&tm);
 }
-
-struct boxpkt_s {
-	uint32_t boxno;
-	uint32_t chunkno;
-	char box[];
-};
 
 int
 main(int argc, const char *argv[])
@@ -147,12 +292,9 @@ main(int argc, const char *argv[])
 		if ((res = dccp_accept(s, UD_NETWORK_SERVICE, 16000)) > 0) {
 			char b[UDPC_PKTLEN];
 			ssize_t sz;
-			fprintf(stderr, "listen %i %s\n", res, strerror(errno));
 
 			while ((sz = dccp_recv(res, b, sizeof(b))) > 0) {
-				struct boxpkt_s *bp = (void*)b;
-				fprintf(stderr, "box %u %u (%zd)\n",
-					bp->boxno, bp->chunkno, sz);
+				unwrap_box((void*)b, sz, NULL);
 			}
 			dccp_close(res);
 		}

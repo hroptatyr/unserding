@@ -118,7 +118,7 @@ __find_min_addr(const_sl1t_t perttf[], size_t perttfsz)
 	for (unsigned int i = 0; i < perttfsz; i++) {
 #if defined __INTEL_COMPILER
 /* gcc fucks up here, treat specially */
-		if ((volatile const void*)(lst[i] - 1) <
+		if ((volatile const void*)(perttf[i] - 1) <
 		    (volatile const void*)(res - 1)) {
 			res = perttf[i];
 		}

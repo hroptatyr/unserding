@@ -111,6 +111,32 @@ ttf_coincide_p(uint16_t tick_ttf, uint16_t blst_ttf)
 }
 
 static const_sl1t_t
+__find_min_addr(const_sl1t_t perttf[], size_t perttfsz)
+{
+	const_sl1t_t res = NULL;
+
+	for (unsigned int i = 0; i < perttfsz; i++) {
+#if defined __INTEL_COMPILER
+/* gcc fucks up here, treat specially */
+		if ((volatile const void*)(lst[i] - 1) <
+		    (volatile const void*)(res - 1)) {
+			res = perttf[i];
+		}
+#else  /* !__INTEL_COMPILER */
+		if (UNLIKELY(res == NULL && perttf[i] != NULL)) {
+			res = perttf[i];
+		} else if (LIKELY(perttf[i] == NULL)) {
+			/* do nothing */
+			;
+		} else if ((const void*)perttf[i] < (const void*)res) {
+			res = perttf[i];
+		}
+#endif	/* __INTEL_COMPILER */
+	}
+	return res;
+}
+
+static const_sl1t_t
 __find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
 {
 	time32_t ts = scom_thdr_sec(key);
@@ -118,9 +144,13 @@ __find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
 	uint16_t ttf = scom_thdr_ttf(key);
 	/* to store the last seen ticks of each tick type 0 to 7 */
 	const_sl1t_t lst[8] = {0};
-	const_sl1t_t res;
 
-	for (const_sl1t_t tmp = t; tmp < t + nt && sl1t_stmp_sec(tmp) <= ts; ) {
+	for (const_sl1t_t tmp = t; tmp < t + nt; ) {
+		time32_t tmpts = (time32_t)sl1t_stmp_sec(tmp);
+		if (tmpts > ts) {
+			UD_DEBUG("break, tmpts %i > ts %i\n", tmpts, ts);
+			break;
+		}
 		uint16_t tkttf = sl1t_ttf(tmp);
 		uint16_t tkidx = sl1t_tblidx(tmp);
 
@@ -131,14 +161,7 @@ __find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
 		tmp += scom_thdr_linked((const void*)(tmp)) ? 2 : 1;
 	}
 	/* find the minimum stamp out of the remaining ones */
-	res = NULL;
-	for (unsigned int i = 0; i < countof(lst); i++) {
-		if ((volatile const void*)(lst[i] - 1) <
-		    (volatile const void*)(res - 1)) {
-			res = lst[i];
-		}
-	}
-	return res;
+	return __find_min_addr(lst, countof(lst));
 }
 
 /* belongs in uteseries.c? */

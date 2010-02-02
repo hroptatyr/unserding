@@ -46,7 +46,7 @@
 
 #include "ud-time.h"
 #include "clihelper.c"
-#include "tcp.h"
+#include "dccp.h"
 #include "tscube.h"
 
 static struct ud_handle_s hdl[1];
@@ -133,32 +133,31 @@ main(int argc, const char *argv[])
 	/* secu and bs */
 	udpc_seria_add_secu(sctx, cid);
 	udpc_seria_add_tbs(sctx, bs);
-	/* the tcp port we expect */
+	/* the dccp port we expect */
 	udpc_seria_add_ui16(sctx, UD_NETWORK_SERVICE);
 	pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
 
 	{
-		int s = tcp_open(), res;
+		int s = dccp_open(), res;
 
 		fprintf(stderr, "socket %i\n", s);
 		ud_send_raw(hdl, pkt);
-#if 0
+#if 1
 		/* listen for traffic */
-		errno = 0;
-		if ((res = tcp_accept(s, UD_NETWORK_SERVICE, 16000)) > 0) {
+		if ((res = dccp_accept(s, UD_NETWORK_SERVICE, 16000)) > 0) {
 			char b[UDPC_PKTLEN];
 			ssize_t sz;
 			fprintf(stderr, "listen %i %s\n", res, strerror(errno));
 
-			while ((sz = tcp_recv(res, b, sizeof(b))) > 0) {
+			while ((sz = dccp_recv(res, b, sizeof(b))) > 0) {
 				struct boxpkt_s *bp = (void*)b;
 				fprintf(stderr, "box %u %u (%zd)\n",
 					bp->boxno, bp->chunkno, sz);
 			}
-			tcp_close(res);
+			dccp_close(res);
 		}
 #endif
-		tcp_close(s);
+		dccp_close(s);
 	}
 	/* and lose the handle again */
 	free_unserding_handle(hdl);

@@ -25,7 +25,7 @@ noinst_HEADERS = protocore-private.h
 
 if BUILD_SERVER
 ## the main server binary
-unserdingd_SOURCES = unserdingd.c mcast.c dccp.c tcp.c
+unserdingd_SOURCES = unserdingd.c mcast.c dccp.c
 unserdingd_SOURCES += protocore.c seria.c
 unserdingd_SOURCES += module.h module.c
 unserdingd_SOURCES += wpool.h wpool.c
@@ -144,7 +144,7 @@ endif
 
 if BUILD_LIBRARY
 ## the lib
-libunserding_la_SOURCES = libstuff.c libhelpers.c dccp.c tcp.c
+libunserding_la_SOURCES = libstuff.c libhelpers.c dccp.c
 libunserding_la_SOURCES += svc-pong.c
 libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS) $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt

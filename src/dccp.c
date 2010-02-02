@@ -57,6 +57,12 @@
 #include "dccp.h"
 #include "ud-sock.h"
 
+#if defined DEBUG_FLAG
+# include <assert.h>
+#else
+# define assert(args...)
+#endif
+
 #if !defined SOCK_DCCP
 # define SOCK_DCCP		6
 #endif	/* !SOCK_DCCP */
@@ -132,16 +138,26 @@ init_epoll_guts(struct epguts_s *epg)
 	return;
 }
 
-static void
+static __attribute__((unused)) void
 free_epoll_guts(struct epguts_s *epg)
 {
-	if (LIKELY(epg->sock >= 0)) {
+	if (LIKELY(epg->sock != -1)) {
 		/* close the epoll socket */
 		close(epg->sock);
 		/* wipe */
 		epg->sock = -1;
 	}
 	return;
+}
+
+/* pseudo constructor, singleton */
+static struct epguts_s*
+epoll_guts(void)
+{
+	if (UNLIKELY(gepg->sock == -1)) {
+		init_epoll_guts(gepg);
+	}
+	return gepg;
 }
 
 static void
@@ -195,8 +211,10 @@ dccp_open(void)
 	setsock_rcvtimeo(s, 2000);
 	/* make socket non blocking */
 	setsock_nonblock(s);
+	/* turn off nagle'ing of data */
+	setsock_nodelay(s);
 	/* create our global epoll guts, maybe malloc me and put me in a hdl */
-	init_epoll_guts(gepg);
+	(void)epoll_guts();
 	return s;
 }
 
@@ -207,7 +225,7 @@ dccp_accept(int s, uint16_t port, int timeout)
 	ud_sockaddr_u remo_sa;
 	socklen_t remo_sa_len;
 	int res = 0;
-	struct epguts_s *epg = gepg;
+	struct epguts_s *epg = epoll_guts();
 
 	if (s < 0) {
 		return s;
@@ -218,25 +236,29 @@ dccp_accept(int s, uint16_t port, int timeout)
 	sa.sa6.sin6_port = htons(port);
 	/* bind the socket to the local address and port. salocal is sockaddr
 	 * of local IP and port */
-	res |= bind(s, &sa.sa, sizeof(sa));
+	if ((res = bind(s, &sa.sa, sizeof(sa))) < 0) {
+		fprintf(stderr, "dccp bind() on %i failed\n", s);
+		return res;
+	}
 	/* listen on that port for incoming connections */
-	res |= listen(s, MAX_DCCP_CONNECTION_BACK_LOG);
-	if (res != 0) {
+	if ((res = listen(s, MAX_DCCP_CONNECTION_BACK_LOG)) < 0) {
+		fprintf(stderr, "dccp listen() on %i failed\n", s);
 		return res;
 	}
 	/* otherwise bother our epoll structure */
 	ud_ep_prep(epg, s, EPOLLIN);
-	if ((res = ud_ep_wait(epg, timeout)) <= 0) {
+	if ((res = ud_ep_wait(epg, timeout)) == 0) {
+		fprintf(stderr, "dccp accept() on %i timed out %x\n", s, res);
 		res = -1;
-		fprintf(stderr, "dccp accept() timed out\n");
-	} else if ((res & EPOLLERR) && (res & EPOLLHUP)) {
-		fprintf(stderr, "epoll error %x\n", res);
+	} else if (res < 0 || res & (EPOLLERR | EPOLLHUP)) {
+		fprintf(stderr, "epoll error on %i: %x\n", s, res);
 		res = -1;
 	} else {
-		/* accept connections */
+		/* everything went fine, invariant res == 1, accept connections */
 		memset(&remo_sa, 0, sizeof(remo_sa));
 		remo_sa_len = sizeof(remo_sa);
 		res = accept(s, &remo_sa.sa, &remo_sa_len);
+		fprintf(stderr, "accept()ed %i -> %i\n", s, res);
 	}
 	ud_ep_fini(epg, s);
 	return res;
@@ -246,39 +268,44 @@ int
 dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 {
 	int res = 0;
-	struct epguts_s *epg = gepg;
+	struct epguts_s *epg = epoll_guts();
 
 	host.sa4.sin_port = htons(port);
-	/* turn off nagle'ing of data */
-	setsock_nodelay(s);
-	errno = 0;
-	if ((res = connect(s, &host.sa, sizeof(host))) == 0) {
-		/* oh, nifty, connect worked right away */
-		return res;
-	}
-	/* otherwise assume res == -1 and errno == EINPROGRESS */
-	if (errno != EINPROGRESS) {
-		return res;
-	}
 
 	/* prepare, connect and wait for the magic to happen */
 	ud_ep_prep(epg, s, EPOLLOUT);
+	/* wait for writability */
+	if ((res = ud_ep_wait(epg, timeout)) <= 0) {
+		/* means we've timed out */
+		fprintf(stderr, "dccp socket %i not writable (%i)\n", s, res);
+		res = -1;
+		goto out;
+	}
+	/* oh, we're writable, good, just issue the connect() */
+	if ((res = connect(s, &host.sa, sizeof(host))) == 0) {
+		/* oh, nifty, connect worked right away */
+		goto out;
+	}
+	/* otherwise connect ought to return EINPROGRESS */
+	assert(errno == EINPROGRESS);
 
 	/* let's see */
 	if ((res = ud_ep_wait(epg, timeout)) <= 0) {
 		/* means we've timed out */
+		fprintf(stderr, "dccp connect() timed out %i\n", res);
 		res = -1;
-		fprintf(stderr, "dccp connect() timed out\n");
-	} else if ((res & EPOLLERR) && (res & EPOLLHUP)) {
-		fprintf(stderr, "epoll error %x\n", res);
+		goto out;
+
+	} else if (res & (EPOLLERR | EPOLLHUP)) {
+		fprintf(stderr, "dccp socket hung up %x\n", res);
 		res = -1;
+		goto out;
+
 	} else {
 		/* ah, must be our connect */
-#if 0
-		errno = 0;
-		res = connect(s, &host.sa, sizeof(host));
-#endif
+		;
 	}
+out:
 	ud_ep_fini(epg, s);
 	return res;
 }
@@ -286,7 +313,8 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 void
 dccp_close(int s)
 {
-	free_epoll_guts(gepg);
+	/* how about we let this guy live on forever? */
+	//free_epoll_guts(gepg);
 	close(s);
 	return;
 }
@@ -296,7 +324,7 @@ dccp_close(int s)
 ssize_t
 dccp_send(int s, const char *buf, size_t bsz)
 {
-	struct epguts_s *epg = gepg;
+	struct epguts_s *epg = epoll_guts();
 	ssize_t res = 0;
 
 	/* add s to the list of observed sockets */
@@ -311,7 +339,7 @@ dccp_send(int s, const char *buf, size_t bsz)
 ssize_t
 dccp_recv(int s, char *restrict buf, size_t bsz)
 {
-	struct epguts_s *epg = gepg;
+	struct epguts_s *epg = epoll_guts();
 	ssize_t res = 0;
 
 	/* add s to the list of observed sockets */

@@ -180,7 +180,7 @@ ud_ep_wait(struct epguts_s *epg, int timeout)
 	int epfd = epg->sock, res;
 	/* wait and return */
 	res = epoll_wait(epfd, ev, 1, timeout);
-	return res == 1 ? ev->events : res;
+	return res == 1 ? (int)ev->events : res;
 }
 
 static void

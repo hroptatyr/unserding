@@ -122,10 +122,6 @@ typedef struct __bbs_s {
 } *__bbs_t;
 
 
-/* for one bunch of ticks */
-/* we'll just use the whole allocation for ticks */
-#define TSC_BOX_SZ	4096
-
 #define MAP_MEMMAP	(MAP_PRIVATE | MAP_ANONYMOUS)
 #define PROT_MEMMAP	(PROT_READ | PROT_WRITE)
 static tsc_box_t

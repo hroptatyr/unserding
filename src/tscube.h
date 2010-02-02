@@ -106,6 +106,9 @@ struct tsc_ops_s {
 	urn_refetch_f urn_refetch_cb;
 };
 
+/* desired size of the box structure */
+#define TSC_BOX_SZ	4096
+
 struct tsc_box_s {
 	/* keep track how large this is */
 	uint16_t nt, skip;

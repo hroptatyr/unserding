@@ -37,6 +37,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "protocore.h"

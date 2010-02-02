@@ -88,7 +88,7 @@ setsock_reuseaddr(int s)
 
 /* probably only available on BSD */
 static inline int
-setsock_reuseport(int s)
+setsock_reuseport(int __attribute__((unused)) s)
 {
 #if defined SO_REUSEPORT
 	return setsockopt_int(s, SOL_SOCKET, SO_REUSEPORT, 1);

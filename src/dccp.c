@@ -329,8 +329,10 @@ dccp_send(int s, const char *buf, size_t bsz)
 
 	/* add s to the list of observed sockets */
 	ud_ep_prep(epg, s, EPOLLOUT);
-	if ((res = ud_ep_wait(epg, 1000)) > 0) {
-		res = send(s, buf, bsz, 0);
+	if ((res = ud_ep_wait(epg, 5000)) > 0) {
+		if ((res = send(s, buf, bsz, 0)) == -1) {
+			perror("send error: ");
+		}
 	}
 	ud_ep_fini(epg, s);
 	return res;
@@ -344,7 +346,7 @@ dccp_recv(int s, char *restrict buf, size_t bsz)
 
 	/* add s to the list of observed sockets */
 	ud_ep_prep(epg, s, EPOLLIN);
-	if ((res = ud_ep_wait(epg, 1000)) > 0) {
+	if ((res = ud_ep_wait(epg, 5000)) > 0) {
 		res = recv(s, buf, bsz, 0);
 	}
 	ud_ep_fini(epg, s);

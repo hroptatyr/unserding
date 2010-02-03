@@ -118,7 +118,7 @@ setsock_nodelay(int s)
 #endif	/* TCP_NODELAY */
 }
 
-static void
+static inline void
 setsock_nonblock(int sock)
 {
 	int opts;

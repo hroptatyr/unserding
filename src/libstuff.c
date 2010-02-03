@@ -222,7 +222,7 @@ fiddle_with_timeout(ud_handle_t hdl, int timeout)
 	if (timeout > 0) {
 		return timeout;
 	}
-	return 2 * hdl->mart;
+	return 2 * hdl->mart ?: 1;
 }
 
 

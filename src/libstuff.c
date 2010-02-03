@@ -61,16 +61,14 @@
 #if defined HAVE_ERRNO_H
 # include <errno.h>
 #endif
-/* conditionalise on me */
-#include <sys/epoll.h>
-/* conditionalise on me too */
-#include <fcntl.h>
 
 /* our master include */
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "protocore.h"
 #include "protocore-private.h"
+#include "ud-sock.h"
+#include "epoll-helpers.h"
 
 #include "svc-pong.h"
 
@@ -100,21 +98,6 @@
 #define SOCK_INVALID		(int)0xffffff
 
 
-static void
-__set_nonblck(int sock)
-{
-	int opts;
-
-	/* get former options */
-	opts = fcntl(sock, F_GETFL);
-	if (opts < 0) {
-		return;
-	}
-	opts |= O_NONBLOCK;
-	(void)fcntl(sock, F_SETFL, opts);
-	return;
-}
-
 static void
 fiddle_with_mtu(int __attribute__((unused)) s)
 {
@@ -238,7 +221,7 @@ init_epoll_guts(ud_handle_t hdl)
 #else
 	hdl->epfd = epoll_create(1);
 #endif
-	__set_nonblck(hdl->epfd);
+	setsock_nonblock(hdl->epfd);
 
 	/* register for input, oob, error and hangups */
 	ev->events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
@@ -428,7 +411,7 @@ init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop)
 		break;
 	}
 	/* operate in non-blocking mode */
-	__set_nonblck(hdl->sock);
+	setsock_nonblock(hdl->sock);
 	/* initialise the epoll backend */
 	init_epoll_guts(hdl);
 	if (negop) {

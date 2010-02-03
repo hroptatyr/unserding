@@ -119,14 +119,14 @@ ep_prep(ep_ctx_t epg, int s, int flags)
 	return epoll_ctl(epg->sock, EPOLL_CTL_ADD, s, &ev);
 }
 
-static int
+static INLINE int
 ep_wait(ep_ctx_t epg, int timeout)
 {
 	/* wait and return */
 	return epoll_wait(epg->sock, epg->ev, epg->nev, timeout);
 }
 
-static int
+static INLINE int
 ep_fini(ep_ctx_t epg, int s)
 {
 	/* remove S from the epoll descriptor EPFD */

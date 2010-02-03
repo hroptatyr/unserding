@@ -41,6 +41,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
+#include <fcntl.h>
 
 static inline int
 getsockopt_int(int s, int level, int optname)

@@ -219,13 +219,9 @@ dccp_open(void)
 }
 
 int
-dccp_accept(int s, uint16_t port, int timeout)
+dccp_listen(int s, uint16_t port)
 {
 	ud_sockaddr_u sa;
-	ud_sockaddr_u remo_sa;
-	socklen_t remo_sa_len;
-	int res = 0;
-	struct epguts_s *epg = epoll_guts();
 
 	if (s < 0) {
 		return s;
@@ -236,15 +232,22 @@ dccp_accept(int s, uint16_t port, int timeout)
 	sa.sa6.sin6_port = htons(port);
 	/* bind the socket to the local address and port. salocal is sockaddr
 	 * of local IP and port */
-	if ((res = bind(s, &sa.sa, sizeof(sa))) < 0) {
+	if (bind(s, &sa.sa, sizeof(sa)) < 0) {
 		fprintf(stderr, "dccp bind() on %i failed\n", s);
-		return res;
+		return -1;
 	}
 	/* listen on that port for incoming connections */
-	if ((res = listen(s, MAX_DCCP_CONNECTION_BACK_LOG)) < 0) {
-		fprintf(stderr, "dccp listen() on %i failed\n", s);
-		return res;
-	}
+	return listen(s, MAX_DCCP_CONNECTION_BACK_LOG);
+}
+
+int
+dccp_accept(int s, int timeout)
+{
+	ud_sockaddr_u remo_sa;
+	socklen_t remo_sa_len;
+	struct epguts_s *epg = epoll_guts();
+	int res;
+
 	/* otherwise bother our epoll structure */
 	ud_ep_prep(epg, s, EPOLLIN);
 	if ((res = ud_ep_wait(epg, timeout)) == 0) {
@@ -281,6 +284,7 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 		res = -1;
 		goto out;
 	}
+
 	/* oh, we're writable, good, just issue the connect() */
 	if ((res = connect(s, &host.sa, sizeof(host))) == 0) {
 		/* oh, nifty, connect worked right away */
@@ -297,7 +301,7 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 		goto out;
 
 	} else if (res & (EPOLLERR | EPOLLHUP)) {
-		fprintf(stderr, "dccp socket hung up %x\n", res);
+		fprintf(stderr, "dccp socket %i hung up %x\n", s, res);
 		res = -1;
 		goto out;
 

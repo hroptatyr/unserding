@@ -44,7 +44,8 @@
 #include "mcast.h"
 
 extern int dccp_open(void); 
-extern int dccp_accept(int socket, uint16_t port, int timeout);
+extern int dccp_listen(int s, uint16_t port);
+extern int dccp_accept(int socket, int timeout);
 extern int dccp_connect(int socket, ud_sockaddr_u host, uint16_t port, int to);
 extern void dccp_close(int socket);
 

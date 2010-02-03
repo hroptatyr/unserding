@@ -220,13 +220,13 @@ reass_box(const struct boxpkt_s *bp, size_t bpsz)
 }
 
 static void
-recv_mktsnp(void)
+recv_mktsnp(int s)
 {
-	int s = dccp_open(), res;
+	int res;
 
 	fprintf(stderr, "socket %i\n", s);
 	/* listen for traffic */
-	if ((res = dccp_accept(s, UD_NETWORK_SERVICE, 16000)) > 0) {
+	if ((res = dccp_accept(s, 4000)) > 0) {
 		char b[UDPC_PKTLEN];
 		ssize_t sz;
 
@@ -240,7 +240,6 @@ recv_mktsnp(void)
 		}
 		dccp_close(res);
 	}
-	dccp_close(s);
 	return;
 }
 
@@ -279,6 +278,7 @@ main(int argc, const char *argv[])
 	char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = {.pbuf = buf, .plen = sizeof(buf)};
 	struct udpc_seria_s sctx[1];
+	int s;
 
 	if (argc <= 1) {
 		fprintf(stderr, "Usage: ud-snap instr [date]\n");
@@ -308,10 +308,16 @@ main(int argc, const char *argv[])
 	udpc_seria_add_ui16(sctx, UD_NETWORK_SERVICE);
 	pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
 
-	/* send the packet */
-	ud_send_raw(hdl, pkt);
-	/* ... and receive the answers */
-	recv_mktsnp();
+	/* open a dccp socket and make it listen */
+	s = dccp_open();
+	if (dccp_listen(s, UD_NETWORK_SERVICE) >= 0) {
+		/* send the packet */
+		ud_send_raw(hdl, pkt);
+		/* ... and receive the answers */
+		recv_mktsnp(s);
+		/* and we're out */
+		dccp_close(s);
+	}
 
 	/* and lose the handle again */
 	free_unserding_handle(hdl);

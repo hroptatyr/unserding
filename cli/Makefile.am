@@ -8,7 +8,7 @@ AM_LDFLAGS = -lpthread
 
 bin_PROGRAMS =
 if BUILD_CLIAPPS
-bin_PROGRAMS += ud-instr ud-snap ud-tick ud-ping
+bin_PROGRAMS += ud-instr ud-snap ud-tick ud-ping ud-test
 endif
 
 BUILT_SOURCES =
@@ -34,6 +34,11 @@ ud_ping_SOURCES = ud-ping.c
 ud_ping_CPPFLAGS = $(AM_CPPFLAGS) 
 ud_ping_LDADD = $(top_builddir)/src/libunserding.la -lrt
 ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
+
+ud_test_SOURCES = ud-test.c
+ud_test_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
+ud_test_LDADD = $(top_builddir)/src/libunserding.la $(PFACK_LIBS)
+ud_test_LDFLAGS = $(AM_LDFLAGS) -static
 endif
 
 # 

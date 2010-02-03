@@ -175,16 +175,24 @@ mcast4_init(ud_handle_t hdl)
 	return s;
 }
 
-static inline int
-ud_handle_epfd(ud_handle_t hdl)
+/* pseudo constructor, singleton */
+static ep_ctx_t
+epoll_guts(void)
 {
-	return hdl->epfd;
+	static struct ep_ctx_s gepg = FLEX_EP_CTX_INITIALISER(4);
+
+	if (UNLIKELY(gepg.sock == -1)) {
+		init_ep_ctx(&gepg, gepg.nev);
+	}
+	return &gepg;
 }
 
-static inline struct epoll_event*
-ud_handle_epev(ud_handle_t hdl)
+static void
+free_epoll_guts(void)
 {
-	return (struct epoll_event*)&hdl->data;
+	ep_ctx_t epg = epoll_guts();
+	free_ep_ctx(epg);
+	return;
 }
 
 typedef struct __convo_flt_s {
@@ -206,76 +214,6 @@ __pkt_our_convo_p(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(s), void *c)
 		return false;
 	}
 	return true;
-}
-
-/* epoll guts */
-static void
-init_epoll_guts(ud_handle_t hdl)
-{
-	struct epoll_event *ev = ud_handle_epev(hdl);
-
-	/* obtain an epoll handle and make it non-blocking*/
-#if 0
-/* too new, needs >= 2.6.30 */
-	hdl->epfd = epoll_create1(0);
-#else
-	hdl->epfd = epoll_create(1);
-#endif
-	setsock_nonblock(hdl->epfd);
-
-	/* register for input, oob, error and hangups */
-	ev->events = EPOLLIN | EPOLLPRI | EPOLLERR | EPOLLHUP;
-	/* register our data */
-	ev->data.ptr = hdl;
-	return;
-}
-
-static void
-free_epoll_guts(ud_handle_t hdl)
-{
-	if (LIKELY(hdl->epfd >= 0)) {
-		/* close the epoll socket */
-		close(hdl->epfd);
-		/* wipe */
-		hdl->epfd = -1;
-		/* ah well */
-		hdl->data[0] = 0;
-		hdl->data[1] = 0;
-	}
-	return;
-}
-
-static void
-ud_ep_prep(ud_handle_t hdl)
-{
-	int s = ud_handle_sock(hdl);
-	int epfd = ud_handle_epfd(hdl);
-	struct epoll_event *ev = ud_handle_epev(hdl);
-
-	/* add S to the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, ev);
-	return;
-}
-
-static int
-ud_ep_wait(ud_handle_t hdl, int timeout)
-{
-	int epfd = ud_handle_epfd(hdl);
-	struct epoll_event *events = NULL;
-	/* wait and return */
-	return epoll_wait(epfd, events, 1, timeout);
-}
-
-static void
-ud_ep_fini(ud_handle_t hdl)
-{
-	int s = ud_handle_sock(hdl);
-	int epfd = ud_handle_epfd(hdl);
-	struct epoll_event *ev = ud_handle_epev(hdl);
-
-	/* remove S from the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, ev);
-	return;
 }
 
 static int
@@ -309,28 +247,28 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	int s = ud_handle_sock(hdl);
 	int nfds;
 	char buf[UDPC_PKTLEN];
+	ep_ctx_t epg = epoll_guts();
 
 	if (UNLIKELY(UDPC_PKT_INVALID_P(pkt))) {
 		return;
 	}
 
 	/* wait for events */
-	ud_ep_prep(hdl);
+	ep_prep_reader(epg, s);
 	timeout = fiddle_with_timeout(hdl, timeout);
-	nfds = ud_ep_wait(hdl, timeout);
+	nfds = ep_wait(epg, timeout);
 	/* no need to loop atm, nfds can be 0 or 1 */
-	if (UNLIKELY(nfds == 0)) {
+	if (LIKELY(nfds != 0)) {
+	/* otherwise NFDS was 1 and it MUST be our socket */
+		(void)recvfrom(s, buf, countof(buf), 0, NULL, 0);
+#if defined DEBUG_PKTTRAF_FLAG
+		udpc_print_pkt(BUF_PACKET(buf));
+#endif	/* DEBUG_PKTTRAF_FLAG */
+	} else {
 		/* nothing received */
 		pkt.plen = 0;
-		goto out;
 	}
-	/* otherwise NFDS was 1 and it MUST be our socket */
-	(void)recvfrom(s, buf, countof(buf), 0, NULL, 0);
-#if defined DEBUG_PKTTRAF_FLAG
-	udpc_print_pkt(BUF_PACKET(buf));
-#endif	/* DEBUG_PKTTRAF_FLAG */
-out:
-	ud_ep_fini(hdl);
+	ep_fini(epg, s);
 	return;
 }
 
@@ -354,12 +292,13 @@ ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo)
 	ud_sockaddr_u __sa;
 	socklen_t lsa = sizeof(__sa);
 	struct sockaddr *sa = (void*)&__sa.sa;
+	ep_ctx_t epg = epoll_guts();
 
 	/* wait for events */
-	ud_ep_prep(hdl);
+	ep_prep_reader(epg, s);
 	timeout = fiddle_with_timeout(hdl, timeout);
 	do {
-		nfds = ud_ep_wait(hdl, timeout);
+		nfds = ep_wait(epg, timeout);
 		/* no need to loop atm, nfds can be 0 or 1 */
 		if (UNLIKELY(nfds == 0)) {
 			/* nothing received */
@@ -371,7 +310,7 @@ ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo)
 			pkt.plen = nread;
 		}
 	} while ((*cb)(pkt, (void*)sa, clo));
-	ud_ep_fini(hdl);
+	ep_fini(epg, s);
 	return;
 }
 
@@ -395,7 +334,6 @@ void
 init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop)
 {
 	hdl->convo = 0;
-	hdl->epfd = -1;
 
 	switch (pref_fam) {
 	default:
@@ -412,8 +350,6 @@ init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop)
 	}
 	/* operate in non-blocking mode */
 	setsock_nonblock(hdl->sock);
-	/* initialise the epoll backend */
-	init_epoll_guts(hdl);
 	if (negop) {
 		/* fiddle with the mart slot */
 		hdl->mart = UD_SENDRECV_TIMEOUT;
@@ -436,7 +372,7 @@ free_unserding_handle(ud_handle_t hdl)
 		hdl->sock = SOCK_INVALID;
 	}
 	/* also free the epoll cruft */
-	free_epoll_guts(hdl);
+	free_epoll_guts();
 	return;
 }
 

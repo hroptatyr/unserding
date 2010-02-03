@@ -89,15 +89,12 @@ typedef bool(*ud_subscr_f)(const ud_packet_t, ud_const_sockaddr_t, void *clo);
  * Struct to handle conversations. */
 struct ud_handle_s {
 	/** Conversation number. */
-	ud_convo_t convo;
+	ud_convo_t convo:8;
 	/** Socket. */
 	int sock:24;
-	int epfd;
 	ud_pktchn_t pktchn;
 	/* our connexion later on */
 	ud_sockaddr_u sa;
-	/* our epoll event, very rudely opaquified */
-	void *data[2];
 	/* moving average roundtrip time (in nano seconds) */
 	int mart;
 	/* system score */

@@ -117,6 +117,21 @@ setsock_nodelay(int s)
 #endif	/* TCP_NODELAY */
 }
 
+static void
+setsock_nonblock(int sock)
+{
+	int opts;
+
+	/* get former options */
+	opts = fcntl(sock, F_GETFL);
+	if (opts < 0) {
+		return;
+	}
+	opts |= O_NONBLOCK;
+	(void)fcntl(sock, F_SETFL, opts);
+	return;
+}
+
 static inline int
 tcp_cork(int s)
 {

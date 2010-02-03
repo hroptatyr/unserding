@@ -56,6 +56,7 @@
 #include "mcast.h"
 #include "dccp.h"
 #include "ud-sock.h"
+#include "epoll-helpers.h"
 
 #if defined DEBUG_FLAG
 # include <assert.h>
@@ -82,14 +83,6 @@
 # define DCCP_SOCKOPT_PACKET_SIZE 1
 #endif	/* !DCCP_SOCKOPT_PACKET_SIZE */
 
-struct epguts_s {
-	struct epoll_event ev[1];
-	int sock;
-};
-
-/* sure? */
-static struct epguts_s gepg[1] = {{.sock = -1}};
-
 static inline void
 set_dccp_service(int s, int service)
 {
@@ -97,101 +90,16 @@ set_dccp_service(int s, int service)
 	return;
 }
 
-static void
-setsock_nonblock(int sock)
-{
-	int opts;
-
-	/* get former options */
-	opts = fcntl(sock, F_GETFL);
-	if (opts < 0) {
-		return;
-	}
-	opts |= O_NONBLOCK;
-	(void)fcntl(sock, F_SETFL, opts);
-	return;
-}
-
-/* epoll guts */
-static void
-init_epoll_guts(struct epguts_s *epg)
-{
-	struct epoll_event *ev = epg->ev;
-
-	if (epg->sock != -1) {
-		return;
-	}
-
-	/* obtain an epoll handle and make it non-blocking*/
-#if 0
-/* too new, needs >= 2.6.30 */
-	epg->sock = epoll_create1(0);
-#else
-	epg->sock = epoll_create(1);
-#endif
-	setsock_nonblock(epg->sock);
-
-	/* register for input, oob, error and hangups */
-	ev->events = EPOLLPRI | EPOLLERR | EPOLLHUP;
-	/* register our data */
-	ev->data.ptr = epg;
-	return;
-}
-
-static __attribute__((unused)) void
-free_epoll_guts(struct epguts_s *epg)
-{
-	if (LIKELY(epg->sock != -1)) {
-		/* close the epoll socket */
-		close(epg->sock);
-		/* wipe */
-		epg->sock = -1;
-	}
-	return;
-}
-
 /* pseudo constructor, singleton */
-static struct epguts_s*
+static ep_ctx_t
 epoll_guts(void)
 {
-	if (UNLIKELY(gepg->sock == -1)) {
-		init_epoll_guts(gepg);
+	static struct ep_ctx_s gepg = FLEX_EP_CTX_INITIALISER(4);
+
+	if (UNLIKELY(gepg.sock == -1)) {
+		init_ep_ctx(&gepg, gepg.nev);
 	}
-	return gepg;
-}
-
-static void
-ud_ep_prep(struct epguts_s *epg, int s, int addflags)
-{
-	int epfd = epg->sock;
-	struct epoll_event ev = *epg->ev;
-
-	/* add additional ADDFLAGS */
-	ev.events |= addflags;
-	/* add S to the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_ADD, s, &ev);
-	return;
-}
-
-static int
-ud_ep_wait(struct epguts_s *epg, int timeout)
-{
-	struct epoll_event ev[1];
-	int epfd = epg->sock, res;
-	/* wait and return */
-	res = epoll_wait(epfd, ev, 1, timeout);
-	return res == 1 ? (int)ev->events : res;
-}
-
-static void
-ud_ep_fini(struct epguts_s *epg, int s)
-{
-	int epfd = epg->sock;
-	struct epoll_event *ev = epg->ev;
-
-	/* remove S from the epoll descriptor EPFD */
-	(void)epoll_ctl(epfd, EPOLL_CTL_DEL, s, ev);
-	return;
+	return &gepg;
 }
 
 
@@ -245,12 +153,12 @@ dccp_accept(int s, int timeout)
 {
 	ud_sockaddr_u remo_sa;
 	socklen_t remo_sa_len;
-	struct epguts_s *epg = epoll_guts();
+	ep_ctx_t epg = epoll_guts();
 	int res;
 
 	/* otherwise bother our epoll structure */
-	ud_ep_prep(epg, s, EPOLLIN);
-	if ((res = ud_ep_wait(epg, timeout)) == 0) {
+	ep_prep_reader(epg, s);
+	if ((res = ep_wait(epg, timeout)) == 0) {
 		fprintf(stderr, "dccp accept() on %i timed out %x\n", s, res);
 		res = -1;
 	} else if (res < 0 || res & (EPOLLERR | EPOLLHUP)) {
@@ -263,7 +171,7 @@ dccp_accept(int s, int timeout)
 		res = accept(s, &remo_sa.sa, &remo_sa_len);
 		fprintf(stderr, "accept()ed %i -> %i\n", s, res);
 	}
-	ud_ep_fini(epg, s);
+	ep_fini(epg, s);
 	return res;
 }
 
@@ -271,14 +179,14 @@ int
 dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 {
 	int res = 0;
-	struct epguts_s *epg = epoll_guts();
+	ep_ctx_t epg = epoll_guts();
 
 	host.sa4.sin_port = htons(port);
 
 	/* prepare, connect and wait for the magic to happen */
-	ud_ep_prep(epg, s, EPOLLOUT);
+	ep_prep_writer(epg, s);
 	/* wait for writability */
-	if ((res = ud_ep_wait(epg, timeout)) <= 0) {
+	if ((res = ep_wait(epg, timeout)) <= 0) {
 		/* means we've timed out */
 		fprintf(stderr, "dccp socket %i not writable (%i)\n", s, res);
 		res = -1;
@@ -294,7 +202,7 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 	assert(errno == EINPROGRESS);
 
 	/* let's see */
-	if ((res = ud_ep_wait(epg, timeout)) <= 0) {
+	if ((res = ep_wait(epg, timeout)) <= 0) {
 		/* means we've timed out */
 		fprintf(stderr, "dccp connect() timed out %i\n", res);
 		res = -1;
@@ -310,7 +218,7 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 		;
 	}
 out:
-	ud_ep_fini(epg, s);
+	ep_fini(epg, s);
 	return res;
 }
 
@@ -318,7 +226,9 @@ void
 dccp_close(int s)
 {
 	/* how about we let this guy live on forever? */
-	//free_epoll_guts(gepg);
+#if 0
+	free_epoll_guts(gepg);
+#endif
 	close(s);
 	return;
 }
@@ -328,32 +238,32 @@ dccp_close(int s)
 ssize_t
 dccp_send(int s, const char *buf, size_t bsz)
 {
-	struct epguts_s *epg = epoll_guts();
+	ep_ctx_t epg = epoll_guts();
 	ssize_t res = 0;
 
 	/* add s to the list of observed sockets */
-	ud_ep_prep(epg, s, EPOLLOUT);
-	if ((res = ud_ep_wait(epg, 5000)) > 0) {
+	ep_prep_writer(epg, s);
+	if ((res = ep_wait(epg, 5000)) > 0) {
 		if ((res = send(s, buf, bsz, 0)) == -1) {
 			perror("send error: ");
 		}
 	}
-	ud_ep_fini(epg, s);
+	ep_fini(epg, s);
 	return res;
 }
 
 ssize_t
 dccp_recv(int s, char *restrict buf, size_t bsz)
 {
-	struct epguts_s *epg = epoll_guts();
+	ep_ctx_t epg = epoll_guts();
 	ssize_t res = 0;
 
 	/* add s to the list of observed sockets */
-	ud_ep_prep(epg, s, EPOLLIN);
-	if ((res = ud_ep_wait(epg, 5000)) > 0) {
+	ep_prep_reader(epg, s);
+	if ((res = ep_wait(epg, 5000)) > 0) {
 		res = recv(s, buf, bsz, 0);
 	}
-	ud_ep_fini(epg, s);
+	ep_fini(epg, s);
 	return res;
 }
 

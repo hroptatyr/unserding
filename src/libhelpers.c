@@ -658,4 +658,122 @@ ud_find_ticks_by_instr(
 	return;
 }
 
+
+/* SVC_MKTSNP: 4228(ui32 ts, ui64 secu, ui32 types) */
+#include "tscube.h"
+#include "dccp.h"
+
+typedef struct unwrbox_clo_s {
+	void(*cb)(su_secu_t, scom_t, void *clo);
+	void *clo;
+} *unwrbox_clo_t;
+
+static size_t
+scom_size(scom_t t)
+{
+	return !scom_thdr_linked(t) ? 1 : 2;
+}
+
+static void
+unwrap_box(const struct tsc_box_s *box, void *clo)
+{
+	unwrbox_clo_t ub = clo;
+	size_t cnt = offsetof(struct tsc_box_s, sl1t) / sizeof(*box->sl1t);
+	const_sl1t_t t = (const void*)box;
+
+	while (cnt < TSC_BOX_SZ / sizeof(*box->sl1t)) {
+		ub->cb(box->secu[0], (const void*)(t + cnt), ub->clo);
+		cnt += scom_size((const void*)(t + cnt));
+	}
+	return;
+}
+
+/* currently assembled box */
+#define CHUNK_SIZE	1024
+static char cbox[TSC_BOX_SZ];
+
+struct boxpkt_s {
+	uint32_t boxno;
+	uint32_t chunkno;
+	char box[];
+};
+
+/* return true when the currently reassembled box is complete */
+static tsc_box_t
+reass_box(const struct boxpkt_s *bp, size_t bpsz)
+{
+	if (bp->chunkno == 0) {
+		/* give the current box a proper rinse */
+		memset(cbox, 0, TSC_BOX_SZ);
+	}
+	memcpy(cbox + bp->chunkno * CHUNK_SIZE,
+	       bp->box, bpsz - offsetof(struct boxpkt_s, box));
+
+	if (bp->chunkno == 3) {
+		return (tsc_box_t)cbox;
+	}
+	return NULL;
+}
+
+/* called when dccp packets arrive */
+static void
+recv_mktsnp(int s, void *clo)
+{
+	int res;
+
+	/* listen for traffic */
+	if ((res = dccp_accept(s, 4000)) > 0) {
+		char b[UDPC_PKTLEN];
+		ssize_t sz;
+
+		while ((sz = dccp_recv(res, b, sizeof(b))) > 0) {
+			tsc_box_t box;
+			if ((box = reass_box((void*)b, sz)) != NULL) {
+				/* box has been assembled, we magically know
+				 * about the box, so just unwrap it with CLO */
+				unwrap_box(box, clo);
+			}
+		}
+		dccp_close(res);
+	}
+	return;
+}
+
+void
+ud_find_mktsnp(
+	ud_handle_t hdl,
+	void(*cb)(su_secu_t, scom_t, void *clo), void *clo,
+	time_t ts, su_secu_t s, tbs_t bs)
+{
+	char buf[UDPC_PKTLEN];
+	ud_packet_t pkt = {.pbuf = buf, .plen = sizeof(buf)};
+	struct udpc_seria_s sctx[1];
+	struct unwrbox_clo_s ubclo[1] = {{.cb = cb, .clo = clo}};
+	int sock;
+
+	/* now kick off the finder */
+	udpc_make_pkt(pkt, 0, 0, UD_SVC_MKTSNP);
+	udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	/* ts first */
+	udpc_seria_add_ui32(sctx, ts);
+	/* secu and bs */
+	udpc_seria_add_secu(sctx, s.mux);
+	udpc_seria_add_tbs(sctx, bs);
+	/* the dccp port we expect */
+	udpc_seria_add_ui16(sctx, UD_NETWORK_SERVICE);
+	pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
+
+	/* open a dccp socket and make it listen */
+	sock = dccp_open();
+	if (dccp_listen(sock, UD_NETWORK_SERVICE) >= 0) {
+		/* send the packet */
+		ud_send_raw(hdl, pkt);
+		/* ... and receive the answers */
+		recv_mktsnp(sock, ubclo);
+		/* and we're out */
+		dccp_close(sock);
+	}
+	return;
+}
+
 /* libhelpers.c ends here */

@@ -183,6 +183,16 @@ ud_find_ticks_by_instr(
 	su_secu_t s, tbs_t bs,
 	time_t *ts, size_t tslen);
 
+/**
+ * Deliver an entire market snapshot at TS, optionally filtering for
+ * secus specified by S and tick types BS.  For each hit CB will be
+ * called as specified. */
+void
+ud_find_mktsnp(
+	ud_handle_t hdl,
+	void(*cb)(su_secu_t, scom_t, void *clo), void *clo,
+	time_t ts, su_secu_t s, tbs_t bs);
+
 
 /* (de)serialisers */
 static inline void

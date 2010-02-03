@@ -47,16 +47,8 @@
 
 #include "ud-time.h"
 #include "clihelper.c"
-#include "dccp.h"
-#include "tscube.h"
 
 static struct ud_handle_s hdl[1];
-
-struct boxpkt_s {
-	uint32_t boxno;
-	uint32_t chunkno;
-	char box[];
-};
 
 static char
 ttc(scom_t t)
@@ -146,7 +138,7 @@ oh(scom_t UNUSED(t))
 }
 
 
-static size_t
+static void
 t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 {
 	uint32_t qd = su_secu_quodi(s);
@@ -160,7 +152,7 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 
 	/* cock off early if it's obviously crap */
 	if (ts == 0) {
-		return scom_thdr_linked(t) ? 2 : 1;
+		return;
 	}
 
 	print_ts_into(tss, sizeof(tss), ts);
@@ -169,76 +161,19 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 
 	if (scom_thdr_nexist_p(t)) {
 		ne(t);
-		return 1;
+		return;
 	} else if (scom_thdr_onhold_p(t)) {
 		oh(t);
-		return 1;
+		return;
 	} else if (!scom_thdr_linked(t)) {
 		t1(t);
-		return 1;
+		return;
 	} else if (ttf == SSNP_FLAVOUR) {
 		t1s(t);
-		return 2;
+		return;
 	} else if (ttf > SCDL_FLAVOUR) {
 		t1c(t);
-		return 2;
-	}
-	return 0;
-}
-
-static void
-unwrap_box(const struct tsc_box_s *box, void *clo)
-{
-	size_t cnt = offsetof(struct tsc_box_s, sl1t) / sizeof(*box->sl1t);
-	const_sl1t_t t = (const void*)box;
-
-	while (cnt < TSC_BOX_SZ / sizeof(*box->sl1t)) {
-		cnt += t_cb(box->secu[0], (const void*)(t + cnt), clo);
-	}
-	return;
-}
-
-/* currently assembled box */
-#define CHUNK_SIZE	1024
-static char cbox[TSC_BOX_SZ];
-
-/* return true when the currently reassembled box is complete */
-static tsc_box_t
-reass_box(const struct boxpkt_s *bp, size_t bpsz)
-{
-	if (bp->chunkno == 0) {
-		/* give the current box a proper rinse */
-		memset(cbox, 0, TSC_BOX_SZ);
-	}
-	memcpy(cbox + bp->chunkno * CHUNK_SIZE,
-	       bp->box, bpsz - offsetof(struct boxpkt_s, box));
-
-	if (bp->chunkno == 3) {
-		return (tsc_box_t)cbox;
-	}
-	return NULL;
-}
-
-static void
-recv_mktsnp(int s)
-{
-	int res;
-
-	fprintf(stderr, "socket %i\n", s);
-	/* listen for traffic */
-	if ((res = dccp_accept(s, 4000)) > 0) {
-		char b[UDPC_PKTLEN];
-		ssize_t sz;
-
-		while ((sz = dccp_recv(res, b, sizeof(b))) > 0) {
-			tsc_box_t box;
-			if ((box = reass_box((void*)b, sz)) != NULL) {
-				/* box has been assembled, we magically know
-				 * about the box, so just unwrap it with CLO */
-				unwrap_box(box, NULL);
-			}
-		}
-		dccp_close(res);
+		return;
 	}
 	return;
 }
@@ -274,11 +209,6 @@ main(int argc, const char *argv[])
 		(1 << SL1T_TTF_TRA) |
 		(1 << SL1T_TTF_STL) |
 		(1 << SL1T_TTF_FIX);
-	/* ud nonsense */
-	char buf[UDPC_PKTLEN];
-	ud_packet_t pkt = {.pbuf = buf, .plen = sizeof(buf)};
-	struct udpc_seria_s sctx[1];
-	int s;
 
 	if (argc <= 1) {
 		fprintf(stderr, "Usage: ud-snap instr [date]\n");
@@ -296,28 +226,8 @@ main(int argc, const char *argv[])
 	init_unserding_handle(hdl, PF_INET6, true);
 	/* just a test */
 	cid = secu_from_str(hdl, argv[1]);
-	/* now kick off the finder */
-	udpc_make_pkt(pkt, 0, 0, UD_SVC_MKTSNP);
-	udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-	/* ts first */
-	udpc_seria_add_ui32(sctx, ts);
-	/* secu and bs */
-	udpc_seria_add_secu(sctx, cid);
-	udpc_seria_add_tbs(sctx, bs);
-	/* the dccp port we expect */
-	udpc_seria_add_ui16(sctx, UD_NETWORK_SERVICE);
-	pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
-
-	/* open a dccp socket and make it listen */
-	s = dccp_open();
-	if (dccp_listen(s, UD_NETWORK_SERVICE) >= 0) {
-		/* send the packet */
-		ud_send_raw(hdl, pkt);
-		/* ... and receive the answers */
-		recv_mktsnp(s);
-		/* and we're out */
-		dccp_close(s);
-	}
+	/* use libunserding's mktsnp service */
+	ud_find_mktsnp(hdl, t_cb, NULL, ts, cid, bs);
 
 	/* and lose the handle again */
 	free_unserding_handle(hdl);

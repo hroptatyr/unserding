@@ -95,25 +95,43 @@ secbugger(su_secu_t s)
 #define NRETRIES	3
 #define BOX_CHUNK_SIZE	1024
 
-static size_t
-chunk_box__(char *restrict tgt, tsc_box_t b, uint32_t boxno, uint32_t partno)
-{
-	/* i was thinking, 4 bytes for the boxno, 4 bytes for the partno */
-	((uint32_t*)tgt)[0] = boxno;
-	((uint32_t*)tgt)[1] = partno;
-	memcpy(tgt + sizeof(boxno) + sizeof(partno),
-	       (char*)b + partno * BOX_CHUNK_SIZE, BOX_CHUNK_SIZE);
-	return sizeof(boxno) + sizeof(partno) + BOX_CHUNK_SIZE;
-}
-
 static volatile int gport;
-static char rplbuf[UDPC_PKTLEN];
 
 struct bcb_clo_s {
 	int sock;
-	struct tsc_key_s *key;
+	tsc_key_t key;
 	udpc_seria_t sctx;
+	job_t j, rplj;
 };
+
+static void
+rearm_cannon(struct bcb_clo_s *clo)
+{
+	/* prepare the reply packet ... */
+	copy_pkt(clo->rplj, clo->j);
+	clear_pkt(clo->sctx, clo->rplj);
+	return;
+}
+
+static void
+fire_cannon(struct bcb_clo_s *clo)
+{
+	clo->rplj->blen = UDPC_HDRLEN + udpc_seria_msglen(clo->sctx);
+	dccp_send(clo->sock, clo->rplj->buf, clo->rplj->blen);
+	return;
+}
+
+static void
+maybe_yield(struct bcb_clo_s *clo)
+{
+	if (udpc_seria_msglen(clo->sctx) >= UDPC_PLLEN - 32) {
+		/* fire the old cannon */
+		fire_cannon(clo);
+		/* rearm the cannon */
+		rearm_cannon(clo);
+	}
+	return;
+}
 
 static void
 box_cb(tsc_box_t b, su_secu_t s, void *clo)
@@ -123,12 +141,21 @@ box_cb(tsc_box_t b, su_secu_t s, void *clo)
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
-	int pno = 0;
-	static __thread char pkt[UDPC_PKTLEN];
-	size_t psz;
+	const_sl1t_t t, lim;
 
-	fprintf(stderr, "found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
-	b->secu[0] = su_secu_ui64(s);
+	UD_DEBUG("found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
+	/* sequential scan, skip all stuff before the beg in question */
+	lim = b->sl1t + b->nt * b->skip;
+	for (t = b->sl1t;
+	     t < lim && (time32_t)sl1t_stmp_sec(t) < bcbclo->key->beg;
+	     t += b->skip);
+	/* no copy all stuff that matches */
+	for (;
+	     t < lim && (time32_t)sl1t_stmp_sec(t) <= bcbclo->key->end;
+	     t += b->skip) {
+		udpc_seria_add_data(bcbclo->sctx, t, b->skip);
+		maybe_yield(bcbclo);
+	}
 	return;
 }
 
@@ -137,6 +164,7 @@ instr_tick_by_ts_svc(job_t j)
 {
 	struct udpc_seria_s sctx[1];
 	struct udpc_seria_s rplsctx[1];
+	struct job_s rplj[1];
 	/* the key we need */
 	struct tsc_key_s key = {
 		/* make sure we let the system know what we want */
@@ -169,10 +197,17 @@ instr_tick_by_ts_svc(job_t j)
 
 	/* use dccp here? */
 	clo->sock = s = dccp_open();
-	errno = 0;
+	/* fill in the rest of the closure */
+	clo->rplj = rplj;
+	clo->j = j;
+	clo->sctx = rplsctx;
+	clo->key = &key;
 	if ((res = dccp_connect(s, j->sa, port, 4000 /*msecs*/)) >= 0) {
 		UD_DEBUG("sock %i res %i\n", s, res);
+		/* prepare the reply packet ... */
+		rearm_cannon(clo);
 		tsc_find_cb(gcube, &key, box_cb, clo);
+		fire_cannon(clo);
 	} else {
 		UD_DEBUG("timed out, res %i: %s\n", res, strerror(errno));
 	}

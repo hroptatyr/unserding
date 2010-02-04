@@ -146,7 +146,7 @@ oh(scom_t UNUSED(t))
 }
 
 
-static size_t
+static void
 t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 {
 	uint32_t qd = su_secu_quodi(s);
@@ -160,7 +160,7 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 
 	/* cock off early if it's obviously crap */
 	if (ts == 0) {
-		return scom_thdr_linked(t) ? 2 : 1;
+		return;
 	}
 
 	print_ts_into(tss, sizeof(tss), ts);
@@ -169,54 +169,41 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 
 	if (scom_thdr_nexist_p(t)) {
 		ne(t);
-		return 1;
+		return;
 	} else if (scom_thdr_onhold_p(t)) {
 		oh(t);
-		return 1;
+		return;
 	} else if (!scom_thdr_linked(t)) {
 		t1(t);
-		return 1;
+		return;
 	} else if (ttf == SSNP_FLAVOUR) {
 		t1s(t);
-		return 2;
+		return;
 	} else if (ttf > SCDL_FLAVOUR) {
 		t1c(t);
-		return 2;
-	}
-	return 0;
-}
-
-static void
-unwrap_box(const struct tsc_box_s *box, void *clo)
-{
-	size_t cnt = offsetof(struct tsc_box_s, sl1t) / sizeof(*box->sl1t);
-	const_sl1t_t t = (const void*)box;
-
-	while (cnt < TSC_BOX_SZ / sizeof(*box->sl1t)) {
-		cnt += t_cb(box->secu[0], (const void*)(t + cnt), clo);
+		return;
 	}
 	return;
 }
 
-/* currently assembled box */
-#define CHUNK_SIZE	1024
-static char cbox[TSC_BOX_SZ];
-
-/* return true when the currently reassembled box is complete */
-static tsc_box_t
-reass_box(const struct boxpkt_s *bp, size_t bpsz)
+/* could be in sushi */
+static size_t
+scom_size(scom_t t)
 {
-	if (bp->chunkno == 0) {
-		/* give the current box a proper rinse */
-		memset(cbox, 0, TSC_BOX_SZ);
-	}
-	memcpy(cbox + bp->chunkno * CHUNK_SIZE,
-	       bp->box, bpsz - offsetof(struct boxpkt_s, box));
+	return !scom_thdr_linked(t) ? 1 : 2;
+}
 
-	if (bp->chunkno == 3) {
-		return (tsc_box_t)cbox;
+static void
+unwrap_box(const char *buf, size_t bsz, void *clo)
+{
+	const_sl1t_t t = (const void*)(buf + UDPC_HDRLEN);
+	const_sl1t_t lim = (const void*)(buf + bsz);
+
+	while (t < lim) {
+		t_cb(su_secu(0, 0, 0), t, clo);
+		t += scom_size(t);
 	}
-	return NULL;
+	return;
 }
 
 static void
@@ -231,12 +218,8 @@ recv_mktsnp(int s)
 		ssize_t sz;
 
 		while ((sz = dccp_recv(res, b, sizeof(b))) > 0) {
-			tsc_box_t box;
-			if ((box = reass_box((void*)b, sz)) != NULL) {
-				/* box has been assembled, we magically know
-				 * about the box, so just unwrap it with CLO */
-				unwrap_box(box, NULL);
-			}
+			fprintf(stderr, "pkt sz %zi\n", sz);
+			unwrap_box(b, sz, NULL);
 		}
 		dccp_close(res);
 	}

@@ -675,15 +675,16 @@ scom_size(scom_t t)
 }
 
 static void
-unwrap_box(const struct tsc_box_s *box, void *clo)
+unwrap_box(char *buf, size_t bsz, void *clo)
 {
 	unwrbox_clo_t ub = clo;
-	size_t cnt = offsetof(struct tsc_box_s, sl1t) / sizeof(*box->sl1t);
-	const_sl1t_t t = (const void*)box;
+	const void *t;
+	struct udpc_seria_s sctx[1];
 
-	while (cnt < TSC_BOX_SZ / sizeof(*box->sl1t)) {
-		ub->cb(box->secu[0], (const void*)(t + cnt), ub->clo);
-		cnt += scom_size((const void*)(t + cnt));
+	udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PAYLLEN(bsz));
+
+	while (udpc_seria_des_data(sctx, &t)) {
+		ub->cb(su_secu(0, 0, 0), t, ub->clo);
 	}
 	return;
 }
@@ -722,17 +723,12 @@ recv_mktsnp(int s, void *clo)
 	int res;
 
 	/* listen for traffic */
-	if ((res = dccp_accept(s, 4000)) > 0) {
+	if ((res = dccp_accept(s, 4000 /*msecs*/)) > 0) {
 		char b[UDPC_PKTLEN];
 		ssize_t sz;
 
 		while ((sz = dccp_recv(res, b, sizeof(b))) > 0) {
-			tsc_box_t box;
-			if ((box = reass_box((void*)b, sz)) != NULL) {
-				/* box has been assembled, we magically know
-				 * about the box, so just unwrap it with CLO */
-				unwrap_box(box, clo);
-			}
+			unwrap_box(b, sz, clo);
 		}
 		dccp_close(res);
 	}

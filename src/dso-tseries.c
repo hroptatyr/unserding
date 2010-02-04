@@ -176,7 +176,7 @@ instr_tick_by_ts_svc(job_t j)
 	struct bcb_clo_s clo[1] = {{.key = &key}};
 
 	/* prepare the iterator for the incoming packet,
-	 * sig: 4220(ui32 ts, ui32 types, ui64 secu, ui64 secu, ...) */
+	 * sig: 4220(ui32 tsb, ui32 tse, ui32 types, ui64 secu, ui64 secu, ...) */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the timestamp */
 	key.beg = udpc_seria_des_ui32(sctx);
@@ -471,51 +471,54 @@ instr_tick_by_instr_svc(job_t j)
 }
 
 
-/* mktsnp getter */
+/* mktsnp getter, essentially like tick-by-ts but returns the last prices before
+ * a given time stamp */
 #include "dccp.h"
 #define NRETRIES	3
 #define BOX_CHUNK_SIZE	1024
 
-static size_t
-chunk_box(char *restrict tgt, tsc_box_t b, uint32_t boxno, uint32_t partno)
-{
-	/* i was thinking, 4 bytes for the boxno, 4 bytes for the partno */
-	((uint32_t*)tgt)[0] = boxno;
-	((uint32_t*)tgt)[1] = partno;
-	memcpy(tgt + sizeof(boxno) + sizeof(partno),
-	       (char*)b + partno * BOX_CHUNK_SIZE, BOX_CHUNK_SIZE);
-	return sizeof(boxno) + sizeof(partno) + BOX_CHUNK_SIZE;
-}
+/* use the bcb_clo_s above */
 
-static int boxno;
+static inline bool
+ttf_coincide_p(uint16_t tick_ttf, tsc_key_t key)
+{
+#if defined CUBE_ENTRY_PER_TTF
+	return (tick_ttf & 0x0f) == key->ttf;
+#else  /* !CUBE_ENTRY_PER_TTF */
+	return (1 << (tick_ttf & 0x0f)) & key->ttf || (key->msk & 8) == 0;
+#endif	/* CUBE_ENTRY_PER_TTF */
+}
 
 static void
 mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 {
-	int sock = (int)(long int)clo;
+	struct bcb_clo_s *bcbclo = clo;
+	int sock = bcbclo->sock;
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
-	int pno = 0;
-	static __thread char pkt[UDPC_PKTLEN];
-	size_t psz;
+	const_sl1t_t lst[8] = {0};
+	const_sl1t_t t, lim;
 
-	fprintf(stderr, "found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
-	b->secu[0] = su_secu_ui64(s);
-
-	psz = chunk_box(pkt, b, boxno, pno++);
-	dccp_send(sock, pkt, psz);
-
-	psz = chunk_box(pkt, b, boxno, pno++);
-	dccp_send(sock, pkt, psz);
-
-	psz = chunk_box(pkt, b, boxno, pno++);
-	dccp_send(sock, pkt, psz);
-
-	psz = chunk_box(pkt, b, boxno, pno++);
-	dccp_send(sock, pkt, psz);
-
-	boxno++;
+	UD_DEBUG("found match %u/%i@%hu %p  -> %i  %zu\n", qd, qt, p, b, sock, b->skip);
+	/* sequential scan, skip all stuff before the beg in question */
+	lim = b->sl1t + b->nt * b->skip;
+	for (t = b->sl1t;
+	     t < lim && (time32_t)sl1t_stmp_sec(t) <= bcbclo->key->end;
+	     t += b->skip) {
+		uint16_t tkttf = sl1t_ttf(t);
+		/* keep track */
+		if (ttf_coincide_p(tkttf, bcbclo->key)) {
+			lst[(tkttf & 0x0f)] = t;
+		}
+	}
+	for (int i = 0; i < (int)countof(lst); i++) {
+		if (lst[i] == 0) {
+			continue;
+		}
+		udpc_seria_add_data(bcbclo->sctx, lst[i], b->skip * sizeof(*t));
+		maybe_yield(bcbclo);
+	}
 	return;
 }
 
@@ -523,6 +526,8 @@ static void
 fetch_mktsnp_svc(job_t j)
 {
 	struct udpc_seria_s sctx[1];
+	struct udpc_seria_s rplsctx[1];
+	struct job_s rplj[1];
 	/* the key we need */
 	struct tsc_key_s key = {
 		/* make sure we let the system know what we want */
@@ -530,8 +535,10 @@ fetch_mktsnp_svc(job_t j)
 	};
 	uint16_t port;
 	int s, res;
+	struct bcb_clo_s clo[1] = {{.key = &key}};
 
-	/* prepare the iterator for the incoming packet */
+	/* prepare the iterator for the incoming packet
+	 * sig: 4228(ui32 tsb, ui64 secu, ui32 types, ui16 port) */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the timestamp */
 	key.beg = key.end = udpc_seria_des_ui32(sctx);
@@ -540,17 +547,28 @@ fetch_mktsnp_svc(job_t j)
 	/* read the types */
 	key.ttf = udpc_seria_des_tbs(sctx);
 	port = udpc_seria_des_ui16(sctx);
+
 	UD_DEBUG("0x%04x (UD_SVC_MKTSNP): %s at %i, %x mask (->%hu)\n",
 		 UD_SVC_MKTSNP, secbugger(key.secu), key.beg, key.ttf, port);
 
-	boxno = 0;
-	s = dccp_open();
-	errno = 0;
-	if ((res = dccp_connect(s, j->sa, port, 4000)) >= 0) {
-		fprintf(stderr, "s %i res %i\n", s, res);
-		tsc_find_cb(gcube, &key, mktsnp_cb, (void*)(long int)s);
+	/* prepare the closure structure and initialise dccp */
+	clo->sock = s = dccp_open();
+	/* fill in the rest of the closure */
+	clo->rplj = rplj;
+	clo->sctx = rplsctx;
+	clo->key = &key;
+	copy_pkt(clo->rplj, j);
+
+	if ((res = dccp_connect(s, j->sa, port, 4000 /*msecs*/)) >= 0) {
+		UD_DEBUG("sock %i res %i\n", s, res);
+		/* prepare the reply packet ... */
+		rearm_cannon(clo);
+		/* do the search dance */
+		tsc_find_cb(gcube, &key, mktsnp_cb, clo);
+		/* final fire */
+		fire_cannon(clo);
 	} else {
-		fprintf(stderr, "res %i: %s\n", res, strerror(errno));
+		UD_DEBUG("timed out, res %i: %s\n", res, strerror(errno));
 	}
 	dccp_close(s);
 	return;

@@ -137,9 +137,11 @@ box_cb(tsc_box_t b, su_secu_t s, void *clo)
 {
 	struct bcb_clo_s *bcbclo = clo;
 	int sock = bcbclo->sock;
+#if defined DEBUG_FLAG
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
+#endif	/* DEBUG_FLAG */
 	const_sl1t_t t, lim;
 
 	UD_DEBUG("found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
@@ -152,7 +154,7 @@ box_cb(tsc_box_t b, su_secu_t s, void *clo)
 	for (;
 	     t < lim && (time32_t)sl1t_stmp_sec(t) <= bcbclo->key->end;
 	     t += b->skip) {
-		udpc_seria_add_data(bcbclo->sctx, t, b->skip * sizeof(*t));
+		udpc_seria_add_scom_secu(bcbclo->sctx, s, (scom_t)t);
 		maybe_yield(bcbclo);
 	}
 	return;
@@ -172,7 +174,7 @@ instr_tick_by_ts_svc(job_t j)
 	uint16_t port;
 	int s, res;
 	/* allow to filter for 64 instruments at once */
-	su_secu_t filt[64];
+	//su_secu_t filt[64];
 	struct bcb_clo_s clo[1] = {{.key = &key}};
 
 	/* prepare the iterator for the incoming packet,
@@ -494,13 +496,15 @@ mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 {
 	struct bcb_clo_s *bcbclo = clo;
 	int sock = bcbclo->sock;
+#if defined DEBUG_FLAG
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
+#endif	/* DEBUG_FLAG */
 	const_sl1t_t lst[8] = {0};
 	const_sl1t_t t, lim;
 
-	UD_DEBUG("found match %u/%i@%hu %p  -> %i  %zu\n", qd, qt, p, b, sock, b->skip);
+	UD_DEBUG("found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
 	/* sequential scan, skip all stuff before the beg in question */
 	lim = b->sl1t + b->nt * b->skip;
 	for (t = b->sl1t;
@@ -516,7 +520,7 @@ mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 		if (lst[i] == 0) {
 			continue;
 		}
-		udpc_seria_add_data(bcbclo->sctx, lst[i], b->skip * sizeof(*t));
+		udpc_seria_add_scom_secu(bcbclo->sctx, s, (scom_t)lst[i]);
 		maybe_yield(bcbclo);
 	}
 	return;

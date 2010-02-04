@@ -668,53 +668,27 @@ typedef struct unwrbox_clo_s {
 	void *clo;
 } *unwrbox_clo_t;
 
-static size_t
-scom_size(scom_t t)
-{
-	return !scom_thdr_linked(t) ? 1 : 2;
-}
-
 static void
 unwrap_box(char *buf, size_t bsz, void *clo)
 {
 	unwrbox_clo_t ub = clo;
-	const void *t;
+	const struct scom_secu_s *st;
 	struct udpc_seria_s sctx[1];
 
 	udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PAYLLEN(bsz));
 
-	while (udpc_seria_des_data(sctx, &t)) {
-		ub->cb(su_secu(0, 0, 0), t, ub->clo);
+	while (udpc_seria_des_scom_secu(sctx, &st)) {
+		ub->cb(st->s, st->t, ub->clo);
 	}
 	return;
 }
 
 /* currently assembled box */
-#define CHUNK_SIZE	1024
-static char cbox[TSC_BOX_SZ];
-
 struct boxpkt_s {
 	uint32_t boxno;
 	uint32_t chunkno;
 	char box[];
 };
-
-/* return true when the currently reassembled box is complete */
-static tsc_box_t
-reass_box(const struct boxpkt_s *bp, size_t bpsz)
-{
-	if (bp->chunkno == 0) {
-		/* give the current box a proper rinse */
-		memset(cbox, 0, TSC_BOX_SZ);
-	}
-	memcpy(cbox + bp->chunkno * CHUNK_SIZE,
-	       bp->box, bpsz - offsetof(struct boxpkt_s, box));
-
-	if (bp->chunkno == 3) {
-		return (tsc_box_t)cbox;
-	}
-	return NULL;
-}
 
 /* called when dccp packets arrive */
 static void

@@ -141,7 +141,6 @@ dccp_listen(int s, uint16_t port)
 	/* bind the socket to the local address and port. salocal is sockaddr
 	 * of local IP and port */
 	if (bind(s, &sa.sa, sizeof(sa)) < 0) {
-		fprintf(stderr, "dccp bind() on %i failed\n", s);
 		return -1;
 	}
 	/* listen on that port for incoming connections */
@@ -159,17 +158,14 @@ dccp_accept(int s, int timeout)
 	/* otherwise bother our epoll structure */
 	ep_prep_reader(epg, s);
 	if ((res = ep_wait(epg, timeout)) == 0) {
-		fprintf(stderr, "dccp accept() on %i timed out %x\n", s, res);
 		res = -1;
 	} else if (res < 0 || res & (EPOLLERR | EPOLLHUP)) {
-		fprintf(stderr, "epoll error on %i: %x\n", s, res);
 		res = -1;
 	} else {
 		/* everything went fine, invariant res == 1, accept connections */
 		memset(&remo_sa, 0, sizeof(remo_sa));
 		remo_sa_len = sizeof(remo_sa);
 		res = accept(s, &remo_sa.sa, &remo_sa_len);
-		fprintf(stderr, "accept()ed %i -> %i\n", s, res);
 	}
 	ep_fini(epg, s);
 	return res;
@@ -188,7 +184,6 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 	/* wait for writability */
 	if ((res = ep_wait(epg, timeout)) <= 0) {
 		/* means we've timed out */
-		fprintf(stderr, "dccp socket %i not writable (%i)\n", s, res);
 		res = -1;
 		goto out;
 	}
@@ -204,12 +199,10 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 	/* let's see */
 	if ((res = ep_wait(epg, timeout)) <= 0) {
 		/* means we've timed out */
-		fprintf(stderr, "dccp connect() timed out %i\n", res);
 		res = -1;
 		goto out;
 
 	} else if (res & (EPOLLERR | EPOLLHUP)) {
-		fprintf(stderr, "dccp socket %i hung up %x\n", s, res);
 		res = -1;
 		goto out;
 

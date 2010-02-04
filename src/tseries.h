@@ -129,6 +129,8 @@ extern "C" {
 
 typedef struct tslab_s *tslab_t;
 
+typedef struct scom_secu_s *scom_secu_t;
+
 typedef uint32_t date_t;
 
 #define TICK_NA		((uint16_t)1023)
@@ -147,6 +149,13 @@ struct tslab_s {
 	su_secu_t secu;
 	time_t from, till;
 	tbs_t types;
+};
+
+/**
+ * Speical sparse tick when the symbol table is not delivered. */
+struct scom_secu_s {
+	su_secu_t s;
+	const struct scom_thdr_s t[];
 };
 
 
@@ -209,6 +218,26 @@ udpc_seria_des_secu(udpc_seria_t sctx)
 /* we assume sizeof(su_secu_t) == 8 */
 	uint64_t wire = udpc_seria_des_ui64(sctx);
 	return su_secu_set_ui64(wire);
+}
+
+static inline void
+udpc_seria_add_scom_secu(udpc_seria_t sctx, su_secu_t s, scom_t t)
+{
+/* this is an almost copy of udpc_seria_add_data() */
+	size_t ssz = sizeof(s);
+	size_t tsz = scom_byte_size(t);
+	sctx->msg[sctx->msgoff + 0] = UDPC_TYPE_DATA;
+	sctx->msg[sctx->msgoff + 1] = (uint8_t)(ssz + tsz);
+	memcpy(&sctx->msg[sctx->msgoff + DATA_HDR_LEN], &s, ssz);
+	memcpy(&sctx->msg[sctx->msgoff + DATA_HDR_LEN + ssz], t, tsz);
+	sctx->msgoff += DATA_HDR_LEN + (ssz + tsz);
+	return;
+}
+
+static inline uint8_t
+udpc_seria_des_scom_secu(udpc_seria_t sctx, const struct scom_secu_s **tgt)
+{
+	return udpc_seria_des_data(sctx, (const void**)tgt);
 }
 
 static inline void

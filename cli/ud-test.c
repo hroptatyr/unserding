@@ -186,22 +186,24 @@ t_cb(su_secu_t s, scom_t t, void *UNUSED(clo))
 	return;
 }
 
+#if 0
 /* could be in sushi */
 static size_t
 scom_size(scom_t t)
 {
 	return !scom_thdr_linked(t) ? 1 : 2;
 }
+#endif
 
 static void
-unwrap_box(const char *buf, size_t bsz, void *clo)
+unwrap_box(char *buf, size_t bsz, void *clo)
 {
-	const_sl1t_t t = (const void*)(buf + UDPC_HDRLEN);
-	const_sl1t_t lim = (const void*)(buf + bsz);
+	const void *t;
+	struct udpc_seria_s sctx[1];
 
-	while (t < lim) {
+	udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PAYLLEN(bsz));
+	while (udpc_seria_des_data(sctx, &t)) {
 		t_cb(su_secu(0, 0, 0), t, clo);
-		t += scom_size(t);
 	}
 	return;
 }
@@ -283,6 +285,7 @@ main(int argc, const char *argv[])
 	udpc_make_pkt(pkt, 0, 0, UD_SVC_TICK_BY_TS);
 	udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
 	/* ts first */
+	udpc_seria_add_ui32(sctx, ts - 300);
 	udpc_seria_add_ui32(sctx, ts);
 	/* secu and bs */
 	udpc_seria_add_tbs(sctx, bs);

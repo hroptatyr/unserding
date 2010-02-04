@@ -101,14 +101,13 @@ struct bcb_clo_s {
 	int sock;
 	tsc_key_t key;
 	udpc_seria_t sctx;
-	job_t j, rplj;
+	job_t rplj;
 };
 
 static void
 rearm_cannon(struct bcb_clo_s *clo)
 {
 	/* prepare the reply packet ... */
-	copy_pkt(clo->rplj, clo->j);
 	clear_pkt(clo->sctx, clo->rplj);
 	return;
 }
@@ -153,7 +152,7 @@ box_cb(tsc_box_t b, su_secu_t s, void *clo)
 	for (;
 	     t < lim && (time32_t)sl1t_stmp_sec(t) <= bcbclo->key->end;
 	     t += b->skip) {
-		udpc_seria_add_data(bcbclo->sctx, t, b->skip);
+		udpc_seria_add_data(bcbclo->sctx, t, b->skip * sizeof(*t));
 		maybe_yield(bcbclo);
 	}
 	return;
@@ -180,7 +179,9 @@ instr_tick_by_ts_svc(job_t j)
 	 * sig: 4220(ui32 ts, ui32 types, ui64 secu, ui64 secu, ...) */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	/* read the timestamp */
-	key.beg = key.end = udpc_seria_des_ui32(sctx);
+	key.beg = udpc_seria_des_ui32(sctx);
+	/* read the timestamp */
+	key.end = udpc_seria_des_ui32(sctx);
 	/* read the types */
 	key.ttf = udpc_seria_des_tbs(sctx);
 	/* read the key secu, we read the first one */
@@ -199,9 +200,9 @@ instr_tick_by_ts_svc(job_t j)
 	clo->sock = s = dccp_open();
 	/* fill in the rest of the closure */
 	clo->rplj = rplj;
-	clo->j = j;
 	clo->sctx = rplsctx;
 	clo->key = &key;
+	copy_pkt(clo->rplj, j);
 	if ((res = dccp_connect(s, j->sa, port, 4000 /*msecs*/)) >= 0) {
 		UD_DEBUG("sock %i res %i\n", s, res);
 		/* prepare the reply packet ... */

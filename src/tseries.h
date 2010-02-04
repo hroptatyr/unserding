@@ -75,8 +75,8 @@ extern "C" {
  * last ticks before a given time stamp, for several instruments.
  * The ticks to return can be specified in a bitset.
  *
- * sig: 4220(ui32 ts, ui32 types, (ui32 secu, ui32 fund, ui32 exch)+)
- *   As a wildcard for all funds or all exchanges 0x00000000 can be used.
+ * sig: 4220(ui32 tsb, ui32 tse, ui32 types, (ui64 susecu)+)
+ *   As a wildcard the null secu can be used.
  *
  * The TYPES parameter is a bitset made up of PFTB_* values as specified
  * in pfack/tick.h */

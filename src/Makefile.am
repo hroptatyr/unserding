@@ -47,6 +47,7 @@ mod_LTLIBRARIES += dso-cli.la dso-scscp.la dso-scscp2.la dso-bbdb.la dso-xbbdb.l
 #mod_LTLIBRARIES += dso-instr.la
 mod_LTLIBRARIES += dso-xdr-instr.la
 mod_LTLIBRARIES += dso-tseries.la dso-tseries-ute.la
+mod_LTLIBRARIES += dso-itanl.la
 if USE_MYSQL
 mod_LTLIBRARIES += dso-tseries-mysql.la
 endif
@@ -103,6 +104,9 @@ instrumenstruation_LDFLAGS = $(PFACK_LIBS)
 instrumenstruation_LDADD = $(PFACK_LIBS) libunserding.la -lpopt
 endif  ## BUILD_SERVER
 header_HEADERS += xdr-instr.h tseries.h
+
+dso_itanl_la_LDFLAGS = -module
+dso_itanl_la_SOURCES = dso-itanl.c
 
 ## fucking automake
 unsercli_YFLAGS = -d -p "cli_yy"

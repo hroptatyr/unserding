@@ -8,7 +8,7 @@ AM_LDFLAGS = -lpthread
 
 bin_PROGRAMS =
 if BUILD_CLIAPPS
-bin_PROGRAMS += ud-instr ud-snap ud-tick ud-ping ud-test
+bin_PROGRAMS += ud-instr ud-snap ud-tick ud-ping ud-test ud-itan
 endif
 
 BUILT_SOURCES =
@@ -39,6 +39,11 @@ ud_test_SOURCES = ud-test.c
 ud_test_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
 ud_test_LDADD = $(top_builddir)/src/libunserding.la $(PFACK_LIBS)
 ud_test_LDFLAGS = $(AM_LDFLAGS) -static
+
+ud_itan_SOURCES = ud-itan.c
+ud_itan_CPPFLAGS = $(AM_CPPFLAGS)
+ud_itan_LDADD = $(top_builddir)/src/libunserding.la
+ud_itan_LDFLAGS = $(AM_LDFLAGS) -static
 endif
 
 # 

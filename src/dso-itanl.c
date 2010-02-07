@@ -64,7 +64,7 @@ typedef itan_t tlst_t[120];
 
 
 static tlst_t gtlst;
-static uint32_t key[4] = {0xdeadbeef, 0xcafebabe, 0x31415926, 0xfacfac44};
+static uint32_t key[4];
 
 static bool
 obtain(itan_t tgt, uint16_t idx)
@@ -73,7 +73,24 @@ obtain(itan_t tgt, uint16_t idx)
 	memcpy(tgt, gtlst[idx - 1], sizeof(itan_t));
 	/* decipher */
 	btea_dec((void*)tgt, sizeof(itan_t) / sizeof(uint32_t), key);
-	return tgt[7] == (char)(idx - 1);
+	return tgt[7] == (char)idx;
+}
+
+static void
+deposit(itan_t tgt, size_t tsz, uint16_t idx)
+{
+	/* cock off early if this isnt a tan */
+	if (tsz > 8) {
+		return;
+	}
+	/* blank the last two bytes */
+	tgt[6] = '\0';
+	tgt[7] = (char)idx;
+	/* and encrypt it */
+	btea_enc((void*)tgt, sizeof(itan_t) / sizeof(uint32_t), key);
+	/* and store */
+	memcpy(gtlst[idx - 1], tgt, sizeof(itan_t));
+	return;
 }
 
 static void
@@ -82,10 +99,19 @@ itanl(job_t j)
 	uint16_t itanno;
 	struct udpc_seria_s sctx[1];
 	itan_t tan;
+	size_t tsz;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	itanno = udpc_seria_des_ui16(sctx);
+	if ((tsz = udpc_seria_des_str_into(tan, sizeof(tan), sctx)) > 0) {
+		/* setter mode */
+		UD_DEBUG("0x%04x (UD_SVC_ITANL): setting itan %hu to %s\n",
+			 UD_SVC_ITANL, itanno, tan);
+		deposit(tan, tsz, itanno);
+		return;
+	}
+	/* otherwise */
 	UD_DEBUG("0x%04x (UD_SVC_ITANL): looking up itan %hu\n",
 		 UD_SVC_ITANL, itanno);
 
@@ -100,45 +126,59 @@ itanl(job_t j)
 }
 
 
+static void
+setup_key(void *tgt, size_t len)
+{
+	/* just utilise /dev/urandom, shall we? */
+	int fd = open("/dev/urandom", O_RDONLY);
+	read(fd, tgt, len);
+	close(fd);
+	return;
+}
+
 static int
-read_itan_lists(void *UNUSED(clo))
+restore_from_file(void *UNUSED(clo), const char *fn)
 {
 	int fd, res = ESUCCESS;
 
-	if ((fd = open("/tmp/l3", O_RDONLY)) < 0) {
+	if ((fd = open(fn, O_RDONLY)) < 0) {
 		return fd;
 	}
-	for (unsigned int i = 0; i < countof(gtlst); i++) {
-		itan_t dummy;
-
-		if (read(fd, dummy, 6 + 1) <= 0) {
-			res = -1;
-			break;
-		}
-		if (dummy[6] != '\n') {
-			res = -1;
-			break;
-		}
-		/* otherwise, blank the last two bytes */
-		dummy[6] = '\0';
-		dummy[7] = (char)i;
-		/* and encrypt it */
-		btea_enc((void*)dummy, sizeof(dummy) / sizeof(uint32_t), key);
-		/* and store */
-		memcpy(gtlst[i], dummy, sizeof(dummy));
-	}
+	/* just read the container, encrypted as it is */
+	res = read(fd, gtlst, sizeof(gtlst)) > 0;
 	close(fd);
 	return res;
 }
 
+static void
+dump_to_file(void *UNUSED(clo), const char *fn)
+{
+	int fd;
+
+	UD_DEBUG("dumping into %s ...", fn);
+	if ((fd = open(fn, O_CREAT | O_TRUNC | O_RDWR), 0600) < 0) {
+		UD_DBGCONT("failed\n");
+		return;
+	}
+	/* just dump the container, encrypted as it is */
+	write(fd, gtlst, sizeof(gtlst));
+
+	close(fd);
+	UD_DBGCONT("done\n");
+	return;
+}
+
 
+static const char fname[] = "/home/freundt/.unserding/itans";
+
 void
 dso_itanl_LTX_init(void *clo)
 {
 	/* itan lookup service */
 	UD_DEBUG("mod/itanl: loading ...");
 	ud_set_service(UD_SVC_ITANL, itanl, NULL);
-	if (read_itan_lists(clo)) {
+	setup_key(key, sizeof(key));
+	if (restore_from_file(clo, fname)) {
 		UD_DBGCONT("failed\n");
 	}
 	UD_DBGCONT("done\n");
@@ -146,9 +186,10 @@ dso_itanl_LTX_init(void *clo)
 }
 
 void
-dso_itanl_LTX_deinit(void *UNUSED(clo))
+dso_itanl_LTX_deinit(void *clo)
 {
 	ud_set_service(UD_SVC_ITANL, NULL, NULL);
+	dump_to_file(clo, fname);
 	return;
 }
 

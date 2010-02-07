@@ -115,17 +115,24 @@ itanl(job_t j)
 	UD_DEBUG("0x%04x (UD_SVC_ITANL): looking up itan %hu\n",
 		 UD_SVC_ITANL, itanno);
 
+	/* prepare the reply packet */
+	clear_pkt(sctx, j);
 	/* get the tan */
 	if (obtain(tan, itanno)) {
-		/* prepare the reply packet */
-		clear_pkt(sctx, j);
 		udpc_seria_add_str(sctx, tan, /* true size is */6);
-		send_pkt(sctx, j);
+	} else {
+		UD_DEBUG("itan decryption problem, got %x%x\n",
+			 ((uint32_t*)tan)[0], ((uint32_t*)tan)[1]);
+		/* send an empty packet, i.e. do nothing here */
+		;
 	}
+	send_pkt(sctx, j);
 	return;
 }
 
 
+#if 0
+/* we get a problem with the persistency here */
 static void
 setup_key(void *tgt, size_t len)
 {
@@ -135,6 +142,15 @@ setup_key(void *tgt, size_t len)
 	close(fd);
 	return;
 }
+#else
+static void
+setup_key(void *tgt, size_t len)
+{
+	/* use the byte code of this function */
+	memcpy(tgt, setup_key, len);
+	return;
+}
+#endif
 
 static int
 restore_from_file(void *UNUSED(clo), const char *fn)
@@ -178,7 +194,7 @@ dso_itanl_LTX_init(void *clo)
 	UD_DEBUG("mod/itanl: loading ...");
 	ud_set_service(UD_SVC_ITANL, itanl, NULL);
 	setup_key(key, sizeof(key));
-	if (restore_from_file(clo, fname)) {
+	if (restore_from_file(clo, fname) < 0) {
 		UD_DBGCONT("failed\n");
 	}
 	UD_DBGCONT("done\n");

@@ -54,7 +54,7 @@ cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(s), void *UNUSED(c))
 
 	udpc_seria_init(sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
 	if (udpc_seria_des_str(sctx, &res) > 0) {
-		fprintf(stderr, "%s\n", res);
+		printf("%s\n", res);
 	}
 	return false;
 }

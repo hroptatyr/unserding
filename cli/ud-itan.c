@@ -95,9 +95,10 @@ main(int argc, const char *argv[])
 
 	/* send the packet */
 	ud_send_raw(hdl, pkt);
-	/* ... and receive the answers */
-	ud_subscr_raw(hdl, 3000, cb, NULL);
-
+	if (tan == NULL) {
+		/* ... and receive the answers, only in query mode */
+		ud_subscr_raw(hdl, 3000, cb, NULL);
+	}
 	/* and lose the handle again */
 	free_unserding_handle(hdl);
 	return 0;

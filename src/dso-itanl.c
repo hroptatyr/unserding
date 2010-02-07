@@ -39,6 +39,7 @@
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
 #include <stdio.h>
+#include <stdbool.h>
 #include <fcntl.h>
 #define UNSERSRV
 #include "unserding.h"
@@ -52,17 +53,35 @@
 # define ESUCCESS	0
 #endif	/* !ESUCCESS */
 
+/* size hereby has to match the block cipher we've chosen */
+typedef char itan_t[8];
 /* very simplistic itan list, indexed naturally */
-typedef char itan_t[6];
 typedef itan_t tlst_t[120];
 
+
+/* a simple and efficient cipher */
+#include "btea.c"
+
+
 static tlst_t gtlst;
+static uint32_t key[4] = {0xdeadbeef, 0xcafebabe, 0x31415926, 0xfacfac44};
+
+static bool
+obtain(itan_t tgt, uint16_t idx)
+{
+	/* fetch the guy */
+	memcpy(tgt, gtlst[idx - 1], sizeof(itan_t));
+	/* decipher */
+	btea_dec((void*)tgt, sizeof(itan_t) / sizeof(uint32_t), key);
+	return tgt[7] == (char)(idx - 1);
+}
 
 static void
 itanl(job_t j)
 {
 	uint16_t itanno;
 	struct udpc_seria_s sctx[1];
+	itan_t tan;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -70,10 +89,13 @@ itanl(job_t j)
 	UD_DEBUG("0x%04x (UD_SVC_ITANL): looking up itan %hu\n",
 		 UD_SVC_ITANL, itanno);
 
-	/* prepare the reply packet */
-	clear_pkt(sctx, j);
-	udpc_seria_add_str(sctx, gtlst[itanno-1], sizeof(gtlst[itanno-1]));
-	send_pkt(sctx, j);
+	/* get the tan */
+	if (obtain(tan, itanno)) {
+		/* prepare the reply packet */
+		clear_pkt(sctx, j);
+		udpc_seria_add_str(sctx, tan, /* true size is */6);
+		send_pkt(sctx, j);
+	}
 	return;
 }
 
@@ -87,15 +109,23 @@ read_itan_lists(void *UNUSED(clo))
 		return fd;
 	}
 	for (unsigned int i = 0; i < countof(gtlst); i++) {
-		char dummy[1];
+		itan_t dummy;
 
-		if (read(fd, gtlst[i], sizeof(gtlst[i])) <= 0) {
+		if (read(fd, dummy, 6 + 1) <= 0) {
 			res = -1;
+			break;
 		}
-		/* there should be a CR there */
-		if (read(fd, dummy, sizeof(dummy)) < 1 || dummy[0] != '\n') {
+		if (dummy[6] != '\n') {
 			res = -1;
+			break;
 		}
+		/* otherwise, blank the last two bytes */
+		dummy[6] = '\0';
+		dummy[7] = (char)i;
+		/* and encrypt it */
+		btea_enc((void*)dummy, sizeof(dummy) / sizeof(uint32_t), key);
+		/* and store */
+		memcpy(gtlst[i], dummy, sizeof(dummy));
 	}
 	close(fd);
 	return res;

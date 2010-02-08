@@ -99,6 +99,7 @@ static volatile int gport;
 
 struct bcb_clo_s {
 	int sock;
+	int pktcnt;
 	tsc_key_t key;
 	udpc_seria_t sctx;
 	job_t rplj;
@@ -117,6 +118,7 @@ fire_cannon(struct bcb_clo_s *clo)
 {
 	clo->rplj->blen = UDPC_HDRLEN + udpc_seria_msglen(clo->sctx);
 	dccp_send(clo->sock, clo->rplj->buf, clo->rplj->blen);
+	clo->pktcnt++;
 	return;
 }
 
@@ -205,6 +207,7 @@ instr_tick_by_ts_svc(job_t j)
 	clo->sctx = rplsctx;
 	clo->key = &key;
 	copy_pkt(clo->rplj, j);
+	clo->pktcnt = 0;
 	if ((res = dccp_connect(s, j->sa, port, 4000 /*msecs*/)) >= 0) {
 		UD_DEBUG("sock %i res %i\n", s, res);
 		/* prepare the reply packet ... */
@@ -214,6 +217,7 @@ instr_tick_by_ts_svc(job_t j)
 	} else {
 		UD_DEBUG("timed out, res %i: %s\n", res, strerror(errno));
 	}
+	UD_DEBUG("sent %i packets\n", clo->pktcnt);
 	dccp_close(s);
 	return;
 }
@@ -562,6 +566,7 @@ fetch_mktsnp_svc(job_t j)
 	clo->sctx = rplsctx;
 	clo->key = &key;
 	copy_pkt(clo->rplj, j);
+	clo->pktcnt = 0;
 
 	if ((res = dccp_connect(s, j->sa, port, 4000 /*msecs*/)) >= 0) {
 		UD_DEBUG("sock %i res %i\n", s, res);
@@ -574,6 +579,7 @@ fetch_mktsnp_svc(job_t j)
 	} else {
 		UD_DEBUG("timed out, res %i: %s\n", res, strerror(errno));
 	}
+	UD_DEBUG("sent %i packets\n", clo->pktcnt);
 	dccp_close(s);
 	return;
 }
@@ -663,7 +669,7 @@ dso_tseries_LTX_init(void *clo)
 	/* administrative services */
 	ud_set_service(UD_SVC_LIST_BOXES, list_boxes_svc, NULL);
 	/* cache cleaning */
-	schedule_timer_every(clo, sched_prune_caches, gcube, 60.0);
+	schedule_timer_every(clo, sched_prune_caches, gcube, 20.0);
 	UD_DBGCONT("done\n");
 
 	/* have the frobq initialised */

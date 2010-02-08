@@ -85,6 +85,17 @@ cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(s), void *UNUSED(c))
 	return false;
 }
 
+static void
+add_tan(udpc_seria_t sctx, const char *tan, size_t len)
+{
+	char tmp[8];
+
+	memcpy(tmp, tan, len > 8 ? 8 : len);
+	btea_enc((void*)tmp, sizeof(tmp) / sizeof(uint32_t), gkey);
+	udpc_seria_add_str(sctx, tmp, sizeof(tmp));
+	return;
+}
+
 
 int
 main(int argc, const char *argv[])
@@ -117,7 +128,7 @@ main(int argc, const char *argv[])
 	/* ts first */
 	udpc_seria_add_ui16(sctx, (uint16_t)idx);
 	if (tan) {
-		udpc_seria_add_str(sctx, tan, 6);
+		add_tan(sctx, tan, strlen(tan));
 	}
 	pkt.plen = udpc_seria_msglen(sctx) + UDPC_HDRLEN;
 

@@ -59,6 +59,12 @@
 # define assert(args...)
 #endif	/* USE_ASSERTIONS */
 
+#if defined TSCUBE_DEBUG_FLAG
+# define UD_DEBUG_TSC(args...)	fprintf(stderr, "[unserding/tscube] " args)
+#else  /* !TSCUBE_DEBUG_FLAG */
+# define UD_DEBUG_TSC(args...)
+#endif	/* TSCUBE_DEBUG_FLAG */
+
 
 /* decouple from intvtree madness */
 #include "intvtree.h"
@@ -624,13 +630,6 @@ bother_cube(tscube_t utsc, tsc_key_t key, keyval_t kv)
 		/* open end */
 		time32_t end = 0x7fffffff;
 
-#if 0
-/* not even worth printing in debugging mode */
-		size_t mt = tsc_box_maxticks(box);
-		fprintf(stderr, "uncached %zu %i %i\n", mt, beg, key->beg);
-		itree_print(kv->intv);
-#endif
-
 		box = make_tsc_box();
 		res = kv->ce->ops->fetch_cb(
 			box, tsc_box_maxticks(box),
@@ -649,7 +648,7 @@ bother_cube(tscube_t utsc, tsc_key_t key, keyval_t kv)
 
 		} else {
 			/* what a waste of time */
-			fprintf(stderr, "nothing found\n");
+			UD_DEBUG_TSC("nothing found\n");
 			free_tsc_box(box);
 			box = NULL;
 		}
@@ -715,7 +714,7 @@ tsc_find(sl1t_t tgt, su_secu_t *sv, size_t tsz, tscube_t tsc, tsc_key_t key)
 	}
 
 	if (key->secu.mux == 0) {
-		fprintf(stderr, "looking for 0-secu\n");
+		UD_DEBUG_TSC("looking for 0-secu\n");
 		return 0;
 	}
 
@@ -727,12 +726,12 @@ tsc_find(sl1t_t tgt, su_secu_t *sv, size_t tsz, tscube_t tsc, tsc_key_t key)
 			continue;
 		} else if (__key_matches_p(ce->key, key)) {
 			tsc_box_t box;
-#if 1
+#if defined TSCUBE_DEBUG_FLAG
 			su_secu_t s = ce->key->secu;
 			uint32_t qd = su_secu_quodi(s);
 			int32_t qt = su_secu_quoti(s);
 			uint16_t p = su_secu_pot(s);
-			fprintf(stderr, "found match %u/%i@%hu\n", qd, qt, p);
+			UD_DEBUG_TSC("found match %u/%i@%hu\n", qd, qt, p);
 #endif
 			if ((box = bother_cube(tsc, key, &m->tbl[i]))) {
 				/* tell tsc_box bout our secu */
@@ -753,9 +752,8 @@ tsc_find_cb(tscube_t tsc, tsc_key_t key, tsc_find_f cb, void *clo)
 	__tscube_t c = tsc;
 	hmap_t m = c->hmap;
 
-	fprintf(stderr, "%p %p\n", cb, clo);
 	if (key->secu.mux == 0) {
-		fprintf(stderr, "looking for 0-secu\n");
+		UD_DEBUG_TSC("looking for 0-secu\n");
 		return;
 	}
 
@@ -768,9 +766,7 @@ tsc_find_cb(tscube_t tsc, tsc_key_t key, tsc_find_f cb, void *clo)
 		} else if (__key_matches_p(ce->key, key)) {
 			tsc_box_t box;
 
-			fprintf(stderr, "bothering cube\n");
 			if ((box = bother_cube(tsc, key, &m->tbl[i]))) {
-				fprintf(stderr, "nifty\n");
 #if 0
 				/* tell tsc_box bout our secu */
 				bbclo.s = ce->key->secu;
@@ -858,18 +854,18 @@ prune_box(it_node_t nd, void *clo)
 	tsc_box_t b = nd->data;
 
 	if (box_age(b) >= TSC_BOX_TTL) {
-		fprintf(stderr, "rem'ing box %p\n", b);
+		UD_DEBUG_TSC("rem'ing box %p\n", b);
 #if defined PRUNE_INPLACE
 		b = itree_del_node_nl(tr, nd);
 		free_tsc_box(b);
-		fprintf(stderr, "rem'd box %p\n", b);
+		UD_DEBUG_TSC("rem'd box %p\n", b);
 #else  /* !PRUNE_INPLACE */
 		prunv[prunn].n = nd;
 		prunv[prunn].t = tr;
 		prunn++;
 #endif	/* PRUNE_INPLACE */
 	} else {
-		fprintf(stderr, "box %p not ripe\n", b);
+		UD_DEBUG_TSC("box %p not ripe\n", b);
 	}
 	return;
 }
@@ -896,7 +892,7 @@ tsc_prune_caches(tscube_t tsc)
 #if !defined PRUNE_INPLACE
 	for (int i = 0; i < prunn; i++) {
 		tsc_box_t b = itree_del_node(prunv[i].t, prunv[i].n);
-		fprintf(stderr, "rem'd box %p\n", b);
+		UD_DEBUG_TSC("rem'd box %p\n", b);
 		free_tsc_box(b);
 	}
 #endif	/* !PRUNE_INPLACE */

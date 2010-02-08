@@ -35,6 +35,7 @@
  *
  ***/
 
+#include <unistd.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -44,6 +45,31 @@
 #include <errno.h>
 #include "svc-itanl.h"
 
+
+#include "btea.c"
+/* key fiddling */
+static uint32_t gkey[4] = {0xdeadbeef, 0xdeadbeef, 0xcafebabe, 0xcafebabe};
+
+static void
+genkey_from_pass(void)
+{
+	char *pw = getpass("Passphrase: "), *p, *k;
+	int ps = strlen(pw);
+	/* scatter, pw over k */
+	for (p = pw, k = (char*)gkey; k < (char*)gkey + sizeof(gkey); ) {
+		*k++ ^= *p++;
+		if (p - pw >= ps) {
+			p = pw;
+		}
+	}
+	free(pw);
+
+	/* encrypt the shite */
+	btea_enc(gkey, sizeof(gkey) / sizeof(uint32_t), gkey);
+	return;
+}
+
+
 static struct ud_handle_s hdl[1];
 
 static bool
@@ -81,6 +107,8 @@ main(int argc, const char *argv[])
 		/* set mode */
 		tan = argv[2];
 	}
+	/* before we start any complicated games, read the passphrase */
+	genkey_from_pass();
 	/* obtain us a new handle */
 	init_unserding_handle(hdl, PF_INET6, true);
 	/* now kick off the finder */

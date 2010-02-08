@@ -837,16 +837,6 @@ tsc_list_boxes(tscube_t tsc)
 }
 
 /* cache pruning */
-#define PRUNE_INPLACE	1
-
-#if !defined PRUNE_INPLACE
-static size_t prunn;
-static struct {
-	it_node_t n;
-	tsc_itr_t t;
-} prunv[16];
-#endif	/* !PRUNE_INPLACE */
-
 static void
 prune_box(it_node_t nd, void *clo)
 {
@@ -855,15 +845,9 @@ prune_box(it_node_t nd, void *clo)
 
 	if (box_age(b) >= TSC_BOX_TTL) {
 		UD_DEBUG_TSC("rem'ing box %p\n", b);
-#if defined PRUNE_INPLACE
 		b = itree_del_node_nl(tr, nd);
 		free_tsc_box(b);
 		UD_DEBUG_TSC("rem'd box %p\n", b);
-#else  /* !PRUNE_INPLACE */
-		prunv[prunn].n = nd;
-		prunv[prunn].t = tr;
-		prunn++;
-#endif	/* PRUNE_INPLACE */
 	} else {
 		UD_DEBUG_TSC("box %p not ripe\n", b);
 	}
@@ -877,9 +861,6 @@ tsc_prune_caches(tscube_t tsc)
 	hmap_t m = c->hmap;
 
 	pthread_mutex_lock(&m->mtx);
-#if !defined PRUNE_INPLACE
-	prunn = 0;
-#endif	/* !PRUNE_INPLACE */
 	/* perform sequential scan */
 	for (uint32_t i = 0; i < m->alloc_sz; i++) {
 		tsc_ce_t ce = m->tbl[i].ce;
@@ -889,13 +870,6 @@ tsc_prune_caches(tscube_t tsc)
 		}
 	}
 	pthread_mutex_unlock(&m->mtx);
-#if !defined PRUNE_INPLACE
-	for (int i = 0; i < prunn; i++) {
-		tsc_box_t b = itree_del_node(prunv[i].t, prunv[i].n);
-		UD_DEBUG_TSC("rem'd box %p\n", b);
-		free_tsc_box(b);
-	}
-#endif	/* !PRUNE_INPLACE */
 	return;
 }
 

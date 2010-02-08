@@ -159,7 +159,7 @@ extern void tsc_trav(tscube_t tsc, tsc_key_t key, tsc_trav_f cb, void *clo);
 extern void tsc_list_boxes(tscube_t tsc);
 extern void tsc_prune_caches(tscube_t tsc);
 
-#define TSC_BOX_TTL	1800
+#define TSC_BOX_TTL	180
 
 typedef void(*tsc_find_f)(tsc_box_t, su_secu_t, void*);
 extern void

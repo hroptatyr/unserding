@@ -836,7 +836,13 @@ tsc_list_boxes(tscube_t tsc)
 	return;
 }
 
+
 /* cache pruning */
+/* ugly stuff first */
+#define UNSERSRV
+static volatile int prunn;
+#include "unserding-dbg.h"
+
 static void
 prune_box(it_node_t nd, void *clo)
 {
@@ -848,6 +854,7 @@ prune_box(it_node_t nd, void *clo)
 		b = itree_del_node_nl(tr, nd);
 		free_tsc_box(b);
 		UD_DEBUG_TSC("rem'd box %p\n", b);
+		prunn++;
 	} else {
 		UD_DEBUG_TSC("box %p not ripe\n", b);
 	}
@@ -862,6 +869,7 @@ tsc_prune_caches(tscube_t tsc)
 
 	pthread_mutex_lock(&m->mtx);
 	/* perform sequential scan */
+	prunn = 0;
 	for (uint32_t i = 0; i < m->alloc_sz; i++) {
 		tsc_ce_t ce = m->tbl[i].ce;
 		if (__key_valid_p(ce->key)) {
@@ -869,6 +877,7 @@ tsc_prune_caches(tscube_t tsc)
 			itree_trav_in_order(tr, prune_box, tr);
 		}
 	}
+	UD_DEBUG("rem'd %i boxes\n", prunn);
 	pthread_mutex_unlock(&m->mtx);
 	return;
 }

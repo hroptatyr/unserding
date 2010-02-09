@@ -87,8 +87,18 @@ typedef uint8_t udpc_type_t;
 
 
 /* packet flags */
-typedef enum udpc_pktstorminess_e udpc_pktstorminess_t;
-typedef enum udpc_pktsched_e udpc_pktsched_t;
+typedef enum udpc_pktstorminess_e {
+	UDPC_PKTSTORMINESS_UNK,
+	UDPC_PKTSTORMINESS_ONE,
+	UDPC_PKTSTORMINESS_MANY,
+} udpc_pktstorminess_t;
+
+/* flags for the scheduler */
+typedef enum udpc_pktsched_e {
+	UDPC_PKTSCHED_UNK,
+	UDPC_PKTSCHED_NOW,
+	UDPC_PKTSCHED_SOON,
+} udpc_pktsched_t;
 
 /** pkt storminess: one pkt, delivery: now */
 #define UDPC_PKTFLO_NOW_ONE	((uint16_t)0xbeef)
@@ -98,18 +108,6 @@ typedef enum udpc_pktsched_e udpc_pktsched_t;
 #define UDPC_PKTFLO_SOON_ONE	((uint16_t)0xcaff)
 /** pkt storminess: many pkts, delivery: soon */
 #define UDPC_PKTFLO_SOON_MANY	((uint16_t)0xcafe)
-
-enum udpc_pktstorminess_e {
-	UDPC_PKTSTORMINESS_UNK,
-	UDPC_PKTSTORMINESS_ONE,
-	UDPC_PKTSTORMINESS_MANY,
-};
-
-enum udpc_pktsched_e {
-	UDPC_PKTSCHED_UNK,
-	UDPC_PKTSCHED_NOW,
-	UDPC_PKTSCHED_SOON,
-};
 
 static inline uint16_t
 udpc_pkt_flags(const ud_packet_t pkt)

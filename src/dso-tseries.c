@@ -69,13 +69,15 @@
 #include "ud-sock.h"
 #include <errno.h>
 
+#if defined UNSERSRV && defined TSER_DEBUG_FLAG
+# define UD_DEBUG_TSER(args...)					\
+	fprintf(logout, "[unserding/tseries] " args)
+#else  /* !UNSERSRV || !TSER_DEBUG_FLAG */
+# define UD_DEBUG_TSER(args...)
+#endif	/* UNSERSRV && TSER_DEBUG_FLAG */
+
 tscube_t gcube = NULL;
 struct hook_s __fetch_urn_hook[1], *fetch_urn_hook = __fetch_urn_hook;
-
-#if defined DEBUG_FLAG
-# define UD_DEBUG_TSER(args...)			\
-	fprintf(logout, "[unserding/tseries] " args)
-#endif	/* DEBUG_FLAG */
 
 static __attribute__((unused)) const char*
 secbugger(su_secu_t s)
@@ -146,7 +148,7 @@ box_cb(tsc_box_t b, su_secu_t s, void *clo)
 #endif	/* DEBUG_FLAG */
 	const_sl1t_t t, lim;
 
-	UD_DEBUG("found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
+	UD_DEBUG_TSER("found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
 	/* sequential scan, skip all stuff before the beg in question */
 	lim = b->sl1t + b->nt * b->skip;
 	for (t = b->sl1t;
@@ -500,7 +502,7 @@ mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 {
 	struct bcb_clo_s *bcbclo = clo;
 	int sock = bcbclo->sock;
-#if defined DEBUG_FLAG
+#if defined TSER_DEBUG_FLAG
 	uint32_t qd = su_secu_quodi(s);
 	int32_t qt = su_secu_quoti(s);
 	uint16_t p = su_secu_pot(s);
@@ -508,7 +510,7 @@ mktsnp_cb(tsc_box_t b, su_secu_t s, void *clo)
 	const_sl1t_t lst[8] = {0};
 	const_sl1t_t t, lim;
 
-	UD_DEBUG("found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
+	UD_DEBUG_TSER("found match %u/%i@%hu %p  -> %i\n", qd, qt, p, b, sock);
 	/* sequential scan, skip all stuff before the beg in question */
 	lim = b->sl1t + b->nt * b->skip;
 	for (t = b->sl1t;

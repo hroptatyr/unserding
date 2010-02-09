@@ -39,10 +39,11 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <ctype.h>
+#include <errno.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "protocore.h"
-#include <errno.h>
 #include "svc-itanl.h"
 
 
@@ -100,37 +101,19 @@ add_tan(udpc_seria_t sctx, const char *tan, size_t len)
 	return;
 }
 
-
-int
-main(int argc, const char *argv[])
+static void
+send_or_query(uint16_t idx, const char *tan)
 {
 	/* ud nonsense */
 	char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = {.pbuf = buf, .plen = sizeof(buf)};
 	struct udpc_seria_s sctx[1];
-	long int idx;
-	const char *tan = NULL;
 
-	if (argc <= 1 || argc > 3) {
-		fprintf(stderr, "Usage: ud-itan index [tan]\n");
-		exit(1);
-	}
-
-	/* query mode */
-	idx = strtol(argv[1], NULL, 0);
-	if (argc == 3) {
-		/* set mode */
-		tan = argv[2];
-	}
-	/* before we start any complicated games, read the passphrase */
-	genkey_from_pass();
-	/* obtain us a new handle */
-	init_unserding_handle(hdl, PF_INET6, true);
 	/* now kick off the finder */
 	udpc_make_pkt(pkt, 0, 0, UD_SVC_ITANL);
 	udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
-	/* ts first */
-	udpc_seria_add_ui16(sctx, (uint16_t)idx);
+	/* index first */
+	udpc_seria_add_ui16(sctx, idx);
 	if (tan) {
 		add_tan(sctx, tan, strlen(tan));
 	}
@@ -138,9 +121,57 @@ main(int argc, const char *argv[])
 
 	/* send the packet */
 	ud_send_raw(hdl, pkt);
-	if (tan == NULL) {
-		/* ... and receive the answers, only in query mode */
-		ud_subscr_raw(hdl, 3000, cb, NULL);
+	return;
+}
+
+
+int
+main(int argc, const char *argv[])
+{
+	long int idx;
+	const char *tan;
+
+	if (argc > 3) {
+		fprintf(stderr, "Usage: ud-itan index [tan]\n");
+		exit(1);
+	}
+
+	/* before we start any complicated games, read the passphrase */
+	genkey_from_pass();
+	/* obtain us a new handle */
+	init_unserding_handle(hdl, PF_INET6, true);
+	/* query mode */
+	if (argc >= 2) {
+		idx = strtol(argv[1], NULL, 0);
+		if (argc == 3) {
+			/* set mode */
+			tan = argv[2];
+		} else {
+			tan = NULL;
+		}
+		/* push */
+		send_or_query(idx, tan);
+
+		if (tan == NULL) {
+			/* ... and receive the answers, only in query mode */
+			ud_subscr_raw(hdl, 3000, cb, NULL);
+		}
+	} else {
+		/* mass sender mode */
+		ssize_t sz;
+		size_t n;
+		char *p = NULL;
+		while ((sz = getline(&p, &n, stdin)) > 0) {
+			char *endp = p;
+			p[sz - 1] = '\0';
+			idx = strtol(p, &endp, 10);
+			while (isspace(*endp) && *endp != '\0') {
+				endp++;
+			}
+			/* endp should point to the start of tan now */
+			send_or_query(idx, endp);
+		}
+		free(p);
 	}
 	/* and lose the handle again */
 	free_unserding_handle(hdl);

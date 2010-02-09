@@ -109,9 +109,10 @@ unsercli_YFLAGS = -d -p "cli_yy"
 if BUILD_SERVER
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l
-unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h
+unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS) $(LIBEDIT_CPPFLAGS)
+unsercli_CPPFLAGS += -imacros tedious.h
 unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lpopt
 unsercli_LDADD = $(LIBEV_LIBS) $(LIBREADLINE_LIBS) libunserding.la
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h

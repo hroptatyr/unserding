@@ -52,20 +52,24 @@
 #if !defined ESUCCESS
 # define ESUCCESS	0
 #endif	/* !ESUCCESS */
+#undef ENCRYPT
 
 /* size hereby has to match the block cipher we've chosen */
 typedef char itan_t[8];
 /* very simplistic itan list, indexed naturally */
-typedef itan_t tlst_t[120];
+typedef itan_t tlst_t[256];
 
 
+#if defined ENCRYPT
 /* a simple and efficient cipher */
 #include "btea.c"
+static uint32_t key[4];
+#endif	/* ENCRYPT */
 
 
 static tlst_t gtlst;
-static uint32_t key[4];
 
+#if defined ENCRYPT
 static bool
 obtain(itan_t tgt, uint16_t idx)
 {
@@ -75,21 +79,24 @@ obtain(itan_t tgt, uint16_t idx)
 	btea_dec((void*)tgt, sizeof(itan_t) / sizeof(uint32_t), key);
 	return tgt[7] == (char)idx;
 }
+#endif	/* ENCRYPT */
 
 static void
-deposit(itan_t tgt, size_t tsz, uint16_t idx)
+deposit(const char *tgt, size_t tsz, uint16_t idx)
 {
 	/* cock off early if this isnt a tan */
 	if (tsz > 8) {
 		return;
 	}
+#if defined ENCRYPT
 	/* blank the last two bytes */
 	tgt[6] = '\0';
 	tgt[7] = (char)idx;
 	/* and encrypt it */
 	btea_enc((void*)tgt, sizeof(itan_t) / sizeof(uint32_t), key);
+#endif	/* ENCRYPT */
 	/* and store */
-	memcpy(gtlst[idx - 1], tgt, sizeof(itan_t));
+	memcpy(gtlst[idx - 1], tgt, tsz);
 	return;
 }
 
@@ -98,16 +105,16 @@ itanl(job_t j)
 {
 	uint16_t itanno;
 	struct udpc_seria_s sctx[1];
-	itan_t tan;
+	const char *tan;
 	size_t tsz;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
 	itanno = udpc_seria_des_ui16(sctx);
-	if ((tsz = udpc_seria_des_str_into(tan, sizeof(tan), sctx)) > 0) {
+	if ((tsz = udpc_seria_des_str(sctx, &tan)) > 0) {
 		/* setter mode */
-		UD_DEBUG("0x%04x (UD_SVC_ITANL): setting itan %hu to %s\n",
-			 UD_SVC_ITANL, itanno, tan);
+		UD_DEBUG("0x%04x (UD_SVC_ITANL): setting itan %hu to %zu\n",
+			 UD_SVC_ITANL, itanno, tsz);
 		deposit(tan, tsz, itanno);
 		return;
 	}
@@ -118,19 +125,25 @@ itanl(job_t j)
 	/* prepare the reply packet */
 	clear_pkt(sctx, j);
 	/* get the tan */
+#if defined ENCRYPT
 	if (obtain(tan, itanno)) {
-		udpc_seria_add_str(sctx, tan, /* true size is */6);
+		udpc_seria_add_str(sctx, tan, sizeof(itan_t));
 	} else {
 		UD_DEBUG("itan decryption problem, got %x%x\n",
 			 ((uint32_t*)tan)[0], ((uint32_t*)tan)[1]);
 		/* send an empty packet, i.e. do nothing here */
 		;
 	}
+#else  /* !ENCRYPT */
+	/* obtain not necessary */
+	udpc_seria_add_str(sctx, gtlst[itanno - 1], sizeof(itan_t));
+#endif	/* ENCRYPT */
 	send_pkt(sctx, j);
 	return;
 }
 
 
+#if defined ENCRYPT
 #if 0
 /* we get a problem with the persistency here */
 static void
@@ -151,6 +164,7 @@ setup_key(void *tgt, size_t len)
 	return;
 }
 #endif
+#endif	/* ENCRYPT */
 
 static int
 restore_from_file(void *UNUSED(clo), const char *fn)
@@ -193,7 +207,9 @@ dso_itanl_LTX_init(void *clo)
 	/* itan lookup service */
 	UD_DEBUG("mod/itanl: loading ...");
 	ud_set_service(UD_SVC_ITANL, itanl, NULL);
+#if defined ENCRYPT
 	setup_key(key, sizeof(key));
+#endif	/* ENCRYPT */
 	if (restore_from_file(clo, fname) < 0) {
 		UD_DBGCONT("failed\n");
 	}

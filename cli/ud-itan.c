@@ -76,10 +76,13 @@ static bool
 cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(s), void *UNUSED(c))
 {
 	struct udpc_seria_s sctx[1];
-	const char *res = NULL;
+	const char *p;
+	char res[8];
 
 	udpc_seria_init(sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	if (udpc_seria_des_str(sctx, &res) > 0) {
+	if (udpc_seria_des_str(sctx, &p) > 0) {
+		memcpy(res, p, sizeof(res));
+		btea_dec((void*)res, sizeof(res) / sizeof(uint32_t), gkey);
 		printf("%s\n", res);
 	}
 	return false;
@@ -90,6 +93,7 @@ add_tan(udpc_seria_t sctx, const char *tan, size_t len)
 {
 	char tmp[8];
 
+	memset(tmp, 0, sizeof(tmp));
 	memcpy(tmp, tan, len > 8 ? 8 : len);
 	btea_enc((void*)tmp, sizeof(tmp) / sizeof(uint32_t), gkey);
 	udpc_seria_add_str(sctx, tmp, sizeof(tmp));

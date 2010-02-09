@@ -668,12 +668,6 @@ typedef struct unwrbox_clo_s {
 	void *clo;
 } *unwrbox_clo_t;
 
-static size_t
-scom_size(scom_t t)
-{
-	return !scom_thdr_linked(t) ? 1 : 2;
-}
-
 static void
 unwrap_box(const struct tsc_box_s *box, void *clo)
 {

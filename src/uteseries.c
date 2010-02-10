@@ -395,7 +395,8 @@ __find_tk(ute_ctx_t ctx, tblister_t tbl, sl1t_t tgtsrc)
 		uint16_t tkidx = sl1t_tblidx(tk);
 		uint16_t tkttf = sl1t_ttf(tk);
 
-		if (tkidx == idx && tkttf == ttf && sl1t_stmp_sec(tk) <= ts) {
+		if (tkidx == idx && tkttf == ttf &&
+		    (time32_t)sl1t_stmp_sec(tk) <= ts) {
 			*tgtsrc = *tk;
 			return tgtsrc;
 		}

@@ -63,6 +63,13 @@
 #define NO_LEGACY
 #include "tseries-private.h"
 
+#if defined UNSERSRV && defined UTE_DEBUG_FLAG
+# define UD_DEBUG_UTE(args...)					\
+	fprintf(logout, "[unserding/tseries/ute] " args)
+#else  /* !UNSERSRV || !UTE_DEBUG_FLAG */
+# define UD_DEBUG_UTE(args...)
+#endif	/* UNSERSRV && UTE_DEBUG_FLAG */
+
 
 /* ugly */
 #include "uteseries.c"
@@ -148,7 +155,7 @@ __find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
 	for (const_sl1t_t tmp = t; tmp < t + nt; ) {
 		time32_t tmpts = (time32_t)sl1t_stmp_sec(tmp);
 		if (tmpts > ts) {
-			UD_DEBUG("break, tmpts %i > ts %i\n", tmpts, ts);
+			UD_DEBUG_UTE("break, tmpts %i > ts %i\n", tmpts, ts);
 			break;
 		}
 		uint16_t tkttf = sl1t_ttf(tmp);
@@ -176,14 +183,14 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	size_t nt;
 	const_sl1t_t t;
 
-	UD_DEBUG("fetching %hu msk %x\n", ttf, tbl ? tbl->ttfbs[idx] : 0);
+	UD_DEBUG_UTE("fetching %hu msk %x\n", ttf, tbl ? tbl->ttfbs[idx] : 0);
 	if (UNLIKELY(tbl == NULL)) {
 		return 0;
 	} else if (!(tbl->ttfbs[idx] & ttf)) {
 		return 0;
 	}
 
-	UD_DEBUG("fetching %u to %u for %i\n", tbl->btk, tbl->etk, ts);
+	UD_DEBUG_UTE("fetching %u to %u for %i\n", tbl->btk, tbl->etk, ts);
 	/* get the corresponding tick block */
 	nt = sl1t_fio_read_ticks(ctx->fio, &t, tbl->btk, tbl->etk);
 	/* this will give us a tick which is before the tick in question */
@@ -202,7 +209,7 @@ fetch_tick(
 	size_t nt, res = 0, i;
 	struct sl1t_s sl1key[1];
 
-	UD_DEBUG("fetching %i %i %x\n", beg, end, k->ttf);
+	UD_DEBUG_UTE("fetching %i %i %x\n", beg, end, k->ttf);
 	/* different keying now */
 	sl1t_set_stmp_sec(sl1key, beg);
 	/* use the global secu -> tblidx map */
@@ -213,7 +220,7 @@ fetch_tick(
 	if ((nt = __cp_tk(t, ctx, sl1key)) == 0) {
 		return 0;
 	}
-	UD_DEBUG("fine-grain over %zu ticks t[0]->ts %u\n",
+	UD_DEBUG_UTE("fine-grain over %zu ticks t[0]->ts %u\n",
 		 nt, sl1t_stmp_sec(t[0]));
 	/* otherwise iterate */
 	if (!scom_thdr_linked((const void*)(t[0]))) {
@@ -245,8 +252,8 @@ fetch_tick(
 	/* absolute count, candles or sl1t's */
 	tgt->nt = res;
 	tgt->beg = sl1t_stmp_sec(tgt->sl1t);
-	UD_DEBUG("srch %u: tgt->beg %i  tgt->end %i\n",
-		 sl1t_stmp_sec(sl1key), tgt->beg, tgt->end);
+	UD_DEBUG_UTE("srch %u: tgt->beg %i  tgt->end %i\n",
+		     sl1t_stmp_sec(sl1key), tgt->beg, tgt->end);
 	return res * tgt->skip;
 }
 

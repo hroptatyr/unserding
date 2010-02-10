@@ -272,6 +272,7 @@ print_qry(char *tgt, size_t len, tsc_key_t k, urn_t urn, time32_t b, time32_t e)
 	case URN_L1_BAT:
 	case URN_L1_PEG:
 	case URN_L1_BATPEG:
+	case URN_UNK:
 	default:
 		len = 0;
 	}
@@ -297,7 +298,7 @@ fetch_tick(
 	qrclo->box = tgt;
 	qrclo->max = tsz;
 	nres = uddb_qry(conn, qry, len, qry_rowf, qrclo);
-	UD_DEBUG("got %zu/%zu prices\n", qrclo->box->nt, nres);
+	UD_DEBUG("got %hu/%zu prices\n", qrclo->box->nt, nres);
 	return qrclo->box->nt;
 }
 

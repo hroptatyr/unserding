@@ -154,7 +154,7 @@ itree_left_root(itree_t it)
 	return itree_root_node(it)->left;
 }
 
-static inline uint32_t
+static inline int32_t
 max_high(__node_t nd)
 {
 	return nd->max_high;
@@ -752,7 +752,7 @@ itree_trav_in_order(itree_t it, it_trav_f cb, void *clo)
 
 /* 0 if N contains P, 1 if P is right of N and -1 if N is right of P. */
 static inline int
-node_pivot_rel(__node_t n, uint32_t p)
+node_pivot_rel(__node_t n, int32_t p)
 {
 	if (p < n->pub.lo) {
 		return -1;
@@ -765,7 +765,7 @@ node_pivot_rel(__node_t n, uint32_t p)
 
 /* 0 if N contains P, 1 if P is right of N and -1 if N is right of P. */
 static inline int
-tree_pivot_rel(__node_t n, uint32_t p)
+tree_pivot_rel(__node_t n, int32_t p)
 {
 	if (p < n->pub.lo) {
 		return -1;

@@ -262,11 +262,13 @@ get_annu(const char *val)
 static void
 make_interest_rate(instr_t in, uint32_t id, void **rows, size_t UNUSED(nflds))
 {
-	mmaturity_t mmat = (mmaturity_t)get_mmat(rows[FRA_MMAT]);
-	annuity_t annu = (annuity_t)get_annu(rows[FRA_ANNU]);
+	uint16_t mmat = get_mmat(rows[FRA_MMAT]);
+	uint16_t annu = get_annu(rows[FRA_ANNU]);
 	uint16_t ccy = strtoul(rows[FRA_CCY], NULL, 10);
 
-	make_trxxxx_into(in, id, rows[IDENT_GA], mmat, annu, ccy);
+	make_trxxxx_into(
+		in, id, rows[IDENT_GA],
+		(mmaturity_t)mmat, (annuity_t)annu, ccy);
 	UD_DEBUG_XDR("made irate %s (%u)\n", instr_name(in), id);
 	return;
 }

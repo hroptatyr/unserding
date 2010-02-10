@@ -74,12 +74,19 @@ genkey_from_pass(void)
 static struct ud_handle_s hdl[1];
 
 static bool
-cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(s), void *UNUSED(c))
+cb(const ud_packet_t pkt, ud_const_sockaddr_t UNUSED(s), void *clo)
 {
 	struct udpc_seria_s sctx[1];
 	const char *p;
 	char res[8];
+	ud_convo_t *cnop = clo;
 
+	if (UDPC_PKT_INVALID_P(pkt)) {
+		return false;
+	} else if (udpc_pkt_cno(pkt) != *cnop) {
+		/* ask for another packet */
+		return true;
+	}
 	udpc_seria_init(sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
 	if (udpc_seria_des_str(sctx, &p) > 0) {
 		memcpy(res, p, sizeof(res));
@@ -101,16 +108,17 @@ add_tan(udpc_seria_t sctx, const char *tan, size_t len)
 	return;
 }
 
-static void
+static ud_convo_t
 send_or_query(uint16_t idx, const char *tan)
 {
 	/* ud nonsense */
 	char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = {.pbuf = buf, .plen = sizeof(buf)};
 	struct udpc_seria_s sctx[1];
+	ud_convo_t cno = hdl->convo++;
 
 	/* now kick off the finder */
-	udpc_make_pkt(pkt, 0, 0, UD_SVC_ITANL);
+	udpc_make_pkt(pkt, cno, 0, UD_SVC_ITANL);
 	udpc_seria_init(sctx, UDPC_PAYLOAD(buf), UDPC_PLLEN);
 	/* index first */
 	udpc_seria_add_ui16(sctx, idx);
@@ -121,7 +129,7 @@ send_or_query(uint16_t idx, const char *tan)
 
 	/* send the packet */
 	ud_send_raw(hdl, pkt);
-	return;
+	return cno;
 }
 
 
@@ -142,6 +150,8 @@ main(int argc, const char *argv[])
 	init_unserding_handle(hdl, PF_INET6, true);
 	/* query mode */
 	if (argc >= 2) {
+		ud_convo_t cno;
+
 		idx = strtol(argv[1], NULL, 0);
 		if (argc == 3) {
 			/* set mode */
@@ -150,11 +160,11 @@ main(int argc, const char *argv[])
 			tan = NULL;
 		}
 		/* push */
-		send_or_query(idx, tan);
+		cno = send_or_query(idx, tan);
 
 		if (tan == NULL) {
 			/* ... and receive the answers, only in query mode */
-			ud_subscr_raw(hdl, 3000, cb, NULL);
+			ud_subscr_raw(hdl, 3000, cb, &cno);
 		}
 	} else {
 		/* mass sender mode */
@@ -169,7 +179,7 @@ main(int argc, const char *argv[])
 				endp++;
 			}
 			/* endp should point to the start of tan now */
-			send_or_query(idx, endp);
+			(void)send_or_query(idx, endp);
 		}
 		free(p);
 	}

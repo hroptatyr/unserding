@@ -140,7 +140,7 @@ mcast6_init(ud_handle_t hdl)
 	int opt = 0;
 
 	/* try v6 first */
-	if ((hdl->sock = s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
+	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
 		return SOCK_INVALID;
 	}
 
@@ -334,7 +334,9 @@ void
 init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop)
 {
 	hdl->convo = 0;
-
+	/* initialise our sockaddr structure upfront */
+	memset(&hdl->sa, 0, sizeof(hdl->sa));
+	/* transport protocol independence */
 	switch (pref_fam) {
 	default:
 	case PF_UNSPEC:
@@ -345,7 +347,7 @@ init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop)
 		hdl->sock = mcast4_init(hdl);
 		break;
 	case PF_INET6:
-		(void)mcast6_init(hdl);
+		hdl->sock = mcast6_init(hdl);
 		break;
 	}
 	/* operate in non-blocking mode */

@@ -388,7 +388,7 @@ fetch_urn_ute(job_t UNUSED(j))
 	}
 
 	while ((ent = fts_read(fts)) != NULL) {
-		ute_ctx_t my_ctx;
+		ute_ctx_t my_ctx = {0};
 		if (ent->fts_info != FTS_F ||
 		    !ute_file_p(ent->fts_path)) {
 			continue;

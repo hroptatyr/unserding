@@ -150,22 +150,25 @@ __find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
 	uint16_t idx = scom_thdr_tblidx(key);
 	uint16_t ttf = scom_thdr_ttf(key);
 	/* to store the last seen ticks of each tick type 0 to 7 */
-	const_sl1t_t lst[8] = {0};
+	const_sl1t_t lst[16] = {0};
 
 	for (const_sl1t_t tmp = t; tmp < t + nt; ) {
 		time32_t tmpts = (time32_t)sl1t_stmp_sec(tmp);
+		uint16_t tkttf;
+		uint16_t tkidx;
+
 		if (tmpts > ts) {
 			UD_DEBUG_UTE("break, tmpts %i > ts %i\n", tmpts, ts);
 			break;
 		}
-		uint16_t tkttf = sl1t_ttf(tmp);
-		uint16_t tkidx = sl1t_tblidx(tmp);
+		tkttf = sl1t_ttf(tmp);
+		tkidx = sl1t_tblidx(tmp);
 
 		if (tkidx == idx && ttf_coincide_p(tkttf, ttf)) {
 			/* keep track */
 			lst[(tkttf & 0x0f)] = tmp;
 		}
-		tmp += scom_thdr_linked((const void*)(tmp)) ? 2 : 1;
+		tmp += scom_size((const void*)(tmp));
 	}
 	/* find the minimum stamp out of the remaining ones */
 	return __find_min_addr(lst, countof(lst));
@@ -194,8 +197,10 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	/* get the corresponding tick block */
 	nt = sl1t_fio_read_ticks(ctx->fio, &t, tbl->btk, tbl->etk);
 	/* this will give us a tick which is before the tick in question */
-	*tgt = __find_bb(t, nt, key);
-	return *tgt ? t + nt - *tgt : 0;
+	if ((*tgt = __find_bb(t, nt, key)) == NULL) {
+		return 0;
+	}
+	return nt + (t - *tgt);
 }
 
 static size_t
@@ -205,7 +210,7 @@ fetch_tick(
 {
 	ute_ctx_t ctx = uval;
 	uint16_t idx;
-	const_sl1t_t t[8];
+	const_sl1t_t t[32];
 	size_t nt, res = 0, i;
 	struct sl1t_s sl1key[1];
 
@@ -221,18 +226,15 @@ fetch_tick(
 		return 0;
 	}
 	UD_DEBUG_UTE("fine-grain over %zu ticks t[0]->ts %u\n",
-		 nt, sl1t_stmp_sec(t[0]));
+		     nt, sl1t_stmp_sec(t[0]));
 	/* otherwise iterate */
-	if (!scom_thdr_linked((const void*)(t[0]))) {
-		tgt->skip = 1;
-	} else {
-		tsz /= (tgt->skip = 2);
-	}
+	tgt->skip = scom_size((const void*)t);
+	tsz /= tgt->skip;
 
 	for (i = res = 0; i < nt && res < tsz; i += tgt->skip) {
-		uint16_t tkidx = sl1t_tblidx(&t[0][i]);
-		uint16_t tkttf = sl1t_ttf(&t[0][i]) & 0x0f;
-		time32_t tkts = sl1t_stmp_sec(&t[0][i]);
+		uint16_t tkidx = sl1t_tblidx(*t + i);
+		uint16_t tkttf = sl1t_ttf(*t + i) & 0x0f;
+		time32_t tkts = sl1t_stmp_sec(*t + i);
 
 		/* assume ascending order */
 		if (UNLIKELY(tkts > end)) {
@@ -241,7 +243,7 @@ fetch_tick(
 			break;
 		} else if (tkidx == idx && ttf_coincide_p(tkttf, k->ttf)) {
 			/* not thread-safe */
-			memcpy(&tgt->sl1t[res * tgt->skip], &t[0][i],
+			memcpy(&tgt->sl1t[res * tgt->skip], *t + i,
 			       sizeof(struct sl1t_s) * tgt->skip);
 			res++;
 		}

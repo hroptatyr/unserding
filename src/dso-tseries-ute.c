@@ -174,7 +174,8 @@ __find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
 	return __find_min_addr(lst, countof(lst));
 }
 
-/* belongs in uteseries.c? */
+/* belongs in uteseries.c?
+ * We deliver pointers to the stuff in the page in question */
 static size_t
 __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 {
@@ -203,13 +204,19 @@ __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 	return nt + (t - *tgt);
 }
 
+/**
+ * Callback function glue for ute <-> cube, this is called by the cube finder
+ * and expected to be filled in within the parameters.  TGT is the box to fill
+ * with ticks in the range from BEG to END which meet the criteria in key K. */
 static size_t
 fetch_tick(
 	tsc_box_t tgt, size_t tsz, tsc_key_t k, void *uval,
 	time32_t beg, time32_t end)
 {
+/* redo me! */
 	ute_ctx_t ctx = uval;
 	uint16_t idx;
+	/* hm? what the? */
 	const_sl1t_t t[32];
 	size_t nt, res = 0, i;
 	struct sl1t_s sl1key[1];
@@ -227,9 +234,8 @@ fetch_tick(
 	}
 	UD_DEBUG_UTE("fine-grain over %zu ticks t[0]->ts %u\n",
 		     nt, sl1t_stmp_sec(t[0]));
-	/* otherwise iterate */
+	/* otherwise iterate, we assume they're all of the same kind */
 	tgt->skip = scom_size((const void*)t);
-	tsz /= tgt->skip;
 
 	for (i = res = 0; i < nt && res < tsz; i += tgt->skip) {
 		uint16_t tkidx = sl1t_tblidx(*t + i);
@@ -245,7 +251,7 @@ fetch_tick(
 			/* not thread-safe */
 			memcpy(&tgt->sl1t[res * tgt->skip], *t + i,
 			       sizeof(struct sl1t_s) * tgt->skip);
-			res++;
+			res += tgt->skip;
 		}
 	}
 	if (tgt->end == 0) {

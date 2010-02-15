@@ -249,7 +249,7 @@ fetch_tick(
 			break;
 		} else if (tkidx == idx && ttf_coincide_p(tkttf, k->ttf)) {
 			/* not thread-safe */
-			memcpy(&tgt->sl1t[res * tgt->skip], *t + i,
+			memcpy(&tgt->sl1t[res], *t + i,
 			       sizeof(struct sl1t_s) * tgt->skip);
 			res += tgt->skip;
 		}

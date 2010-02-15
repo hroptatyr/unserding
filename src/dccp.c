@@ -260,4 +260,20 @@ dccp_recv(int s, char *restrict buf, size_t bsz)
 	return res;
 }
 
+ssize_t
+dccp_splice(int in_s, int out_s)
+{
+	ep_ctx_t epg = epoll_guts();
+	ssize_t res = 0;
+	loff_t off = 0;
+
+	/* add s to the list of observed sockets */
+	ep_prep_reader(epg, in_s);
+	if ((res = ep_wait(epg, 5000)) > 0) {
+		res = splice(in_s, NULL, out_s, &off, 4096, 0);
+	}
+	ep_fini(epg, in_s);
+	return res;
+}
+
 /* dccp.c ends here */

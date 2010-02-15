@@ -51,5 +51,6 @@ extern void dccp_close(int socket);
 
 extern ssize_t dccp_recv(int s, char *restrict buf, size_t bsz);
 extern ssize_t dccp_send(int s, const char *buf, size_t bsz);
+extern ssize_t dccp_splice(int in_s, int out_s);
 
 #endif	/* INCLUDED_dccp_h_ */

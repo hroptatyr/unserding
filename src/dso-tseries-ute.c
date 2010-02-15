@@ -235,7 +235,7 @@ fetch_tick(
 	UD_DEBUG_UTE("fine-grain over %zu ticks t[0]->ts %u\n",
 		     nt, sl1t_stmp_sec(t[0]));
 	/* otherwise iterate, we assume they're all of the same kind */
-	tgt->skip = scom_size((const void*)t);
+	tgt->skip = scom_size((const void*)*t);
 
 	for (i = res = 0; i < nt && res < tsz; i += tgt->skip) {
 		uint16_t tkidx = sl1t_tblidx(*t + i);

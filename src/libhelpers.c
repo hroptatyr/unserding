@@ -525,18 +525,20 @@ set_seen(ftbi_ctx_t bictx, index_t i)
 static void
 feed_stamps(ftbi_ctx_t bictx)
 {
+	time_t *ts = bictx->ts;
+	size_t nts = bictx->nts;
 	index_t i = bictx->offs;
 	size_t flim = FILL(bictx->tbs) + i;
 
-	if (UNLIKELY(flim > bictx->nts)) {
-		flim = bictx->nts;
+	if (UNLIKELY(flim > nts)) {
+		flim = nts;
 	}
 
 	/* send the secu and the desired ticks */
 	udpc_seria_add_tick_by_instr_hdr(bictx->sctx, bictx->secu, bictx->tbs);
 
 	for (; i < flim; i++) {
-		udpc_seria_add_ui32(bictx->sctx, bictx->ts[i]);
+		udpc_seria_add_ui32(bictx->sctx, ts[i]);
 	}
 	bictx->offs = i;
 	return;
@@ -544,9 +546,11 @@ feed_stamps(ftbi_ctx_t bictx)
 
 #else  /* !USE_SCHEDFLO */
 static void
-feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
+feed_stamps(ftbi_ctx_t bictx)
 {
-#undef FILL
+	time_t *ts = bictx->ts;
+	size_t nts = bictx->nts;
+
 	/* send the secu and the desired ticks */
 	udpc_seria_add_tick_by_instr_hdr(bictx->sctx, bictx->secu, bictx->tbs);
 	for (index_t j = 0, i = 0; j < FILL(bictx->tbs) && i < nts; i++) {
@@ -555,10 +559,6 @@ feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 			j++;
 		}
 	}
-#if defined USE_SUBSCR
-	bictx->ts = ts;
-	bictx->nts = nts;
-#endif	/* USE_SUBSCR */
 	return;
 }
 #endif	/* USE_SCHEDFLO */
@@ -689,7 +689,7 @@ moarp(ftbi_ctx_t bictx)
 #if defined USE_SCHEDFLO
 	return bictx->offs < bictx->nts && bictx->retry > 0;
 #else  /* !USE_SCHEDFLO */
-	return bictx->rcvd < tslen && bictx->retry > 0;
+	return bictx->rcvd < bictx->nts && bictx->retry > 0;
 #endif	/* USE_SCHEDFLO */
 }
 

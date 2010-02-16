@@ -56,6 +56,10 @@
 
 #define NRETRIES	2
 #define USE_SUBSCR
+/* when schedflo is in use we do not try to guess if there's more
+ * data to come, instead we will evaluate the storminess flag of the
+ * packet and if it's ONE it's guaranteed to be the last packet */
+#define USE_SCHEDFLO
 
 struct f1i_clo_s {
 	ud_convo_t cno;
@@ -437,15 +441,17 @@ struct ftbi_ctx_s {
 	su_secu_t secu;
 	tbs_t tbs;
 	ud_packet_t pkt;
+#if defined USE_SCHEDFLO
+	size_t offs;
+#else  /* !USE_SCHEDFLO */
 	/* hope this still works on 32b systems
 	 * oh oh, this implicitly encodes NFILL (which is 64 at the mo) */
 	uint64_t seen;
+#endif	/* USE_SCHEDFLO */
 	void(*cb)(su_secu_t, scom_t, void *clo);
 	void *clo;
-#if defined USE_SUBSCR
 	time_t *ts;
 	size_t nts;
-#endif	/* USE_SUBSCR */
 };
 
 static inline void
@@ -454,10 +460,15 @@ init_bictx(ftbi_ctx_t bictx, ud_handle_t hdl)
 	bictx->hdl = hdl;
 	bictx->retry = NRETRIES;
 	bictx->rcvd = 0;
+#if defined USE_SCHEDFLO
+	bictx->offs = 0;
+#else  /* !USE_SCHEDFLO */
 	bictx->seen = 0;
+#endif	/* USE_SCHEDFLO */
 	return;
 }
 
+#if !defined USE_SCHEDFLO
 static index_t
 whereis(const_sl1t_t t, time_t ts[], size_t nts)
 {
@@ -469,6 +480,7 @@ whereis(const_sl1t_t t, time_t ts[], size_t nts)
 	}
 	return nts;
 }
+#endif	/* !USE_SCHEDFLO */
 
 static void
 new_convo(ftbi_ctx_t bictx)
@@ -485,6 +497,8 @@ new_convo(ftbi_ctx_t bictx)
 	return;
 }
 
+#if !defined USE_SCHEDFLO
+/* obsoleted by the use of the sched/flow system */
 static inline bool
 seenp(ftbi_ctx_t bictx, index_t i)
 {
@@ -504,11 +518,36 @@ set_seen(ftbi_ctx_t bictx, index_t i)
 	bictx->seen |= (1 << i);
 	return;
 }
+#endif	/* !USE_SCHEDFLO */
 
-static __attribute__((noinline)) void
+#define FILL(X)	(48 / max_num_ticks(X))
+#if defined USE_SCHEDFLO
+static void
+feed_stamps(ftbi_ctx_t bictx)
+{
+	index_t i = bictx->offs;
+	size_t flim = FILL(bictx->tbs) + i;
+
+	if (UNLIKELY(flim > bictx->nts)) {
+		flim = bictx->nts;
+	}
+
+	/* send the secu and the desired ticks */
+	udpc_seria_add_tick_by_instr_hdr(bictx->sctx, bictx->secu, bictx->tbs);
+
+	for (; i < flim; i++) {
+		udpc_seria_add_ui32(bictx->sctx, bictx->ts[i]);
+	}
+	bictx->offs = i;
+	return;
+}
+
+#else  /* !USE_SCHEDFLO */
+static void
 feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 {
-#define FILL(X)	(48 / max_num_ticks(X))
+#undef FILL
+	/* send the secu and the desired ticks */
 	udpc_seria_add_tick_by_instr_hdr(bictx->sctx, bictx->secu, bictx->tbs);
 	for (index_t j = 0, i = 0; j < FILL(bictx->tbs) && i < nts; i++) {
 		if (!seenp(bictx, i)) {
@@ -516,13 +555,14 @@ feed_stamps(ftbi_ctx_t bictx, time_t ts[], size_t nts)
 			j++;
 		}
 	}
-#undef FILL
 #if defined USE_SUBSCR
 	bictx->ts = ts;
 	bictx->nts = nts;
 #endif	/* USE_SUBSCR */
 	return;
 }
+#endif	/* USE_SCHEDFLO */
+#undef FILL
 
 static void
 send_stamps(ftbi_ctx_t bictx)
@@ -550,6 +590,7 @@ __recv_tick_cb(const ud_packet_t pkt, ud_const_sockaddr_t usa, void *clo)
 		bc->sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
 	while ((bc->secu = udpc_seria_des_secu(bc->sctx)).mux &&
 	       udpc_seria_des_sl1t(bc->sl1t, bc->sctx)) {
+#if !defined USE_SCHEDFLO
 		index_t where;
 		if ((where = whereis(bc->sl1t, bc->ts, bc->nts)) < bc->nts) {
 			if (!sl1t_onhold_p(bc->sl1t)) {
@@ -558,12 +599,17 @@ __recv_tick_cb(const ud_packet_t pkt, ud_const_sockaddr_t usa, void *clo)
 				set_seen(bc, where);
 			}
 		}
+#endif	/* !USE_SCHEDFLO */
 		/* callback */
 		bc->cb(bc->secu, (const void*)bc->sl1t, bc->clo);
 		bc->retry = NRETRIES;
 	}
-	/* ask for more */
+	/* ask for more, true will keep the subscription */
+#if defined USE_SCHEDFLO
+	return udpc_pktstorminess(pkt) == UDPC_PKTSTORMINESS_MANY;
+#else  /* !USE_SCHEDFLO */
 	return !seen_all_p(bc);
+#endif	/* USE_SCHEDFLO */
 }
 
 static void
@@ -589,8 +635,11 @@ recv_ticks(ftbi_ctx_t bc)
 }
 
 static void
-frob_ticks(ftbi_ctx_t bictx, time_t ts[], size_t nts)
+frob_ticks(ftbi_ctx_t bictx)
 {
+	time_t *ts = bictx->ts;
+	size_t nts = bictx->nts;
+
 	/* we don't really need this, do we? */
 	udpc_seria_des_secu(bictx->sctx);
 	while (udpc_seria_des_sl1t(bictx->sl1t, bictx->sctx)) {
@@ -619,11 +668,29 @@ lodge_closure(ftbi_ctx_t b, void(*cb)(su_secu_t, scom_t, void *clo), void *clo)
 }
 
 static inline void
+lodge_stamps(ftbi_ctx_t b, time_t *ts, size_t tslen)
+{
+	b->ts = ts;
+	b->nts = tslen;
+	return;
+}
+
+static inline void
 lodge_ihdr(ftbi_ctx_t bictx, su_secu_t secu, tbs_t tbs)
 {
 	bictx->secu = secu;
 	bictx->tbs = tbs;
 	return;
+}
+
+static inline bool
+moarp(ftbi_ctx_t bictx)
+{
+#if defined USE_SCHEDFLO
+	return bictx->offs < bictx->nts && bictx->retry > 0;
+#else  /* !USE_SCHEDFLO */
+	return bictx->rcvd < tslen && bictx->retry > 0;
+#endif	/* USE_SCHEDFLO */
 }
 
 void
@@ -639,12 +706,13 @@ ud_find_ticks_by_instr(
 	init_bictx(bictx, hdl);
 	lodge_ihdr(bictx, s, bs);
 	lodge_closure(bictx, cb, clo);
+	lodge_stamps(bictx, ts, tslen);
 
 	do {
 		/* initiate new conversation */
 		new_convo(bictx);
 		/* 4222(instr-triple, tick_bitset, ts, ts, ts, ...) */
-		feed_stamps(bictx, ts, tslen);
+		feed_stamps(bictx);
 		/* prepare packet for sending im off */
 		send_stamps(bictx);
 
@@ -652,9 +720,9 @@ ud_find_ticks_by_instr(
 		recv_ticks(bictx);
 #if !defined USE_SUBSCR
 		/* eval, possibly marking them */
-		frob_ticks(bictx, ts, tslen);
+		frob_ticks(bictx);
 #endif	/* !USE_SUBSCR */
-	} while (bictx->rcvd < tslen && bictx->retry > 0);
+	} while (moarp(bictx));
 	return;
 }
 

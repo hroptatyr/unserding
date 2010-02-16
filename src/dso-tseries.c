@@ -445,7 +445,8 @@ instr_tick_by_instr_svc(job_t j)
 	tbs_t tbs;
 	/* allow to filter for 64 time stamps at once */
 	unsigned int nfilt = 0;
-	bool moarp = true;
+	bool moarp;
+	index_t i;
 
 	/* prepare the iterator for the incoming packet */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
@@ -463,14 +464,18 @@ instr_tick_by_instr_svc(job_t j)
 	octx->nfilt = nfilt;
 	octx->tbs = tbs;
 
-	for (index_t i = 0; moarp;) {
+	i = 0;
+	do {
+		uint16_t sf;
 		/* prepare the reply packet ... */
 		copy_pkt(&rplj, j);
 		clear_pkt(rplsctx, &rplj);
 		/* process some time stamps, this fills the packet */
 		moarp = (i = proc_some(octx, i)) < octx->nfilt;
+		/* determine the sched/flow */
+		sf = moarp ? UDPC_PKTFLO_NOW_MANY : UDPC_PKTFLO_NOW_ONE;
 		/* send what we've got so far */
-		send_pkt(rplsctx, &rplj);
+		send_pkt(rplsctx, &rplj, sf);
 	} while (moarp);
 
 	/* we cater for any frobnication desires now */
@@ -621,7 +626,7 @@ instr_urn_svc(job_t j)
 	/* reuse buf and sctx, just traverse the cube and send the bugger */
 	clear_pkt(sctx, j);
 	tsc_trav(gcube, &k, get_urn_cb, sctx);
-	send_pkt(sctx, j);
+	send_pkt(sctx, j, UDPC_PKTFLO_NOW_ONE);
 	return;
 }
 

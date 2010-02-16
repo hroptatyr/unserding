@@ -73,7 +73,7 @@ ping(job_t j)
 	udpc_seria_add_ui32(&sctx, ts.tv_nsec);
 	udpc_seria_add_byte(&sctx, (ud_pong_score_t)my_hdl->score);
 	/* off we go */
-	send_pkt(&sctx, j);
+	send_pkt(&sctx, j, UDPC_PKTFLO_NOW_ONE);
 	return;
 }
 

@@ -302,7 +302,7 @@ instr_dump_svc(job_t j)
 	} while (++cnt);
 out:
 	/* send what we've got */
-	send_pkt(&rplsctx, &rplj);
+	send_pkt(&rplsctx, &rplj, UDPC_PKTFLO_NOW_ONE);
 	return;
 }
 

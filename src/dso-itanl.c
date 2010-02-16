@@ -138,7 +138,7 @@ itanl(job_t j)
 	/* obtain not necessary */
 	udpc_seria_add_str(sctx, gtlst[itanno - 1], sizeof(itan_t));
 #endif	/* ENCRYPT */
-	send_pkt(sctx, j);
+	send_pkt(sctx, j, UDPC_PKTFLO_NOW_ONE);
 	return;
 }
 

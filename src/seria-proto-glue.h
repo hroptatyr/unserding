@@ -68,15 +68,16 @@ prep_pkt(udpc_seria_t sctx, job_t rplj, job_t srcj)
 }
 
 static inline void
-send_pkt(udpc_seria_t sctx, job_t j)
+send_pkt(udpc_seria_t sctx, job_t j, uint16_t schedflo)
 {
 	j->blen = UDPC_HDRLEN + udpc_seria_msglen(sctx);
+	udpc_pkt_set_flags(JOB_PACKET(j), schedflo);
 	send_cl(j);
 #if defined UD_LOG
 	int cno = udpc_pkt_cno(JOB_PACKET(j));
 	int pno = udpc_pkt_pno(JOB_PACKET(j));
 	int cmd = udpc_pkt_cmd(JOB_PACKET(j));
-	uint16_t mag = ntohs(((const uint16_t*)j->buf)[3]);
+	uint16_t mag = udpc_pkt_flags(JOB_PACKET(j));
 	UD_LOG("xdr-instr reply  "
 	       ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04hx\n",
 	       (unsigned int)j->blen, cno, pno, cmd, mag);

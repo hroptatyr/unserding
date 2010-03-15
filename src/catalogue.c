@@ -212,7 +212,6 @@ __by_name_nolock(_cat_t c, const char *name)
 		ident_t this_ident = instr_ident(this_instr);
 		if (ident_name(this_ident)[0] != '\0' &&
 		    name_equal_p(ident_name(this_ident), name)) {
-			pthread_mutex_unlock(&c->mtx);
 			return this_instr;
 		}
 	}
@@ -347,6 +346,24 @@ find_instr_by_name(cat_t cat, const char *name)
 	res = __by_name_nolock(c, name);
 	pthread_mutex_unlock(&c->mtx);
 	return res;
+}
+
+
+/* traversal */
+void
+cat_trav(cat_t cat, cat_trav_f tf)
+{
+	_cat_t c = cat;
+
+	pthread_mutex_lock(&c->mtx);
+	for (index_t i = 0; i < c->ninstrs; i++) {
+		instr_t this_instr = (void*)cat_instr(c, i);
+		if (!tf(this_instr)) {
+			break;
+		}
+	}
+	pthread_mutex_unlock(&c->mtx);
+	return;
 }
 
 /* catalogue-ng.c ends here */

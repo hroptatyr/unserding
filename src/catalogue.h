@@ -41,6 +41,7 @@
 #include "unserding.h"
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <pfack/instruments.h>
 
 /**
@@ -95,5 +96,17 @@ cat_bang_instr_nolck(cat_t cat, instr_t i);
 
 extern instr_t find_instr_by_gaid(cat_t cat, gaid_t gaid);
 extern instr_t find_instr_by_name(cat_t cat, const char *name);
+
+/**
+ * Callback function for catalogue traversals.
+ * The callback is supposed to return FALSE when the traversal is to
+ * be stopped, and TRUE if more instruments should be traversed.
+ * If used as a filter this function should return TRUE if the passed
+ * instrument is deemed to pass the filter and FALSE otherwise. */
+typedef bool(*cat_trav_f)(const_instr_t);
+
+/**
+ * Traversal routine. */
+extern void cat_trav(cat_t cat, cat_trav_f tf);
 
 #endif	/* INCLUDED_catalogue_h_ */

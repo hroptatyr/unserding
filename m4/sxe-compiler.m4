@@ -64,9 +64,12 @@ AC_DEFUN([SXE_CHECK_CC_VERSION], [dnl
 	gcc_compiler_specs=""
 	AC_MSG_CHECKING([for compiler version information])
 
+	## extract the actual binary from CC
+	CC_BINARY=$(echo "${CC}" | cut -d' ' -f1)
+
 	dnl First try portable compilers, then crack system secrets
 	dnl run through the AC_PROG_CC mill.
-	case "$(basename $CC)" in
+	case "$(basename ${CC_BINARY})" in
 	dnl GNU cc compiler
 	gcc*)
 		compiler_version=$($CC --version | head -1)
@@ -888,8 +891,7 @@ AC_DEFUN([SXE_CC_MAXOPT_IBM], [dnl
 ])dnl SXE_CC_MAXOPT_IBM
 
 AC_DEFUN([SXE_CC_MAXOPT_INTEL], [dnl
-	optiflags="-O3"
-
+	optiflags="-O3 -ansi_alias"
 	if test "$acx_maxopt_portable" = "no"; then
 		icc_archflag=unknown
 		icc_flags=""
@@ -1627,12 +1629,14 @@ extern void f(void*restrict[]);
 dnl recommended interface macros
 ## compiler wrapper
 AC_DEFUN([SXE_CHECK_CC], [dnl
-
 	AC_REQUIRE([AC_PROG_CPP])
 	AC_REQUIRE([AC_HEADER_STDC])
-	AC_PROG_CC([gcc icc cc])
-	dnl AC_PROG_CC_STDC
+
+	AC_PROG_CC(["icc -static-intel" icc gcc cc])
+	AC_PROG_CC_STDC
 	AC_PROG_CC_C99
+
+	AC_CANONICAL_HOST
 
 	## check for machine and architecture
 	m4_ifdef([SXE_CHECK_MACHARCH], [SXE_CHECK_MACHARCH])

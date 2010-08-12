@@ -6,7 +6,7 @@ dnl This file is part of SXEmacs
 
 AC_DEFUN([SXE_CHECK_LIBTOOL], [dnl
 	AC_MSG_RESULT([starting libtool investigation...])
-	m4_ifdef([LT_INIT], [_SXE_CHECK_LT2], [_SXE_CHECK_LT1])
+	_SXE_CHECK_LT2
 
 	if test -n "$export_dynamic_flag_spec"; then
 		sxe_cv_export_dynamic=$(\
@@ -39,18 +39,16 @@ might be wrong as well.
 ])dnl SXE_CHECK_LIBTOOL
 
 AC_DEFUN([_SXE_CHECK_LT2], [dnl
-	LT_CONFIG_LTDL_DIR([libltdl], [recursive])
+
 	LT_PREREQ([2.1])
 	LT_INIT([dlopen])
-	LTDL_INSTALLABLE
-	AC_REQUIRE([LTDL_INIT])
 
 	LT_LIB_DLLOAD
 	LT_LIB_M
 	LT_SYS_DLOPEN_DEPLIBS
-	AC_REQUIRE([LT_SYS_DLSEARCH_PATH])
-	AC_REQUIRE([LT_SYS_MODULE_EXT])
-	AC_REQUIRE([LT_SYS_MODULE_PATH])
+	LT_SYS_DLSEARCH_PATH
+	LT_SYS_MODULE_EXT
+	LT_SYS_MODULE_PATH
 	LT_SYS_SYMBOL_USCORE
 	LT_FUNC_DLSYM_USCORE
 
@@ -62,40 +60,13 @@ AC_DEFUN([_SXE_CHECK_LT2], [dnl
 	AC_CONFIG_MACRO_DIR([libltdl/m4])
 ])dnl _SXE_CHECK_LT2
 
-m4_ifdef([LT_CONFIG_LTDL_DIR], [], [dnl else
-AC_DEFUN([LT_CONFIG_LTDL_DIR], [dnl
-	AS_MESSAGE([trying to fake an initialisation of a libltdl subproject])
-])dnl LT_CONFIG_LTDL_DIR
-])
-
-AC_DEFUN([_SXE_CHECK_LT1], [dnl
-	## This overcomes a strange but existent scenario
-	## (see ssh horstbox for one)
-	## where autoconf is SO new that it can actually only work
-	## with libtool2 but, sigh, of course, sigh, libtool-1.stone.age
-	## is installed
-	LT_CONFIG_LTDL_DIR([libltdl], [recursive])
-
-	AC_LIBLTDL_INSTALLABLE
-	dnl AC_LTDL_ENABLE_INSTALL
-	dnl Check for dlopen support
-	AC_LIBTOOL_DLOPEN
-	AC_PROG_LIBTOOL([dlopen])
-	AC_REQUIRE([AC_LIB_LTDL])
-	AC_LTDL_SYMBOL_USCORE
-
-	dnl Substitute LTDLINCL and LIBLTDL in the Makefiles
-	AC_SUBST(LTDLINCL)
-	AC_SUBST(LIBLTDL)
-	AC_SUBST([LIBTOOL_DEPS])
-
-	dnl Configure libltdl
-	AC_CONFIG_SUBDIRS([libltdl])
-])dnl _SXE_CHECK_LT1
-
 AC_DEFUN([SXE_CHECK_LIBLTDL], [dnl
 	## make sure the libtool stuff has been run before
 	AC_REQUIRE([SXE_CHECK_LIBTOOL])
+
+	LT_CONFIG_LTDL_DIR([libltdl], [recursive])
+	LTDL_INSTALLABLE
+	LTDL_INIT
 
 	AC_CACHE_CHECK([for dynamic loader provided by libltdl],
 		[sxe_cv_feat_libltdl], [_SXE_CHECK_LIBLTDL])

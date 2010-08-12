@@ -2,7 +2,7 @@ dnl -------------------------------------------------------------------------
 dnl Autoconf startup.
 dnl -------------------------------------------------------------------------
 
-AC_PREREQ([2.61])
+AC_PREREQ([2.64])
 AC_INIT([unserding], [0.1], [http://www.ga-group.nl])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADER([src/config.h])
@@ -33,6 +33,7 @@ SXE_INIT_MSG_LEVEL
 with_ridiculously_aggressive_optimisations="yes"
 with_maximum_warning_output="yes"
 with_omp="no"
+AC_PROG_CC(["icc -static-intel" icc gcc cc])
 SXE_CHECK_CC
 SXE_CHECK_CFLAGS
 
@@ -41,6 +42,7 @@ SXE_CHECK_PARSER_LEXER
 
 ## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
+SXE_CHECK_LIBLTDL
 
 ## basic posix stuff
 SXE_CHECK_BASIC_HEADERS

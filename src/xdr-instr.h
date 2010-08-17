@@ -40,7 +40,7 @@
 
 #include <stdbool.h>
 #include <time.h>
-#include <sushi/secu.h>
+#include "secu.h"
 #include "unserding.h"
 #include "protocore.h"
 #include "seria.h"

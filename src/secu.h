@@ -41,6 +41,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #define USE_PACKED_STRUCTS
 
 /* type muxing
@@ -81,7 +85,9 @@ static inline su_secu_t __attribute__((pure, const, always_inline))
 su_null_secu(void)
 {
 /* return the empty security */
-	su_secu_t res = {.mux = 0};
+	su_secu_t res;
+	/* just for C--, sigh */
+	res.mux = 0;
 	return res;
 }
 
@@ -125,12 +131,43 @@ su_secu_pot(su_secu_t s)
 #endif	/* !USE_PACKED_STRUCTS */
 }
 
-#if defined USE_PACKED_STRUCTS && defined DEBUG_FLAG
+#if defined USE_PACKED_STRUCTS
+/**
+ * Return the contents of S as 8-byte integer. */
 static inline uint64_t
-su_secu_mux(su_secu_t s)
+su_secu_ui64(su_secu_t s)
 {
 	return s.mux;
 }
-#endif	/* DEBUG_FLAG */
+
+/**
+ * Treat 8-byte integer INP as su_secu_t. */
+static inline su_secu_t
+su_secu_set_ui64(uint64_t inp)
+{
+	su_secu_t res;
+	res.mux = inp;
+	return res;
+}
+#endif	/* USE_PACKED_STRUCTS */
+
+/**
+ * Return true if MATCHEE matches MATCHER.
+ * su_secu's match if they are identical or if some components (qd, qt, p)
+ * in MATCHER are 0 and their corresponding component in MATCHEE is set. */
+static inline bool
+su_secu_match_p(su_secu_t matcher, su_secu_t matchee)
+{
+	if (matcher.mux == matchee.mux) {
+		return true;
+	} else if ((matcher.mux | matchee.mux) == matchee.mux) {
+		return true;
+	}
+	return false;
+}
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif	/* !INCLUDED_secu_h_ */

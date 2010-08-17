@@ -278,6 +278,7 @@ triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
 /* helper for daemon mode */
 static bool daemonisep = 0;
 static bool prefer6p = 0;
+static char *cf = NULL;
 
 static int
 daemonise(void)
@@ -366,6 +367,9 @@ static struct poptOption srv_opts[] = {
 	{"prefer-ipv6", '6', POPT_ARG_NONE,
 	 &prefer6p, 0,
 	 "Prefer ipv6 traffic to ipv4 if applicable..", NULL},
+	{"config", 'c', POPT_ARG_STRING,
+	 &cf, 0,
+	 "Configuration file.", NULL},
 	{"daemon", 'd', POPT_ARG_NONE,
 	 &daemonisep, 0,
 	 "Detach from tty and run as daemon.", NULL},
@@ -458,6 +462,11 @@ ud_read_config(ud_ctx_t ctx)
 
 	/* we prefer the user's config file, then fall back to the
 	 * global config file if that's not available */
+	if (cf && read_lua_config(ctx->cfgctx, cf)) {
+		UD_DBGCONT("done\n");
+		return;
+	}
+
 	ud_expand_user_cfg_file_name(cfgf);
 	if (read_lua_config(ctx->cfgctx, cfgf)) {
 		UD_DBGCONT("done\n");

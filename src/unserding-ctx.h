@@ -58,4 +58,19 @@ struct ud_ctx_s {
 	ud_handle_t hdl;
 };
 
+/* only used during the module load stage, could be a separate arg one day */
+static inline void
+udctx_set_setting(ud_ctx_t ctx, ud_cfgset_t setting)
+{
+	ctx->curr_cfgset = setting;
+	return;
+}
+
+static inline ud_cfgset_t
+udctx_get_setting(ud_ctx_t ctx)
+{
+	void *res = ctx->curr_cfgset;
+	return res;
+}
+
 #endif	/* INCLUDED_unserding_ctx_h_ */

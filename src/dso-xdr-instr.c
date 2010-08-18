@@ -55,7 +55,9 @@
 #define UNSERSRV
 #include "unserding-dbg.h"
 #include "unserding-nifty.h"
+#define USE_LUA
 #include "unserding-ctx.h"
+#include "unserding-cfg.h"
 #include "unserding-private.h"
 
 #include <pfack/instruments.h>

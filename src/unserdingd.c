@@ -76,10 +76,12 @@
 # include <popt.h>
 #endif
 
+#define USE_LUA
 /* our master include file */
 #include "unserding.h"
 /* context goodness, passed around internally */
 #include "unserding-ctx.h"
+#include "unserding-cfg.h"
 /* our private bits */
 #include "unserding-private.h"
 /* proto stuff */

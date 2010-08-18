@@ -55,6 +55,7 @@
 #include <pthread.h>
 /* for the config stuff and the context */
 #include "unserding-ctx.h"
+#include "unserding-cfg.h"
 #include "unserding-nifty.h"
 
 typedef struct ud_conn_s *ud_conn_t;

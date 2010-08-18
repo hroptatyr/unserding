@@ -1,4 +1,4 @@
-/*** unserding-ctx.h -- unserding context
+/*** unserding-cfg.h -- unserding context
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -39,12 +39,9 @@
 #define INCLUDED_unserding_cfg_h_
 
 #include "unserding-ctx.h"
-#if defined USE_LUA
-# include "lua-config.h"
-#endif	/* USE_LUA */
+#include "lua-config.h"
 
 /* config mumbojumbo, just redirs to the lua cruft */
-#if defined USE_LUA
 static inline ud_cfgset_t
 udcfg_tbl_lookup(ud_ctx_t ctx, ud_cfgset_t s, const char *name)
 {
@@ -75,6 +72,5 @@ udcfg_glob_lookup_b(ud_ctx_t ctx, const char *name)
 {
 	return lc_globcfg_lookup_b(ctx->cfgctx, name);
 }
-#endif	/* USE_LUA */
 
 #endif	/* INCLUDED_unserding_cfg_h_ */

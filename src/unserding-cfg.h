@@ -35,27 +35,46 @@
  *
  ***/
 
-#if !defined INCLUDED_unserding_ctx_h_
-#define INCLUDED_unserding_ctx_h_
+#if !defined INCLUDED_unserding_cfg_h_
+#define INCLUDED_unserding_cfg_h_
 
-#include "unserding.h"
+#include "unserding-ctx.h"
+#if defined USE_LUA
+# include "lua-config.h"
+#endif	/* USE_LUA */
 
-/**
- * Unserding context structure, passed along to submods. */
-typedef struct ud_ctx_s *ud_ctx_t;
+/* config mumbojumbo, just redirs to the lua cruft */
+#if defined USE_LUA
+static inline ud_cfgset_t
+udcfg_tbl_lookup(ud_ctx_t ctx, ud_cfgset_t s, const char *name)
+{
+	return lc_cfgtbl_lookup(ctx->cfgctx, s, name);
+}
 
-/**
- * Opaque data type for settings tables whither configuration goes. */
-typedef void *ud_cfgset_t;
+static inline void
+udcfg_tbl_free(ud_ctx_t ctx, ud_cfgset_t s)
+{
+	lc_cfgtbl_free(ctx->cfgctx, s);
+	return;
+}
 
-/**
- * Guts of the unserding context struct. */
-struct ud_ctx_s {
-	/** libev's mainloop */
-	void *mainloop;
-	void *cfgctx;
-	ud_cfgset_t curr_cfgset;
-	ud_handle_t hdl;
-};
+static inline size_t
+udcfg_tbl_lookup_s(const char **t, ud_ctx_t c, ud_cfgset_t s, const char *n)
+{
+	return lc_cfgtbl_lookup_s(t, c->cfgctx, s, n);
+}
 
-#endif	/* INCLUDED_unserding_ctx_h_ */
+static inline size_t
+udcfg_glob_lookup_s(const char **t, ud_ctx_t c, const char *n)
+{
+	return lc_globcfg_lookup_s(t, c->cfgctx, n);
+}
+
+static inline bool
+udcfg_glob_lookup_b(ud_ctx_t ctx, const char *name)
+{
+	return lc_globcfg_lookup_b(ctx->cfgctx, name);
+}
+#endif	/* USE_LUA */
+
+#endif	/* INCLUDED_unserding_cfg_h_ */

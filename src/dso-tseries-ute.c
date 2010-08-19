@@ -144,7 +144,7 @@ __find_min_addr(const_sl1t_t perttf[], size_t perttfsz)
 }
 
 static const_sl1t_t
-__find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
+__find_bb(const_sl1t_t t, size_t nt, scom_t key)
 {
 	time32_t ts = scom_thdr_sec(key);
 	uint16_t idx = scom_thdr_tblidx(key);
@@ -179,7 +179,7 @@ __find_bb(const_sl1t_t t, size_t nt, const_scom_thdr_t key)
 static size_t
 __cp_tk(const_sl1t_t *tgt, ute_ctx_t ctx, sl1t_t src)
 {
-	const_scom_thdr_t key = (const void*)src;
+	scom_t key = (const void*)src;
 	time32_t ts = scom_thdr_sec(key);
 	uint16_t idx = scom_thdr_tblidx(key);
 	uint16_t ttf = scom_thdr_ttf(key);

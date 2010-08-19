@@ -290,7 +290,7 @@ udpc_seria_des_tslab(tslab_t ts, udpc_seria_t sctx)
 }
 
 static inline __attribute__((pure)) bool
-scom_thdr_onhold_p(const_scom_thdr_t h)
+scom_thdr_onhold_p(scom_t h)
 {
 	return scom_thdr_msec(h) == SCOM_ONHOLD;
 }

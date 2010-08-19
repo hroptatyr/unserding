@@ -375,7 +375,7 @@ __find_blister_by_ts(tblister_t tbl, time_t ts)
 static __attribute__((unused)) const_sl1t_t
 __find_tk(ute_ctx_t ctx, tblister_t tbl, sl1t_t tgtsrc)
 {
-	const_scom_thdr_t src = (const void*)tgtsrc;
+	scom_t src = (const void*)tgtsrc;
 	time32_t ts = scom_thdr_sec(src);
 	uint16_t idx = scom_thdr_tblidx(src);
 	uint16_t ttf = scom_thdr_ttf(src);

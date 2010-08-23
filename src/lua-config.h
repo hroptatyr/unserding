@@ -49,8 +49,10 @@ extern void
 lc_cfgtbl_free(void *L, void *s);
 extern size_t
 lc_cfgtbl_lookup_s(const char **res, void *L, void *s, const char *name);
+extern int lc_cfgtbl_lookup_i(void *L, void *s, const char *name);
 
 extern bool lc_globcfg_lookup_b(void *L, const char *name);
+extern int lc_globcfg_lookup_i(void *L, const char *name);
 extern size_t
 lc_globcfg_lookup_s(const char **res, void *L, const char *name);
 

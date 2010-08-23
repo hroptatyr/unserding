@@ -1,4 +1,4 @@
-/*** unserding-cfg.h -- unserding context
+/*** unserding-cfg.h -- unserding config stuff
  *
  * Copyright (C) 2009 Sebastian Freundt
  *
@@ -61,6 +61,12 @@ udcfg_tbl_lookup_s(const char **t, ud_ctx_t c, ud_cfgset_t s, const char *n)
 	return lc_cfgtbl_lookup_s(t, c->cfgctx, s, n);
 }
 
+static inline int
+udcfg_tbl_lookup_i(ud_ctx_t c, ud_cfgset_t s, const char *n)
+{
+	return lc_cfgtbl_lookup_i(c->cfgctx, s, n);
+}
+
 static inline size_t
 udcfg_glob_lookup_s(const char **t, ud_ctx_t c, const char *n)
 {
@@ -71,6 +77,12 @@ static inline bool
 udcfg_glob_lookup_b(ud_ctx_t ctx, const char *name)
 {
 	return lc_globcfg_lookup_b(ctx->cfgctx, name);
+}
+
+static inline int
+udcfg_glob_lookup_i(ud_ctx_t ctx, const char *name)
+{
+	return lc_globcfg_lookup_i(ctx->cfgctx, name);
 }
 
 #endif	/* INCLUDED_unserding_cfg_h_ */

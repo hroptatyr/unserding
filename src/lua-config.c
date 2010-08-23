@@ -121,6 +121,18 @@ lc_cfgtbl_lookup_s(const char **res, void *L, void *s, const char *name)
 	return len;
 }
 
+int
+lc_cfgtbl_lookup_i(void *L, void *s, const char *name)
+{
+	int res;
+
+	lc_deref(L, s);
+	lua_getfield(L, -1, name);
+	res = lua_tointeger(L, -1);
+	lua_pop(L, 1);
+	return res;
+}
+
 size_t
 lc_globcfg_lookup_s(const char **res, void *L, const char *name)
 {
@@ -139,6 +151,17 @@ lc_globcfg_lookup_b(void *L, const char *name)
 
 	lua_getglobal(L, name);
 	res = lua_toboolean(L, -1);
+	lua_pop(L, 1);
+	return res;
+}
+
+int
+lc_globcfg_lookup_i(void *L, const char *name)
+{
+	long int res;
+
+	lua_getglobal(L, name);
+	res = lua_tointeger(L, -1);
 	lua_pop(L, 1);
 	return res;
 }

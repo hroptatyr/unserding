@@ -10,6 +10,9 @@ moddir = $(libdir)/unserding
 
 bin_PROGRAMS =
 noinst_PROGRAMS =
+header_HEADERS =
+noinst_HEADERS =
+EXTRA_DIST =
 if BUILD_SERVER
 bin_PROGRAMS += unserdingd unsercli
 #noinst_PROGRAMS += instrumenstruation
@@ -22,19 +25,25 @@ endif
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
-header_HEADERS = unserding.h protocore.h seria.h mcast.h dccp.h module.h
+header_HEADERS += unserding.h protocore.h seria.h mcast.h dccp.h module.h
 header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
 header_HEADERS += lua-config.h
 header_HEADERS += secu.h
-noinst_HEADERS = protocore-private.h
+noinst_HEADERS += unserding-private.h protocore-private.h
+noinst_HEADERS += ud-sock.h epoll-helpers.h ud-time.h
+noinst_HEADERS += unserding-nifty.h unserding-dbg.h
+noinst_HEADERS += seria-proto-glue.h
+## stuff that really does not belong here, expect this to be kicked
+EXTRA_DIST += svc-itanl.h
+EXTRA_DIST += btea.c
 
 if BUILD_SERVER
 ## the main server binary
 unserdingd_SOURCES = unserdingd.c mcast.c dccp.c
 unserdingd_SOURCES += protocore.c seria.c
 unserdingd_SOURCES += module.h module.c
-unserdingd_SOURCES += wpool.h wpool.c
+unserdingd_SOURCES += wpool.h wpool.c fsarrqueue.h
 unserdingd_SOURCES += jpool.h jpool.c
 unserdingd_SOURCES += lua-config.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
@@ -104,7 +113,7 @@ endif
 if BUILD_LIBRARY
 ## the lib
 libunserding_la_SOURCES = libstuff.c dccp.c
-libunserding_la_SOURCES += svc-pong.c
+libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS) $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
 endif

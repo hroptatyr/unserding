@@ -91,7 +91,7 @@
 /* worker pool */
 #include "wpool.h"
 
-#define UD_VERSION		"v" ## PACKAGE_VERSION
+#define UD_VERSION		"v" PACKAGE_VERSION
 
 FILE *logout;
 

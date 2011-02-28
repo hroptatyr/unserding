@@ -40,6 +40,7 @@
 
 #include <sys/types.h>
 #include <sys/time.h>
+#include <string.h>
 /* for struct timespec */
 #include <time.h>
 

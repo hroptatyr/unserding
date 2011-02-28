@@ -2,7 +2,7 @@ dnl -------------------------------------------------------------------------
 dnl Autoconf startup.
 dnl -------------------------------------------------------------------------
 
-AC_PREREQ([2.64])
+AC_PREREQ([2.63])
 AC_INIT([unserding], m4_esyscmd([./git-version-gen]), [https://trac.ga-group.nl/freundt_devel])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADER([src/config.h])

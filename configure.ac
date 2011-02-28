@@ -3,7 +3,7 @@ dnl Autoconf startup.
 dnl -------------------------------------------------------------------------
 
 AC_PREREQ([2.64])
-AC_INIT([unserding], [0.1], [http://www.ga-group.nl])
+AC_INIT([unserding], m4_esyscmd([./git-version-gen]), [https://trac.ga-group.nl/freundt_devel])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADER([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -161,20 +161,6 @@ if test "$with_mysql" != "no"; then
 fi
 AM_CONDITIONAL([USE_MYSQL], [test "$with_mysql" != "no" -a "${MYSQL_CONFIG}" != ":"])
 
-## check for libffff
-dnl AC_CHECK_FFFF
-dnl AC_DEFINE([WITH_FFFF], [1], [Whether ffff support library is requested.])
-dnl if test "${have_libffff}" = "yes"; then
-dnl 	AC_DEFINE([HAVE_FFFF], [1], [Whether ffff support library is usable.])
-dnl 	LDFLAGS="${LDFLAGS} ${LIBFFFF_LDFLAGS} ${LIBFFFF_LIBS}"
-dnl 	CPPFLAGS="${CPPFLAGS} ${LIBFFFF_CPPFLAGS} -DUSE_FFFF"
-dnl else
-dnl 	AC_MSG_ERROR([ffff support is mandatory.])
-dnl fi
-
-## check for libpfack
-PKG_CHECK_MODULES([PFACK], [libpfack >= 0.0.99], [:], [:])
-
 ## readline and friends
 SXE_DUMP_LIBS
 VL_LIB_READLINE
@@ -206,6 +192,10 @@ AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 ## check if we've got libconfig
 dnl PKG_CHECK_MODULES([LIBCONFIG], [libconfig])
 ## check for lua instead!
+
+## we don't really want pfack dependencies here
+## however this could be useful to module authors to see whats possible
+AM_CONDITIONAL([HAVE_PFACK], [test "0" = "1"])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])

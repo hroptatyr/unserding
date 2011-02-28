@@ -8,13 +8,17 @@ AM_LDFLAGS = -lpthread
 
 bin_PROGRAMS =
 if BUILD_CLIAPPS
-bin_PROGRAMS += ud-instr ud-snap ud-tick ud-ping ud-test ud-itan
+if HAVE_PFACK
+bin_PROGRAMS += ud-instr ud-snap ud-tick
+endif  ## HAVE_PFACK
+bin_PROGRAMS += ud-ping ud-itan
 endif
 
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
 if BUILD_CLIAPPS
+if HAVE_PFACK
 ud_instr_SOURCES = ud-instr.c
 ud_instr_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
 ud_instr_LDADD = $(top_builddir)/src/libunserding.la $(PFACK_LIBS) -lpopt
@@ -29,16 +33,12 @@ ud_tick_SOURCES = ud-tick.c
 ud_tick_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
 ud_tick_LDADD = $(top_builddir)/src/libunserding.la $(PFACK_LIBS)
 ud_tick_LDFLAGS = $(AM_LDFLAGS) -static
+endif  ## HAVE_PFACK
 
 ud_ping_SOURCES = ud-ping.c
 ud_ping_CPPFLAGS = $(AM_CPPFLAGS) 
 ud_ping_LDADD = $(top_builddir)/src/libunserding.la -lrt
 ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
-
-ud_test_SOURCES = ud-test.c
-ud_test_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
-ud_test_LDADD = $(top_builddir)/src/libunserding.la $(PFACK_LIBS)
-ud_test_LDFLAGS = $(AM_LDFLAGS) -static
 
 ud_itan_SOURCES = ud-itan.c
 ud_itan_CPPFLAGS = $(AM_CPPFLAGS)

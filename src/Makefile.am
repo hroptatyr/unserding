@@ -9,9 +9,11 @@ headerdir = $(includedir)/unserding
 moddir = $(libdir)/unserding
 
 bin_PROGRAMS =
+noinst_PROGRAMS =
 if BUILD_SERVER
 bin_PROGRAMS += unserdingd unsercli
-noinst_PROGRAMS = instrumenstruation uteseries
+#noinst_PROGRAMS += instrumenstruation
+#noinst_PROGRAMS += uteseries
 endif
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
@@ -47,70 +49,18 @@ unserdingd_SOURCES += dso-pong.c
 
 ## server dynamic modules
 mod_LTLIBRARIES =
-mod_LTLIBRARIES += dso-cli.la dso-scscp.la dso-scscp2.la dso-bbdb.la dso-xbbdb.la
-#mod_LTLIBRARIES += dso-instr.la
-mod_LTLIBRARIES += dso-xdr-instr.la
-mod_LTLIBRARIES += dso-tseries.la dso-tseries-ute.la
-mod_LTLIBRARIES += dso-itanl.la
-if USE_MYSQL
-mod_LTLIBRARIES += dso-tseries-mysql.la
-endif
-dso_cli_la_LDFLAGS = -module
-dso_scscp_la_LDFLAGS = -module
-dso_scscp2_la_LDFLAGS = -module
-dso_bbdb_la_LDFLAGS = -module
-## the xml bbdb module
-dso_xbbdb_la_CPPFLAGS = $(shell pkg-config --cflags libxml-2.0)
-dso_xbbdb_la_LDFLAGS = -module $(shell pkg-config --libs libxml-2.0)
-
-## the catalogue module
-dso_xdr_instr_la_LDFLAGS = -module $(PFACK_LIBS)
-dso_xdr_instr_la_CPPFLAGS = $(PFACK_CFLAGS)
-dso_xdr_instr_la_LIBADD = $(PFACK_LIBS)
-if USE_MYSQL
-dso_xdr_instr_la_CPPFLAGS += $(MYSQL_CPPFLAGS)
-dso_xdr_instr_la_LDFLAGS += $(MYSQL_LDFLAGS) -lmysqlclient
-endif
-dso_xdr_instr_la_SOURCES = catalogue.c dso-xdr-instr.c
-if USE_MYSQL
-dso_xdr_instr_la_SOURCES += dso-xdr-instr-mysql.c
-endif
-dso_xdr_instr_la_SOURCES += dso-xdr-instr-file.c
-
-## the time series module
-dso_tseries_la_LDFLAGS = -module $(PFACK_LIBS) -export-dynamic
-dso_tseries_la_CPPFLAGS = $(AM_CPPFLAGS) $(PFACK_CFLAGS)
-dso_tseries_la_LIBADD = $(PFACK_LIBS)
-dso_tseries_la_SOURCES = dso-tseries.c
-dso_tseries_la_SOURCES += intvtree.c tscube.c
-dso_tseries_la_SOURCES += dso-tseries-frobq.c
-dso_tseries_la_LIBADD += -luterus
-
-if USE_MYSQL
-dso_tseries_mysql_la_SOURCES = dso-tseries-mysql.c
-dso_tseries_mysql_la_CPPFLAGS = $(MYSQL_CPPFLAGS)
-dso_tseries_mysql_la_LDFLAGS = -module
-dso_tseries_mysql_la_LDFLAGS += $(MYSQL_LDFLAGS) -lmysqlclient
-endif
-
-dso_tseries_ute_la_LDFLAGS = -module
-dso_tseries_ute_la_SOURCES = dso-tseries-ute.c
-dso_tseries_ute_la_LIBADD = -luterus
 
 ## stuff we develop here but that will go eventually to sushi
-uteseries_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_MODE
-uteseries_LDFLAGS = -static
-uteseries_LDADD = -luterus -lpopt
+#uteseries_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_MODE
+#uteseries_LDFLAGS = -static
+#uteseries_LDADD = -luterus -lpopt
 
 ## to fiddle with option chains and other instruments
-instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)
-instrumenstruation_LDFLAGS = $(PFACK_LIBS)
-instrumenstruation_LDADD = $(PFACK_LIBS) libunserding.la -lpopt
+#instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)
+#instrumenstruation_LDFLAGS = $(PFACK_LIBS)
+#instrumenstruation_LDADD = $(PFACK_LIBS) libunserding.la -lpopt
 endif  ## BUILD_SERVER
-header_HEADERS += xdr-instr.h tseries.h
-
-dso_itanl_la_LDFLAGS = -module
-dso_itanl_la_SOURCES = dso-itanl.c
+##header_HEADERS += xdr-instr.h tseries.h
 
 ## fucking automake
 unsercli_YFLAGS = -d -p "cli_yy"
@@ -153,7 +103,7 @@ endif
 
 if BUILD_LIBRARY
 ## the lib
-libunserding_la_SOURCES = libstuff.c libhelpers.c dccp.c
+libunserding_la_SOURCES = libstuff.c dccp.c
 libunserding_la_SOURCES += svc-pong.c
 libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS) $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt

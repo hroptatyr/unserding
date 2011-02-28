@@ -187,11 +187,6 @@ ud_handle_set_4svc(ud_handle_t hdl)
  * Ping/pong service to determine neighbours. */
 #define UD_SVC_PING	0x0004
 
-
-/* more of them */
-#include "xdr-instr.h"
-#include "tseries.h"
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

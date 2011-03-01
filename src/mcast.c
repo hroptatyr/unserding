@@ -41,9 +41,7 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <string.h>
-#if defined HAVE_SYS_TYPES_H
-# include <sys/types.h>
-#endif
+#include <sys/types.h>
 #if defined HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
 #endif
@@ -58,9 +56,7 @@
 #elif defined HAVE_LWRES_NETDB_H
 # include <lwres/netdb.h>
 #endif	/* NETDB */
-#if defined HAVE_ERRNO_H
-# include <errno.h>
-#endif
+#include <errno.h>
 /* our master include */
 #if defined AF_INET6
 # define SA_STRUCT		struct sockaddr_in6

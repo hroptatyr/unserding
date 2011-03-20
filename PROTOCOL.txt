@@ -1,0 +1,684 @@
+DRAFT
+
+This file describes the unserding packet protocol.
+The specification here is preliminary, sloppy, and may not give the
+bigger picture, however it's precise enough to implement clients and
+servers.
+
+
+Packets
+=======
+Unserding traffic is packet-oriented and aligned to specific properties
+of its underlying transport mechanisms, namely UDP/MCAST across networks
+of IPv6 nodes.
+
+Unserding packets are stacked on top of IPv6 and UDP and even though
+implementations will likely use SOCK_DGRAMs on IPPROTO_UDP, all of our
+offset diagrams are relative to the IPv6 header.  Implementations
+designed for networks that require extension headers must therefore cope
+with all offset layouts, in practice this is equivalent with dealing
+with different maximum packet sizes.
+
+A packet is at most 1280 bytes long, that in the simplest case (no
+extension headers, no fragment header) leaves 1232 bytes gross payload,
+that is IPv6 minimum MTU - 48 bytes for the IPv6 UDP pseudo header (as
+defined in rfc 2460), and 1224 bytes net payload (which is 1232 gross
+payload minus 8 bytes headers).
+
+The simple case offset diagram looks like:
+
+0x000 ipv6 header	(payload <= 0x500, next header = 0x11 (UDP))
+0x028 udp header	(src port, dst port, length <= 0x500, chksum)
+0x030 uint8_t  CONVO	conversation id, can be set by the client
+0x031 uint24_t PKTNO	packet number wrt to the conversation
+0x034 uint16_t CMD	command to issue, see below
+0x036 uint16_t FLAGS	flags related to flow control etc.
+0x038 char *PAYLOAD
+...
+0x500 
+
+Remark:
+The uint24_t is just descriptive, in real-world implementations, the
+CONVO and PKTNO slots make up a uint32_t.
+
+CONVO:
+The traffic is divided into conversations, a client can thus request
+multiple conversations at the same time.
+A reply has the same conversation number as the request itself, it is
+the client's responsibility to pick conversation numbers not currently
+in use, or to employ other means to keep track of conversations.
+
+PKTNO:
+A new conversation always starts with packet number 0, subsequent
+packets are denoted by increasing the PKTNO slot.  This facilitates
+the detection of lost packets or provides information on how to
+reassemble a bigger unit that has been fragmented into several packets.
+
+CMD:
+Conversations are usually the result of a client or server requesting a
+service on the network.  To distinguish between the services present on
+the network the command slot (CMD) takes the service number.
+As a general rule, request commands are even, the corresponding reply
+(if any) is odd (LOR'd with 0x0001).
+
+FLAGS:
+Flags are used both as magic cookies and to encode simple flow control
+information, tailored specifically to the requirements of some unserding
+services.  The first octet encodes the scheduled arrival of information,
+following values are defined currently:
+
+0xbe	the current packet contains the information requested
+0xca	the packet with the information requested is to arrive soon
+
+Everything else is reserved for future use.
+
+The 0xca family indicates that packets with the real information are due
+soon.  This makes sense in the context of time-critical services where
+usually timeouts and concurrency schemas (on the client or more general
+requesting side) guarantee a close to real-time response.  The 0xca family
+now offers a simple mechanism on the server side (or more general
+replying side) to defer the delivery of packets, the requesting side can
+then decide whether or not the information is worth waiting for.
+
+The 0xbe family indicates quite the opposite, the information on the
+replying side is complete, i.e. no packets will be deferred.
+
+The second octet is dubbed packet storminess parameter and gives a rough
+idea of how many packets constitute the response, current values are:
+
+0xef	this packet is the last in this conversation from this node
+0xee	after this packet there are more to come in this conversation
+0xff	after this packet there is either another 0xff packet to come
+		or a final one with 0xef
+0xfe	after this packet there are either more 0xfe packets to come
+		or a 0xee packet storm begins 
+
+PAYLOAD:
+The payload is a priori not restricted in any way but its size.  The
+unserding packet protocol (UPP) recommends the payload to be made up
+from TLV (tag-length-value) tuples but services may define their own
+implicit payload format, see section `Services (aka CMDs)' below.
+For information about the TLV wire format see section `TLV on the wire'
+below.
+
+Example conversation
+--------------------
+0000  60 00 00 00 00 10 11 40  fe 80 00 00 00 00 00 00   `......@ ........
+0010  80 6e 7c ff fe 0f 7d 3a  fe 80 00 00 00 00 00 00   .n|...}: ........
+0020  80 6e 7c ff fe 0f 7d 3a  8b 35 21 cd 00 10 14 12   .n|...}: !..5....
+0030  36 00 00 00 00 04 be ef                            6.......
+
+0x06 -> IPv6
+0x00 -> traffic class 0
+0x00000 -> flow label 0
+0x0010 -> payload 16 bytes
+0x11 -> next header 0x11 (UDP)
+0x40 -> max hops 64
+0xfe80000000000000806e7cfffe0f7d3a -> source fe80::806e:7cff:fe0f:7d3a
+0xfe80000000000000806e7cfffe0f7d3a -> dest fe80::806e:7cff:fe0f:7d3a
+0x8b35 -> source port 35637
+0x21cd -> destination port 8653
+0x0010 -> length 16 bytes
+0x1412 -> checksum 0x1412
+0x36 -> conversation 54
+0x000000 -> packet number 0
+0x0004 -> command 4 (UD_SVC_PING)
+0xbe -> payload immediate
+0xef -> last packet in conversation
+
+Reply could be:
+
+0000  60 00 00 00 00 26 11 40  fe 80 00 00 00 00 00 00   `....&.@ ........
+0010  80 6e 7c ff fe 0f 7d 3a  fe 80 00 00 00 00 00 00   .n|...}: ........
+0020  80 6e 7c ff fe 0f 7d 3a  21 cd 8b 35 00 26 80 13   .n|...}: !..5.&..
+0030  36 00 00 01 00 05 be ef  81 05 73 65 67 65 6e 04   6....... ..segen.
+0040  73 04 86 4d 04 00 00 00  d3 e9 53 13 01 00         s..M.... ..S...  
+
+0x06 -> IPv6
+0x00 -> traffic class 0
+0x00000 -> flow label 0
+0x0026 -> payload 38 bytes
+0x11 -> next header 0x11 (UDP)
+0x40 -> max hops 64
+0xfe80000000000000806e7cfffe0f7d3a -> source fe80::806e:7cff:fe0f:7d3a
+0xfe80000000000000806e7cfffe0f7d3a -> dest fe80::806e:7cff:fe0f:7d3a
+0x21cd -> source port 8653
+0x8b35 -> destination port 35637
+0x0026 -> length 38 bytes
+0x8013 -> checksum 0x8013
+0x36 -> conversation 54
+0x000001 -> packet number 1
+0x0005 -> command 5 (UD_SVC_PING + 1 = UD_SVC_PONG)
+0xbe -> payload immediate
+0xef -> last packet in conversation
+0x81 -> string
+0x05 -> length 5
+0x736567656e -> "segen"
+0x04 -> uint32 (length 4, host byte-order)
+0x7304864d -> 1300628595 (seconds since epoch)
+0x04000000 -> uint32 (length 4, host byte-order, alignment pad 3 bytes)
+0xd3e95313 -> 324266451 (nano-second part of the time stamp)
+0x01 -> uint8 (length 1)
+0x00 -> 0 (score value)
+
+Remark:
+The base network of unserding servers is ff0x::134 as assigned by IANA,
+the base port for network-wide communication is 8653.  See the service
+section on how to obtain specific services, their hosts and port
+numbers.
+
+
+Services (aka CMDs)
+===================
+The unserding packet protocol (UPP) is quite universal and open, in the
+sense that it does not restrict the payload.  However, some services
+have been classified as infrastructural and hence may not be used for
+other purposes.
+
+0x0004 (UD_SVC_PING)
+--------------------
+Replying to this command is mandatory for all unserding servers.  The
+request is a CMD 0x0004 with FLAGS set to 0xbeef and empty payload.
+
+The reply is 0x0005 with FLAGS set to 0xbeef, the payload looks as
+follows:
+...
+0x038	TLV(string, LEN(<hostname>), <hostname>)
+	TLV(ui32, 4, <current-time second part>)
+	TLV(ui32, 4, <current-time nanosecond part>)
+	TLV(ui8, 1, <score>)
+
+Remark:
+For information about the TLV wire format see section `TLV on the wire'
+below.
+
+Remark:
+The score is part of the score negotiation process that facilitates load
+sharing between several servers that offer identical or similar
+services.  Essentially the lower the score the less important the node.
+
+0x0006 (UD_SVC_LIST_SVCS)
+-------------------------
+Replying to this command is optional (at the moment).  The request is a
+CMD 0x0006 with FLAGS set to 0xbeef and payload as follows:
+
+0x038	TLV(seqof(ui16), LEN(<svc-list>), [svc, svc, ...])
+
+An empty service list shall be interpreted as a list of all registered
+services.  The reply is 0x0007 with FLAGS set to 0xbeef and payload as
+follows:
+
+0x038	TLV(string, LEN(<hostname>), <hostname>)
+	TLV(ui32, 4, <current-time second part>)
+	TLV(ui32, 4, <current-time nanosecond part>)
+	TLV(ui8, 1, <score>)
+	TLV(seqof(ui16), LEN(<svc-list>), [svc, svc, svc, ...])
+
+This service is for service detection within the unserding network, each
+participating server replies with its hostname, a time stamp and a list
+of services registered with this server (out of the list the client
+requested).
+
+This service can be seen as a more general ping with and is used to
+detect similar servers on the network as well as renegotiate scores
+between servers that are capable of registering further services at
+run-time to keep an optimal number of provided services relative to the
+current load.
+
+
+TLV on the wire
+---------------
+TLV payloads are the recommended form for new unserding services.  TLV
+(like ASN.1) can be understood without context and packet monitors can
+make sense of new packets immediately, whereas bespoke formats would
+have to be skipped entirely or could only be dumped as a whole without
+modifying the monitors.
+
+On the other hand, unserding does not discourage the use of other
+payload formats especially for time critical applications or when TLV is
+overhead as data follows a fixed-length approach already (see UTE
+example below).
+
+The tag definitions can be found in seria.h in the reference
+implementation.  Here's the list of currently supported fixed-length
+tags:
+
+#define UDPC_TYPE_UNK		0x00
+#define UDPC_TYPE_BYTE		0x01
+#define UDPC_TYPE_UI16		0x02
+#define UDPC_TYPE_UI32		0x04
+#define UDPC_TYPE_UI64		0x08
+
+#define UDPC_TYPE_FLTH		(UDPC_TYPE_UI16 | UDPC_FLT_MASK)
+#define UDPC_TYPE_FLTS		(UDPC_TYPE_UI32 | UDPC_FLT_MASK)
+#define UDPC_TYPE_FLTD		(UDPC_TYPE_UI64 | UDPC_FLT_MASK)
+
+The first half speaks for itself.  The second half is defined through
+the FLT_MASK and denotes half-floats, single floats and double floats
+respectively, i.e. 16 bits, 32 bits and 64 bits in length.
+
+The masks are defined as follows:
+
+#define UDPC_SGN_MASK		0x10
+#define UDPC_FLT_MASK		0x20
+#define UDPC_SEQ_MASK		0x80
+#define UDPC_SIZ_MASK		0x0f
+
+where the SGN_MASK turns the BYTE, UI16, UI32, UI64 into signed values
+of the respective size.  The FLT_MASK treats them as floats of the
+respective size.  The SIZ_MASK is the complement of all mask bits to get
+the size portion of a tag again.
+
+The SEQ_MASK introduces variadic tags (sequence-of operator) which
+consists of an underlying type, a length (number of underlying objects
+that make up the sequence) and the actual value, as many objects as
+specified.
+
+Obviously, strings can be understood as
+
+#define UDPC_TYPE_STR		(UDPC_TYPE_BYTE | UDPC_SEQ_MASK)
+
+sequence of BYTEs, or LOR'd with UDPC_SGN_MASK to talk of a sequence of
+signed characters.  Similarly, a (single) float array would be
+
+#define UDPC_TYPE_FA		(UDPC_TYPE_FLT | UDPC_SEQ_MASK)
+
+and so on.
+
+Unserding allows several more tags that have no fixed or a-priori-known
+length on the wire in the sense of TLV but we show them here to make the
+list complete (since they are actually in use already):
+
+#define UDPC_TYPE_REC		(0x0f)	/* + slot sigs */
+#define UDPC_TYPE_EOR		(UDPC_TYPE_REC | 0x0f)
+#define UDPC_TYPE_DATA		(0x0c)
+#define UDPC_TYPE_XDR		(0x0d)
+#define UDPC_TYPE_ASN1		(0x0e)
+
+Records are merely a wire representation of C structs (as long as they
+are made up of TLV-serialisable types), initiated by 0x0f and terminated
+by 0x1f.  So sequences of float-uint32 pairs could simply be represented
+as 0x8f 0x24 0x04 0x1f ... which saves quite a considerable amount of
+bytes as the tags do not have to be repeated over and over again and due
+to alignment issues.  While it is possible to nest structs this way flat
+records are more straight-forward to parse and hence can be deserialised
+a lot faster.
+The generic data tag (TYPE_DATA) can be used for services that do not
+want to expose their intrinsics and yet want to instruct packet monitors
+to skip the rest of the packet without interpretation.
+The XDR and ASN1 tags can be used to indicate that the next bit of the
+packet is in XDR or ASN.1 format respectively.
+
+Alignment:
+---------
+Payload data in TLV format is aligned to the size of the datatype that
+the tag represents.  This is to utilise modern CPUs' data access
+policies that allow faster access to properly aligned data.  Alignment
+is simply implemented by the __alignof__ macro and the ROUND macro as
+defined in seria.h:
+
+# define ROUND(s, a)		(a * ((s + a - 1) / a))
+
+So to access a (TYPE*)p array one would usually skip to
+
+{
+	size_t off = ROUND(OFFSET, __alignof__(TYPE));
+	TYPE *p = (TYPE*)(MSG + off);
+}
+
+where OFFSET is the beginning of the value part of a TLV object and MSG
+points to the beginning of the packet.
+
+
+Example UTE tick service
+========================
+To illustrate the versatility of unserding networks, the core
+application, a ticker plant, is shortly outlined here.  The tick
+services occupy service numbers 0x4220 to 0x422f, this range must not be
+used for other services.
+
+Tick data is sent without request to all participants of ff0x::134, the
+conversation number is clamped to 0xff, the packet number is increased
+for each packet of ticks, the flags are always 0xbeee.
+
+The payload format is the same as for UTE files, without the file header
+and metadata.  Metadata can be queried on service 0x421e
+(UD_SVC_INSTR_BY_IID).
+
+UTE data is layered, from primitve to complex layers as follows:
+* tick payloads
+* ticks
+* tick pages
+* tick file
+
+However, the tick page and tick file layer are not present when UTE data
+is distributed via unserding.  Consumers are responsible themselves to
+produce valid UTE files on the consumer side.
+
+One packet of tick data will contain (at most) 72 ticks (16 bytes each),
+and a footer that is identical to the payload in UD_SVC_PONG messages,
+i.e. the hostname, a time stamp with nanoseconds and the score of the
+providing server.
+
+Tick payloads
+-------------
+Tick payloads are usually 32 bits wide, under certain circumstances 64
+bits are admissible too.  Tick payloads always come in multiples of 64
+bits, so 32bit payloads come in pairs.
+
+The meaning (and context) of the payload depends on the surrounding tick
+type and hence tick payloads cannot exist on their own.
+
+1. m30 payloads (32 bits)
+Prices, the most important data to track, can be encoded using a special
+fixed-point format with 30 mantissa bits and 2 exponent bits.
+
+Exponents are
+- 0x00 1E-8
+- 0x01 1E-4
+- 0x02 1E+0
+- 0x03 1E+4
+
+That means there is no unique nor canonical presentation for a given
+decimal number.  Also note, in contrast to ieee754 there is no sign bit
+so signedness interpretation is up to the application.
+
+This gives following ranges:
+- 0x00 0.00000000 to 5.36870912
+- 0x01 0.0000 to 53687.0912
+- 0x02 0 to 538670912
+- 0x03 0, then 10000 to 5368709120000
+
+2. m62 payloads (64 bits)
+The wider version of m30 data is m62 data which uses 62 mantissa bits
+and 2 exponent bits. 
+
+The exponents are the same as the m30 ones.  This gives following
+ranges:
+- 0x00 0.00000000 to 23058430092.13693952
+- 0x01 0.0000 to 230584300921369.3952
+- 0x02 0 to 2305843009213693952
+- 0x03 0, then 10000 to 23058430092136939520000
+
+3. u32 payloads
+
+This is indeed the (anonymous) type used to implement tick payloads, a
+plain uint32_t that is capable of storing 32bits.
+
+4. u64 payloads
+
+This is indeed the (anonymous) type used to implement tick payloads, a
+plain uint64_t that is capable of storing 64bits.
+
+Supported routines:
+Conversion to m30:
+m30_t get_ui32(uint32_t);
+m30_t get_f(float);
+m30_t get_d(double);
+m30_t get_s(const char**);
+
+Conversion from m30:
+uint32_t ui32(m30_t);
+float f(m30_t);
+double d(m30_t);
+size_t s(char*, m30_t);
+
+Conversion to m62:
+m62_t get_ui64(uint64_t);
+m62_t get_f(float);
+m62_t get_d(double);
+m62_t get_s(const char**);
+
+Conversion from m62:
+uint64_t ui64(m62_t);
+float f(m62_t);
+double d(m62_t);
+size_t s(char*, m62_t);
+
+
+Ticks and tick headers
+----------------------
+Ticks are the envelopes of tick payloads in the sense that they give
+them their meanings.  The tick layer is flexible and extensible apart
+from the tick header which will not change in future versions due to its
+importance.
+
+The header consists of following data (and widths)
+offset   width   slot  description
+0x0000   32bits  sec   unix timestamp of the tick
+0x0004   10bits  msec  millisecond part of the timestamp
+0x000x    6bits  ttf   tick type and flags
+0x0007   16bits  idx   index, used to distinguish several time series
+0x0008   var.          tick payloads
+
+These constraints imply:
+- there cannot be ticks on 01 Jan 1970 00:00:00, special stamp 0x00000000
+- there cannot be ticks on 31 Dec 1969 23:59:59, special stamp 0xffffffff
+- the oldest tick date is: dd mmm 1902, special stamp 0x80000000
+- the youngest tick date is: dd mmm 2038, special, stamp 0x7fffffff
+- tick msec values must be between 000 and 999 otherwise they change the
+  meaning of the tick
+- there can be only 65536 simultaneous time series (idx is 16bits)
+
+There is some predefined functionality overloading the msec slot.
+A value of:
+- 1023 indicates that the tick in question does not exist.
+- 1022 is reserved for unserding, meaning the tick is on hold.
+- 1021 indicates a market-halted event tick
+- 1020 indicates a padding tick which is used for alignment in tick
+       pages/files, the tick must be ignored altogether
+- 1019 indicates that the tick is a once-a-day tick, i.e. the
+       hour/minute/second part of the time stamp is to be ignored
+- 1000 indicates that a millisecond resolution of the timestamp is not
+       available for the tick in question
+
+Moreover, there are some predefined values for the ttf slot:
+value   name   indicates
+0x0000  unk    an unknown tick type
+0x0001  bid    speaks for itself
+0x0002  ask    speaks for itself
+0x0003  tra    a trade tick
+0x0004  fix    a fixing tick
+0x0005  stl    a settlement tick
+0x0006  auc    an auction tick
+0x0007  div    a dividend tick
+0x0008  vol    a (pure) volume tick (uses m62 payloads)
+0x0009  vpr    a price volume tick (uses m62 payloads)
+0x000a  vwp    a VWAP tick (vpr divided by vol)
+0x000b  spl    a split tick, two m30s denoting before and after
+0x000c  oi     an open interest tick (number of all open long contracts)
+0x000d  g32    a generic tick using 2 32bit payloads
+0x000e  g64    a generic tick using 1 64bit payload
+0x000f  reserved
+
+We now discuss predefined tick types.
+
+Sparse level 1 ticks:
+---------------------
+Sparsity in this sense means that a tick payload is fully wrapped in a
+tick envelope, i.e. a transferred bid/ask or bid/ask/trade tuple is
+dissected into 2 or 3 single ticks, each having their own timestamps
+(or generally headers).
+
+A sparse level 1 tick looks like:
+
+offset   width   slot   description
+0x0000   64bits  hdr    the full header as described above
+0x0008   32bits  v1     an m30-coded price (for bid/ask/tra/fix/stl/auc/vwp)
+0x000c   32bits  v2     an m30-coded size
+0x0010
+
+or
+0x0000   64bits  hdr    the full header as described above
+0x0008   64bits  w      an m62-coded value (for vol/vpr)
+0x0010
+
+Sparse candles:
+---------------
+Sparsity is to be understood as for sparse level 1 ticks.
+
+A sparse candle looks like:
+
+offset   width   slot   description
+0x0000   64bits  hdr    the full header as described above
+0x0008   32bits  hi     the high price, m30-coded
+0x000c   32bits  lo     the low price, m30-coded
+0x0010   32bits  op     the open price, m30-coded
+0x0014   32bits  cl     the close price, m30-coded
+0x0018   32bits  sts    the time stamp when the candle started
+0x001c   32bits  cnt    free, used to count the number of ticks in the
+                        interval at the moment
+0x0020
+
+Deviating from the standard O/H/L/C notation the layout here has been
+optimised so that the more frequently used open and close prices are on
+a 128bit boundary (for algorithms using SSE).
+
+Sparse snapshots:
+-----------------
+A sparse snapshot can be used to reflect a current view on the market,
+as if it was frozen.  If frozen a captured security generally has a
+bid side, an ask side and some trade history.
+The ticks look like:
+
+offset   width   slot   description
+0x0000   64bits  hdr    the full header as described above
+0x0008   32bits  bq     the m30-coded size of the bid position
+0x000c   32bits  aq     the m30-coded size of the ask position
+0x0010   32bits  bp     the m30-coded bid price
+0x0014   32bits  ap     the m30-coded ask price
+0x0018   32bits  tvpr   free, or the m30-coded traded volume price
+0x001c   32bits  tq     free, or the m30-coded total traded quantity
+0x0020
+
+The layout, again, has been optimised so that the frequently used bid
+and ask prices are on a 128bit boundary (for algorithms using SSE).
+
+The last 2 slots are generally free, as snapshots depict the current
+market situation and it is rather unlikely that a trade has happened
+exactly at the specified time of the tick.
+
+Note however, if the tvpr and tq slots are used, there is currently no
+way of keeping track (inside the tick envelope) which period has been
+used for their observation, this information has to be built-in
+knowledge of the application or has to be stored elsewhere.
+
+Sparse BAT candles:
+-------------------
+A sparse BAT candle can be used to capture OHLCV candles for the bid,
+ask and trade sides altogether, and looks like:
+
+offset   width   slot   description
+0x0000   64bits  hdr    the full header as described above
+0x0008   32bits  bo     bid-open (m30-coded)
+0x000c   32bits  bh     bid-high (m30-coded)
+0x0010   32bits  bl     bid-low (m30-coded)
+0x0014   32bits  bc     bid-close (m30-coded)
+0x0018   32bits  ao     ask-open (m30-coded)
+0x001c   32bits  ah     ask-high (m30-coded)
+0x0020   32bits  al     ask-low (m30-coded)
+0x0024   32bits  ac     ask-close (m30-coded)
+0x0028   32bits  to     trade-open (m30-coded)
+0x002c   32bits  th     trade-high (m30-coded)
+0x0030   32bits  tl     trade-low (m30-coded)
+0x0034   32bits  tc     trade-close (m30-coded)
+0x0038   32bits  tv     trade volume (m30-coded)
+0x003c   32bits  sts    the time stamp when the candle started
+
+This tick type is highly experimental and subject to change.
+
+Dense level1 ticks:
+-------------------
+Dense level1 ticks, although defined in the UTE specs, must not appear
+on unserding ticker plants.
+
+Sparse level2 ticks (depth):
+----------------------------
+Sparse level2 ticks are not inherently distinct from sparse level1
+ticks, in fact they can be marked as such using 1 bit (WHICH ONE?).
+Given the strict ordering by time and the overall sparseness of ute
+files, their nature implies minor differences in the way a processor
+tool must treat changing quotes, sizes, depths.
+
+In the naive aggregation mode, where for a given price level all
+contributing sizes add up to one number, a change in depth can be
+represented with one sparse level2 tick, holding a price level and an
+(aggregated) size.  If that size is made of two parties and one of them
+is about to change their quote, there will be two level2 ticks, one
+stating the new size of the former price level, one stating the new
+price of the changing party's quote along with its size.
+
+One proposal, ticks along the time axis, cf. Example 1 to 4.
+
+Example 1
+---------
+We demonstrate how depth is built up.
+
+  L2(09:00:00.000, b, 15.00, 100)
+  L2(09:00:00.100, b, 15.01, 100)
+
+The order book at time 09:00:00.100 would then look like:
+  b: 15.01/100  15.00/100
+     top level  --depth-->
+
+Example 2 (given the order book of Example 1)
+---------
+We demonstrate how quotes in depth are changed.
+  L2(09:00:00.200, b, 15.00, 200)
+
+The order book at time 09:00:00.200 would then look like:
+b: 15.01/100  15.00/200
+   top level  --depth-->
+
+Example 3 (given the order book of Example 2):
+---------
+We demonstrate how a price level in depth is split.
+  L2l(09:00:00.300, b, 15.00, 100, 14.99, 100)
+Here L2l is a linked tick consisting of 2 sparse level2 ticks.
+
+The order book at time 09:00:00.300 would then look like:
+b: 15.01/100  15.00/100  14.99/100
+   top level  --depth-->
+
+Example 4 (given the order book of Example 3):
+---------
+We demonstrate how a price level in depth vanishes.
+  L2(09:00:00.400, b, 15.00, 0)
+
+The order book at time 09:00:00.400 would then look like:
+b: 15.01/100  14.99/100
+   top level  --depth-->
+
+Remark on statelessness:
+Given that actually observed sizes and prices are submitted (instead of,
+say, price/size increments) it is even possible to miss out on some
+ticks in a feed of these sparse level2 ticks gracefully.  That is the
+next successfully received tick at price x corrects any mistakes made in
+the slot for the price level x.
+
+Further ticks:
+--------------
+Further tick kinds may be desirable but there is currently no
+specification for them.  Here is an assortment of questions:
+- Level 2 data? Sparse? Dense?
+- Pegs (to determine BBOs (best-bid-offer))?
+  Store POTs (place of trade) somewhere?
+
+
+PROBLEMS and DISCUSSION
+=======================
+
+Multiplexing several ticker plants
+----------------------------------
+In larger unserding networks, the limitation of 65536 simultaneous
+instruments may be overcome by joining ad-hoc multicast networks that
+only deliver a fixed set of instruments (experiments utilising this
+approach are still on-going).
+
+Also a port-based solution has been implemented, concurrent ticker
+plants will send their ticks from port 8653 + N where N denotes the N-th
+set of ticking instruments.
+
+Generally speaking it's up to the consuming client and pre-subscription
+meta data to make sense of tick streams at the moment.
+

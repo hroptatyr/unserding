@@ -50,6 +50,7 @@
 #include <errno.h>
 /* we just need the headers hereof and hope that unserding used the same ones */
 #include <ev.h>
+#include "unserding-private.h"
 #include "unserding-nifty.h"
 #include "unserding-dbg.h"
 #include "ud-sock.h"
@@ -155,12 +156,15 @@ __shut_sock(int s)
 }
 
 static void
-clo_wio(EV_P_ ev_io *w)
+clos_conn(EV_P_ ud_conn_t c, bool force)
 {
-	fsync(w->fd);
-	ev_io_stop(EV_A_ w);
-	__shut_sock(w->fd);
-	free_conn((void*)w);
+	if (c->clos && c->clos(c, c->io->data) < 0 && !force) {
+		return;
+	}
+	fsync(c->io->fd);
+	ev_io_stop(EV_A_ c->io);
+	__shut_sock(c->io->fd);
+	free_conn(c);
 	return;
 }
 
@@ -322,9 +326,7 @@ clo:
 		}
 	}
 	UD_DEBUG_TU("%zd data, closing socket %d\n", nrd, w->fd);
-	if (c->clos && c->clos(c, c->io->data) >= 0) {
-		clo_wio(EV_A_ w);
-	}
+	clos_conn(EV_A_ c, false);
 	return;
 }
 
@@ -381,6 +383,7 @@ make_tcp_conn(uint16_t port, ud_cbcb_f data, ud_ccb_f clo)
 
 	if (port &&
 	    (sock = conn_listener_net(port)) > 0 &&
+	    gloop != NULL &&
 	    (res = init_conn_watchers(gloop, sock)) != NULL) {
 		res->iord = data;
 		res->clos = clo;
@@ -396,6 +399,7 @@ make_unix_conn(const char *path, ud_cbcb_f data, ud_ccb_f clo)
 
 	if (path &&
 	    (sock = conn_listener_uds(path)) > 0 &&
+	    gloop != NULL &&
 	    (res =init_conn_watchers(gloop, sock)) != NULL) {
 		res->iord = data;
 		res->clos = clo;
@@ -415,15 +419,11 @@ ud_conn_fini(ud_conn_t c)
 			case UD_CONN_TCP:
 			case UD_CONN_UNIX:
 			case UD_CONN_WR:
-				if (c->clos) {
-					c->clos(c, c->io->data);
-				}
-				clo_wio(gloop, (void*)(conns + i));
-				free_conn(conns + i);
+				clos_conn(gloop, conns + i, true);
 			}
 		}
 	}
-	free_conn(c);
+	clos_conn(gloop, c, true);
 	return res;
 }
 
@@ -455,6 +455,30 @@ ud_write_soon(ud_conn_t conn, const char *buf, size_t len, ud_ccb_f noti_clos)
         ev_io_init(c->io, writ_cb, fd, EV_WRITE);
         ev_io_start(gloop, c->io);
 	return c;
+}
+
+int
+ud_attach_tcp_unix(EV_P_ bool UNUSED(prefer_ipv6))
+{
+	gloop = loop;
+	return 0;
+}
+
+int
+ud_detach_tcp_unix(EV_P)
+{
+	for (size_t i = 0; i < nconns; i++) {
+		switch (conns[i].ty) {
+		case UD_CONN_TCP:
+		case UD_CONN_UNIX:
+		case UD_CONN_WR:
+			/* ideally we'd close the user's data socket too
+			 * alas we can't */
+			clos_conn(EV_A_ conns + i, true);
+		}
+	}
+	gloop = NULL;
+	return 0;
 }
 
 /* tcp-unix.c ends here */

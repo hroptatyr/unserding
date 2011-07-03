@@ -594,6 +594,9 @@ main(int argc, const char *argv[])
 	 * causing the libev main loop to crash. */
 	ud_attach_mcast(EV_A_ prefer6p);
 
+	/* attach the tcp/unix service */
+	ud_attach_tcp_unix(EV_A_ prefer6p);
+
 	/* static modules */
 	ud_init_statmods(&__ctx);
 
@@ -608,6 +611,9 @@ main(int argc, const char *argv[])
 
 	/* pong service */
 	ud_deinit_statmods(&__ctx);
+
+	/* close the tcp/unix service */
+	ud_detach_tcp_unix(EV_A);
 
 	/* close the socket */
 	ud_detach_mcast(EV_A);

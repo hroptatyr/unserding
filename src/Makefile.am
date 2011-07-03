@@ -25,7 +25,8 @@ endif
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
-header_HEADERS += unserding.h protocore.h seria.h mcast.h dccp.h module.h
+header_HEADERS += unserding.h protocore.h seria.h module.h
+header_HEADERS += mcast.h dccp.h tcp-unix.h
 header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
 header_HEADERS += lua-config.h
@@ -40,7 +41,7 @@ EXTRA_DIST += btea.c
 
 if BUILD_SERVER
 ## the main server binary
-unserdingd_SOURCES = unserdingd.c mcast.c dccp.c
+unserdingd_SOURCES = unserdingd.c mcast.c dccp.c tcp-unix.c
 unserdingd_SOURCES += protocore.c seria.c
 unserdingd_SOURCES += module.h module.c
 unserdingd_SOURCES += wpool.h wpool.c fsarrqueue.h

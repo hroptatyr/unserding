@@ -431,7 +431,7 @@ init_stat_watchers(EV_P_ const char *file)
 
 /* public funs */
 ud_conn_t
-make_tcp_conn(uint16_t port, ud_cbcb_f data, ud_ccb_f clo)
+make_tcp_conn(uint16_t port, ud_cbcb_f data_in, ud_ccb_f clo, void *data)
 {
 	volatile int sock = -1;
 	ud_conn_t res = NULL;
@@ -440,14 +440,15 @@ make_tcp_conn(uint16_t port, ud_cbcb_f data, ud_ccb_f clo)
 	    (sock = conn_listener_net(port)) > 0 &&
 	    gloop != NULL &&
 	    (res = init_conn_watchers(gloop, sock)) != NULL) {
-		res->iord = data;
+		res->iord = data_in;
 		res->clos = clo;
+		res->data = data;
 	}
 	return res;
 }
 
 ud_conn_t
-make_unix_conn(const char *path, ud_cbcb_f data, ud_ccb_f clo)
+make_unix_conn(const char *path, ud_cbcb_f data_in, ud_ccb_f clo, void *data)
 {
 	volatile int sock = -1;
 	ud_conn_t res = NULL;
@@ -456,14 +457,15 @@ make_unix_conn(const char *path, ud_cbcb_f data, ud_ccb_f clo)
 	    (sock = conn_listener_uds(path)) > 0 &&
 	    gloop != NULL &&
 	    (res =init_conn_watchers(gloop, sock)) != NULL) {
-		res->iord = data;
+		res->iord = data_in;
 		res->clos = clo;
+		res->data = data;
 	}
 	return res;
 }
 
 ud_conn_t
-make_inot_conn(const char *file, ud_cicb_f noti_cb)
+make_inot_conn(const char *file, ud_cicb_f noti_cb, void *data)
 {
 	volatile int sock = -1;
 	ud_conn_t res = NULL;
@@ -472,6 +474,7 @@ make_inot_conn(const char *file, ud_cicb_f noti_cb)
 	    gloop != NULL &&
 	    (res = init_stat_watchers(gloop, file)) != NULL) {
 		res->inot = noti_cb;
+		res->data = data;
 	}
 	return res;
 }

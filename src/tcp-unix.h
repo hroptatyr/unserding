@@ -39,25 +39,34 @@
 #define INCLUDED_tcp_unix_h_
 
 #include <sys/types.h>
+#include <sys/stat.h>
 
 typedef struct __conn_s *ud_conn_t;
 
 typedef int(*ud_ccb_f)(ud_conn_t, void*);
+typedef int(*ud_cicb_f)(ud_conn_t, const char *f, const struct stat*, void*);
 typedef int(*ud_cbcb_f)(ud_conn_t, char *buf, size_t len, void*);
 
 /* ctors/dtors */
 /**
  * Make a tcp listener, bind it to PORT.
- * Connections are accepted automatically, the DATA callback is called
+ * Connections are accepted automatically, the DATA_IN callback is called
  * when new data has been read, the CLO callback is called when the
  * connection is closed. */
-extern ud_conn_t make_tcp_conn(uint16_t port, ud_cbcb_f data, ud_ccb_f clo);
+extern ud_conn_t
+make_tcp_conn(uint16_t port, ud_cbcb_f data_in, ud_ccb_f clo, void *data);
 /**
  * Make a unix listener, bind it to PATH.
- * Connections are accepted automatically, the DATA callback is called
+ * Connections are accepted automatically, the DATA_IN callback is called
  * when new data has been read, the CLO callback is called when the
  * connection is closed. */
-extern ud_conn_t make_unix_conn(const char *path, ud_cbcb_f data, ud_ccb_f clo);
+extern ud_conn_t
+make_unix_conn(const char *path, ud_cbcb_f data_in, ud_ccb_f clo, void *data);
+/**
+ * Make an inotify listener, operate on FILE.
+ * Whenever FILE changes the callback INOT_CB is called. */
+extern ud_conn_t
+make_inot_conn(const char *file, ud_cicb_f inot, void *data);
 /**
  * Close the listener CONN and return its data. */
 extern void *ud_conn_fini(ud_conn_t c);

@@ -73,6 +73,7 @@ typedef enum {
 	UD_CONN_LSTN,
 	UD_CONN_RD,
 	UD_CONN_WR,
+	UD_CONN_INOT,
 } ud_ctype_t;
 
 struct __wbuf_s {
@@ -89,7 +90,10 @@ struct __wbuf_s {
 
 /* helpers for careless tcp/unix writing */
 struct __conn_s {
-	ev_io io[1];
+	union {
+		ev_io io[1];
+		ev_stat st[1];
+	};
 
 	ud_ctype_t ty;
 
@@ -97,9 +101,13 @@ struct __conn_s {
 	struct __wbuf_s wb[1];
 
 	ud_cbcb_f iord;
-	ud_ccb_f clos;
+	union {
+		ud_ccb_f clos;
+		ud_cicb_f inot;
+	};
 
 	ud_conn_t parent;
+	void *data;
 };
 
 /* helpers for the buffer writers */
@@ -139,13 +147,13 @@ free_conn(ud_conn_t c)
 void*
 ud_conn_get_data(ud_conn_t c)
 {
-	return c->io->data;
+	return c->data;
 }
 
 void
 ud_conn_put_data(ud_conn_t c, void *data)
 {
-	c->io->data = data;
+	c->data = data;
 	return;
 }
 
@@ -164,12 +172,20 @@ __shut_sock(int s)
 static void
 clos_conn(EV_P_ ud_conn_t c, bool force)
 {
-	if (c->clos && c->clos(c, c->io->data) < 0 && !force) {
+	if (c->clos && c->clos(c, c->data) < 0 && !force) {
 		return;
 	}
 	fsync(c->io->fd);
 	ev_io_stop(EV_A_ c->io);
 	__shut_sock(c->io->fd);
+	free_conn(c);
+	return;
+}
+
+static void
+clos_inot(EV_P_ ud_conn_t c, bool UNUSED(force))
+{
+	ev_stat_stop(EV_A_ c->st);
 	free_conn(c);
 	return;
 }
@@ -300,7 +316,7 @@ clo:
 
 	if (c->clos) {
 		/* call the user's idea of what has to be done now */
-		c->clos(c, c->io->data);
+		c->clos(c, c->data);
 	}
 	/* remove ourselves from our neighbour's slot */
 	ud_conn_put_data(c->wb->neigh, NULL);
@@ -319,7 +335,7 @@ data_cb(EV_P_ ev_io *w, int UNUSED(re))
 		goto clo;
 	}
 	UD_DEBUG_TU("new data in sock %d\n", w->fd);
-	if (c->iord && c->iord(c, buf, nrd, c->io->data) < 0) {
+	if (c->iord && c->iord(c, buf, nrd, c->data) < 0) {
 		goto clo;
 	}
 	return;
@@ -354,13 +370,28 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(re))
         /* make an io watcher and watch the accepted socket */
 	aw = make_conn(UD_CONN_RD);
         ev_io_init(aw->io, data_cb, ns, EV_READ);
-	aw->io->data = NULL;
+	aw->data = NULL;
 	par = (void*)w;
 	aw->parent = par;
 	aw->iord = par->iord;
 	aw->clos = par->clos;
         ev_io_start(EV_A_ aw->io);
 	UD_DBGCONT("success, new sock %d %p\n", ns, aw);
+	return;
+}
+
+static void
+inot_cb(EV_P_ ev_stat *w, int UNUSED(re))
+{
+	ud_conn_t c = (void*)w;
+
+	UD_DEBUG_TU("INOT something changed in %s...\n", w->path);
+	if (c->inot && c->inot(c, w->path, &w->attr, c->data) < 0) {
+		goto clo;
+	}
+	return;
+clo:
+	ev_stat_stop(EV_A_ w);
 	return;
 }
 
@@ -378,40 +409,72 @@ init_conn_watchers(EV_P_ int s)
 	c = make_conn(UD_CONN_LSTN);
         ev_io_init(c->io, inco_cb, s, EV_READ);
         ev_io_start(EV_A_ c->io);
-	/* last loop wins */
+	return c;
+}
+
+static ud_conn_t
+init_stat_watchers(EV_P_ const char *file)
+{
+	ud_conn_t c;
+
+	if (file == NULL) {
+		return NULL;
+	}
+
+        /* initialise an io watcher, then start it */
+	c = make_conn(UD_CONN_INOT);
+        ev_stat_init(c->st, inot_cb, file, 0.);
+        ev_stat_start(EV_A_ c->st);
 	return c;
 }
 
 
 /* public funs */
 ud_conn_t
-make_tcp_conn(uint16_t port, ud_cbcb_f data, ud_ccb_f clo)
+make_tcp_conn(uint16_t port, ud_cbcb_f data_in, ud_ccb_f clo, void *data)
 {
 	volatile int sock = -1;
 	ud_conn_t res = NULL;
 
-	if (port &&
+	if (port > 0 &&
 	    (sock = conn_listener_net(port)) > 0 &&
 	    gloop != NULL &&
 	    (res = init_conn_watchers(gloop, sock)) != NULL) {
-		res->iord = data;
+		res->iord = data_in;
 		res->clos = clo;
+		res->data = data;
 	}
 	return res;
 }
 
 ud_conn_t
-make_unix_conn(const char *path, ud_cbcb_f data, ud_ccb_f clo)
+make_unix_conn(const char *path, ud_cbcb_f data_in, ud_ccb_f clo, void *data)
 {
 	volatile int sock = -1;
 	ud_conn_t res = NULL;
 
-	if (path &&
+	if (path != NULL &&
 	    (sock = conn_listener_uds(path)) > 0 &&
 	    gloop != NULL &&
 	    (res =init_conn_watchers(gloop, sock)) != NULL) {
-		res->iord = data;
+		res->iord = data_in;
 		res->clos = clo;
+		res->data = data;
+	}
+	return res;
+}
+
+ud_conn_t
+make_inot_conn(const char *file, ud_cicb_f noti_cb, void *data)
+{
+	volatile int sock = -1;
+	ud_conn_t res = NULL;
+
+	if (file != NULL &&
+	    gloop != NULL &&
+	    (res = init_stat_watchers(gloop, file)) != NULL) {
+		res->inot = noti_cb;
+		res->data = data;
 	}
 	return res;
 }
@@ -419,7 +482,7 @@ make_unix_conn(const char *path, ud_cbcb_f data, ud_ccb_f clo)
 void*
 ud_conn_fini(ud_conn_t c)
 {
-	void *res = c->io->data;
+	void *res = c->data;
 
 	for (size_t i = 0; i < nconns; i++) {
 		/* find kids, whose parent is C */
@@ -428,6 +491,13 @@ ud_conn_fini(ud_conn_t c)
 			case UD_CONN_LSTN:
 			case UD_CONN_WR:
 				clos_conn(gloop, conns + i, true);
+				break;
+			case UD_CONN_INOT:
+				clos_inot(gloop, conns + i, true);
+				break;
+			default:
+			case UD_CONN_UNK:
+				break;
 			}
 		}
 	}
@@ -483,6 +553,13 @@ ud_detach_tcp_unix(EV_P)
 			/* ideally we'd close the user's data socket too
 			 * alas we can't */
 			clos_conn(EV_A_ conns + i, true);
+			break;
+		case UD_CONN_INOT:
+			clos_inot(EV_A_ conns + i, true);
+			break;
+		case UD_CONN_UNK:
+		default:
+			break;
 		}
 	}
 	gloop = NULL;

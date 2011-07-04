@@ -72,9 +72,6 @@
 #if defined HAVE_FCNTL_H
 # include <fcntl.h>
 #endif
-#if defined HAVE_POPT_H || 1
-# include <popt.h>
-#endif
 
 #define USE_LUA
 /* our master include file */
@@ -344,79 +341,6 @@ get_num_proc(void)
 }
 
 
-/* the popt helper */
-static void
-hlp(poptContext con, UNUSED(enum poptCallbackReason foo),
-    struct poptOption *key, UNUSED(const char *arg), UNUSED(void *data))
-{
-	if (key->shortName == 'h') {
-		poptPrintHelp(con, stdout, 0);
-	} else if (key->shortName == 'V') {
-		fprintf(stdout, "unserdingd " UD_VERSION "\n");
-	} else {
-		poptPrintUsage(con, stdout, 0);
-	}
-
-#if !defined(__LCLINT__)
-        /* XXX keep both splint & valgrind happy */
-	con = poptFreeContext(con);
-#endif
-	exit(0);
-	return;
-}
-
-static struct poptOption srv_opts[] = {
-	{"prefer-ipv6", '6', POPT_ARG_NONE,
-	 &prefer6p, 0,
-	 "Prefer ipv6 traffic to ipv4 if applicable..", NULL},
-	{"config", 'c', POPT_ARG_STRING,
-	 &cf, 0,
-	 "Configuration file.", NULL},
-	{"daemon", 'd', POPT_ARG_NONE,
-	 &daemonisep, 0,
-	 "Detach from tty and run as daemon.", NULL},
-	{"workers", 'w', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT,
-	 &nworkers, 0,
-	 "Number of concurrent worker threads.", NULL},
-        POPT_TABLEEND
-};
-
-static struct poptOption help_opts[] = {
-	{NULL, '\0', POPT_ARG_CALLBACK, (void*)hlp, 0, NULL, NULL},
-	{"help", 'h', 0, NULL, '?', "Show this help message", NULL},
-	{"version", 'V', 0, NULL, 'V', "Print version string and exit.", NULL},
-	{"usage", '\0', 0, NULL, 'u', "Display brief usage message", NULL},
-	POPT_TABLEEND
-};
-
-static const struct poptOption ud_opts[] = {
-        {NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
-	 "Server Options", NULL},
-	{NULL, '\0', POPT_ARG_INCLUDE_TABLE, help_opts, 0,
-	 "Help options", NULL},
-        POPT_TABLEEND
-};
-
-static const char *const*
-ud_parse_cl(size_t argc, const char *argv[])
-{
-        poptContext opt_ctx;
-
-        UD_DEBUG("parsing command line options\n");
-        opt_ctx = poptGetContext(NULL, argc, argv, ud_opts, 0);
-        poptSetOtherOptionHelp(
-		opt_ctx,
-		"[server-options] "
-		"module [module [...]]");
-
-        /* auto-do */
-        while (poptGetNextOpt(opt_ctx) > 0) {
-                /* Read all the options ... */
-                ;
-        }
-        return poptGetArgs(opt_ctx);
-}
-
 #define GLOB_CFG_PRE	"/etc/unserding"
 #if !defined MAX_PATH_LEN
 # define MAX_PATH_LEN	64
@@ -509,8 +433,11 @@ ud_deinit_statmods(void *clo)
 }
 
 
+#include "unserdingd-clo.h"
+#include "unserdingd-clo.c"
+
 int
-main(int argc, const char *argv[])
+main(int argc, char *argv[])
 {
 	/* use the default event loop unless you have special needs */
 	struct ev_loop *loop;
@@ -519,9 +446,10 @@ main(int argc, const char *argv[])
 	ev_signal *sigterm_watcher = &__sigterm_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 	ev_signal *sigusr2_watcher = &__sigusr2_watcher;
-	const char *const *rest;
 	struct ud_ctx_s __ctx;
 	struct ud_handle_s __hdl;
+	/* args */
+	struct gengetopt_args_info argi[1];
 
 	/* whither to log */
 	logout = stderr;
@@ -531,7 +459,12 @@ main(int argc, const char *argv[])
 	nworkers = get_num_proc();
 
 	/* parse the command line */
-	rest = ud_parse_cl(argc, argv);
+	if (cmdline_parser(argc, argv, argi)) {
+		exit(1);
+	}
+	/* evaluate argi */
+	daemonisep |= argi->daemon_flag;
+	cf = argi->config_arg;
 
 	/* try and read the context file */
 	ud_read_config(&__ctx);
@@ -595,7 +528,7 @@ main(int argc, const char *argv[])
 	ud_attach_tcp_unix(EV_A_ prefer6p);
 
 	/* initialise modules */
-	ud_init_modules(rest, &__ctx);
+	ud_init_modules(argi->inputs, argi->inputs_num, &__ctx);
 
 	/* static modules */
 	ud_init_statmods(&__ctx);
@@ -628,6 +561,7 @@ main(int argc, const char *argv[])
 
 	/* kick the config context */
 	ud_free_config(&__ctx);
+	cmdline_parser_free(argi);
 
 	/* close our log output */	
 	fflush(logout);

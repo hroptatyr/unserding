@@ -45,7 +45,7 @@ extern void *find_sym(void *handle, const char *sym_name);
 
 extern void ud_mod_dump(FILE *whither);
 
-extern void ud_init_modules(const char *const *rest, void *clo);
+extern void ud_init_modules(char *const args[], size_t nargs, void *clo);
 extern void ud_deinit_modules(void *clo);
 
 extern void ud_defer_dso(const char *name, void *cfgset);

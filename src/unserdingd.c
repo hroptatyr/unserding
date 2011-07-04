@@ -462,11 +462,13 @@ main(int argc, char *argv[])
 	if (cmdline_parser(argc, argv, argi)) {
 		exit(1);
 	}
+	/* evaluate argi */
+	daemonisep |= argi->daemon_flag;
+	cf = argi->config_arg;
 
 	/* try and read the context file */
 	ud_read_config(&__ctx);
 
-	daemonisep |= argi->daemon_flag;
 	daemonisep |= udcfg_glob_lookup_b(&__ctx, "daemonise");
 	prefer6p |= udcfg_glob_lookup_b(&__ctx, "prefer_ipv6");
 

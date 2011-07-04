@@ -149,6 +149,10 @@ extern bool cli_waiting_p;
 extern int ud_attach_mcast(EV_P_ bool prefer_ipv6_p);
 extern int ud_detach_mcast(EV_P);
 
+/* even more socket goodness, defined in tcp-unix.c */
+extern int ud_attach_tcp_unix(EV_P_ bool prefer_ipv6_p);
+extern int ud_detach_tcp_unix(EV_P);
+
 /* more mainloop magic */
 extern void
 schedule_once_idle(void *ctx, void(*cb)(void *clo), void *clo);

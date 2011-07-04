@@ -564,9 +564,6 @@ main(int argc, const char *argv[])
 	init_unserding_handle(&__hdl, PF_INET6, true);
 	__ctx.hdl = &__hdl;
 
-	/* initialise modules */
-	ud_init_modules(rest, &__ctx);
-
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
 	ev_signal_start(EV_A_ sigint_watcher);
@@ -596,6 +593,9 @@ main(int argc, const char *argv[])
 
 	/* attach the tcp/unix service */
 	ud_attach_tcp_unix(EV_A_ prefer6p);
+
+	/* initialise modules */
+	ud_init_modules(rest, &__ctx);
 
 	/* static modules */
 	ud_init_statmods(&__ctx);

@@ -341,7 +341,7 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
 /* we're tcp so we've got to accept() the bugger, don't forget :) */
 	volatile int ns;
-	ud_conn_t aw;
+	ud_conn_t aw, par;
 	struct sockaddr_storage sa;
 	socklen_t sa_size = sizeof(sa);
 
@@ -355,8 +355,11 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(re))
 	aw = make_conn(UD_CONN_RD);
         ev_io_init(aw->io, data_cb, ns, EV_READ);
 	aw->io->data = NULL;
+	par = (void*)w;
+	aw->parent = par;
+	aw->iord = par->iord;
+	aw->clos = par->clos;
         ev_io_start(EV_A_ aw->io);
-	aw->parent = (void*)w;
 	UD_DBGCONT("success, new sock %d %p\n", ns, aw);
 	return;
 }

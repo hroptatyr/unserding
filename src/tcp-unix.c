@@ -70,8 +70,8 @@
 
 typedef enum {
 	UD_CONN_UNK,
-	UD_CONN_TCP,
-	UD_CONN_UNIX,
+	UD_CONN_LSTN,
+	UD_CONN_RD,
 	UD_CONN_WR,
 } ud_ctype_t;
 
@@ -107,11 +107,14 @@ static size_t nconns = 0;
 static struct __conn_s *conns = NULL;
 
 static ud_conn_t
-make_conn(void)
+make_conn(ud_ctype_t ty)
 {
+	ud_conn_t res;
+
 	for (size_t i = 0; i < nconns; i++) {
 		if (conns[i].ty == UD_CONN_UNK) {
-			return conns + i;
+			res = conns + i;
+			goto out;
 		}
 	}
 	/* create one, check for resize first */
@@ -119,7 +122,10 @@ make_conn(void)
 		conns = realloc(conns, 16 * sizeof(*conns));
 		memset(conns + nconns, 0, 16 * sizeof(*conns));
 	}
-	return conns + nconns++;
+	res = conns + nconns++;
+out:
+	res->ty = ty;
+	return res;
 }
 
 static void
@@ -339,19 +345,19 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(re))
 	struct sockaddr_storage sa;
 	socklen_t sa_size = sizeof(sa);
 
-	UD_DEBUG_TU("they got back to us...");
+	UD_DEBUG_TU("they got back to us %p...", w);
 	if ((ns = accept(w->fd, (struct sockaddr*)&sa, &sa_size)) < 0) {
 		UD_DBGCONT("accept() failed %s\n", strerror(errno));
 		return;
 	}
 
         /* make an io watcher and watch the accepted socket */
-	aw = make_conn();
+	aw = make_conn(UD_CONN_RD);
         ev_io_init(aw->io, data_cb, ns, EV_READ);
 	aw->io->data = NULL;
         ev_io_start(EV_A_ aw->io);
 	aw->parent = (void*)w;
-	UD_DBGCONT("success, new sock %d\n", ns);
+	UD_DBGCONT("success, new sock %d %p\n", ns, aw);
 	return;
 }
 
@@ -366,7 +372,7 @@ init_conn_watchers(EV_P_ int s)
 	}
 
         /* initialise an io watcher, then start it */
-	c = make_conn();
+	c = make_conn(UD_CONN_LSTN);
         ev_io_init(c->io, inco_cb, s, EV_READ);
         ev_io_start(EV_A_ c->io);
 	/* last loop wins */
@@ -416,8 +422,7 @@ ud_conn_fini(ud_conn_t c)
 		/* find kids, whose parent is C */
 		if (conns[i].parent == c) {
 			switch (conns[i].ty) {
-			case UD_CONN_TCP:
-			case UD_CONN_UNIX:
+			case UD_CONN_LSTN:
 			case UD_CONN_WR:
 				clos_conn(gloop, conns + i, true);
 			}
@@ -442,7 +447,7 @@ ud_write_soon(ud_conn_t conn, const char *buf, size_t len, ud_ccb_f noti_clos)
 		return NULL;
 	}
 	/* otherwise the user isn't so much a prick as we thought*/
-	c = make_conn();
+	c = make_conn(UD_CONN_WR);
 	/* fill in */
 	c->wb->cbuf = buf;
 	c->wb->len = len;
@@ -469,8 +474,8 @@ ud_detach_tcp_unix(EV_P)
 {
 	for (size_t i = 0; i < nconns; i++) {
 		switch (conns[i].ty) {
-		case UD_CONN_TCP:
-		case UD_CONN_UNIX:
+		case UD_CONN_LSTN:
+		case UD_CONN_RD:
 		case UD_CONN_WR:
 			/* ideally we'd close the user's data socket too
 			 * alas we can't */

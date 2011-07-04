@@ -1,0 +1,10 @@
+args "--unamed-opts"
+usage " [server-options] [display-options]"
+##description "unserding client"
+
+section "Server options"
+option "port" p "Multicast port" int default="8653" optional
+
+section "Display options"
+option "hex" x "Include hex dump of incoming traffic" flag off
+

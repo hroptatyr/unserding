@@ -53,6 +53,7 @@ unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
 unserdingd_LDFLAGS += $(shell pkg-config --libs libxml-2.0)
 unserdingd_LDFLAGS += -llua ## check for me
 unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL) -lunserding
+BUILT_SOURCES += unserdingd-clo.c
 
 ## server static modules
 unserdingd_SOURCES += dso-pong.c
@@ -84,7 +85,7 @@ unsercli_CPPFLAGS += -imacros tedious.h
 unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsercli_LDADD = $(LIBEV_LIBS) $(LIBREADLINE_LIBS) libunserding.la
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
-BUILT_SOURCES += unserdingd-clo.c
+BUILT_SOURCES += unsercli-clo.c
 ## weird, must be an automake bug
 CLEANFILES += unsercli-unsercli.c unsercli-scanner.c
 

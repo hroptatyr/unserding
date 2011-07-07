@@ -103,6 +103,7 @@ struct __conn_s {
 	ud_cbcb_f iord;
 	union {
 		ud_ccb_f clos;
+		ud_cbcb_f eowr;
 		ud_cicb_f inot;
 	};
 
@@ -314,9 +315,9 @@ clo:
 	/* unsubscribe interest */
 	ev_io_stop(EV_A_ e);
 
-	if (c->clos) {
+	if (c->eowr) {
 		/* call the user's idea of what has to be done now */
-		c->clos(c, c->data);
+		c->eowr(c, c->wb->buf, c->wb->len, c->data);
 	}
 	/* remove ourselves from our neighbour's slot */
 	ud_conn_put_data(c->wb->neigh, NULL);
@@ -507,7 +508,7 @@ ud_conn_fini(ud_conn_t c)
 
 /* helpers for careless writing */
 ud_conn_t
-ud_write_soon(ud_conn_t conn, const char *buf, size_t len, ud_ccb_f noti_clos)
+ud_write_soon(ud_conn_t conn, const char *buf, size_t len, ud_cbcb_f noti_clos)
 {
 	ud_conn_t c;
 	ssize_t nwr;
@@ -525,7 +526,7 @@ ud_write_soon(ud_conn_t conn, const char *buf, size_t len, ud_ccb_f noti_clos)
 	c->wb->cbuf = buf;
 	c->wb->len = len;
 	c->wb->nwr = nwr > 0 ? nwr : 0UL;
-	c->clos = noti_clos;
+	c->eowr = noti_clos;
 	c->wb->neigh = conn;
 	c->parent = conn->parent;
 

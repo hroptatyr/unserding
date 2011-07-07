@@ -79,6 +79,6 @@ extern void ud_conn_put_data(ud_conn_t ctx, void *data);
  * CB is called when the buffer has been written completely or there
  * was an error. */
 extern ud_conn_t
-ud_write_soon(ud_conn_t, const char *buf, size_t len, ud_ccb_f eo_wri);
+ud_write_soon(ud_conn_t, const char *buf, size_t len, ud_cbcb_f eo_wri);
 
 #endif	/* INCLUDED_tcp_unix_h_ */

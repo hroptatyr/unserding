@@ -58,74 +58,58 @@
 #endif
 #include <stdio.h>
 
+/* our own logger facility */
+#include "logger.h"
+
 
 /* logging */
 extern FILE *logout;
 
+#define UD_LOGOUT(args...)	fprintf(logout, args)
+
 #if defined UNSERSRV && defined DEBUG_FLAG
-#define UD_CRITICAL(args...)				\
-	fprintf(logout, "[unserding] CRITICAL " args)
-# define UD_DEBUG(args...)			\
-	fprintf(logout, "[unserding] " args)
-# define UD_CRITICAL_MCAST(args...)					\
-	fprintf(logout, "[unserding/input/mcast] CRITICAL " args)
-# define UD_DEBUG_MCAST(args...)				\
-	fprintf(logout, "[unserding/input/mcast] " args)
+# define UD_DEBUG(args...)	UD_LOGOUT("[unserding] " args)
 # define UD_CRITICAL_STDIN(args...)				\
-	fprintf(logout, "[unserding/stdin] CRITICAL " args)
+	UD_LOGOUT("[unserding/stdin] CRITICAL " args)
 # define UD_DEBUG_STDIN(args...)			\
-	fprintf(logout, "[unserding/stdin] " args)
+	UD_LOGOUT("[unserding/stdin] " args)
 # define UD_CRITICAL_PROTO(args...)				\
-	fprintf(logout, "[unserding/proto] CRITICAL " args)
+	UD_LOGOUT("[unserding/proto] CRITICAL " args)
 # define UD_DEBUG_PROTO(args...)			\
-	fprintf(logout, "[unserding/proto] " args)
+	UD_LOGOUT("[unserding/proto] " args)
 # define UD_CRITICAL_CAT(args...)				\
-	fprintf(logout, "[unserding/catalogue] CRITICAL " args)
+	UD_LOGOUT("[unserding/catalogue] CRITICAL " args)
 # define UD_DEBUG_CAT(args...)				\
-	fprintf(logout, "[unserding/catalogue] " args)
+	UD_LOGOUT("[unserding/catalogue] " args)
 # define UD_DBGCONT(args...)			\
-	fprintf(logout, args)
+	UD_LOGOUT(args)
 
 #elif defined UNSERCLI && defined DEBUG_FLAG
-# define UD_CRITICAL(args...)				\
-	fprintf(logout, "[unserding] CRITICAL " args)
 # define UD_DEBUG(args...)				\
-	fprintf(logout, "[unserding] " args)
-# define UD_CRITICAL_MCAST(args...)					\
-	fprintf(logout, "[unserding/input/mcast] CRITICAL " args)
-# define UD_DEBUG_MCAST(args...)				\
-	fprintf(logout, "[unserding/input/mcast] " args)
+	UD_LOGOUT("[unserding] " args)
 # define UD_CRITICAL_STDIN(args...)			\
-	fprintf(logout, "[unserding/stdin] CRITICAL " args)
+	UD_LOGOUT("[unserding/stdin] CRITICAL " args)
 # define UD_DEBUG_STDIN(args...)
 # define UD_CRITICAL_PROTO(args...)
 # define UD_DEBUG_PROTO(args...)
 # define UD_CRITICAL_CAT(args...)
 # define UD_DEBUG_CAT(args...)
 # define UD_DBGCONT(args...)			\
-	fprintf(logout, args)
+	UD_LOGOUT(args)
 
 #elif defined UNSERMON && defined DEBUG_FLAG
-# define UD_CRITICAL(args...)				\
-	fprintf(logout, "[unserding] CRITICAL " args)
 # define UD_DEBUG(args...)
-# define UD_CRITICAL_MCAST(args...)
-# define UD_DEBUG_MCAST(args...)
 # define UD_CRITICAL_STDIN(args...)
 # define UD_DEBUG_STDIN(args...)
 # define UD_CRITICAL_PROTO(args...)				\
-	fprintf(logout, "[unserding/proto] CRITICAL " args)
+	UD_LOGOUT("[unserding/proto] CRITICAL " args)
 # define UD_DEBUG_PROTO(args...)
 # define UD_CRITICAL_CAT(args...)
 # define UD_DEBUG_CAT(args...)
 # define UD_DBGCONT(args...)
 
 #else  /* aux stuff */
-# define UD_CRITICAL(args...)			\
-	fprintf(logout, "[unserding] CRITICAL " args)
 # define UD_DEBUG(args...)
-# define UD_CRITICAL_MCAST(args...)
-# define UD_DEBUG_MCAST(args...)
 # define UD_CRITICAL_STDIN(args...)
 # define UD_DEBUG_STDIN(args...)
 # define UD_CRITICAL_PROTO(args...)
@@ -135,82 +119,14 @@ extern FILE *logout;
 # define UD_DBGCONT(args...)
 #endif
 
+#define UD_CRITICAL(args...)					\
+	do {							\
+		UD_LOGOUT("[unserding] CRITICAL " args);	\
+		UD_SYSLOG(LOG_CRIT, "CRITICAL " args);		\
+	} while (0)
+
 #if defined UNSERMON
-# define UD_UNSERMON_PKT(args...)	fprintf(logout, "%02x:%06x: " args)
+# define UD_UNSERMON_PKT(args...)	UD_LOGOUT("%02x:%06x: " args)
 #endif	/* UNSERMON */
-
-
-#if defined UNSERSRV
-# if defined TIME_WITH_SYS_TIME
-#  include <sys/time.h>
-#  include <time.h>
-# else  /* !TIME_WITH_SYS_TIME */
-#  if defined HAVE_SYS_TIME_H
-#   include <sys/time.h>
-#  endif
-#  if defined HAVE_TIME_H
-#   include <time.h>
-#  endif
-# endif
-
-#if !defined DEBUG_FLAG
-# define UD_LOG(args...)
-# define UD_LOG_MCAST(args...)
-
-#else  /* DEBUG_FLAG */
-# if __GNUC_PREREQ(4,3) && !defined __INTEL_COMPILER
-#  define UD_LOG(args...)	__ud_log("%lu.%09u [unserding] " args)
-#  define UD_LOG_MCAST(args...)	__ud_log("%lu.%09u [unserding/mcast] " args)
-/* methinks this is fuck ugly, but kinda cool */
-static inline void __attribute__((always_inline, format(printf,1,0)))
-__ud_log(const char *restrict fmt, ...)
-{
-#  if defined HAVE_CLOCK_GETTIME || 1 /* check for me */
-	struct timespec n;
-#  else	 /* !HAVE_CLOCK_GETTIME */
-#   error "WTF?!"
-#  endif  /* HAVE_CLOCK_GETTIME */
-	clock_gettime(CLOCK_REALTIME, &n);
-	/* there must be %lu.%09u in the format string */
-	fprintf(logout, fmt, n.tv_sec, n.tv_nsec, __builtin_va_arg_pack());
-	fflush(logout);
-	return;
-}
-
-# elif defined __INTEL_COMPILER
-#  define UD_LOG(args...)				\
-	do {						\
-		__ud_log();				\
-		fprintf(logout, "[unserding] " args);	\
-	} while (0)
-#  define UD_LOG_MCAST(args...)			\
-	do {					\
-		__ud_log();			\
-		fprintf(logout, "[unserding/mcast] " args);	\
-	} while (0)
-/* bit slower than the builtin_va_arg_pack, bite me */
-static inline void __attribute__((always_inline, format(printf,1,0)))
-__ud_log(void)
-{
-#  if defined HAVE_CLOCK_GETTIME || 1 /* check for me */
-	struct timespec n;
-#  else	 /* !HAVE_CLOCK_GETTIME */
-#   error "WTF?!"
-#  endif  /* HAVE_CLOCK_GETTIME */
-	clock_gettime(CLOCK_REALTIME, &n);
-	/* there must be %lu.%09u in the format string */
-	fprintf(logout, "%ld.%09ld ", n.tv_sec, n.tv_nsec);
-	return;
-}
-
-# else	/* !4.3 */
-#  error "Use gcc 4.3 or give me va_arg_pack() implementation!"
-# endif	 /* >= 4.3 */
-#endif	/* DEBUG_FLAG */
-
-#else  /* !UNSERSRV */
-# define UD_LOG(args...)
-# define UD_LOG_MCAST(args...)
-#endif	/* UNSERSRV */
 
 #endif	/* INCLUDED_unserding_dbg_h_ */

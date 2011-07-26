@@ -69,6 +69,31 @@
 #include "protocore.h"
 #include "protocore-private.h"
 #include "ud-sock.h"
+#include "unserding-dbg.h"
+
+#if defined DEBUG_FLAG
+# define UD_CRITICAL_MCAST(args...)					\
+	do {								\
+		UD_LOGOUT("[unserding/input/mcast] CRITICAL " args);	\
+		UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args);	\
+	} while (0)
+# define UD_DEBUG_MCAST(args...)					\
+	do {								\
+		UD_LOGOUT("[unserding/input/mcast] " args);		\
+		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
+	} while (0)
+# define UD_INFO_MCAST(args...)						\
+	do {								\
+		UD_LOGOUT("[unserding/input/mcast] " args);		\
+		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
+	} while (0)
+#else  /* !DEBUG_FLAG */
+# define UD_CRITICAL_MCAST(args...)				\
+	UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args)
+# define UD_INFO_MCAST(args...)					\
+	UD_SYSLOG(LOG_INFO, "[input/mcast] " args)
+# define UD_DEBUG_MCAST(args...)
+#endif	/* DEBUG_FLAG */
 
 /**
  * Rate used for keep-alive pings to neighbours in seconds. */
@@ -443,14 +468,15 @@ mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	a = inet_ntop(ud_sockaddr_fam(&j->sa),
 		      ud_sockaddr_addr(&j->sa), buf, sizeof(buf));
 	p = ud_sockaddr_port(&j->sa);
-	UD_LOG_MCAST(":sock %d connect :from [%s]:%d  "
-		     ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-		     w->fd, a, p,
-		     (unsigned int)nread,
-		     udpc_pkt_cno(JOB_PACKET(j)),
-		     udpc_pkt_pno(JOB_PACKET(j)),
-		     udpc_pkt_cmd(JOB_PACKET(j)),
-		     ntohs(((const uint16_t*)j->buf)[3]));
+	UD_INFO_MCAST(
+		":sock %d connect :from [%s]:%d  "
+		":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+		w->fd, a, p,
+		(unsigned int)nread,
+		udpc_pkt_cno(JOB_PACKET(j)),
+		udpc_pkt_pno(JOB_PACKET(j)),
+		udpc_pkt_cmd(JOB_PACKET(j)),
+		ntohs(((const uint16_t*)j->buf)[3]));
 
 	/* handle the reading */
 	if (UNLIKELY(nread <= 0)) {

@@ -40,18 +40,10 @@
 
 #include <syslog.h>
 
-#if !defined DEBUG_FLAG && !defined UD_DEBUG
-# define UD_DEBUG(args...)
-#endif	/* !UD_DEBUG */
-
 #define UD_LOG_FLAGS		(LOG_PID | LOG_NDELAY)
 #define UD_FACILITY		(LOG_LOCAL4)
 #define UD_MAKEPRI(x)		(x)
-#define UD_SYSLOG(x, args...)			\
-	do {					\
-		UD_DEBUG(args);			\
-		syslog(UD_MAKEPRI(x), args);	\
-	} while (0)
+#define UD_SYSLOG(x, args...)	syslog(UD_MAKEPRI(x), args)
 
 static inline
 ud_openlog(void)

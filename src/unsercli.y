@@ -121,7 +121,6 @@ static const char help_rpl[] =
 
 /* popt helper */
 static int prefer4 = 0;
-static uint16_t port = UD_NETWORK_SERVICE;
 /* whether to display a hex dump of incoming traffic */
 static int hexp = 0;
 
@@ -698,70 +697,28 @@ ud_parse(const char *line, size_t UNUSED(len))
 }
 
 
-static struct poptOption srv_opts[] = {
-	{ NULL, '4', POPT_ARG_NONE,
-	  &prefer4, 1,
-	  "Prefer IPv4 multicasting to IPv6.", NULL },
-	{ "port", 'p', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT,
-	  &port, 0,
-	  "Multicast port.", NULL },
-        POPT_TABLEEND
-};
+#include "unsercli-clo.h"
+#include "unsercli-clo.c"
 
-static struct poptOption dpy_opts[] = {
-	{ NULL, 'x', POPT_ARG_NONE,
-	  &hexp, 1,
-	  "Include hex dump of incoming traffic.", NULL },
-        POPT_TABLEEND
-};
-
-static const struct poptOption uc_opts[] = {
-#if 1
-        { NULL, '\0', POPT_ARG_INCLUDE_TABLE, srv_opts, 0,
-          "Server Options", NULL },
-        { NULL, '\0', POPT_ARG_INCLUDE_TABLE, dpy_opts, 0,
-          "Display Options", NULL },
-#endif
-        POPT_AUTOHELP
-        POPT_TABLEEND
-};
-
-static const char *const*
-ud_parse_cl(size_t argc, const char *argv[])
-{
-        poptContext opt_ctx;
-
-        UD_DEBUG("parsing command line options\n");
-        opt_ctx = poptGetContext(NULL, argc, argv, uc_opts, 0);
-        poptSetOtherOptionHelp(opt_ctx, "-4x -p <port>");
-
-        /* auto-do */
-        while (poptGetNextOpt(opt_ctx) > 0) {
-                /* Read all the options ... */
-                ;
-        }
-        return poptGetArgs(opt_ctx);
-}
-
-
 int
-main(int argc, const char *argv[])
+main(int argc, char *argv[])
 {
 	/* use the default event loop unless you have special needs */
 	struct ev_loop *loop = ev_default_loop(0);
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 	ev_io *srv_watcher = &__srv_watcher;
-	const char *const *rest;
+	struct gengetopt_args_info argi[1];
 
 	/* where to log */
 	logout = stderr;
 
 	/* parse the command line */
-	rest = ud_parse_cl(argc, argv);
-	for (const char *const *r = rest; r && *r; r++) {
-		UD_DEBUG("unknown option \"%s\"\n", *r);
+	if (cmdline_parser(argc, argv, argi)) {
+		exit(1);
 	}
+	/* populate clo parser results */
+	hexp = argi->hex_flag;
 
 	/* get us some nice handle */
 	if (!prefer4) {
@@ -769,8 +726,8 @@ main(int argc, const char *argv[])
 	} else {
 		init_unserding_handle(&__hdl, PF_INET, false);
 	}
-	if (port != UD_NETWORK_SERVICE) {
-		ud_handle_set_port(&__hdl, port);
+	if (argi->port_arg != UD_NETWORK_SERVICE) {
+		ud_handle_set_port(&__hdl, argi->port_arg);
 	}
 	/* store our global packet */
 	__hdl.pktchn = &__pkt;

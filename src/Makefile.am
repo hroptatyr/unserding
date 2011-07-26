@@ -25,7 +25,8 @@ endif
 BUILT_SOURCES =
 CLEANFILES = $(BUILT_SOURCES)
 
-header_HEADERS += unserding.h protocore.h seria.h mcast.h dccp.h module.h
+header_HEADERS += unserding.h protocore.h seria.h module.h
+header_HEADERS += mcast.h dccp.h tcp-unix.h
 header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
 header_HEADERS += lua-config.h
@@ -40,7 +41,7 @@ EXTRA_DIST += btea.c
 
 if BUILD_SERVER
 ## the main server binary
-unserdingd_SOURCES = unserdingd.c mcast.c dccp.c
+unserdingd_SOURCES = unserdingd.c mcast.c dccp.c tcp-unix.c
 unserdingd_SOURCES += protocore.c seria.c
 unserdingd_SOURCES += module.h module.c
 unserdingd_SOURCES += wpool.h wpool.c fsarrqueue.h
@@ -48,10 +49,11 @@ unserdingd_SOURCES += jpool.h jpool.c
 unserdingd_SOURCES += lua-config.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
 unserdingd_CPPFLAGS += $(LIBEV_CPPFLAGS)
-unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt -lpopt
+unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
 unserdingd_LDFLAGS += $(shell pkg-config --libs libxml-2.0)
 unserdingd_LDFLAGS += -llua ## check for me
 unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL) -lunserding
+BUILT_SOURCES += unserdingd-clo.c
 
 ## server static modules
 unserdingd_SOURCES += dso-pong.c
@@ -62,12 +64,12 @@ mod_LTLIBRARIES =
 ## stuff we develop here but that will go eventually to sushi
 #uteseries_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_MODE
 #uteseries_LDFLAGS = -static
-#uteseries_LDADD = -luterus -lpopt
+#uteseries_LDADD = -luterus
 
 ## to fiddle with option chains and other instruments
 #instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)
 #instrumenstruation_LDFLAGS = $(PFACK_LIBS)
-#instrumenstruation_LDADD = $(PFACK_LIBS) libunserding.la -lpopt
+#instrumenstruation_LDADD = $(PFACK_LIBS) libunserding.la
 endif  ## BUILD_SERVER
 ##header_HEADERS += xdr-instr.h tseries.h
 
@@ -80,9 +82,10 @@ unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS) $(LIBEDIT_CPPFLAGS)
 unsercli_CPPFLAGS += -imacros tedious.h
-unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lpopt
+unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsercli_LDADD = $(LIBEV_LIBS) $(LIBREADLINE_LIBS) libunserding.la
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
+BUILT_SOURCES += unsercli-clo.c
 ## weird, must be an automake bug
 CLEANFILES += unsercli-unsercli.c unsercli-scanner.c
 
@@ -118,7 +121,11 @@ libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS) $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
 endif
 
-# 
+## our rule for gengetopt
+%.c: %.ggo
+	gengetopt -l -i $< -F $*
+
+#
 # Help the developers get nice post-processed source files
 
 ## Create preprocessor output (debugging purposes only)

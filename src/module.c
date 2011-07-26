@@ -264,23 +264,6 @@ ud_mod_dump(FILE *whither)
 
 
 static void
-load_climods(const char *const *rest, void *clo)
-{
-	if (rest == NULL) {
-		/* no modules at all */
-		return;
-	}
-	/* initialise all modules specified on the command line
-	 * one of which is assumed to initialise the global deposit somehow
-	 * if not, we care fuckall, let the bugger crash relentlessly */
-	for (const char *const *mod = rest; *mod; mod++) {
-		UD_DEBUG("loading module \"%s\"\n", *mod);
-		open_aux(*mod, clo);
-	}
-	return;
-}
-
-static void
 load_deferred(void *clo)
 {
 	UD_DEBUG("deferred mods %p\n", ud_defs);
@@ -293,7 +276,7 @@ load_deferred(void *clo)
 }
 
 void
-ud_init_modules(const char *const *rest, void *clo)
+ud_init_modules(char *const args[], size_t nargs, void *clo)
 {
 	/* initialise the dl system */
 	lt_dlinit();
@@ -302,7 +285,13 @@ ud_init_modules(const char *const *rest, void *clo)
 	add_myself();
 
 	/* now load modules */
-	load_climods(rest, clo);
+	/* initialise all modules specified on the command line
+	 * one of which is assumed to initialise the global deposit somehow
+	 * if not, we care fuckall, let the bugger crash relentlessly */
+	for (size_t i = 0; i < nargs; i++) {
+		UD_DEBUG("loading module \"%s\"\n", args[i]);
+		open_aux(args[i], clo);
+	}
 	/* load all deferred modules */
 	load_deferred(clo);
 	return;

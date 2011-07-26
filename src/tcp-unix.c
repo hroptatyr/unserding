@@ -65,7 +65,7 @@
 # define UD_DEBUG_TU(args...)				\
 	fprintf(logout, "[unserding/input/tcpunix] " args)
 #else
-# define UD_DEBUG_MCAST(args...)
+# define UD_DEBUG_TU(args...)
 #endif
 
 typedef enum {

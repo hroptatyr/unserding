@@ -353,6 +353,10 @@ data_cb(EV_P_ ev_io *w, int UNUSED(re))
 		goto clo;
 	}
 	UD_DEBUG_TU("new data in sock %d\n", w->fd);
+	if (nrd < sizeof(buf)) {
+		/* just a service so that message parsers can use the string */
+		buf[nrd] = '\0';
+	}
 	if (c->iord && c->iord(c, buf, nrd, c->data) < 0) {
 		goto clo;
 	}

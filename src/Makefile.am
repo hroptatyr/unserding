@@ -27,6 +27,7 @@ CLEANFILES = $(BUILT_SOURCES)
 
 header_HEADERS += unserding.h protocore.h seria.h module.h
 header_HEADERS += mcast.h dccp.h tcp-unix.h
+header_HEADERS += logger.h
 header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
 header_HEADERS += lua-config.h

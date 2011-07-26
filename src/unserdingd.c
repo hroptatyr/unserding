@@ -291,7 +291,7 @@ daemonise(void)
 	case 0:
 		break;
 	default:
-		UD_DEBUG("Successfully bore a squaller: %d\n", pid);
+		UD_SYSLOG(LOG_NOTICE, "Successfully bore a squaller: %d\n", pid);
 		exit(0);
 	}
 
@@ -310,7 +310,7 @@ daemonise(void)
 			(void)close(fd);
 		}
 	}
-	logout = fopen("/tmp/unserding.log", "w");
+	logout = fopen("/dev/null", "w");
 	return 0;
 }
 
@@ -453,6 +453,7 @@ main(int argc, char *argv[])
 
 	/* whither to log */
 	logout = stderr;
+	ud_openlog();
 	/* wipe stack pollution */
 	memset(&__ctx, 0, sizeof(__ctx));
 	/* obtain the number of cpus */
@@ -566,6 +567,7 @@ main(int argc, char *argv[])
 	/* close our log output */	
 	fflush(logout);
 	fclose(logout);
+	ud_closelog();
 	/* unloop was called, so exit */
 	return 0;
 }

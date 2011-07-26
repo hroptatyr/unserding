@@ -539,6 +539,7 @@ ud_write_soon(ud_conn_t conn, const char *buf, size_t len, ud_cbcb_f noti_clos)
 	if (buf == NULL || len == 0) {
 		return NULL;
 	} else if ((nwr = write(fd, buf, len)) == len) {
+		UD_DEBUG_TU("everything written, no write buffer needed\n");
 		return NULL;
 	}
 	/* otherwise the user isn't so much a prick as we thought*/
@@ -554,6 +555,7 @@ ud_write_soon(ud_conn_t conn, const char *buf, size_t len, ud_cbcb_f noti_clos)
 	/* finally we pretend interest in this socket */
         ev_io_init(c->io, writ_cb, fd, EV_WRITE);
         ev_io_start(gloop, c->io);
+	UD_DEBUG_TU("installed %p %zu\n", c, nconns);
 	return c;
 }
 

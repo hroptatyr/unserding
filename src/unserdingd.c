@@ -540,6 +540,8 @@ main(int argc, char *argv[])
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
+	UD_SYSLOG(LOG_NOTICE, "shutting down unserdingd");
+
 	/* deinitialise modules */
 	ud_deinit_modules(&__ctx);
 

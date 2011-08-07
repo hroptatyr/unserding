@@ -1,5 +1,3 @@
-
-
 ### Makefile.am
 
 AM_CPPFLAGS = -pthread -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
@@ -12,18 +10,19 @@ bin_PROGRAMS =
 noinst_PROGRAMS =
 header_HEADERS =
 noinst_HEADERS =
-EXTRA_DIST =
 if BUILD_SERVER
-bin_PROGRAMS += unserdingd unsercli
-#noinst_PROGRAMS += instrumenstruation
-#noinst_PROGRAMS += uteseries
+bin_PROGRAMS += unserdingd
+endif
+if BUILD_CLIAPPS
+bin_PROGRAMS += unsercli
 endif
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
 endif
 
 BUILT_SOURCES =
-CLEANFILES = $(BUILT_SOURCES)
+CLEANFILES =
+EXTRA_DIST = $(BUILT_SOURCES)
 
 header_HEADERS += unserding.h protocore.h seria.h module.h
 header_HEADERS += mcast.h dccp.h tcp-unix.h
@@ -54,29 +53,18 @@ unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
 unserdingd_LDFLAGS += $(shell pkg-config --libs libxml-2.0)
 unserdingd_LDFLAGS += -llua ## check for me
 unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL) -lunserding
-BUILT_SOURCES += unserdingd-clo.c
+BUILT_SOURCES += unserdingd-clo.c unserdingd-clo.h
 
 ## server static modules
 unserdingd_SOURCES += dso-pong.c
+endif
 
 ## server dynamic modules
 mod_LTLIBRARIES =
 
-## stuff we develop here but that will go eventually to sushi
-#uteseries_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_MODE
-#uteseries_LDFLAGS = -static
-#uteseries_LDADD = -luterus
-
-## to fiddle with option chains and other instruments
-#instrumenstruation_CPPFLAGS = $(PFACK_CFLAGS)
-#instrumenstruation_LDFLAGS = $(PFACK_LIBS)
-#instrumenstruation_LDADD = $(PFACK_LIBS) libunserding.la
-endif  ## BUILD_SERVER
-##header_HEADERS += xdr-instr.h tseries.h
-
 ## fucking automake
 unsercli_YFLAGS = -d -p "cli_yy"
-if BUILD_SERVER
+if BUILD_CLIAPPS
 ## the main client binary
 unsercli_SOURCES = unsercli.y scanner.l
 unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
@@ -86,9 +74,7 @@ unsercli_CPPFLAGS += -imacros tedious.h
 unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsercli_LDADD = $(LIBEV_LIBS) $(LIBREADLINE_LIBS) libunserding.la
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
-BUILT_SOURCES += unsercli-clo.c
-## weird, must be an automake bug
-CLEANFILES += unsercli-unsercli.c unsercli-scanner.c
+BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
 
 ## fucking automake refuses to replay my flex patch
 unsercli-scanner.h: scanner.l
@@ -123,7 +109,7 @@ libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
 endif
 
 ## our rule for gengetopt
-%.c: %.ggo
+%.c %.h: %.ggo
 	gengetopt -l -i $< -F $*
 
 #

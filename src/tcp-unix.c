@@ -62,10 +62,27 @@
 #endif	/* __INTEL_COMPILER */
 
 #if defined DEBUG_FLAG
-# define UD_DEBUG_TU(args...)				\
-	fprintf(logout, "[unserding/input/tcpunix] " args)
+# define UD_DEBUG_TU(args...)					\
+	do {							\
+		UD_LOGOUT("[unserding/input/tcpunix] " args);	\
+		UD_SYSLOG(LOG_INFO, "[input/tcpunix] " args);	\
+	} while (0)
+# define UD_ERROR_TU(args...)						\
+	do {								\
+		UD_LOGOUT("[unserding/input/tcpunix] ERROR " args);	\
+		UD_SYSLOG(LOG_ERR, "[input/tcpunix] ERROR " args);	\
+	} while (0)
+# define UD_INFO_TU(args...)						\
+	do {								\
+		UD_LOGOUT("[unserding/input/tcpunix] " args);	\
+		UD_SYSLOG(LOG_INFO, "[input/tcpunix] " args);	\
+	} while (0)
 #else
-# define UD_DEBUG_MCAST(args...)
+# define UD_DEBUG_TU(args...)
+# define UD_ERROR_TU(args...)					\
+	UD_SYSLOG(LOG_ERR, "[input/tcpunix] ERROR " args)
+# define UD_INFO_TU(args...)				\
+	UD_SYSLOG(LOG_INFO, "[input/tcpunix] " args)
 #endif
 
 typedef enum {
@@ -209,7 +226,7 @@ conn_listener_net(uint16_t port)
 		/* likely case upfront */
 		;
 	} else {
-		UD_DEBUG_TU("socket() failed ... I'm clueless now\n");
+		UD_ERROR_TU("socket() failed ... I'm clueless now\n");
 		return s;
 	}
 
@@ -234,7 +251,7 @@ conn_listener_net(uint16_t port)
 	/* we used to retry upon failure, but who cares */
 	if (bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6)) < 0 ||
 	    listen(s, 2) < 0) {
-		UD_DEBUG_TU("bind() failed, errno %d\n", errno);
+		UD_ERROR_TU("bind() failed, errno %d\n", errno);
 		close(s);
 		return -1;
 	}
@@ -258,7 +275,7 @@ conn_listener_uds(const char *sock_path)
 		/* likely case upfront */
 		;
 	} else {
-		UD_DEBUG_TU("socket() failed ... I'm clueless now\n");
+		UD_ERROR_TU("socket() failed ... I'm clueless now\n");
 		return s;
 	}
 
@@ -278,13 +295,13 @@ conn_listener_uds(const char *sock_path)
 	unlink(sock_path);
 	/* we used to retry upon failure, but who cares */
 	if (bind(s, (struct sockaddr*)&__s, sz) < 0) {
-		UD_DEBUG_TU("bind() failed: %s\n", strerror(errno));
+		UD_ERROR_TU("bind() failed: %s\n", strerror(errno));
 		close(s);
 		unlink(sock_path);
 		return -1;
 	}
 	if (listen(s, 2) < 0) {
-		UD_DEBUG_TU("listen() failed: %s\n", strerror(errno));
+		UD_ERROR_TU("listen() failed: %s\n", strerror(errno));
 		close(s);
 		unlink(sock_path);
 		return -1;
@@ -336,6 +353,10 @@ data_cb(EV_P_ ev_io *w, int UNUSED(re))
 		goto clo;
 	}
 	UD_DEBUG_TU("new data in sock %d\n", w->fd);
+	if (nrd < sizeof(buf)) {
+		/* just a service so that message parsers can use the string */
+		buf[nrd] = '\0';
+	}
 	if (c->iord && c->iord(c, buf, nrd, c->data) < 0) {
 		goto clo;
 	}
@@ -386,7 +407,7 @@ inot_cb(EV_P_ ev_stat *w, int UNUSED(re))
 {
 	ud_conn_t c = (void*)w;
 
-	UD_DEBUG_TU("INOT something changed in %s...\n", w->path);
+	UD_INFO_TU("INOT something changed in %s...\n", w->path);
 	if (c->inot && c->inot(c, w->path, &w->attr, c->data) < 0) {
 		goto clo;
 	}
@@ -518,6 +539,7 @@ ud_write_soon(ud_conn_t conn, const char *buf, size_t len, ud_cbcb_f noti_clos)
 	if (buf == NULL || len == 0) {
 		return NULL;
 	} else if ((nwr = write(fd, buf, len)) == len) {
+		UD_DEBUG_TU("everything written, no write buffer needed\n");
 		return NULL;
 	}
 	/* otherwise the user isn't so much a prick as we thought*/
@@ -533,6 +555,7 @@ ud_write_soon(ud_conn_t conn, const char *buf, size_t len, ud_cbcb_f noti_clos)
 	/* finally we pretend interest in this socket */
         ev_io_init(c->io, writ_cb, fd, EV_WRITE);
         ev_io_start(gloop, c->io);
+	UD_DEBUG_TU("installed %p %zu\n", c, nconns);
 	return c;
 }
 

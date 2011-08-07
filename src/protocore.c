@@ -77,7 +77,7 @@ ud_proto_parse(job_t j)
 	ud_pktwrk_f wf = ud_services[cmd];
 
 	if (UNLIKELY(wf == NULL)) {
-		UD_LOG("found 0x%04x but cannot cope\n", cmd);
+		UD_CRITICAL("found 0x%04x but cannot cope\n", cmd);
 		return;
 	}
 	/* otherwise, just do what's in there */

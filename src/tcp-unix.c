@@ -378,14 +378,24 @@ static void
 inco_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
 /* we're tcp so we've got to accept() the bugger, don't forget :) */
+	static char buf[UDPC_PKTLEN];
 	volatile int ns;
 	ud_conn_t aw, par;
-	struct sockaddr_storage sa;
+	union ud_sockaddr_u sa;
 	socklen_t sa_size = sizeof(sa);
+	/* the address in human readable form */
+	const char *a;
+	/* the port (in host-byte order) */
+	uint16_t p;
 
-	UD_DEBUG_TU("they got back to us %p...", w);
-	if ((ns = accept(w->fd, (struct sockaddr*)&sa, &sa_size)) < 0) {
-		UD_DBGCONT("accept() failed %s\n", strerror(errno));
+	ns = accept(w->fd, &sa.sa, &sa_size);
+	/* obtain the address in human readable form */
+	a = inet_ntop(
+		ud_sockaddr_fam(&sa), ud_sockaddr_addr(&sa), buf, sizeof(buf));
+	p = ud_sockaddr_port(&sa);
+	UD_INFO_TU(":sock %d connect :from [%s]:%d -> %d\n", w->fd, a, p, ns);
+	if (ns < 0) {
+		UD_ERROR_TU("accept() failed %s\n", strerror(errno));
 		return;
 	}
 
@@ -398,7 +408,6 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(re))
 	aw->iord = par->iord;
 	aw->clos = par->clos;
         ev_io_start(EV_A_ aw->io);
-	UD_DBGCONT("success, new sock %d %p\n", ns, aw);
 	return;
 }
 

@@ -32,7 +32,6 @@ header_HEADERS += logger.h
 header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
 header_HEADERS += lua-config.h
-header_HEADERS += secu.h
 noinst_HEADERS += unserding-private.h protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h ud-time.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h

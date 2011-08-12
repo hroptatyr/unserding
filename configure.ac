@@ -161,8 +161,8 @@ AS_HELP_STRING([--enable-cliapps], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 AC_ARG_ENABLE([library], [
-AS_HELP_STRING([--enable-library], [Build the library component, default: yes.])],
-	[enable_library="${enableval}"], [enable_library="yes"])
+AS_HELP_STRING([--enable-library], [Build the library component, default: no.])],
+	[enable_library="${enableval}"], [enable_library="no"])
 AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 
 ## check if we've got libconfig
@@ -175,14 +175,31 @@ AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([unserding.pc])
 AC_OUTPUT
 
+if test -n "${BUILD_SERVER_FALSE}"; then
+	BUILD_SRV="yes"
+else
+	BUILD_SRV="no"
+fi
+if test -n "${BUILD_LIBRARY_FALSE}"; then
+	BUILD_LIB="yes"
+else
+	BUILD_LIB="no"
+fi
+if test -n "${BUILD_CLIAPPS_FALSE}"; then
+	BUILD_CLI="yes"
+else
+	BUILD_CLI="no"
+fi
+
 echo
 echo
 echo "Build summary"
 echo "============="
 echo
-echo "Build server: ${BUILD_SERVER_FALSE:+yes}"
-echo "Build cliapps: ${BUILD_CLIAPPS_FALSE:+yes}"
-echo "Build library: ${BUILD_LIBRARY_FALSE:+yes}"
+echo "Build cliapps: ${BUILD_CLI}"
+echo "Build library: ${BUILD_LIB}"
+echo "Build server: ${BUILD_SRV}"
+echo "Scripting engine: ${HAVE_LUA_FALSE:+lua}"
 echo
 
 dnl configure.ac ends here

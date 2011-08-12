@@ -416,6 +416,23 @@ ud_free_config(ud_ctx_t ctx)
 }
 #endif
 
+static void
+write_pidfile(const char *pidfile)
+{
+	char str[32];
+	pid_t pid;
+	size_t len;
+	int fd;
+
+	if ((pid = getpid()) &&
+	    (len = snprintf(str, sizeof(str) - 1, "%d\n", pid)) &&
+	    (fd = open(pidfile, O_RDWR | O_CREAT | O_TRUNC, 0644)) >= 0) {
+		write(fd, str, len);
+		close(fd);
+	}
+	return;
+}
+
 
 /* static module loader */
 static void
@@ -480,6 +497,10 @@ main(int argc, char *argv[])
 	/* check if nworkers is not too large */
 	if (nworkers > MAX_WORKERS) {
 		nworkers = MAX_WORKERS;
+	}
+	/* write the pid file */
+	if (argi->pidfile_given) {
+		write_pidfile(argi->pidfile_arg);
 	}
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);

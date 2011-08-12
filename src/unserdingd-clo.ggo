@@ -9,7 +9,9 @@ option "config" c
 option "daemon" d
 	"Detach from tty and run as daemon"
 	flag off
+option "pidfile" p
+	"Output pid of server process into this file"
+	string optional typestr="FILE"
 option "workers" w
 	"Number of concurrent worker threads (default: # of cores)"
 	int optional
-

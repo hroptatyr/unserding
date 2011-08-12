@@ -150,6 +150,15 @@ AC_SUBST([LIBREADLINE_CPPFLAGS])
 
 ## check if we've got libedit, we don't use it though at the moment
 PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
+## check for lua, critical
+PKG_CHECK_MODULES([LUA], [lua >= 5.1.4], [have_lua="yes"], [
+	have_lua="no"
+	if test "${enable_server}" = "yes"; then
+		AC_MSG_WARN([server build request but lua missing.])
+		enable_server="no"
+	fi
+])
+AM_CONDITIONAL([HAVE_LUA], [test "${have_lua}" = "yes"])
 
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
@@ -164,10 +173,6 @@ AC_ARG_ENABLE([library], [
 AS_HELP_STRING([--enable-library], [Build the library component, default: no.])],
 	[enable_library="${enableval}"], [enable_library="no"])
 AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
-
-## check if we've got libconfig
-dnl PKG_CHECK_MODULES([LIBCONFIG], [libconfig])
-## check for lua instead!
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])

@@ -6,9 +6,9 @@ AM_CPPFLAGS = -pthread -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_CPPFLAGS += -I$(top_srcdir)/src
 AM_LDFLAGS = -lpthread
 
-bin_PROGRAMS =
 if BUILD_CLIAPPS
-bin_PROGRAMS += ud-ping ud-itan
+bin_PROGRAMS = ud-ping
+noinst_PROGRAMS = ud-itan
 endif
 
 BUILT_SOURCES =

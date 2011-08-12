@@ -45,14 +45,14 @@
 #define UD_MAKEPRI(x)		(x)
 #define UD_SYSLOG(x, args...)	syslog(UD_MAKEPRI(x), args)
 
-static inline
+static inline void
 ud_openlog(void)
 {
 	openlog("unserdingd", UD_LOG_FLAGS, UD_FACILITY);
 	return;
 }
 
-static inline
+static inline void
 ud_closelog(void)
 {
 	closelog();

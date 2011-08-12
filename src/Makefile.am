@@ -18,6 +18,8 @@ bin_PROGRAMS += unsercli
 endif
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
+else
+noinst_LIBRARIES = libunserding.a
 endif
 
 BUILT_SOURCES =
@@ -30,7 +32,6 @@ header_HEADERS += logger.h
 header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
 header_HEADERS += lua-config.h
-header_HEADERS += secu.h
 noinst_HEADERS += unserding-private.h protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h ud-time.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
@@ -50,9 +51,14 @@ unserdingd_SOURCES += lua-config.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
 unserdingd_CPPFLAGS += $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
-unserdingd_LDFLAGS += $(shell pkg-config --libs libxml-2.0)
 unserdingd_LDFLAGS += -llua ## check for me
-unserdingd_LDADD = $(LIBEV_LIBS) $(LIBLTDL) -lunserding
+unserdingd_LDFLAGS += $(LIBEV_LIBS)
+unserdingd_LDFLAGS += $(LIBLTDL)
+if BUILD_LIBRARY
+unserdingd_LDADD = libunserding.la
+else
+unserdingd_LDADD = libunserding.a
+endif
 BUILT_SOURCES += unserdingd-clo.c unserdingd-clo.h
 
 ## server static modules
@@ -71,8 +77,15 @@ unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS) $(LIBEDIT_CPPFLAGS)
 unsercli_CPPFLAGS += -imacros tedious.h
-unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
-unsercli_LDADD = $(LIBEV_LIBS) $(LIBREADLINE_LIBS) libunserding.la
+unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
+unsercli_LDFLAGS += $(LIBEV_LIBS)
+unsercli_LDFLAGS += $(LIBREADLINE_LIBS)
+if BUILD_LIBRARY
+unsercli_LDADD = libunserding.la
+else
+unsercli_LDADD = libunserding.a
+endif
+endif
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
 BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
 
@@ -82,30 +95,16 @@ unsercli-scanner.h: scanner.l
 	test -e lex.yy.c && $(RM) lex.yy.c
 	test -e lex.yy.h && mv lex.yy.h $@
 
-## gperf baloney
-#GPERF = gperf
-#GPERFFLAGS = --multiple-iterations=8 --language=ANSI-C
-#BUILT_SOURCES += keywords.c
-#CLEANFILES += keywords.c keywords.c.tmp
-### gperf target
-#keywords.c: keywords.perf
-#	if $(GPERF) $(GPERFFLAGS) $< > $@.tmp; then \
-#		mv $@.tmp $@; \
-#	elif $(GPERF) --version >/dev/null 2>&1; then \
-#		rm $@.tmp; \
-#		exit 1; \
-#	else \
-#		rm $@.tmp; \
-#		touch $@; \
-#	fi
-endif
-
+## the lib, or its archive counterpart
 if BUILD_LIBRARY
-## the lib
 libunserding_la_SOURCES = libstuff.c dccp.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
-libunserding_la_CPPFLAGS = -DUNSERLIB $(PFACK_CFLAGS) $(AM_CPPFLAGS)
+libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
+else
+libunserding_a_SOURCES = libstuff.c dccp.c
+libunserding_a_SOURCES += svc-pong.c svc-pong.h
+libunserding_a_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERLIB
 endif
 
 ## our rule for gengetopt

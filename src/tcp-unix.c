@@ -203,8 +203,34 @@ clos_conn(EV_P_ ud_conn_t c, bool force)
 static void
 clos_inot(EV_P_ ud_conn_t c, bool UNUSED(force))
 {
+	union {
+		void *ptr;
+		const char *str;
+	} tmp = {
+		.str = c->st->path,
+	};
 	ev_stat_stop(EV_A_ c->st);
+	free(tmp.ptr);
 	free_conn(c);
+	return;
+}
+
+static void
+clos_any(EV_P_ ud_conn_t c, bool force)
+{
+	switch (c->ty) {
+	case UD_CONN_LSTN:
+	case UD_CONN_WR:
+	case UD_CONN_RD:
+		clos_conn(EV_A_ c, force);
+		break;
+	case UD_CONN_INOT:
+		clos_inot(EV_A_ c, force);
+		break;
+	default:
+	case UD_CONN_UNK:
+		break;
+	}
 	return;
 }
 
@@ -378,14 +404,24 @@ static void
 inco_cb(EV_P_ ev_io *w, int UNUSED(re))
 {
 /* we're tcp so we've got to accept() the bugger, don't forget :) */
+	static char buf[UDPC_PKTLEN];
 	volatile int ns;
 	ud_conn_t aw, par;
-	struct sockaddr_storage sa;
+	union ud_sockaddr_u sa;
 	socklen_t sa_size = sizeof(sa);
+	/* the address in human readable form */
+	const char *a;
+	/* the port (in host-byte order) */
+	uint16_t p;
 
-	UD_DEBUG_TU("they got back to us %p...", w);
-	if ((ns = accept(w->fd, (struct sockaddr*)&sa, &sa_size)) < 0) {
-		UD_DBGCONT("accept() failed %s\n", strerror(errno));
+	ns = accept(w->fd, &sa.sa, &sa_size);
+	/* obtain the address in human readable form */
+	a = inet_ntop(
+		ud_sockaddr_fam(&sa), ud_sockaddr_addr(&sa), buf, sizeof(buf));
+	p = ud_sockaddr_port(&sa);
+	UD_INFO_TU(":sock %d connect :from [%s]:%d -> %d\n", w->fd, a, p, ns);
+	if (ns < 0) {
+		UD_ERROR_TU("accept() failed %s\n", strerror(errno));
 		return;
 	}
 
@@ -398,7 +434,6 @@ inco_cb(EV_P_ ev_io *w, int UNUSED(re))
 	aw->iord = par->iord;
 	aw->clos = par->clos;
         ev_io_start(EV_A_ aw->io);
-	UD_DBGCONT("success, new sock %d %p\n", ns, aw);
 	return;
 }
 
@@ -438,14 +473,16 @@ static ud_conn_t
 init_stat_watchers(EV_P_ const char *file)
 {
 	ud_conn_t c;
+	char *fcpy;
 
 	if (file == NULL) {
 		return NULL;
 	}
 
         /* initialise an io watcher, then start it */
+	fcpy = strdup(file);
 	c = make_conn(UD_CONN_INOT);
-        ev_stat_init(c->st, inot_cb, file, 0.);
+        ev_stat_init(c->st, inot_cb, fcpy, 0.);
         ev_stat_start(EV_A_ c->st);
 	return c;
 }
@@ -509,21 +546,10 @@ ud_conn_fini(ud_conn_t c)
 	for (size_t i = 0; i < nconns; i++) {
 		/* find kids, whose parent is C */
 		if (conns[i].parent == c) {
-			switch (conns[i].ty) {
-			case UD_CONN_LSTN:
-			case UD_CONN_WR:
-				clos_conn(gloop, conns + i, true);
-				break;
-			case UD_CONN_INOT:
-				clos_inot(gloop, conns + i, true);
-				break;
-			default:
-			case UD_CONN_UNK:
-				break;
-			}
+			clos_any(gloop, conns + i, true);
 		}
 	}
-	clos_conn(gloop, c, true);
+	clos_any(gloop, c, true);
 	return res;
 }
 
@@ -570,21 +596,7 @@ int
 ud_detach_tcp_unix(EV_P)
 {
 	for (size_t i = 0; i < nconns; i++) {
-		switch (conns[i].ty) {
-		case UD_CONN_LSTN:
-		case UD_CONN_RD:
-		case UD_CONN_WR:
-			/* ideally we'd close the user's data socket too
-			 * alas we can't */
-			clos_conn(EV_A_ conns + i, true);
-			break;
-		case UD_CONN_INOT:
-			clos_inot(EV_A_ conns + i, true);
-			break;
-		case UD_CONN_UNK:
-		default:
-			break;
-		}
+		clos_any(EV_A_ conns + i, true);
 	}
 	gloop = NULL;
 	return 0;

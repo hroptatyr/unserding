@@ -162,8 +162,8 @@ AM_CONDITIONAL([HAVE_LUA], [test "${have_lua}" = "yes"])
 
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
-AS_HELP_STRING([--enable-server], [Build the server component, default: no.])],
-	[enable_server="${enableval}"], [enable_server="no"])
+AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
+	[enable_server="${enableval}"], [enable_server="yes"])
 AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
 AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-cliapps], [Build the client apps, default: yes.])],
@@ -202,8 +202,8 @@ echo "Build summary"
 echo "============="
 echo
 echo "Build cliapps: ${BUILD_CLI}"
-echo "Build library: ${BUILD_LIB}"
 echo "Build server: ${BUILD_SRV}"
+echo "Build library: ${BUILD_LIB}"
 echo "Scripting engine: ${HAVE_LUA_FALSE:+lua}"
 echo
 

@@ -203,8 +203,34 @@ clos_conn(EV_P_ ud_conn_t c, bool force)
 static void
 clos_inot(EV_P_ ud_conn_t c, bool UNUSED(force))
 {
+	union {
+		void *ptr;
+		const char *str;
+	} tmp = {
+		.str = c->st->path,
+	};
 	ev_stat_stop(EV_A_ c->st);
+	free(tmp.ptr);
 	free_conn(c);
+	return;
+}
+
+static void
+clos_any(EV_P_ ud_conn_t c, bool force)
+{
+	switch (c->ty) {
+	case UD_CONN_LSTN:
+	case UD_CONN_WR:
+	case UD_CONN_RD:
+		clos_conn(EV_A_ c, force);
+		break;
+	case UD_CONN_INOT:
+		clos_inot(EV_A_ c, force);
+		break;
+	default:
+	case UD_CONN_UNK:
+		break;
+	}
 	return;
 }
 
@@ -447,14 +473,16 @@ static ud_conn_t
 init_stat_watchers(EV_P_ const char *file)
 {
 	ud_conn_t c;
+	char *fcpy;
 
 	if (file == NULL) {
 		return NULL;
 	}
 
         /* initialise an io watcher, then start it */
+	fcpy = strdup(file);
 	c = make_conn(UD_CONN_INOT);
-        ev_stat_init(c->st, inot_cb, file, 0.);
+        ev_stat_init(c->st, inot_cb, fcpy, 0.);
         ev_stat_start(EV_A_ c->st);
 	return c;
 }
@@ -518,21 +546,10 @@ ud_conn_fini(ud_conn_t c)
 	for (size_t i = 0; i < nconns; i++) {
 		/* find kids, whose parent is C */
 		if (conns[i].parent == c) {
-			switch (conns[i].ty) {
-			case UD_CONN_LSTN:
-			case UD_CONN_WR:
-				clos_conn(gloop, conns + i, true);
-				break;
-			case UD_CONN_INOT:
-				clos_inot(gloop, conns + i, true);
-				break;
-			default:
-			case UD_CONN_UNK:
-				break;
-			}
+			clos_any(gloop, conns + i, true);
 		}
 	}
-	clos_conn(gloop, c, true);
+	clos_any(gloop, c, true);
 	return res;
 }
 
@@ -579,21 +596,7 @@ int
 ud_detach_tcp_unix(EV_P)
 {
 	for (size_t i = 0; i < nconns; i++) {
-		switch (conns[i].ty) {
-		case UD_CONN_LSTN:
-		case UD_CONN_RD:
-		case UD_CONN_WR:
-			/* ideally we'd close the user's data socket too
-			 * alas we can't */
-			clos_conn(EV_A_ conns + i, true);
-			break;
-		case UD_CONN_INOT:
-			clos_inot(EV_A_ conns + i, true);
-			break;
-		case UD_CONN_UNK:
-		default:
-			break;
-		}
+		clos_any(EV_A_ conns + i, true);
 	}
 	gloop = NULL;
 	return 0;

@@ -137,30 +137,6 @@ fi
 AM_CONDITIONAL([WITH_INPUT_MULTICAST],
 	[test "$have_inputs_multicast" = "yes" -a "$with_inputs_multicast" = "yes"])
 
-## database stuff ... does not belong here
-AC_ARG_WITH([mysql], [
-AS_HELP_STRING([--with-mysql], [Which mysql to use])], [], [])
-dnl AC_ARG_WITH([pgsql], [
-dnl AS_HELP_STRING([--with-pgsql], [Which postgres to use])], [], [])
-dnl 
-if test "$with_mysql" != "no"; then
-	AC_PATH_PROG([MYSQL_CONFIG], [mysql_config], [:])
-	MYSQL_CPPFLAGS=$(${MYSQL_CONFIG} --include)
-	MYSQL_LDFLAGS=$(${MYSQL_CONFIG} --libs)
-	AC_SUBST([MYSQL_CPPFLAGS])
-	AC_SUBST([MYSQL_LDFLAGS])
-	if test "${MYSQL_CONFIG}" != ":"; then
-		AC_DEFINE([HAVE_MYSQL], [1], [Defined when mysql could be found])
-	fi
-	AC_DEFINE([WITH_MYSQL], [1], [Defined when mysql was desired])
-
-	SXE_DUMP_LIBS
-	CPPFLAGS="${CPPFLAGS} ${MYSQL_CPPFLAGS}"
-	AC_CHECK_HEADERS([mysql/mysql.h mysql.h])
-	SXE_RESTORE_LIBS
-fi
-AM_CONDITIONAL([USE_MYSQL], [test "$with_mysql" != "no" -a "${MYSQL_CONFIG}" != ":"])
-
 ## readline and friends
 SXE_DUMP_LIBS
 VL_LIB_READLINE
@@ -174,28 +150,29 @@ AC_SUBST([LIBREADLINE_CPPFLAGS])
 
 ## check if we've got libedit, we don't use it though at the moment
 PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
+## check for lua, critical
+PKG_CHECK_MODULES([LUA], [lua >= 5.1.4], [have_lua="yes"], [
+	have_lua="no"
+	if test "${enable_server}" = "yes"; then
+		AC_MSG_WARN([server build request but lua missing.])
+		enable_server="no"
+	fi
+])
+AM_CONDITIONAL([HAVE_LUA], [test "${have_lua}" = "yes"])
 
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
-AS_HELP_STRING([--enable-server], [Build the server component, default: no.])],
-	[enable_server="${enableval}"], [enable_server="no"])
+AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
+	[enable_server="${enableval}"], [enable_server="yes"])
 AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
 AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-cliapps], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 AC_ARG_ENABLE([library], [
-AS_HELP_STRING([--enable-library], [Build the library component, default: yes.])],
-	[enable_library="${enableval}"], [enable_library="yes"])
+AS_HELP_STRING([--enable-library], [Build the library component, default: no.])],
+	[enable_library="${enableval}"], [enable_library="no"])
 AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
-
-## check if we've got libconfig
-dnl PKG_CHECK_MODULES([LIBCONFIG], [libconfig])
-## check for lua instead!
-
-## we don't really want pfack dependencies here
-## however this could be useful to module authors to see whats possible
-AM_CONDITIONAL([HAVE_PFACK], [test "0" = "1"])
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
@@ -203,14 +180,31 @@ AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([unserding.pc])
 AC_OUTPUT
 
+if test -n "${BUILD_SERVER_FALSE}"; then
+	BUILD_SRV="yes"
+else
+	BUILD_SRV="no"
+fi
+if test -n "${BUILD_LIBRARY_FALSE}"; then
+	BUILD_LIB="yes"
+else
+	BUILD_LIB="no"
+fi
+if test -n "${BUILD_CLIAPPS_FALSE}"; then
+	BUILD_CLI="yes"
+else
+	BUILD_CLI="no"
+fi
+
 echo
 echo
 echo "Build summary"
 echo "============="
 echo
-echo "Build server: ${BUILD_SERVER_FALSE:+yes}"
-echo "Build cliapps: ${BUILD_CLIAPPS_FALSE:+yes}"
-echo "Build library: ${BUILD_LIBRARY_FALSE:+yes}"
+echo "Build cliapps: ${BUILD_CLI}"
+echo "Build server: ${BUILD_SRV}"
+echo "Build library: ${BUILD_LIB}"
+echo "Scripting engine: ${HAVE_LUA_FALSE:+lua}"
 echo
 
 dnl configure.ac ends here

@@ -3,7 +3,13 @@ usage " [server-options] module [...]"
 ##description "unserding daemon"
 
 section "Server options"
-option "config" c "Configuration file" string optional
-option "daemon" d "Detach from tty and run as daemon" flag off
-option "workers" w "Number of concurrent worker threads (default: # of cores)" int optional
+option "config" c
+	"Configuration file"
+	string optional typestr="FILE"
+option "daemon" d
+	"Detach from tty and run as daemon"
+	flag off
+option "workers" w
+	"Number of concurrent worker threads (default: # of cores)"
+	int optional
 

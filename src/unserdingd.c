@@ -92,6 +92,27 @@
 
 FILE *logout;
 
+#define UD_LOG_CRIT(args...)						\
+	do {								\
+		UD_LOGOUT("[unserding] CRITICAL " args);		\
+		UD_SYSLOG(LOG_CRIT, "CRITICAL " args);			\
+	} while (0)
+#define UD_LOG_INFO(args...)						\
+	do {								\
+		UD_LOGOUT("[unserding] " args);				\
+		UD_SYSLOG(LOG_INFO, args);				\
+	} while (0)
+#define UD_LOG_ERR(args...)						\
+	do {								\
+		UD_LOGOUT("[unserding] ERROR " args);			\
+		UD_SYSLOG(LOG_ERR, "ERROR " args);			\
+	} while (0)
+#define UD_LOG_NOTI(args...)						\
+	do {								\
+		UD_LOGOUT("[unserding] NOTICE " args);			\
+		UD_SYSLOG(LOG_NOTICE, args);				\
+	} while (0)
+
 
 typedef struct ud_ev_async_s ud_ev_async;
 
@@ -291,7 +312,7 @@ daemonise(void)
 	case 0:
 		break;
 	default:
-		UD_SYSLOG(LOG_NOTICE, "Successfully bore a squaller: %d\n", pid);
+		UD_LOG_NOTI("Successfully bore a squaller: %d\n", pid);
 		exit(0);
 	}
 
@@ -429,6 +450,8 @@ write_pidfile(const char *pidfile)
 	    (fd = open(pidfile, O_RDWR | O_CREAT | O_TRUNC, 0644)) >= 0) {
 		write(fd, str, len);
 		close(fd);
+	} else {
+		UD_LOG_ERR("Could not write pid file %s\n", pidfile);
 	}
 	return;
 }
@@ -498,9 +521,15 @@ main(int argc, char *argv[])
 	if (nworkers > MAX_WORKERS) {
 		nworkers = MAX_WORKERS;
 	}
-	/* write the pid file */
-	if (argi->pidfile_given) {
-		write_pidfile(argi->pidfile_arg);
+	/* write a pid file? */
+	{
+		const char *pidf;
+
+		if ((argi->pidfile_given && (pidf = argi->pidfile_arg)) ||
+		    (udcfg_glob_lookup_s(&pidf, &__ctx, "pidfile") > 0)) {
+			/* command line has precedence */
+			write_pidfile(pidf);
+		}
 	}
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);
@@ -561,7 +590,7 @@ main(int argc, char *argv[])
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
-	UD_SYSLOG(LOG_NOTICE, "shutting down unserdingd");
+	UD_LOG_NOTI("shutting down unserdingd\n");
 
 	/* deinitialise modules */
 	ud_deinit_modules(&__ctx);

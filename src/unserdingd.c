@@ -521,9 +521,15 @@ main(int argc, char *argv[])
 	if (nworkers > MAX_WORKERS) {
 		nworkers = MAX_WORKERS;
 	}
-	/* write the pid file */
-	if (argi->pidfile_given) {
-		write_pidfile(argi->pidfile_arg);
+	/* write a pid file? */
+	{
+		const char *pidf;
+
+		if ((argi->pidfile_given && (pidf = argi->pidfile_arg)) ||
+		    (udcfg_glob_lookup_s(&pidf, &__ctx, "pidfile") > 0)) {
+			/* command line has precedence */
+			write_pidfile(pidf);
+		}
 	}
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);

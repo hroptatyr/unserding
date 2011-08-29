@@ -1,0 +1,2 @@
+PIDFILE=/var/run/unserding.pid
+CONFFILE=/etc/unserding/default.lua

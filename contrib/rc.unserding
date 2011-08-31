@@ -35,6 +35,8 @@ UNSERDING_BIN=/usr/sbin/unserdingd
 test -x "${UNSERDING_BIN}" || exit 5
 
 # Check for existence of needed config file and read it
+## we expect the variable CONFFILE to be set and point at a
+## lua config file suitable for unserding, see example.unserding.lua
 UNSERDING_CONFIG=/etc/sysconfig/unserding
 test -r "${UNSERDING_CONFIG}" || exit 6
 . "${UNSERDING_CONFIG}"

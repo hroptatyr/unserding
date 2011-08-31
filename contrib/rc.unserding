@@ -70,6 +70,7 @@ rc_reset
 # considered a success.
 
 PIDFILE=/var/run/unserding/unserding.pid
+UNSERUSER=unser
 
 case "$1" in
     start)
@@ -79,7 +80,8 @@ case "$1" in
 
 	# NOTE: startproc returns 0, even if service is
 	# already running to match LSB spec.
-	startproc "${UNSERDING_BIN}" -d -c "${CONFFILE}" -p "${PIDFILE}"
+	startproc -f -u "${UNSERUSER}" \
+		"${UNSERDING_BIN}" -d -c "${CONFFILE}" -p "${PIDFILE}"
 
 	# Remember status and be verbose
 	rc_status -v

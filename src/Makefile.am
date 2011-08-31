@@ -6,15 +6,14 @@ AM_LDFLAGS = -lpthread
 headerdir = $(includedir)/unserding
 moddir = $(libdir)/unserding
 
-bin_PROGRAMS =
 noinst_PROGRAMS =
 header_HEADERS =
 noinst_HEADERS =
 if BUILD_SERVER
-bin_PROGRAMS += unserdingd
+sbin_PROGRAMS = unserdingd
 endif
 if BUILD_CLIAPPS
-bin_PROGRAMS += unsercli
+bin_PROGRAMS = unsercli
 endif
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la

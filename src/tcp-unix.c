@@ -515,7 +515,7 @@ make_unix_conn(const char *path, ud_cbcb_f data_in, ud_ccb_f clo, void *data)
 	if (path != NULL &&
 	    (sock = conn_listener_uds(path)) > 0 &&
 	    gloop != NULL &&
-	    (res =init_conn_watchers(gloop, sock)) != NULL) {
+	    (res = init_conn_watchers(gloop, sock)) != NULL) {
 		res->iord = data_in;
 		res->clos = clo;
 		res->data = data;

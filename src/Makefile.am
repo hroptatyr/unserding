@@ -49,7 +49,7 @@ unserdingd_SOURCES += jpool.h jpool.c
 unserdingd_SOURCES += lua-config.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
 unserdingd_CPPFLAGS += $(LIBEV_CPPFLAGS)
-unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
+unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unserdingd_LDFLAGS += -llua ## check for me
 unserdingd_LDFLAGS += $(LIBEV_LIBS)
 unserdingd_LDFLAGS += $(LIBLTDL)
@@ -58,6 +58,7 @@ unserdingd_LDADD = libunserding.la
 else
 unserdingd_LDADD = libunserding.a
 endif
+unserdingd_LDADD += -lrt
 BUILT_SOURCES += unserdingd-clo.c unserdingd-clo.h
 
 ## server static modules
@@ -76,7 +77,7 @@ unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS) $(LIBEDIT_CPPFLAGS)
 unsercli_CPPFLAGS += -imacros tedious.h
-unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
+unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsercli_LDFLAGS += $(LIBEV_LIBS)
 unsercli_LDFLAGS += $(LIBREADLINE_LIBS)
 if BUILD_LIBRARY
@@ -84,6 +85,7 @@ unsercli_LDADD = libunserding.la
 else
 unsercli_LDADD = libunserding.a
 endif
+unsercli_LDADD += -lrt
 endif
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
 BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
@@ -99,7 +101,8 @@ if BUILD_LIBRARY
 libunserding_la_SOURCES = libstuff.c dccp.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
-libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
+libunserding_la_LDFLAGS = $(AM_LDFLAGS)
+libunserding_la_LIBADD = -lrt
 else
 libunserding_a_SOURCES = libstuff.c dccp.c
 libunserding_a_SOURCES += svc-pong.c svc-pong.h

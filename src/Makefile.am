@@ -3,11 +3,9 @@
 AM_CPPFLAGS = -pthread -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS = -lpthread
 
-headerdir = $(includedir)/unserding
 moddir = $(libdir)/unserding
 
 noinst_PROGRAMS =
-header_HEADERS =
 noinst_HEADERS =
 if BUILD_SERVER
 sbin_PROGRAMS = unserdingd
@@ -25,12 +23,23 @@ BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
+if BUILD_LIBRARY
+headerdir = $(includedir)/unserding
+header_HEADERS =
 header_HEADERS += unserding.h protocore.h seria.h module.h
 header_HEADERS += mcast.h dccp.h tcp-unix.h
 header_HEADERS += logger.h
 header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
 header_HEADERS += lua-config.h
+else
+noinst_HEADERS += unserding.h protocore.h seria.h module.h
+noinst_HEADERS += mcast.h dccp.h tcp-unix.h
+noinst_HEADERS += logger.h
+noinst_HEADERS += unserding-cfg.h
+noinst_HEADERS += unserding-ctx.h
+noinst_HEADERS += lua-config.h
+endif
 noinst_HEADERS += unserding-private.h protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h ud-time.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h

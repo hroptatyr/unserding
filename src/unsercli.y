@@ -66,10 +66,6 @@
 # include <errno.h>
 #endif
 
-#if defined HAVE_POPT_H || 1
-# include <popt.h>
-#endif
-
 #include "unserding.h"
 #include "unserding-private.h"
 #include "protocore.h"

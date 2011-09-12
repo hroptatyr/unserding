@@ -57,9 +57,10 @@ unserdingd_SOURCES += wpool.h wpool.c fsarrqueue.h
 unserdingd_SOURCES += jpool.h jpool.c
 unserdingd_SOURCES += lua-config.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
+unserdingd_CPPFLAGS += $(LUA_CFLAGS)
 unserdingd_CPPFLAGS += $(LIBEV_CPPFLAGS)
 unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
-unserdingd_LDFLAGS += -llua ## check for me
+unserdingd_LDFLAGS += $(LUA_LIBS)
 unserdingd_LDFLAGS += $(LIBEV_LIBS)
 unserdingd_LDFLAGS += $(LIBLTDL)
 if BUILD_LIBRARY

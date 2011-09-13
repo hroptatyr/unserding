@@ -6,7 +6,24 @@ dnl This file is part of SXEmacs
 
 AC_DEFUN([SXE_CHECK_LIBTOOL], [dnl
 	AC_MSG_RESULT([starting libtool investigation...])
-	_SXE_CHECK_LT2
+	LT_PREREQ([2.1])
+	LT_INIT([dlopen])
+
+	LT_LIB_DLLOAD
+	LT_LIB_M
+	LT_SYS_DLOPEN_DEPLIBS
+	LT_SYS_DLSEARCH_PATH
+	LT_SYS_MODULE_EXT
+	LT_SYS_MODULE_PATH
+	LT_SYS_SYMBOL_USCORE
+	LT_FUNC_DLSYM_USCORE
+
+	dnl Configure libltdl
+	dnl newer libtool2s will do this implicitly, we drop all support
+	dnl for the `old' libtool2 stuff as this is available through
+	dnl cvs only and we stick with the latest
+	dnl AC_CONFIG_SUBDIRS([libltdl])
+	AC_CONFIG_MACRO_DIR([libltdl/m4])
 
 	if test -n "$export_dynamic_flag_spec"; then
 		sxe_cv_export_dynamic=$(\
@@ -38,127 +55,14 @@ might be wrong as well.
 	AC_SUBST([LT_CONVENIENCE_PREFIX])
 ])dnl SXE_CHECK_LIBTOOL
 
-AC_DEFUN([_SXE_CHECK_LT2], [dnl
-
-	LT_PREREQ([2.1])
-	LT_INIT([dlopen])
-
-	LT_LIB_DLLOAD
-	LT_LIB_M
-	LT_SYS_DLOPEN_DEPLIBS
-	LT_SYS_DLSEARCH_PATH
-	LT_SYS_MODULE_EXT
-	LT_SYS_MODULE_PATH
-	LT_SYS_SYMBOL_USCORE
-	LT_FUNC_DLSYM_USCORE
-
-	dnl Configure libltdl
-	dnl newer libtool2s will do this implicitly, we drop all support
-	dnl for the `old' libtool2 stuff as this is available through
-	dnl cvs only and we stick with the latest
-	dnl AC_CONFIG_SUBDIRS([libltdl])
-	AC_CONFIG_MACRO_DIR([libltdl/m4])
-])dnl _SXE_CHECK_LT2
-
 AC_DEFUN([SXE_CHECK_LIBLTDL], [dnl
 	## make sure the libtool stuff has been run before
 	AC_REQUIRE([SXE_CHECK_LIBTOOL])
 
 	LT_CONFIG_LTDL_DIR([libltdl], [recursive])
-	LTDL_INSTALLABLE
 	LTDL_INIT
 
-	AC_CACHE_CHECK([for dynamic loader provided by libltdl],
-		[sxe_cv_feat_libltdl], [_SXE_CHECK_LIBLTDL])
-
-	## if the user wants to use the included libltdl, descend
-	if test -z "$with_included_ltdl" -a \
-		-d "libltdl" -a \
-		"$with_module_support" != "no" -a \
-		"$sxe_cv_feat_libltdl" != "yes"; then
-		with_included_ltdl="yes"
-		## assume we have a working ltdl lib afterwards
-		sxe_cv_feat_libltdl="yes"
-		## also install that pig
-		enable_ltdl_install="yes"
-		## add libltdl/ to the include path
-		CPPFLAGS="$CPPFLAGS ${LTDLINCL}"
-		## and assume we've seen ltdl.h
-		AC_DEFINE([HAVE_LTDL_H], [1], [Whether ltdl.h is somewhere])
-	elif test -d "libltdl" -a \
-		"$with_included_ltdl" = "yes"; then
-		## the user WANTS to use the included ltdl
-		## assume we have a working ltdl lib afterwards
-		sxe_cv_feat_libltdl="yes"
-		## also install that pig
-		enable_ltdl_install="yes"
-		## add libltdl/ to the include path
-		CPPFLAGS="$CPPFLAGS -I${top_srcdir}/libltdl"
-		## and assume we've seen ltdl.h
-		AC_DEFINE([HAVE_LTDL_H], [1], [Whether ltdl.h is somewhere])
-	else
-		with_included_ltdl="no"
-	fi
 	AM_CONDITIONAL([DESCEND_LIBLTDL], [test "$with_included_ltdl" = "yes"])
 ])dnl SXE_CHECK_LIBLTDL
-
-AC_DEFUN([_SXE_CHECK_LIBLTDL], [dnl
-	AC_MSG_RESULT([])
-	SXE_CHECK_LTDL_HEADERS
-	SXE_CHECK_LTDL_FUNCS
-
-	if test "$ac_cv_header_ltdl_h" = "yes" -a \
-		"$ac_cv_func_lt_dlopen" = "yes" -a \
-		"$ac_cv_func_lt_dlclose" = "yes" -a \
-		"$ac_cv_type_lt_dlhandle" = "yes" -a \
-		"$ac_cv_type_lt_dlinfo" = "yes"; then
-		sxe_cv_feat_libltdl="yes"
-	else
-		sxe_cv_feat_libltdl="no"
-	fi
-])dnl _SXE_CHECK_LIBLTDL
-
-AC_DEFUN([SXE_CHECK_LTDL_HEADERS], [dnl
-	AC_CHECK_HEADERS([ltdl.h])
-])dnl SXE_CHECK_LTDL_HEADERS
-
-AC_DEFUN([SXE_CHECK_LTDL_FUNCS], [dnl
-	AC_REQUIRE([SXE_CHECK_LIBTOOL])
-
-	SXE_DUMP_LIBS
-	LIBS="$LIBS $LIBLTDL"
-	_SXE_CHECK_LTDL_FUNCS
-	SXE_RESTORE_LIBS
-
-	_SXE_CHECK_LTDL_TYPES
-])dnl _SXE_CHECK_LTDL_FUNCS
-
-AC_DEFUN([_SXE_CHECK_LTDL_FUNCS], [dnl
-	AC_CHECK_FUNCS([dnl
-		lt_dlopen lt_dlopenext dnl
-		lt_dlclose lt_dlexit dnl
-		lt_dlsym lt_dlgetinfo dnl
-		lt_dlfree lt_dlforeach lt_dlhandle_next dnl
-		lt_dlinterface_register lt_dlcaller_register lt_dlhandle_fetch dnl
-		lt_dladdsearchdir dnl
-		lt_dlcaller_set_data lt_dlcaller_get_data dnl
-		lt_dlcaller_id dnl
-		])
-
-	AC_CHECK_DECLS([lt_dlopen, lt_dlopenext, lt_dlclose, lt_dlexit],
-		[], [], [
-#ifdef HAVE_LTDL_H
-# include <ltdl.h>
-#endif
-		])
-])dnl _SXE_CHECK_LTDL_FUNCS
-
-AC_DEFUN([_SXE_CHECK_LTDL_TYPES], [dnl
-	AC_CHECK_TYPES([lt_dlinfo, lt_dlhandle], [], [], [
-#ifdef HAVE_LTDL_H
-# include <ltdl.h>
-#endif
-		])
-])dnl _SXE_CHECK_LTDL_TYPES
 
 dnl sxe-libtool.m4 ends here

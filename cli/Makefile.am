@@ -24,13 +24,15 @@ UD_LDXFLAGS = -lrt
 if BUILD_CLIAPPS
 ud_ping_SOURCES = ud-ping.c
 ud_ping_CPPFLAGS = $(AM_CPPFLAGS) 
-ud_ping_LDFLAGS = $(AM_LDFLAGS) $(UD_LDXFLAGS) -static
+ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
 ud_ping_LDADD = $(UD_LIBS)
+ud_ping_LDADD += $(UD_LDXFLAGS)
 
 ud_itan_SOURCES = ud-itan.c
 ud_itan_CPPFLAGS = $(AM_CPPFLAGS)
-ud_itan_LDFLAGS = $(AM_LDFLAGS) $(UD_LDXFLAGS) -static
+ud_itan_LDFLAGS = $(AM_LDFLAGS) -static
 ud_itan_LDADD = $(UD_LIBS)
+ud_itan_LDADD += $(UD_LDXFLAGS)
 endif
 
 # 

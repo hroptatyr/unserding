@@ -3,11 +3,9 @@
 AM_CPPFLAGS = -pthread -D_GNU_SOURCE -D_POSIX_C_SOURCE=201001L -D__USE_XOPEN2K8
 AM_LDFLAGS = -lpthread
 
-headerdir = $(includedir)/unserding
 moddir = $(libdir)/unserding
 
 noinst_PROGRAMS =
-header_HEADERS =
 noinst_HEADERS =
 if BUILD_SERVER
 sbin_PROGRAMS = unserdingd
@@ -25,12 +23,23 @@ BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
+if BUILD_LIBRARY
+headerdir = $(includedir)/unserding
+header_HEADERS =
 header_HEADERS += unserding.h protocore.h seria.h module.h
 header_HEADERS += mcast.h dccp.h tcp-unix.h
 header_HEADERS += logger.h
 header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
 header_HEADERS += lua-config.h
+else
+noinst_HEADERS += unserding.h protocore.h seria.h module.h
+noinst_HEADERS += mcast.h dccp.h tcp-unix.h
+noinst_HEADERS += logger.h
+noinst_HEADERS += unserding-cfg.h
+noinst_HEADERS += unserding-ctx.h
+noinst_HEADERS += lua-config.h
+endif
 noinst_HEADERS += unserding-private.h protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h ud-time.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
@@ -48,9 +57,10 @@ unserdingd_SOURCES += wpool.h wpool.c fsarrqueue.h
 unserdingd_SOURCES += jpool.h jpool.c
 unserdingd_SOURCES += lua-config.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
+unserdingd_CPPFLAGS += $(LUA_CFLAGS)
 unserdingd_CPPFLAGS += $(LIBEV_CPPFLAGS)
-unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
-unserdingd_LDFLAGS += -llua ## check for me
+unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+unserdingd_LDFLAGS += $(LUA_LIBS)
 unserdingd_LDFLAGS += $(LIBEV_LIBS)
 unserdingd_LDFLAGS += $(LIBLTDL)
 if BUILD_LIBRARY
@@ -58,6 +68,7 @@ unserdingd_LDADD = libunserding.la
 else
 unserdingd_LDADD = libunserding.a
 endif
+unserdingd_LDADD += -lrt
 BUILT_SOURCES += unserdingd-clo.c unserdingd-clo.h
 
 ## server static modules
@@ -76,7 +87,7 @@ unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
 unsercli_LFLAGS = --prefix="cli_yy"
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS) $(LIBEDIT_CPPFLAGS)
 unsercli_CPPFLAGS += -imacros tedious.h
-unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS) -lrt
+unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
 unsercli_LDFLAGS += $(LIBEV_LIBS)
 unsercli_LDFLAGS += $(LIBREADLINE_LIBS)
 if BUILD_LIBRARY
@@ -84,6 +95,7 @@ unsercli_LDADD = libunserding.la
 else
 unsercli_LDADD = libunserding.a
 endif
+unsercli_LDADD += -lrt
 endif
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
 BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
@@ -99,7 +111,8 @@ if BUILD_LIBRARY
 libunserding_la_SOURCES = libstuff.c dccp.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
-libunserding_la_LDFLAGS = $(AM_LDFLAGS) -lrt
+libunserding_la_LDFLAGS = $(AM_LDFLAGS)
+libunserding_la_LIBADD = -lrt
 else
 libunserding_a_SOURCES = libstuff.c dccp.c
 libunserding_a_SOURCES += svc-pong.c svc-pong.h

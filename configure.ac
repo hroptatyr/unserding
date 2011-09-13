@@ -3,7 +3,12 @@ dnl Autoconf startup.
 dnl -------------------------------------------------------------------------
 
 AC_PREREQ([2.63])
-AC_INIT([unserding], m4_esyscmd([./git-version-gen]), [https://trac.ga-group.nl/freundt_devel])
+m4_define([GIT_VERSION_GEN], [dnl
+pushdef([version], [m4_esyscmd([./git-version-gen])])dnl
+ifelse([]version[], [], [0.2.2], []version[])[]dnl
+popdef([version])dnl
+])
+AC_INIT([unserding], [GIT_VERSION_GEN], [https://trac.ga-group.nl/freundt_devel/])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADER([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])

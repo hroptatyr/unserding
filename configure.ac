@@ -156,7 +156,7 @@ AC_SUBST([LIBREADLINE_CPPFLAGS])
 ## check if we've got libedit, we don't use it though at the moment
 PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
 ## check for lua, critical
-PKG_CHECK_MODULES([LUA], [lua >= 5.1.4], [have_lua="yes"], [
+PKG_CHECK_MODULES([LUA], [lua >= 5.1], [have_lua="yes"], [
 	have_lua="no"
 	if test "${enable_server}" = "yes"; then
 		AC_MSG_WARN([server build request but lua missing.])

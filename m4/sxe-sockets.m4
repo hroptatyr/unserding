@@ -461,7 +461,6 @@ AC_DEFUN([SXE_CHECK_TCPUDP_SOCKETS], [dnl
 	have_tcpudp="uncertain"
 
 	SXE_CHECK_HEADERS([netinet/in.h])
-	SXE_CHECK_GETHOSTBYNAME
 	SXE_CHECK_GETHOSTNAME
 	SXE_CHECK_GETNAMEINFO
 	SXE_CHECK_GETADDRINFO
@@ -479,7 +478,6 @@ AC_DEFUN([SXE_CHECK_TCPUDP_SOCKETS], [dnl
 		"$ac_cv_header_arpa_inet_h" = "yes" -a \
 		"$ac_cv_header_netdb_h" = "yes"; then
 		if test "$ac_sxe_func_socket" = "yes" -a \
-			"$ac_sxe_func_gethostbyname" = "yes" -a \
 			"$ac_sxe_func_gethostname" = "yes" -a \
 			"$ac_sxe_func_getnameinfo" = "yes" -a \
 			"$ac_sxe_func_getaddrinfo" = "yes"; then

@@ -3,7 +3,11 @@ LC_ALL = C
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = libltdl src cli
+SUBDIRS =
+if DESCEND_LIBLTDL
+SUBDIRS += libltdl
+endif
+SUBDIRS += src cli
 
 if BUILD_LIBRARY
 pkgconfigdir = @libdir@/pkgconfig

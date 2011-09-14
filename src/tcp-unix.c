@@ -126,30 +126,39 @@ struct __conn_s {
 
 	ud_conn_t parent;
 	void *data;
+
+	/* navigator */
+	ud_conn_t next;
 };
 
 /* helpers for the buffer writers */
 static size_t nconns = 0;
-static struct __conn_s *conns = NULL;
+static ud_conn_t free_conns = NULL;
+static ud_conn_t used_conns = NULL;
 
 static ud_conn_t
 make_conn(ud_ctype_t ty)
 {
 	ud_conn_t res;
 
-	for (size_t i = 0; i < nconns; i++) {
-		if (conns[i].ty == UD_CONN_UNK) {
-			res = conns + i;
-			goto out;
+	/* check if the free list has enough connections */
+	if (free_conns == NULL) {
+		/* create 16 free conns cells */
+		free_conns = calloc(16, sizeof(*free_conns));
+		for (size_t i = 0; i < 15; i++) {
+			free_conns[i].next = free_conns + i + 1;
 		}
 	}
-	/* create one, check for resize first */
-	if ((nconns % 16) == 0) {
-		conns = realloc(conns, 16 * sizeof(*conns));
-		memset(conns + nconns, 0, 16 * sizeof(*conns));
+
+	res = free_conns;
+	free_conns = free_conns->next;
+	nconns++;
+	if (used_conns) {
+		res->next = used_conns;
+	} else {
+		res->next = NULL;
 	}
-	res = conns + nconns++;
-out:
+	used_conns = res;
 	res->ty = ty;
 	return res;
 }
@@ -157,7 +166,23 @@ out:
 static void
 free_conn(ud_conn_t c)
 {
+	if (c == used_conns) {
+		used_conns = used_conns->next;
+	} else {
+		for (ud_conn_t p = used_conns; p && p->next; p = p->next) {
+			if (p->next == c) {
+				p->next = c->next;
+				break;
+			}
+		}
+	}
+
 	memset(c, 0, sizeof(*c));
+	if (free_conns) {
+		c->next = free_conns;
+	}
+	free_conns = c;
+	nconns--;
 	return;
 }
 
@@ -388,9 +413,8 @@ data_cb(EV_P_ ev_io *w, int UNUSED(re))
 	}
 	return;
 clo:
-	for (size_t i = 0; i < nconns; i++) {
-		if (conns[i].wb->neigh == c) {
-			ud_conn_t n = conns + i;
+	for (ud_conn_t p = used_conns; p; p = p->next) {
+		if (p->wb->neigh == c) {
 			UD_DEBUG_TU("unfinished business on %p\n", c);
 			return;
 		}
@@ -515,7 +539,7 @@ make_unix_conn(const char *path, ud_cbcb_f data_in, ud_ccb_f clo, void *data)
 	if (path != NULL &&
 	    (sock = conn_listener_uds(path)) > 0 &&
 	    gloop != NULL &&
-	    (res =init_conn_watchers(gloop, sock)) != NULL) {
+	    (res = init_conn_watchers(gloop, sock)) != NULL) {
 		res->iord = data_in;
 		res->clos = clo;
 		res->data = data;
@@ -543,10 +567,10 @@ ud_conn_fini(ud_conn_t c)
 {
 	void *res = c->data;
 
-	for (size_t i = 0; i < nconns; i++) {
+	for (ud_conn_t p = used_conns; p; p = p->next) {
 		/* find kids, whose parent is C */
-		if (conns[i].parent == c) {
-			clos_any(gloop, conns + i, true);
+		if (p->parent == c) {
+			clos_any(gloop, p->parent, true);
 		}
 	}
 	clos_any(gloop, c, true);
@@ -595,8 +619,8 @@ ud_attach_tcp_unix(EV_P_ bool UNUSED(prefer_ipv6))
 int
 ud_detach_tcp_unix(EV_P)
 {
-	for (size_t i = 0; i < nconns; i++) {
-		clos_any(EV_A_ conns + i, true);
+	for (ud_conn_t p = used_conns; p; p = p->next) {
+		clos_any(EV_A_ p, true);
 	}
 	gloop = NULL;
 	return 0;

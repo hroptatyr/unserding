@@ -3,7 +3,12 @@ dnl Autoconf startup.
 dnl -------------------------------------------------------------------------
 
 AC_PREREQ([2.63])
-AC_INIT([unserding], m4_esyscmd([./git-version-gen]), [https://trac.ga-group.nl/freundt_devel])
+m4_define([GIT_VERSION_GEN], [dnl
+pushdef([version], [m4_esyscmd([./git-version-gen])])dnl
+ifelse([]version[], [], [0.2.2], []version[])[]dnl
+popdef([version])dnl
+])
+AC_INIT([unserding], [GIT_VERSION_GEN], [https://github.com/hroptatyr/unserding])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_HEADER([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -151,7 +156,7 @@ AC_SUBST([LIBREADLINE_CPPFLAGS])
 ## check if we've got libedit, we don't use it though at the moment
 PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
 ## check for lua, critical
-PKG_CHECK_MODULES([LUA], [lua >= 5.1.4], [have_lua="yes"], [
+PKG_CHECK_MODULES([LUA], [lua >= 5.1], [have_lua="yes"], [
 	have_lua="no"
 	if test "${enable_server}" = "yes"; then
 		AC_MSG_WARN([server build request but lua missing.])

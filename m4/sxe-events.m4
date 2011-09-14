@@ -66,19 +66,16 @@ AC_DEFUN([SXE_CHECK_LIBEV], [
 		AC_DEFINE([HAVE_LIBEV], [1], [Whether libev is fully functional])
 		sxe_cv_feat_libev="yes"
 		have_libev="yes"
-		LIBEV_CPPFLAGS=
-		LIBEV_LDFLAGS=
+		LIBEV_CFLAGS=
 		LIBEV_LIBS="-lev"
 	else
 		sxe_cv_feat_libev="no"
 		have_libev="no"
-		LIBEV_CPPFLAGS=
-		LIBEV_LDFLAGS=
+		LIBEV_CFLAGS=
 		LIBEV_LIBS=
 	fi
 
-	AC_SUBST([LIBEV_CPPFLAGS])
-	AC_SUBST([LIBEV_LDFLAGS])
+	AC_SUBST([LIBEV_CFLAGS])
 	AC_SUBST([LIBEV_LIBS])
 ])dnl SXE_CHECK_LIBEVENT
 

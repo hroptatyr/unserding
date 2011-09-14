@@ -51,8 +51,8 @@ unserdingd_SOURCES += jpool.h jpool.c
 unserdingd_SOURCES += lua-config.c
 unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
 unserdingd_CPPFLAGS += $(LUA_CFLAGS)
-unserdingd_CPPFLAGS += $(LIBEV_CPPFLAGS)
-unserdingd_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+unserdingd_CPPFLAGS += $(LIBEV_CFLAGS)
+unserdingd_LDFLAGS = $(AM_LDFLAGS)
 unserdingd_LDFLAGS += $(LUA_LIBS)
 unserdingd_LDFLAGS += $(LIBEV_LIBS)
 unserdingd_LDFLAGS += $(LIBLTDL)
@@ -78,9 +78,9 @@ if BUILD_CLIAPPS
 unsercli_SOURCES = unsercli.y scanner.l
 unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
 unsercli_LFLAGS = --prefix="cli_yy"
-unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CPPFLAGS) $(LIBEDIT_CPPFLAGS)
+unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CFLAGS) $(LIBEDIT_CPPFLAGS)
 unsercli_CPPFLAGS += -imacros tedious.h
-unsercli_LDFLAGS = $(AM_LDFLAGS) $(LIBEV_LDFLAGS)
+unsercli_LDFLAGS = $(AM_LDFLAGS)
 unsercli_LDFLAGS += $(LIBEV_LIBS)
 unsercli_LDFLAGS += $(LIBREADLINE_LIBS)
 if BUILD_LIBRARY

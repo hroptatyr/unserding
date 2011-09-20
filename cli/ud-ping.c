@@ -253,7 +253,7 @@ Usage: ud-ping [-c count] [-n|--negotiation] [-i interval]\n");
 }
 
 static void
-parse_args(int argc, const char *argv[])
+parse_args(int argc, const char *const *argv)
 {
 	/* set some defaults */
 	timeout = 1000;
@@ -298,7 +298,7 @@ parse_args(int argc, const char *argv[])
 }
 
 int
-main(int argc, const char *argv[])
+main(int argc, char *argv[])
 {
 	static struct ud_handle_s __hdl;
 

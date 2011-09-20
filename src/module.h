@@ -43,7 +43,7 @@ extern void *open_aux(const char *file, void *clo);
 extern void close_aux(void *handle, void *clo);
 extern void *find_sym(void *handle, const char *sym_name);
 
-extern void ud_mod_dump(FILE *whither);
+extern void ud_mod_dump(void *file);
 
 extern void ud_init_modules(char *const args[], size_t nargs, void *clo);
 extern void ud_deinit_modules(void *clo);

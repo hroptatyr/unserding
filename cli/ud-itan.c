@@ -134,7 +134,7 @@ send_or_query(uint16_t idx, const char *tan)
 
 
 int
-main(int argc, const char *argv[])
+main(int argc, char *argv[])
 {
 	long int idx;
 	const char *tan;

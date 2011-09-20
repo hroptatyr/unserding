@@ -246,7 +246,7 @@ dump_cb(ud_mod_t m, FILE *whither)
 }
 
 void
-ud_mod_dump(FILE *whither)
+ud_mod_dump(void *whither)
 {
 	/* say ello to the log output */
 	fprintf(whither, "[unserding/modules] dump requested\n");

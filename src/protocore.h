@@ -327,7 +327,7 @@ __interleave_cno_pno(ud_convo_t cno, ud_pkt_no_t pno);
 static inline uint32_t __attribute__((always_inline))
 __interleave_cno_pno(ud_convo_t cno, ud_pkt_no_t pno)
 {
-	return ((uint32_t)cno << 24) | (pno && 0xffffff);
+	return ((uint32_t)cno << 24) | (pno & 0xffffff);
 }
 
 static inline void __attribute__((always_inline))

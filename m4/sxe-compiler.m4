@@ -251,7 +251,7 @@ AC_DEFUN([SXE_CHECK_CFLAGS], [dnl
 	## unset the werror flag again
 	SXE_LANG_WERROR([off])
 
-	CFLAGS="$SXE_CFLAGS ${CFLAGS}"
+	CFLAGS="$SXE_CFLAGS ${ac_cv_env_CFLAGS_value}"
 	AC_MSG_CHECKING([for preferred CFLAGS])
 	AC_MSG_RESULT([${SXE_CFLAGS}])
 

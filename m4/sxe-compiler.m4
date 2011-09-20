@@ -189,6 +189,8 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 	SXE_CHECK_COMPILER_FLAGS([-Wdeprecated], [
 		warnflags="$warnflags -Wdeprecated"])
 
+	SXE_CHECK_COMPILER_FLAGS([-w2], [warnflags="-w2"])
+
 	AC_MSG_CHECKING([for preferred warning flags])
 	AC_MSG_RESULT([${warnflags}])
 ])dnl SXE_WARNFLAGS

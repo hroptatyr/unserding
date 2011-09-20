@@ -38,7 +38,7 @@ SXE_INIT_MSG_LEVEL
 with_ridiculously_aggressive_optimisations="yes"
 with_maximum_warning_output="yes"
 with_omp="no"
-AC_PROG_CC(["icc -static-intel" icc gcc cc])
+AC_PROG_CC([icc gcc clang tcc cc])
 SXE_CHECK_CC
 SXE_CHECK_CFLAGS
 

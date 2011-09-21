@@ -242,7 +242,7 @@ init_histfile()
         if (getpwuid_r(geteuid(), &pwdstr, pwdbuf, sizeof(pwdbuf), &pwd) != 0) {
                 return;
 	}
-        p += snprintf(histfile, countof(histfile), pwd->pw_dir);
+        p += snprintf(histfile, countof(histfile), "%s", pwd->pw_dir);
 	*p++ = '/';
 	memcpy(p, HISTFILE, countof(HISTFILE));
         return;

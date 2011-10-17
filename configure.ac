@@ -29,7 +29,7 @@ AC_COPYRIGHT(
 ###     autoreconf
 ])
 
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([foreign dist-xz])
 
 ## initialise our cool message nest levels
 SXE_INIT_MSG_LEVEL

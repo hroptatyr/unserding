@@ -201,8 +201,13 @@ AC_DEFUN([SXE_OPTIFLAGS], [dnl
 ])dnl SXE_OPTIFLAGS
 
 AC_DEFUN([SXE_FEATFLAGS], [dnl
+	## if libtool then
+	dnl XFLAG="-XCClinker"
 	## default flags for needed features
-	dnl none at the moment
+	SXE_CHECK_COMPILER_FLAGS([-static-intel], [
+		ldflags="${ldflags} ${XFLAG} -static-intel"])
+	SXE_CHECK_COMPILER_FLAGS([-static-libgcc], [
+		ldflags="${ldflags} ${XFLAG} -static-libgcc"])
 ])dnl SXE_FEATFLAGS
 
 
@@ -256,7 +261,7 @@ AC_DEFUN([SXE_CHECK_CFLAGS], [dnl
 
 	CFLAGS="$SXE_CFLAGS ${ac_cv_env_CFLAGS_value}"
 	AC_MSG_CHECKING([for preferred CFLAGS])
-	AC_MSG_RESULT([${SXE_CFLAGS}])
+	AC_MSG_RESULT([${CFLAGS}])
 
 	AC_MSG_NOTICE([
 If you wish to ADD your own flags you want to stop here and rerun the
@@ -271,7 +276,57 @@ or
 respectively
 		])
 
+	LDFLAGS="${ldflags} ${ac_cv_env_LDFLAGS_value}"
+	AC_MSG_CHECKING([for preferred LDFLAGS])
+	AC_MSG_RESULT([${LDFLAGS}])
+
 ])dnl SXE_CHECK_CFLAGS
+
+AC_DEFUN([SXE_CHECK_CC], [dnl
+	for i in "gnu1x" "c1x" "gnu99" "c99"; do
+		SXE_CHECK_COMPILER_FLAGS([-std="${i}"], [
+			std="-std=${i}"
+			break
+		])
+	done
+
+	AC_MSG_CHECKING([for preferred CC std])
+	AC_MSG_RESULT([${std}])
+	CC="${CC} ${std}"
+])dnl SXE_CHECK_CC
+
+AC_DEFUN([SXE_CHECK_ANON_STRUCTS], [
+	AC_MSG_CHECKING([whether C compiler can cope with anonymous structures])
+	AC_LANG_PUSH(C)
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+union __test_u {
+	int i;
+	struct {
+		char c;
+		char padc;
+		short int pads;
+	};
+};
+	]], [[
+	union __test_u tmp = {.c = '4'};
+	]])], [
+		sxe_cv_have_anon_structs="yes"
+	], [
+		sxe_cv_have_anon_structs="no"
+	])
+	AC_MSG_RESULT([${sxe_cv_have_anon_structs}])
+
+	if test "${sxe_cv_have_anon_structs}" = "yes"; then
+		AC_DEFINE([HAVE_ANON_STRUCTS], [1], [
+			Whether c1x anon structs work])
+		$1
+		:
+	else
+		$2
+		:
+	fi
+	AC_LANG_POP()
+])dnl SXE_CHECK_ANON_STRUCTS
 
 
 dnl sxe-compiler.m4 ends here

@@ -204,7 +204,7 @@ read_lua_config(void *L, const char *file)
 void
 lua_config_init(void **state)
 {
-	*state = lua_open();
+	*state = luaL_newstate();
 	/* add our bindings */
 	register_funs(*state);
 	return;

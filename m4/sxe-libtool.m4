@@ -54,8 +54,8 @@ might be wrong as well.
 	LT_CONVENIENCE_PREFIX="lt-"
 	AC_SUBST([LT_CONVENIENCE_PREFIX])
 
-	## also check for what we need to pass to get through to our linker
-	SXE_CHECK_COMPILER_XFLAG
+	## reset XCCFLAG, we KNOW it's XCClinker in libtool
+	XCCFLAG="-XCClinker"
 ])dnl SXE_CHECK_LIBTOOL
 
 AC_DEFUN([SXE_CHECK_LIBLTDL], [dnl

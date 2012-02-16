@@ -40,14 +40,14 @@ AC_PROG_CC([icc gcc clang tcc cc])
 AC_PROG_CC_C99
 AM_PROG_CC_C_O
 SXE_CHECK_CFLAGS
+## check for ld flags that we might need
+SXE_CHECK_LDFLAGS
 
 SXE_CHECK_PARSER_LEXER
 
 ## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
 SXE_CHECK_LIBLTDL
-## check for ld flags that we might need
-SXE_CHECK_LDFLAGS
 
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])

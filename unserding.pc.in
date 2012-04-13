@@ -6,6 +6,6 @@ libdir=@libdir@
 Name: unserding
 Description: Ubiquitous Network Service to Enquire Real or Deduced Information
 Version: @PACKAGE_VERSION@
-Libs: @LDFLAGS@ -L${libdir} -lc
+Libs: @LDFLAGS@ -L${libdir} -lunserding
 Cflags: @CPPFLAGS@ -I${includedir}
 

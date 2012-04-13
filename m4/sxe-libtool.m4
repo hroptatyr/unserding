@@ -53,6 +53,9 @@ might be wrong as well.
 	## seems to be a consistent choice throughout all libtools
 	LT_CONVENIENCE_PREFIX="lt-"
 	AC_SUBST([LT_CONVENIENCE_PREFIX])
+
+	## reset XCCFLAG, we KNOW it's XCClinker in libtool
+	XCCFLAG="-XCClinker"
 ])dnl SXE_CHECK_LIBTOOL
 
 AC_DEFUN([SXE_CHECK_LIBLTDL], [dnl

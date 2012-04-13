@@ -104,7 +104,7 @@ if BUILD_LIBRARY
 libunserding_la_SOURCES = libstuff.c dccp.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
-libunserding_la_LDFLAGS = $(AM_LDFLAGS)
+libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
 libunserding_la_LIBADD = -lrt
 else
 libunserding_a_SOURCES = libstuff.c dccp.c

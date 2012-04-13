@@ -41,7 +41,9 @@ AC_DEFUN([SXE_CHECK_LIBEV], [
 	CPPFLAGS="$CPPFLAGS $LIBEV_CFLAGS"
 	LDFLAGS="$LDFLAGS $LIBEV_LIBS"
 	SXE_CHECK_HEADERS([ev.h])
+	SXE_LANG_WERROR([push+off])
 	SXE_CHECK_LIB_FUNCS([ev], [ev_loop_new])
+	SXE_LANG_WERROR([pop])
 	SXE_RESTORE_LIBS
 
 	if test "$ac_cv_header_ev_h" = "yes" -a \

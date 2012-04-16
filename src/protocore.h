@@ -222,7 +222,7 @@ typedef ud_pktwrk_f *ud_pktfam_t;
 
 /**
  * Very prominent job that gets executed in one of the worker threads. */
-extern void ud_proto_parse_j(void *clo);
+extern void ud_proto_parse_j(job_t);
 
 
 extern void init_proto(void);

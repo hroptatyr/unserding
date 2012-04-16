@@ -87,10 +87,8 @@ ud_proto_parse(job_t j)
 
 /* to switch thread contexts */
 void
-ud_proto_parse_j(void *clo)
+ud_proto_parse_j(job_t j)
 {
-	job_t j = clo;
-
 	ud_proto_parse(j);
 	jpool_release(j);
 	return;

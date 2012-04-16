@@ -441,6 +441,7 @@ mcast_listener_deinit(int sock)
 
 
 static char scratch_buf[UDPC_PKTLEN];
+static wpool_work_f wpcb = NULL;
 
 /* this callback is called when data is readable on the main server socket */
 static void
@@ -495,7 +496,7 @@ mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space, also trigger the lazy bastards */
-	wpool_enq(gwpool, ud_proto_parse_j, j, true);
+	wpool_enq(gwpool, wpcb, j, true);
 	return;
 }
 
@@ -556,10 +557,13 @@ send_m46(job_t j)
 
 
 int
-ud_attach_mcast(EV_P_ bool prefer_ipv6_p)
+ud_attach_mcast(EV_P_ ud_work_f cb, bool prefer_ipv6_p)
 {
 	/* get us a global sock */
 	lsock6 = mcast6_listener_init();
+
+	/* store the callback */
+	wpcb = (wpool_work_f)cb;
 
 	if (!prefer_ipv6_p) {
 		/* if we prefer IPv6 we actually mean it's v6 only */

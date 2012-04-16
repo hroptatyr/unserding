@@ -573,7 +573,7 @@ main(int argc, char *argv[])
 	 * we add this quite late so that it's unlikely that a plethora of
 	 * events has already been injected into our precious queue
 	 * causing the libev main loop to crash. */
-	ud_attach_mcast(EV_A_ prefer6p);
+	ud_attach_mcast(EV_A_ ud_proto_parse_j, prefer6p);
 
 	/* attach the tcp/unix service */
 	ud_attach_tcp_unix(EV_A_ prefer6p);

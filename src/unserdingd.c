@@ -377,9 +377,12 @@ static void
 ud_expand_user_cfg_file_name(char *tgt)
 {
 	char *p;
+	const char *homedir = getenv("HOME");
+	size_t homedirlen = strlen(homedir);
 
 	/* get the user's home dir */
-	p = stpcpy(tgt, getenv("HOME"));
+	memcpy(tgt, homedir, homedirlen);
+	p = tgt + homedirlen;
 	*p++ = '/';
 	*p++ = '.';
 	strncpy(p, cfg_file_name, sizeof(cfg_file_name));

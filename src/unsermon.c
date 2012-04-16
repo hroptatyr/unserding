@@ -41,7 +41,6 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <stdbool.h>
-#include <limits.h>
 
 #if defined HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
@@ -66,30 +65,104 @@
 
 #define USE_COROUTINES		1
 
-static FILE *monout;
-static int c_c_p = 0;
+FILE *logout;
 
 
-static void
-sigint_cb(int UNUSED(signum))
+typedef struct ud_worker_s *ud_worker_t;
+typedef struct ud_ev_async_s ud_ev_async;
+
+/* our version of the async event, cdr-coding */
+struct ud_ev_async_s {
+	struct ev_async super;
+};
+
+struct ud_worker_s {
+	pthread_t ALGN16(thread);
+#if !USE_COROUTINES
+	/* the loop we live on */
+	struct ev_loop *loop;
+	/* a watcher for worker jobs */
+	struct ev_async ALGN16(work_watcher);
+	/* a watcher for harakiri orders */
+	struct ev_async ALGN16(kill_watcher);
+#endif	/* !USE_COROUTINES */
+} __attribute__((aligned(16)));
+
+
+static ev_signal ALGN16(__sigint_watcher);
+static ev_signal ALGN16(__sigpipe_watcher);
+static ev_async ALGN16(__wakeup_watcher);
+ev_async *glob_notify;
+
+/* worker magic */
+/* round robin var */
+static index_t rr_wrk = 0;
+
+/* the global job queue */
+static struct job_queue_s __glob_jq = {
+	.ji = 0, .mtx = PTHREAD_MUTEX_INITIALIZER
+};
+job_queue_t glob_jq;
+
+
+inline void __attribute__((always_inline, gnu_inline))
+trigger_job_queue(void)
 {
-	c_c_p = 1;
+	ev_async_send(EV_DEFAULT_ glob_notify);
 	return;
 }
 
-static bool
-ncb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *UNUSED(clo))
-{
-	struct udpc_seria_s sctx;
+static const char emer_msg[] = "unserding has been shut down, cya mate!\n";
 
-	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
-		fputs("no activity\n", monout);
-		return false;
-	}
-	return true;
+static void
+sigint_cb(EV_P_ ev_signal *w, int revents)
+{
+	UD_DEBUG("C-c caught, unrolling everything\n");
+	ev_unloop(EV_A_ EVUNLOOP_ALL);
+	return;
 }
 
 
+static void
+worker_cb(EV_P_ ev_async *w, int revents)
+{
+	job_t j;
+
+	for (unsigned short int i = 0; i < NJOBS; i++) {
+		pthread_mutex_lock(&glob_jq->mtx);
+		j = &glob_jq->jobs[i];
+		if (LIKELY(j->readyp != 0)) {
+			j->readyp = 0;
+		}
+		pthread_mutex_unlock(&glob_jq->mtx);
+		/* race condition!!! */
+		if (LIKELY(j->workf != NULL)) {
+			j->workf(j);
+		}
+		if (LIKELY(j->prntf != NULL)) {
+			j->prntf(j);
+		}
+		free_job(j);
+	}
+	return;
+}
+
+
+/* interests module husk */
+extern void __attribute__((weak)) init_interests(void);
+void __attribute__((weak))
+init_interests(void)
+{
+	return;
+}
+
+static void
+init_glob_jq(void)
+{
+	glob_jq = &__glob_jq;
+	return;
+}
+
 #if defined __INTEL_COMPILER
 # pragma warning (disable:593)
 # pragma warning (disable:181)
@@ -110,41 +183,51 @@ ncb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *UNUSED(clo))
 int
 main(int argc, char *argv[])
 {
-	static struct ud_handle_s hdl[1];
 	struct gengetopt_args_info argi[1];
+	/* use the default event loop unless you have special needs */
+	struct ev_loop *loop = ev_default_loop(0);
+	ev_signal *sigint_watcher = &__sigint_watcher;
+	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 	int res = 0;
 
+	/* where to log */
+	logout = stderr;
 	if (cmdline_parser(argc, argv, argi)) {
 		res = 1;
 		goto out;
 	}
 
-	/* where to log */
-	monout = stdout;
+	/* initialise global job q */
+	init_glob_jq();
 
-	/* obtain a new handle */
-	init_unserding_handle(hdl, PF_INET6, false);
+	/* attach a multicast listener */
+	ud_attach_mcast4(EV_A);
 
-	/* install sig handler */
-	(void)signal(SIGINT, sigint_cb);
-	/* read the raw feed */
-	while (!c_c_p) {
-		char buf[UDPC_PKTLEN];
-		ud_packet_t pkt = {
-			.plen = sizeof(buf),
-			.pbuf = buf
-		};
-		ssize_t nrcv;
-		nrcv = ud_recv_raw(hdl, pkt, 1000);
-		fprintf(monout, "something %zd\n", nrcv);
-	}
+	/* initialise a sig C-c handler */
+	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
+	ev_signal_start(EV_A_ sigint_watcher);
+	/* initialise a sig C-c handler */
+	ev_signal_init(sigpipe_watcher, sigint_cb, SIGPIPE);
+	ev_signal_start(EV_A_ sigpipe_watcher);
+	/* initialise a wakeup handler */
+	glob_notify = &__wakeup_watcher;
+	ev_async_init(glob_notify, worker_cb);
+	ev_async_start(EV_A_ glob_notify);
 
-	/* and lose the handle again */
-	free_unserding_handle(hdl);
+	/* reset the round robin var */
+	rr_wrk = 0;
+	/* now wait for events to arrive */
+	ev_loop(EV_A_ 0);
+
+	/* close the socket */
+	ud_detach_mcast4(EV_A);
+
+	/* destroy the default evloop */
+	ev_default_destroy();
 
 	/* close log file */
-	fflush(monout);
-	fclose(monout);
+	fflush(logout);
+	fclose(logout);
 out:
 	/* free all other resources */
 	cmdline_parser_free(argi);

@@ -134,6 +134,7 @@ static ud_sockaddr_u __sa6 = {
 #endif	/* AF_INET */
 
 
+#if defined UNSERSRV
 /* a simple packet queue and the re-tx service */
 #define MAX_PKTQ_LEN	65536
 #define UD_SVC_RETX	0x0002
@@ -215,6 +216,7 @@ ud_retx(job_t j)
 	send_cl(j);
 	return;
 }
+#endif	/* UNSERSRV */
 
 
 /* socket goodies */
@@ -507,8 +509,10 @@ send_cl(job_t j)
 	}
 	/* write back to whoever sent the packet */
 	(void)sendto(j->sock, j->buf, j->blen, 0, &j->sa.sa, sizeof(j->sa));
+#if defined UNSERSRV
 	/* also store a copy of the packet for the re-tx service */
 	add_packet(j->buf, j->blen);
+#endif	/* UNSERSRV */
 	return;
 }
 
@@ -578,8 +582,10 @@ ud_attach_mcast(EV_P_ bool prefer_ipv6_p)
 		ev_io_start(EV_A_ srv_watcher);
 	}
 
-	/* announce our service */
+#if defined UNSERSRV
+	/* announce our packet queuing service */
 	ud_set_service(UD_SVC_RETX, ud_retx, NULL);
+#endif	/* UNSERSRV */
 	return 0;
 }
 

@@ -8,12 +8,8 @@ moddir = $(libdir)/unserding
 
 noinst_PROGRAMS =
 noinst_HEADERS =
-if BUILD_SERVER
-sbin_PROGRAMS = unserdingd
-endif
-if BUILD_CLIAPPS
-bin_PROGRAMS = unsercli
-endif
+bin_PROGRAMS =
+sbin_PROGRAMS =
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
 else
@@ -44,6 +40,7 @@ EXTRA_DIST += btea.c
 
 if BUILD_SERVER
 ## the main server binary
+sbin_PROGRAMS += unserdingd
 unserdingd_SOURCES = unserdingd.c mcast.c dccp.c tcp-unix.c
 unserdingd_SOURCES += protocore.c seria.c
 unserdingd_SOURCES += module.h module.c
@@ -76,6 +73,7 @@ mod_LTLIBRARIES =
 unsercli_YFLAGS = -d -p "cli_yy"
 if BUILD_CLIAPPS
 ## the main client binary
+bin_PROGRAMS += unsercli
 unsercli_SOURCES = unsercli.y scanner.l
 unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
 unsercli_LFLAGS = --prefix="cli_yy"
@@ -90,7 +88,7 @@ else
 unsercli_LDADD = libunserding.a
 endif
 unsercli_LDADD += -lrt
-endif
+endif ## BUILD_CLIAPPS
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
 BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
 

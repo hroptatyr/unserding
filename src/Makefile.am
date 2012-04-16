@@ -86,6 +86,15 @@ endif ## BUILD_CLIAPPS
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
 BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
 
+if BUILD_CLIAPPS
+bin_PROGRAMS += unsermon
+unsermon_SOURCES = unsermon.c unsermon-clo.ggo
+unsermon_LDFLAGS = $(AM_LDFLAGS)
+unsermon_LDFLAGS += $(LIBEV_LIBS)
+unsermon_LDADD = $(unserding_LIBS)
+endif ## BUILD_CLIAPPS
+BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
+
 ## fucking automake refuses to replay my flex patch
 unsercli-scanner.h: scanner.l
 	$(LEX) $(unsercli_LFLAGS) --header-file=$@ $<

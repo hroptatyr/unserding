@@ -163,16 +163,39 @@ init_glob_jq(void)
 	return;
 }
 
+#if defined __INTEL_COMPILER
+# pragma warning (disable:593)
+# pragma warning (disable:181)
+#elif defined __GNUC__
+# pragma GCC diagnostic ignored "-Wswitch"
+# pragma GCC diagnostic ignored "-Wswitch-enum"
+#endif	/* __INTEL_COMPILER */
+#include "unsermon-clo.h"
+#include "unsermon-clo.c"
+#if defined __INTEL_COMPILER
+# pragma warning (default:593)
+# pragma warning (default:181)
+#elif defined __GNUC__
+# pragma GCC diagnostic warning "-Wswitch"
+# pragma GCC diagnostic warning "-Wswitch-enum"
+#endif	/* __INTEL_COMPILER */
+
 int
-main (void)
+main(int argc, char *argv[])
 {
+	struct gengetopt_args_info argi[1];
 	/* use the default event loop unless you have special needs */
 	struct ev_loop *loop = ev_default_loop(0);
 	ev_signal *sigint_watcher = &__sigint_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+	int res = 0;
 
 	/* where to log */
 	logout = stderr;
+	if (cmdline_parser(argc, argv, argi)) {
+		res = 1;
+		goto out;
+	}
 
 	/* initialise global job q */
 	init_glob_jq();
@@ -205,8 +228,10 @@ main (void)
 	/* close log file */
 	fflush(logout);
 	fclose(logout);
-	/* unloop was called, so exit */
-	return 0;
+out:
+	/* free all other resources */
+	cmdline_parser_free(argi);
+	return res;
 }
 
 /* unsermon.c ends here */

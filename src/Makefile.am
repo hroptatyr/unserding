@@ -12,7 +12,9 @@ bin_PROGRAMS =
 sbin_PROGRAMS =
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
+unserding_LIBS = libunserding.la
 else
+unserding_LIBS = libunserding.a
 noinst_LIBRARIES = libunserding.a
 endif
 
@@ -54,11 +56,7 @@ unserdingd_LDFLAGS = $(AM_LDFLAGS)
 unserdingd_LDFLAGS += $(LUA_LIBS)
 unserdingd_LDFLAGS += $(LIBEV_LIBS)
 unserdingd_LDFLAGS += $(LIBLTDL)
-if BUILD_LIBRARY
-unserdingd_LDADD = libunserding.la
-else
-unserdingd_LDADD = libunserding.a
-endif
+unserdingd_LDADD = $(unserding_LIBS)
 unserdingd_LDADD += -lrt
 BUILT_SOURCES += unserdingd-clo.c unserdingd-clo.h
 
@@ -82,11 +80,7 @@ unsercli_CPPFLAGS += -imacros tedious.h
 unsercli_LDFLAGS = $(AM_LDFLAGS)
 unsercli_LDFLAGS += $(LIBEV_LIBS)
 unsercli_LDFLAGS += $(LIBREADLINE_LIBS)
-if BUILD_LIBRARY
-unsercli_LDADD = libunserding.la
-else
-unsercli_LDADD = libunserding.a
-endif
+unsercli_LDADD = $(unserding_LIBS)
 unsercli_LDADD += -lrt
 endif ## BUILD_CLIAPPS
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h

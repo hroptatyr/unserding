@@ -113,7 +113,7 @@ extern void free_unserding_handle(ud_handle_t);
 /**
  * Send packet PKT through the handle HDL.
  * Block until there is an answer. */
-extern void ud_send_raw(ud_handle_t hdl, ud_packet_t pkt);
+extern ssize_t ud_send_raw(ud_handle_t hdl, ud_packet_t pkt);
 /**
  * Send a CMD-packet through the handle HDL. */
 extern ud_convo_t ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd);
@@ -121,7 +121,7 @@ extern ud_convo_t ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd);
  * Wait (read block) until packets arrive or TIMEOUT millisecs have passed.
  * If packets were found this routine returns exactly one packet and
  * their content is copied into PKT. */
-extern void
+extern ssize_t
 ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout);
 /**
  * Like ud_recv_raw() but only receive packets that belong to convo CNO. */

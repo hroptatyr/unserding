@@ -89,6 +89,9 @@ BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
 if BUILD_CLIAPPS
 bin_PROGRAMS += unsermon
 unsermon_SOURCES = unsermon.c unsermon-clo.ggo
+unsermon_SOURCES += mcast.c mcast.h
+unsermon_SOURCES += wpool.h wpool.c fsarrqueue.h
+unsermon_SOURCES += jpool.h jpool.c
 unsermon_LDFLAGS = $(AM_LDFLAGS)
 unsermon_LDFLAGS += $(LIBEV_LIBS)
 unsermon_LDADD = $(unserding_LIBS)

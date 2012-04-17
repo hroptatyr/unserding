@@ -92,6 +92,7 @@ unsermon_SOURCES = unsermon.c unsermon-clo.ggo
 unsermon_SOURCES += mcast.c mcast.h
 unsermon_SOURCES += wpool.h wpool.c fsarrqueue.h
 unsermon_SOURCES += jpool.h jpool.c
+unsermon_SOURCES += protocore.c protocore.h protocore-private.h
 unsermon_LDFLAGS = $(AM_LDFLAGS)
 unsermon_LDFLAGS += $(LIBEV_LIBS)
 unsermon_LDADD = $(unserding_LIBS)

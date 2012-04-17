@@ -66,6 +66,7 @@
 #include "unserding-private.h"
 /* worker pool */
 #include "wpool.h"
+#include "protocore-private.h"
 
 #define USE_COROUTINES		1
 
@@ -113,7 +114,12 @@ struct ud_loopclo_s {
 static void
 mon_pkt_cb(job_t j)
 {
-	fputs("ACK\n", monout);
+	static char buf[8192];
+	size_t psz;
+
+	psz = ud_sprint_pkt_pretty(buf, JOB_PACKET(j));
+	buf[psz] = '\0';
+	fputs(buf, logout);
 	jpool_release(j);
 	return;
 }

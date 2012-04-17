@@ -227,7 +227,7 @@ fiddle_with_timeout(ud_handle_t hdl, int timeout)
 
 
 /* public funs */
-void
+ssize_t
 ud_send_raw(ud_handle_t hdl, ud_packet_t pkt)
 {
 	int s = ud_handle_sock(hdl);
@@ -237,20 +237,18 @@ ud_send_raw(ud_handle_t hdl, ud_packet_t pkt)
 	}
 
 	/* always send to the mcast addresses */
-	(void)sendto(s, pkt.pbuf, pkt.plen, 0, &hdl->sa.sa, sizeof(hdl->sa));
-	return;
+	return sendto(s, pkt.pbuf, pkt.plen, 0, &hdl->sa.sa, sizeof(hdl->sa));
 }
 
-void
+ssize_t
 ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 {
 	int s = ud_handle_sock(hdl);
 	int nfds;
-	char buf[UDPC_PKTLEN];
 	ep_ctx_t epg = epoll_guts();
 
 	if (UNLIKELY(UDPC_PKT_INVALID_P(pkt))) {
-		return;
+		return -1;
 	}
 
 	/* wait for events */
@@ -260,7 +258,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 	/* no need to loop atm, nfds can be 0 or 1 */
 	if (LIKELY(nfds != 0)) {
 	/* otherwise NFDS was 1 and it MUST be our socket */
-		(void)recvfrom(s, buf, countof(buf), 0, NULL, 0);
+		pkt.plen = recvfrom(s, pkt.pbuf, pkt.plen, 0, NULL, 0);
 #if defined DEBUG_PKTTRAF_FLAG
 		udpc_print_pkt(BUF_PACKET(buf));
 #endif	/* DEBUG_PKTTRAF_FLAG */
@@ -269,7 +267,7 @@ ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 		pkt.plen = 0;
 	}
 	ep_fini(epg, s);
-	return;
+	return pkt.plen;
 }
 
 void

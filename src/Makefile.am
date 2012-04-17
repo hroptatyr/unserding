@@ -8,15 +8,13 @@ moddir = $(libdir)/unserding
 
 noinst_PROGRAMS =
 noinst_HEADERS =
-if BUILD_SERVER
-sbin_PROGRAMS = unserdingd
-endif
-if BUILD_CLIAPPS
-bin_PROGRAMS = unsercli
-endif
+bin_PROGRAMS =
+sbin_PROGRAMS =
 if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
+unserding_LIBS = libunserding.la
 else
+unserding_LIBS = libunserding.a
 noinst_LIBRARIES = libunserding.a
 endif
 
@@ -44,6 +42,7 @@ EXTRA_DIST += btea.c
 
 if BUILD_SERVER
 ## the main server binary
+sbin_PROGRAMS += unserdingd
 unserdingd_SOURCES = unserdingd.c mcast.c dccp.c tcp-unix.c
 unserdingd_SOURCES += protocore.c seria.c
 unserdingd_SOURCES += module.h module.c
@@ -57,11 +56,7 @@ unserdingd_LDFLAGS = $(AM_LDFLAGS)
 unserdingd_LDFLAGS += $(LUA_LIBS)
 unserdingd_LDFLAGS += $(LIBEV_LIBS)
 unserdingd_LDFLAGS += $(LIBLTDL)
-if BUILD_LIBRARY
-unserdingd_LDADD = libunserding.la
-else
-unserdingd_LDADD = libunserding.a
-endif
+unserdingd_LDADD = $(unserding_LIBS)
 unserdingd_LDADD += -lrt
 BUILT_SOURCES += unserdingd-clo.c unserdingd-clo.h
 
@@ -76,6 +71,7 @@ mod_LTLIBRARIES =
 unsercli_YFLAGS = -d -p "cli_yy"
 if BUILD_CLIAPPS
 ## the main client binary
+bin_PROGRAMS += unsercli
 unsercli_SOURCES = unsercli.y scanner.l
 unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
 unsercli_LFLAGS = --prefix="cli_yy"
@@ -84,15 +80,24 @@ unsercli_CPPFLAGS += -imacros tedious.h
 unsercli_LDFLAGS = $(AM_LDFLAGS)
 unsercli_LDFLAGS += $(LIBEV_LIBS)
 unsercli_LDFLAGS += $(LIBREADLINE_LIBS)
-if BUILD_LIBRARY
-unsercli_LDADD = libunserding.la
-else
-unsercli_LDADD = libunserding.a
-endif
+unsercli_LDADD = $(unserding_LIBS)
 unsercli_LDADD += -lrt
-endif
+endif ## BUILD_CLIAPPS
 BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
 BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
+
+if BUILD_CLIAPPS
+bin_PROGRAMS += unsermon
+unsermon_SOURCES = unsermon.c unsermon-clo.ggo
+unsermon_SOURCES += mcast.c mcast.h
+unsermon_SOURCES += wpool.h wpool.c fsarrqueue.h
+unsermon_SOURCES += jpool.h jpool.c
+unsermon_SOURCES += protocore.c protocore.h protocore-private.h
+unsermon_LDFLAGS = $(AM_LDFLAGS)
+unsermon_LDFLAGS += $(LIBEV_LIBS)
+unsermon_LDADD = $(unserding_LIBS)
+endif ## BUILD_CLIAPPS
+BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 
 ## fucking automake refuses to replay my flex patch
 unsercli-scanner.h: scanner.l

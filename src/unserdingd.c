@@ -377,9 +377,12 @@ static void
 ud_expand_user_cfg_file_name(char *tgt)
 {
 	char *p;
+	const char *homedir = getenv("HOME");
+	size_t homedirlen = strlen(homedir);
 
 	/* get the user's home dir */
-	p = stpcpy(tgt, getenv("HOME"));
+	memcpy(tgt, homedir, homedirlen);
+	p = tgt + homedirlen;
 	*p++ = '/';
 	*p++ = '.';
 	strncpy(p, cfg_file_name, sizeof(cfg_file_name));
@@ -573,7 +576,7 @@ main(int argc, char *argv[])
 	 * we add this quite late so that it's unlikely that a plethora of
 	 * events has already been injected into our precious queue
 	 * causing the libev main loop to crash. */
-	ud_attach_mcast(EV_A_ prefer6p);
+	ud_attach_mcast(EV_A_ ud_proto_parse_j, prefer6p);
 
 	/* attach the tcp/unix service */
 	ud_attach_tcp_unix(EV_A_ prefer6p);

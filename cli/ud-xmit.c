@@ -61,6 +61,12 @@
 # define UNUSED(_x)	__attribute__((unused)) _x
 #endif	/* !UNUSED */
 
+#if defined DEBUG_FLAG
+# define XMIT_DEBUG(args...)	fprintf(stderr, args)
+#else  /* !DEBUG_FLAG */
+# define XMIT_DEBUG(args...)
+#endif	/* DEBUG_FLAG */
+
 struct xmit_s {
 	ud_handle_t ud;
 	utectx_t ute;
@@ -105,16 +111,20 @@ error(int eno, const char *fmt, ...)
 static void
 work(const struct xmit_s *ctx)
 {
-	static unsigned int cno = 0;
+	static unsigned int pno = 0;
+	static size_t nt = 0;
 	struct udpc_seria_s ser[1];
 	static char buf[UDPC_PKTLEN];
 	static ud_packet_t pkt = {0, buf};
 	time_t reft = 0;
 	useconds_t refu = 0;
 
+#define RESET_SER						\
+	udpc_make_pkt(pkt, 0, pno++, 0x2000);			\
+	udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN)
+
 	/* initial set up of pkt */
-	udpc_make_pkt(pkt, cno++, 0, 0x2000);
-	udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+	RESET_SER;
 
 	UTE_ITER(ti, ctx->ute) {
 		time_t stmp = scom_thdr_sec(ti);
@@ -130,32 +140,43 @@ work(const struct xmit_s *ctx)
 		/* artifical break */
 		usec = (msec + (stmp - reft) * 1000) * 1000;
 		if (usec > refu) {
+			useconds_t slp;
+
 			/* send previous pack */
-			if ((pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser))) {
+			if (udpc_seria_msglen(ser)) {
+				pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
+				XMIT_DEBUG("XMIT %zx\n", pkt.plen);
 				ud_send_raw(ctx->ud, pkt);
+				/* re-set up pkt */
+				RESET_SER;
 			}
 			/* and sleep */
-			usleep(usec - refu);
+			slp = (useconds_t)((usec - refu) * ctx->speed);
+			XMIT_DEBUG("SLEEP %u\n", slp);
+			usleep(slp);
 			refu = usec;
-			/* re-set up pkt */
-			udpc_make_pkt(pkt, cno++, 0, 0x2000);
-			udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+			reft = stmp;
 		}
 		/* disseminate */
 		bs = scom_byte_size(ti);
-		plen = UDPC_PLLEN + udpc_seria_msglen(ser);
+		plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
 		if (plen + bs > UDPC_PKTLEN) {
 			pkt.plen = plen;
+			XMIT_DEBUG("XMIT/over %zx\n", pkt.plen);
 			ud_send_raw(ctx->ud, pkt);
 			/* reset ser */
-			udpc_make_pkt(pkt, cno++, 0, 0x2000);
-			udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+			RESET_SER;
 		}
+		XMIT_DEBUG("ADD\n");
 		udpc_seria_add_data(ser, ti, bs);
+		nt++;
 	}
-	if ((pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser))) {
+	if (udpc_seria_msglen(ser)) {
+		pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
+		XMIT_DEBUG("XMIT/stock %zx\n", pkt.plen);
 		ud_send_raw(ctx->ud, pkt);
 	}
+	printf("sent %zu ticks in %u packets\n", nt, pno);
 	return;
 }
 
@@ -209,7 +230,7 @@ main(int argc, char *argv[])
 	switch (setjmp(jb)) {
 	case 0:
 		ctx->ud = hdl;
-		ctx->speed = 1.0;
+		ctx->speed = argi->speed_arg;
 		work(ctx);
 		break;
 	case SIGINT:

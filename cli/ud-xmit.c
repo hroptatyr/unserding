@@ -120,7 +120,8 @@ work(const struct xmit_s *ctx)
 	static char buf[UDPC_PKTLEN];
 	static ud_packet_t pkt = {0, buf};
 	time_t reft = 0;
-	useconds_t refu = 0;
+	unsigned int refm = 0;
+	const unsigned int speed = (unsigned int)(1000 * ctx->speed);
 
 #define RESET_SER						\
 	udpc_make_pkt(pkt, 0, pno++, 0x2000);			\
@@ -132,7 +133,6 @@ work(const struct xmit_s *ctx)
 	UTE_ITER(ti, ctx->ute) {
 		time_t stmp = scom_thdr_sec(ti);
 		unsigned int msec = scom_thdr_msec(ti);
-		useconds_t usec;
 		size_t plen;
 		size_t bs;
 
@@ -141,8 +141,7 @@ work(const struct xmit_s *ctx)
 			reft = stmp;
 		}
 		/* artifical break */
-		usec = (msec + (stmp - reft) * 1000) * 1000;
-		if (usec > refu) {
+		if (stmp > reft || msec > refm) {
 			useconds_t slp;
 
 			/* send previous pack */
@@ -155,13 +154,13 @@ work(const struct xmit_s *ctx)
 				RESET_SER;
 			}
 			/* and sleep */
-			slp = (useconds_t)((usec - refu) * ctx->speed);
+			slp = ((stmp - reft) * 1000 + msec - refm) * speed;
 			for (unsigned int i = slp; i; i /= 2) {
 				XMIT_STUP('@');
 			}
 			XMIT_STUP('\n');
 			usleep(slp);
-			refu = usec;
+			refm = msec;
 			reft = stmp;
 		}
 		/* disseminate */

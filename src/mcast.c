@@ -482,9 +482,12 @@ mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		ntohs(((const uint16_t*)j->buf)[3]));
 
 	/* handle the reading */
-	if (UNLIKELY(nread <= 0)) {
+	if (UNLIKELY(nread < 0)) {
 		UD_CRITICAL_MCAST("could not handle incoming connection\n");
-		return;
+		goto out_revok;
+	} else if (nread == 0) {
+		/* no need to bother */
+		goto out_revok;
 	}
 
 	j->blen = nread;
@@ -497,6 +500,9 @@ mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space, also trigger the lazy bastards */
 	wpool_enq(gwpool, wpcb, j, true);
+	return;
+out_revok:
+	jpool_release(j);
 	return;
 }
 

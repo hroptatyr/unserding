@@ -53,6 +53,7 @@
 /* posix? */
 #include <inttypes.h>
 #include <pthread.h>
+#include <ctype.h>
 
 /* our master include */
 #include "unserding.h"
@@ -123,18 +124,6 @@ init_proto(void)
 }
 #endif	/* UNSERSRV */
 
-void
-ud_fprint_pkthdr(ud_packet_t pkt, FILE *fp)
-{
-	fprintf(fp, ":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-		(unsigned int)pkt.plen,
-		udpc_pkt_cno(pkt),
-		udpc_pkt_pno(pkt),
-		udpc_pkt_cmd(pkt),
-		ntohs(((const uint16_t*)pkt.pbuf)[3]));
-	return;
-}
-
 size_t
 ud_sprint_pkthdr(char *restrict buf, ud_packet_t pkt)
 {
@@ -175,177 +164,45 @@ b2a(char *restrict outbuf, char a)
 	return;
 }
 
-static inline void
-putb(char a, FILE *fp)
+static size_t
+__pretty_hex(char *restrict buf, const char *s, size_t len)
 {
-	char b = a & 0xf, c = (a >> 4) & 0xf;
-	switch (c) {
-	case 0 ... 9:
-		putc(c + 0x30, fp);
-		break;
-	case 10 ... 15:
-		putc(c + 0x57, fp);
-		break;
-	default:
-		break;
-	}
-	switch (b) {
-	case 0 ... 9:
-		putc(b + 0x30, fp);
-		break;
-	case 10 ... 15:
-		putc(b + 0x57, fp);
-		break;
-	default:
-		break;
-	}
-	putc(' ', fp);
-	return;
-}
+	char *bp = buf;
 
-void
-ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp)
-{
-	uint16_t i = 0;
-	for (; i < (pkt.plen & ~0xf); i += 16) {
-		fprintf(fp, "%04x  ", i);
-		putb(pkt.pbuf[i+0], fp);
-		putb(pkt.pbuf[i+1], fp);
-		putb(pkt.pbuf[i+2], fp);
-		putb(pkt.pbuf[i+3], fp);
-		putb(pkt.pbuf[i+4], fp);
-		putb(pkt.pbuf[i+5], fp);
-		putb(pkt.pbuf[i+6], fp);
-		putb(pkt.pbuf[i+7], fp);
-		putc(' ', fp);
-		putb(pkt.pbuf[i+8], fp);
-		putb(pkt.pbuf[i+9], fp);
-		putb(pkt.pbuf[i+10], fp);
-		putb(pkt.pbuf[i+11], fp);
-		putb(pkt.pbuf[i+12], fp);
-		putb(pkt.pbuf[i+13], fp);
-		putb(pkt.pbuf[i+14], fp);
-		putb(pkt.pbuf[i+15], fp);
-		putc('\n', fp);
-	}
-	if (i == pkt.plen) {
-		return;
-	}
+	for (size_t i = 0; i < len; i += 16) {
+		bp += sprintf(bp, "%04zx ", i);
+		for (size_t j = i; j < len && j < i + 16; j++) {
+			unsigned char hi = ((unsigned char)s[j] >> 4) & 0xf;
+			unsigned char lo = ((unsigned char)s[j] >> 0) & 0xf;
 
-	fprintf(fp, "%04x  ", i);
-	if ((pkt.plen & 0xf) >= 8) {
-		putb(pkt.pbuf[i+0], fp);
-		putb(pkt.pbuf[i+1], fp);
-		putb(pkt.pbuf[i+2], fp);
-		putb(pkt.pbuf[i+3], fp);
-		putb(pkt.pbuf[i+4], fp);
-		putb(pkt.pbuf[i+5], fp);
-		putb(pkt.pbuf[i+6], fp);
-		putb(pkt.pbuf[i+7], fp);
-		putc(' ', fp);
-		i += 8;
+			if (!(j % 8)) {
+				*bp++ = ' ';
+			}
+			*bp++ = hi < 10 ? '0' + hi : 'a' + hi - 10;
+			*bp++ = lo < 10 ? '0' + lo : 'a' + lo - 10;
+			*bp++ = ' ';
+		}
+		/* to be even more hexdump-like, use ascii chars now */
+		*bp++ = ' ';
+		*bp++ = ' ';
+		*bp++ = '|';
+		for (size_t j = i; j < len && j < i + 16; j++) {
+			if (isprint(s[j])) {
+				*bp++ = s[j];
+			} else {
+				*bp++ = '.';
+			}
+		}
+		*bp++ = '|';
+		*bp++ = '\n';
 	}
-	/* and the rest, duff's */
-	switch (pkt.plen & 0x7) {
-	case 7:
-		putb(pkt.pbuf[i++], fp);
-	case 6:
-		putb(pkt.pbuf[i++], fp);
-	case 5:
-		putb(pkt.pbuf[i++], fp);
-	case 4:
-		putb(pkt.pbuf[i++], fp);
-
-	case 3:
-		putb(pkt.pbuf[i++], fp);
-	case 2:
-		putb(pkt.pbuf[i++], fp);
-	case 1:
-		putb(pkt.pbuf[i++], fp);
-	case 0:
-	default:
-		break;
-	}
-	putc('\n', fp);
-	return;
+	return bp - buf;
 }
 
 size_t
 ud_sprint_pkt_raw(char *restrict buf, ud_packet_t pkt)
 {
-	size_t res = 0;
-	uint16_t i = 0;
-
-	for (; i < (pkt.plen & ~0xf); i += 16) {
-		res += sprintf(&buf[res], "%04x  ", i);
-		b2a(&buf[res + 0], pkt.pbuf[i+0]);
-		b2a(&buf[res + 3], pkt.pbuf[i+1]);
-		b2a(&buf[res + 6], pkt.pbuf[i+2]);
-		b2a(&buf[res + 9], pkt.pbuf[i+3]);
-		b2a(&buf[res + 12], pkt.pbuf[i+4]);
-		b2a(&buf[res + 15], pkt.pbuf[i+5]);
-		b2a(&buf[res + 18], pkt.pbuf[i+6]);
-		b2a(&buf[res + 21], pkt.pbuf[i+7]);
-		buf[res + 24] = ' ';
-		b2a(&buf[res + 25], pkt.pbuf[i+8]);
-		b2a(&buf[res + 28], pkt.pbuf[i+9]);
-		b2a(&buf[res + 31], pkt.pbuf[i+10]);
-		b2a(&buf[res + 34], pkt.pbuf[i+11]);
-		b2a(&buf[res + 37], pkt.pbuf[i+12]);
-		b2a(&buf[res + 40], pkt.pbuf[i+13]);
-		b2a(&buf[res + 43], pkt.pbuf[i+14]);
-		b2a(&buf[res + 46], pkt.pbuf[i+15]);
-		buf[res + 49] = '\n';
-		res += 50;
-	}
-	if (i == pkt.plen) {
-		return res;
-	}
-
-	res += sprintf(&buf[res], "%04x  ", i);
-	if ((pkt.plen & 0xf) >= 8) {
-		b2a(&buf[res + 0], pkt.pbuf[i+0]);
-		b2a(&buf[res + 3], pkt.pbuf[i+1]);
-		b2a(&buf[res + 6], pkt.pbuf[i+2]);
-		b2a(&buf[res + 9], pkt.pbuf[i+3]);
-		b2a(&buf[res + 12], pkt.pbuf[i+4]);
-		b2a(&buf[res + 15], pkt.pbuf[i+5]);
-		b2a(&buf[res + 18], pkt.pbuf[i+6]);
-		b2a(&buf[res + 21], pkt.pbuf[i+7]);
-		buf[res + 24] = ' ';
-		i += 8;
-		res += 25;
-	}
-	/* and the rest, duff's */
-	switch (pkt.plen & 0x7) {
-	case 7:
-		b2a(&buf[res], pkt.pbuf[i++]);
-		res += 3;
-	case 6:
-		b2a(&buf[res], pkt.pbuf[i++]);
-		res += 3;
-	case 5:
-		b2a(&buf[res], pkt.pbuf[i++]);
-		res += 3;
-	case 4:
-		b2a(&buf[res], pkt.pbuf[i++]);
-		res += 3;
-
-	case 3:
-		b2a(&buf[res], pkt.pbuf[i++]);
-		res += 3;
-	case 2:
-		b2a(&buf[res], pkt.pbuf[i++]);
-		res += 3;
-	case 1:
-		b2a(&buf[res], pkt.pbuf[i++]);
-		res += 3;
-	case 0:
-	default:
-		break;
-	}
-	buf[res++] = '\n';
-	return res;
+	return __pretty_hex(buf, pkt.pbuf, pkt.plen);
 }
 
 static size_t
@@ -445,12 +302,15 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 
 	case UDPC_TYPE_DATA: {
 		const char *s;
+		char *bp;
 		uint8_t len;
 
 		memcpy(buf, "(DATA)", 6);
 		len = udpc_seria_des_data(sctx, (const void**)&s);
-		len = sprintf(buf + 6, "%u\n", (unsigned int)len);
-		return len + 6;
+		bp = buf + 6;
+		bp += sprintf(bp, "%u\n", (unsigned int)len);
+		bp += __pretty_hex(bp, s, len);
+		return bp - buf;
 	}
 
 	case UDPC_TYPE_XDR: {

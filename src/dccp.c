@@ -38,6 +38,8 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+/* because of splice() */
+#define _GNU_SOURCE
 #if defined HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
 #endif	/* HAVE_SYS_SOCKET_H */

@@ -13,7 +13,7 @@ noinst_PROGRAMS = ud-itan
 endif
 
 BUILT_SOURCES =
-CLEANFILES = $(BUILT_SOURCES)
+CLEANFILES =
 
 if BUILD_LIBRARY
 UD_LIBS = $(top_builddir)/src/libunserding.la
@@ -31,10 +31,27 @@ ud_ping_LDADD += $(UD_LDXFLAGS)
 
 ud_itan_SOURCES = ud-itan.c
 ud_itan_CPPFLAGS = $(AM_CPPFLAGS)
+ud_itan_CPPFLAGS += -D_GNU_SOURCE
 ud_itan_LDFLAGS = $(AM_LDFLAGS) -static
 ud_itan_LDADD = $(UD_LIBS)
 ud_itan_LDADD += $(UD_LDXFLAGS)
-endif
+
+if HAVE_UTERUS
+bin_PROGRAMS += ud-xmit
+ud_xmit_clo = ud-xmit-clo.c ud-xmit-clo.h
+ud_xmit_SOURCES = ud-xmit.c
+ud_xmit_CPPFLAGS = $(AM_CPPFLAGS)
+ud_xmit_CPPFLAGS += $(uterus_CFLAGS)
+ud_xmit_LDFLAGS = -static
+ud_xmit_LDFLAGS += $(uterus_LIBS)
+ud_xmit_LDADD = $(UD_LIBS) $(UD_LDXFLAGS)
+endif  ## HAVE_UTERUS
+endif  ## BUILD_CLIAPPS
+BUILT_SOURCES += $(ud_xmit_clo)
+
+## our rule for gengetopt
+%.c %.h: %.ggo
+	gengetopt -l -i $< -F $*
 
 # 
 # Help the developers get nice post-processed source files

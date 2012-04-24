@@ -31,6 +31,7 @@ ud_ping_LDADD += $(UD_LDXFLAGS)
 
 ud_itan_SOURCES = ud-itan.c
 ud_itan_CPPFLAGS = $(AM_CPPFLAGS)
+ud_itan_CPPFLAGS += -D_GNU_SOURCE
 ud_itan_LDFLAGS = $(AM_LDFLAGS) -static
 ud_itan_LDADD = $(UD_LIBS)
 ud_itan_LDADD += $(UD_LDXFLAGS)

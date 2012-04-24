@@ -120,6 +120,8 @@ work(const struct xmit_s *ctx)
 		time_t stmp = scom_thdr_sec(ti);
 		unsigned int msec = scom_thdr_msec(ti);
 		useconds_t usec;
+		size_t plen;
+		size_t bs;
 
 		if (UNLIKELY(!reft)) {
 			/* singleton */
@@ -140,7 +142,16 @@ work(const struct xmit_s *ctx)
 			udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN);
 		}
 		/* disseminate */
-		udpc_seria_add_data(ser, ti, scom_byte_size(ti));
+		bs = scom_byte_size(ti);
+		plen = UDPC_PLLEN + udpc_seria_msglen(ser);
+		if (plen + bs > UDPC_PKTLEN) {
+			pkt.plen = plen;
+			ud_send_raw(ctx->ud, pkt);
+			/* reset ser */
+			udpc_make_pkt(pkt, cno++, 0, 0x2000);
+			udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+		}
+		udpc_seria_add_data(ser, ti, bs);
 	}
 	if ((pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser))) {
 		ud_send_raw(ctx->ud, pkt);

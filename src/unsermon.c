@@ -117,9 +117,12 @@ mon_pkt_cb(job_t j)
 	static char buf[8192];
 	size_t psz;
 
-	psz = ud_sprint_pkt_pretty(buf, JOB_PACKET(j));
-	buf[psz] = '\0';
-	fputs(buf, logout);
+	if ((psz = ud_sprint_pkt_pretty(buf, JOB_PACKET(j)))) {
+		buf[psz] = '\0';
+		fputs(buf, logout);
+	} else {
+		fputs("NAUGHT message\n", logout);
+	}
 	jpool_release(j);
 	return;
 }

@@ -445,12 +445,22 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 
 	case UDPC_TYPE_DATA: {
 		const char *s;
+		char *bp;
 		uint8_t len;
 
 		memcpy(buf, "(DATA)", 6);
 		len = udpc_seria_des_data(sctx, (const void**)&s);
-		len = sprintf(buf + 6, "%u\n", (unsigned int)len);
-		return len + 6;
+		bp = buf + 6;
+		bp += sprintf(bp, "%u\n  ", (unsigned int)len);
+		for (uint8_t i = 0; i < len; i++) {
+			unsigned char hi = ((unsigned char)s[i] >> 4) & 0xf;
+			unsigned char lo = ((unsigned char)s[i] >> 0) & 0xf;
+			*bp++ = hi < 10 ? '0' + hi : 'a' + hi - 10;
+			*bp++ = lo < 10 ? '0' + lo : 'a' + lo - 10;
+			*bp++ = ' ';
+		}
+		*bp++ = '\n';
+		return bp - buf;
 	}
 
 	case UDPC_TYPE_XDR: {

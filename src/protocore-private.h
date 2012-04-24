@@ -50,10 +50,6 @@ ud_fputs(uint8_t len, const char *s, FILE *f)
 	return;
 }
 
-extern void ud_fprint_pkthdr(ud_packet_t pkt, FILE *fp);
-extern void ud_fprint_pkt_raw(ud_packet_t pkt, FILE *fp);
-extern void ud_fprint_pkt_pretty(ud_packet_t pkt, FILE *fp);
-
 extern size_t ud_sprint_pkthdr(char *restrict buf, ud_packet_t pkt);
 extern size_t ud_sprint_pkt_raw(char *restrict buf, ud_packet_t pkt);
 extern size_t ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt);

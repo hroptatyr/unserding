@@ -156,6 +156,9 @@ work(const struct xmit_s *ctx)
 			}
 			/* and sleep */
 			slp = (useconds_t)((usec - refu) * ctx->speed);
+			for (unsigned int i = slp; i; i /= 2) {
+				XMIT_STUP('@');
+			}
 			XMIT_STUP('\n');
 			usleep(slp);
 			refu = usec;

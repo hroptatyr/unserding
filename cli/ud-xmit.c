@@ -63,8 +63,10 @@
 
 #if defined DEBUG_FLAG
 # define XMIT_DEBUG(args...)	fprintf(stderr, args)
+# define XMIT_STUP(arg)		fputc(arg, stderr)
 #else  /* !DEBUG_FLAG */
 # define XMIT_DEBUG(args...)
+# define XMIT_STUP(arg)
 #endif	/* DEBUG_FLAG */
 
 struct xmit_s {
@@ -145,14 +147,15 @@ work(const struct xmit_s *ctx)
 			/* send previous pack */
 			if (udpc_seria_msglen(ser)) {
 				pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
-				XMIT_DEBUG("XMIT %zx\n", pkt.plen);
+				XMIT_STUP('!');
 				ud_send_raw(ctx->ud, pkt);
+				XMIT_STUP('\n');
 				/* re-set up pkt */
 				RESET_SER;
 			}
 			/* and sleep */
 			slp = (useconds_t)((usec - refu) * ctx->speed);
-			XMIT_DEBUG("SLEEP %u\n", slp);
+			XMIT_STUP('\n');
 			usleep(slp);
 			refu = usec;
 			reft = stmp;
@@ -162,19 +165,21 @@ work(const struct xmit_s *ctx)
 		plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
 		if (plen + bs > UDPC_PKTLEN) {
 			pkt.plen = plen;
-			XMIT_DEBUG("XMIT/over %zx\n", pkt.plen);
+			XMIT_STUP('/');
 			ud_send_raw(ctx->ud, pkt);
+			XMIT_STUP('\n');
 			/* reset ser */
 			RESET_SER;
 		}
-		XMIT_DEBUG("ADD\n");
+		XMIT_STUP('+');
 		udpc_seria_add_data(ser, ti, bs);
 		nt++;
 	}
 	if (udpc_seria_msglen(ser)) {
 		pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
-		XMIT_DEBUG("XMIT/stock %zx\n", pkt.plen);
+		XMIT_STUP('/');
 		ud_send_raw(ctx->ud, pkt);
+		XMIT_STUP('\n');
 	}
 	printf("sent %zu ticks in %u packets\n", nt, pno);
 	return;

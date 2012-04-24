@@ -35,11 +35,18 @@
  *
  ***/
 
+#include <unistd.h>
 #include <stdbool.h>
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <setjmp.h>
+#include <uterus.h>
 #include "unserding.h"
+#include "protocore.h"
+#include "seria.h"
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect(!!(_x), 1)
@@ -54,11 +61,90 @@
 # define UNUSED(_x)	__attribute__((unused)) _x
 #endif	/* !UNUSED */
 
+struct xmit_s {
+	ud_handle_t ud;
+	utectx_t ute;
+	float speed;
+};
+
+static jmp_buf jb;
+
 
 static void
-handle_sigint(int UNUSED(signum))
+handle_sigint(int signum)
 {
-	/* just set cnt to naught and we will exit the main loop */
+	longjmp(jb, signum);
+	return;
+}
+
+static void
+__attribute__((format(printf, 2, 3)))
+error(int eno, const char *fmt, ...)
+{
+	va_list vap;
+	va_start(vap, fmt);
+	vfprintf(stderr, fmt, vap);
+	va_end(vap);
+	if (eno || errno) {
+		fputc(':', stderr);
+		fputc(' ', stderr);
+		fputs(strerror(eno ?: errno), stderr);
+	}
+	fputc('\n', stderr);
+	return;
+}
+
+#if !defined UTE_ITER
+# define UTE_ITER(i, __ctx)						\
+	for (size_t __i = 0, __tsz;					\
+	     __i < ute_nticks(__ctx); __i += __tsz)			\
+		for (scom_t i = ute_seek(__ctx, __i); i;		\
+		     __tsz = scom_tick_size(i), i = 0)
+#endif	/* !UTE_ITER */
+
+static void
+work(const struct xmit_s *ctx)
+{
+	static unsigned int cno = 0;
+	struct udpc_seria_s ser[1];
+	static char buf[UDPC_PKTLEN];
+	static ud_packet_t pkt = {0, buf};
+	time_t reft = 0;
+	useconds_t refu = 0;
+
+	/* initial set up of pkt */
+	udpc_make_pkt(pkt, cno++, 0, 0x2000);
+	udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+
+	UTE_ITER(ti, ctx->ute) {
+		time_t stmp = scom_thdr_sec(ti);
+		unsigned int msec = scom_thdr_msec(ti);
+		useconds_t usec;
+
+		if (UNLIKELY(!reft)) {
+			/* singleton */
+			reft = stmp;
+		}
+		/* artifical break */
+		usec = (msec + (stmp - reft) * 1000) * 1000;
+		if (usec > refu) {
+			/* send previous pack */
+			if ((pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser))) {
+				ud_send_raw(ctx->ud, pkt);
+			}
+			/* and sleep */
+			usleep(usec - refu);
+			refu = usec;
+			/* re-set up pkt */
+			udpc_make_pkt(pkt, cno++, 0, 0x2000);
+			udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN);
+		}
+		/* disseminate */
+		udpc_seria_add_data(ser, ti, scom_byte_size(ti));
+	}
+	if ((pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser))) {
+		ud_send_raw(ctx->ud, pkt);
+	}
 	return;
 }
 
@@ -85,20 +171,48 @@ main(int argc, char *argv[])
 {
 	static struct ud_handle_s hdl[1];
 	struct gengetopt_args_info argi[1];
+	struct xmit_s ctx[1];
 	int res = 0;
 
 	/* parse the command line */
 	if (cmdline_parser(argc, argv, argi)) {
 		res = 1;
 		goto out;
+	} else if (argi->inputs_num < 1) {
+		error(0, "need input file");
+		res = 1;
+		goto fr_out;
+	} else if ((ctx->ute = ute_open(argi->inputs[0], UO_RDONLY)) == NULL) {
+		error(0, "cannot open file '%s'", argi->inputs[0]);
+		res = 1;
+		goto fr_out;
 	}
 
-	/* obtain a new handle */
+	/* set signal handler */
+	signal(SIGINT, handle_sigint);
+
+	/* obtain a new handle, somehow we need to use the port number innit? */
 	init_unserding_handle(hdl, PF_INET6, false);
+
+	/* the actual work */
+	switch (setjmp(jb)) {
+	case 0:
+		ctx->ud = hdl;
+		ctx->speed = 1.0;
+		work(ctx);
+		break;
+	case SIGINT:
+	default:
+		break;	
+	}
 
 	/* and lose the handle again */
 	free_unserding_handle(hdl);
 
+	/* and close the file */
+	ute_close(ctx->ute);
+
+fr_out:
 	/* free up command line parser resources */
 	cmdline_parser_free(argi);
 out:

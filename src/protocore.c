@@ -53,6 +53,7 @@
 /* posix? */
 #include <inttypes.h>
 #include <pthread.h>
+#include <ctype.h>
 
 /* our master include */
 #include "unserding.h"

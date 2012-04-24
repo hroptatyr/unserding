@@ -110,11 +110,12 @@ error(int eno, const char *fmt, ...)
 		     __tsz = scom_tick_size(i), i = 0)
 #endif	/* !UTE_ITER */
 
+static unsigned int pno = 0;
+static size_t nt = 0;
+
 static void
 work(const struct xmit_s *ctx)
 {
-	static unsigned int pno = 0;
-	static size_t nt = 0;
 	struct udpc_seria_s ser[1];
 	static char buf[UDPC_PKTLEN];
 	static ud_packet_t pkt = {0, buf};
@@ -181,7 +182,6 @@ work(const struct xmit_s *ctx)
 		ud_send_raw(ctx->ud, pkt);
 		XMIT_STUP('\n');
 	}
-	printf("sent %zu ticks in %u packets\n", nt, pno);
 	return;
 }
 
@@ -237,9 +237,9 @@ main(int argc, char *argv[])
 		ctx->ud = hdl;
 		ctx->speed = argi->speed_arg;
 		work(ctx);
-		break;
 	case SIGINT:
 	default:
+		printf("sent %zu ticks in %u packets\n", nt, pno);
 		break;	
 	}
 

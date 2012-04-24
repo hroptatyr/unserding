@@ -1,0 +1,14 @@
+args "--unamed-opts"
+package "ud-xmit"
+usage "ud-xmit [OPTION]... FILE"
+description "\
+Transmit FILE through unserding network in a replay fashion."
+
+section "Server options"
+option "port" p
+	"Multicast control channel port"
+	int default="8653" optional
+
+option "beef" - 
+	"Multicast payload channel  (default determined by network)"
+	int optional

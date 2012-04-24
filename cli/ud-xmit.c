@@ -141,7 +141,7 @@ work(const struct xmit_s *ctx)
 				ud_send_raw(ctx->ud, pkt);
 			}
 			/* and sleep */
-			slp = (useconds_t)(usec - refu);
+			slp = (useconds_t)((usec - refu) * ctx->speed);
 			usleep(slp);
 			refu = usec;
 			reft = stmp;
@@ -217,7 +217,7 @@ main(int argc, char *argv[])
 	switch (setjmp(jb)) {
 	case 0:
 		ctx->ud = hdl;
-		ctx->speed = 1.0;
+		ctx->speed = argi->speed_arg;
 		work(ctx);
 		break;
 	case SIGINT:

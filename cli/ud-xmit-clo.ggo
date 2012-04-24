@@ -12,3 +12,8 @@ option "port" p
 option "beef" - 
 	"Multicast payload channel  (default determined by network)"
 	int optional
+
+section "Transmission options"
+option "speed" -
+	"Slow down transmission by this factor"
+	float default="1.0" optional

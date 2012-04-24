@@ -366,6 +366,18 @@ __pretty_hex(char *restrict buf, const char *s, size_t len)
 			*bp++ = lo < 10 ? '0' + lo : 'a' + lo - 10;
 			*bp++ = ' ';
 		}
+		/* to be even more hexdump-like, use ascii chars now */
+		*bp++ = ' ';
+		*bp++ = ' ';
+		*bp++ = '|';
+		for (size_t j = i; j < len && j < i + 16; j++) {
+			if (isprint(s[j])) {
+				*bp++ = s[j];
+			} else {
+				*bp++ = '.';
+			}
+		}
+		*bp++ = '|';
 		*bp++ = '\n';
 	}
 	return bp - buf;

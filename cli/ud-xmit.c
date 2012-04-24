@@ -63,8 +63,10 @@
 
 #if defined DEBUG_FLAG
 # define XMIT_DEBUG(args...)	fprintf(stderr, args)
+# define XMIT_STUP(arg)		fputc(arg, stderr)
 #else  /* !DEBUG_FLAG */
 # define XMIT_DEBUG(args...)
+# define XMIT_STUP(arg)
 #endif	/* DEBUG_FLAG */
 
 struct xmit_s {
@@ -108,11 +110,12 @@ error(int eno, const char *fmt, ...)
 		     __tsz = scom_tick_size(i), i = 0)
 #endif	/* !UTE_ITER */
 
+static unsigned int pno = 0;
+static size_t nt = 0;
+
 static void
 work(const struct xmit_s *ctx)
 {
-	static unsigned int pno = 0;
-	static size_t nt = 0;
 	struct udpc_seria_s ser[1];
 	static char buf[UDPC_PKTLEN];
 	static ud_packet_t pkt = {0, buf};
@@ -145,14 +148,18 @@ work(const struct xmit_s *ctx)
 			/* send previous pack */
 			if (udpc_seria_msglen(ser)) {
 				pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
-				XMIT_DEBUG("XMIT %zx\n", pkt.plen);
+				XMIT_STUP('!');
 				ud_send_raw(ctx->ud, pkt);
+				XMIT_STUP('\n');
 				/* re-set up pkt */
 				RESET_SER;
 			}
 			/* and sleep */
 			slp = (useconds_t)((usec - refu) * ctx->speed);
-			XMIT_DEBUG("SLEEP %u\n", slp);
+			for (unsigned int i = slp; i; i /= 2) {
+				XMIT_STUP('@');
+			}
+			XMIT_STUP('\n');
 			usleep(slp);
 			refu = usec;
 			reft = stmp;
@@ -162,21 +169,22 @@ work(const struct xmit_s *ctx)
 		plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
 		if (plen + bs > UDPC_PKTLEN) {
 			pkt.plen = plen;
-			XMIT_DEBUG("XMIT/over %zx\n", pkt.plen);
+			XMIT_STUP('/');
 			ud_send_raw(ctx->ud, pkt);
+			XMIT_STUP('\n');
 			/* reset ser */
 			RESET_SER;
 		}
-		XMIT_DEBUG("ADD\n");
+		XMIT_STUP('+');
 		udpc_seria_add_data(ser, ti, bs);
 		nt++;
 	}
 	if (udpc_seria_msglen(ser)) {
 		pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
-		XMIT_DEBUG("XMIT/stock %zx\n", pkt.plen);
+		XMIT_STUP('/');
 		ud_send_raw(ctx->ud, pkt);
+		XMIT_STUP('\n');
 	}
-	printf("sent %zu ticks in %u packets\n", nt, pno);
 	return;
 }
 
@@ -232,9 +240,9 @@ main(int argc, char *argv[])
 		ctx->ud = hdl;
 		ctx->speed = argi->speed_arg;
 		work(ctx);
-		break;
 	case SIGINT:
 	default:
+		printf("sent %zu ticks in %u packets\n", nt, pno);
 		break;	
 	}
 

@@ -144,7 +144,7 @@ work(const struct xmit_s *ctx)
 
 			/* send previous pack */
 			if (udpc_seria_msglen(ser)) {
-				pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser);
+				pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
 				XMIT_DEBUG("XMIT %zx\n", pkt.plen);
 				ud_send_raw(ctx->ud, pkt);
 				/* re-set up pkt */
@@ -159,7 +159,7 @@ work(const struct xmit_s *ctx)
 		}
 		/* disseminate */
 		bs = scom_byte_size(ti);
-		plen = UDPC_PLLEN + udpc_seria_msglen(ser);
+		plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
 		if (plen + bs > UDPC_PKTLEN) {
 			pkt.plen = plen;
 			XMIT_DEBUG("XMIT/over %zx\n", pkt.plen);
@@ -172,7 +172,7 @@ work(const struct xmit_s *ctx)
 		nt++;
 	}
 	if (udpc_seria_msglen(ser)) {
-		pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser);
+		pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
 		XMIT_DEBUG("XMIT/stock %zx\n", pkt.plen);
 		ud_send_raw(ctx->ud, pkt);
 	}

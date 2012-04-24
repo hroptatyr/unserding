@@ -349,6 +349,41 @@ ud_sprint_pkt_raw(char *restrict buf, ud_packet_t pkt)
 }
 
 static size_t
+__pretty_hex(char *restrict buf, const char *s, size_t len)
+{
+	char *bp = buf;
+
+	for (size_t i = 0; i < len; i += 16) {
+		bp += sprintf(bp, "%04zx ", i);
+		for (size_t j = i; j < len && j < i + 16; j++) {
+			unsigned char hi = ((unsigned char)s[j] >> 4) & 0xf;
+			unsigned char lo = ((unsigned char)s[j] >> 0) & 0xf;
+
+			if (!(j % 8)) {
+				*bp++ = ' ';
+			}
+			*bp++ = hi < 10 ? '0' + hi : 'a' + hi - 10;
+			*bp++ = lo < 10 ? '0' + lo : 'a' + lo - 10;
+			*bp++ = ' ';
+		}
+		/* to be even more hexdump-like, use ascii chars now */
+		*bp++ = ' ';
+		*bp++ = ' ';
+		*bp++ = '|';
+		for (size_t j = i; j < len && j < i + 16; j++) {
+			if (isprint(s[j])) {
+				*bp++ = s[j];
+			} else {
+				*bp++ = '.';
+			}
+		}
+		*bp++ = '|';
+		*bp++ = '\n';
+	}
+	return bp - buf;
+}
+
+static size_t
 __pretty_oneseq(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 {
 	size_t res = 0;
@@ -451,15 +486,8 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		memcpy(buf, "(DATA)", 6);
 		len = udpc_seria_des_data(sctx, (const void**)&s);
 		bp = buf + 6;
-		bp += sprintf(bp, "%u\n  ", (unsigned int)len);
-		for (uint8_t i = 0; i < len; i++) {
-			unsigned char hi = ((unsigned char)s[i] >> 4) & 0xf;
-			unsigned char lo = ((unsigned char)s[i] >> 0) & 0xf;
-			*bp++ = hi < 10 ? '0' + hi : 'a' + hi - 10;
-			*bp++ = lo < 10 ? '0' + lo : 'a' + lo - 10;
-			*bp++ = ' ';
-		}
-		*bp++ = '\n';
+		bp += sprintf(bp, "%u\n", (unsigned int)len);
+		bp += __pretty_hex(bp, s, len);
 		return bp - buf;
 	}
 

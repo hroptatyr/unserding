@@ -35,12 +35,17 @@ ud_itan_LDFLAGS = $(AM_LDFLAGS) -static
 ud_itan_LDADD = $(UD_LIBS)
 ud_itan_LDADD += $(UD_LDXFLAGS)
 
+if HAVE_UTERUS
 bin_PROGRAMS += ud-xmit
 ud_xmit_clo = ud-xmit-clo.c ud-xmit-clo.h
 ud_xmit_SOURCES = ud-xmit.c
+ud_xmit_CPPFLAGS = $(AM_CPPFLAGS)
+ud_xmit_CPPFLAGS += $(uterus_CFLAGS)
 ud_xmit_LDFLAGS = -static
+ud_xmit_LDFLAGS += $(uterus_LIBS)
 ud_xmit_LDADD = $(UD_LIBS) $(UD_LDXFLAGS)
-endif
+endif  ## HAVE_UTERUS
+endif  ## BUILD_CLIAPPS
 BUILT_SOURCES += $(ud_xmit_clo)
 
 ## our rule for gengetopt

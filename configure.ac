@@ -157,6 +157,11 @@ PKG_CHECK_MODULES([LUA], [lua >= 5.1], [have_lua="yes"], [
 ])
 AM_CONDITIONAL([HAVE_LUA], [test "${have_lua}" = "yes"])
 
+## check for lua, critical
+PKG_CHECK_MODULES([uterus], [libuterus >= 0.2.0],
+	[have_uterus="yes"], [have_uterus="no"])
+AM_CONDITIONAL([HAVE_UTERUS], [test "${have_uterus}" = "yes"])
+
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
 AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],

@@ -4,7 +4,7 @@ usage "ud-xmit [OPTION]... FILE"
 description "\
 Transmit FILE through unserding network in a replay fashion."
 
-section "Server options"
+section "Network options"
 option "port" p
 	"Multicast control channel port"
 	int default="8653" optional

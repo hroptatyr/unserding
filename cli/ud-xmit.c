@@ -137,16 +137,17 @@ work(const struct xmit_s *ctx)
 			useconds_t slp;
 
 			/* send previous pack */
-			if ((pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser))) {
+			if (udpc_seria_msglen(ser)) {
+				pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser);
 				ud_send_raw(ctx->ud, pkt);
+				/* re-set up pkt */
+				RESET_SER;
 			}
 			/* and sleep */
 			slp = (useconds_t)((usec - refu) * ctx->speed);
 			usleep(slp);
 			refu = usec;
 			reft = stmp;
-			/* re-set up pkt */
-			RESET_SER;
 		}
 		/* disseminate */
 		bs = scom_byte_size(ti);
@@ -160,7 +161,8 @@ work(const struct xmit_s *ctx)
 		udpc_seria_add_data(ser, ti, bs);
 		nt++;
 	}
-	if ((pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser))) {
+	if (udpc_seria_msglen(ser)) {
+		pkt.plen = UDPC_PLLEN + udpc_seria_msglen(ser);
 		ud_send_raw(ctx->ud, pkt);
 	}
 	printf("sent %zu ticks in %u packets\n", nt, pno);

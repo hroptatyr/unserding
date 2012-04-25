@@ -723,7 +723,8 @@ main(int argc, char *argv[])
 		init_unserding_handle(&__hdl, PF_INET, false);
 	}
 	if (argi->port_arg != UD_NETWORK_SERVICE) {
-		ud_handle_set_port(&__hdl, argi->port_arg);
+		/* grrrrr */
+		ud_sockaddr_set_port(&__hdl.sa, argi->port_arg);
 	}
 	/* store our global packet */
 	__hdl.pktchn = &__pkt;

@@ -64,11 +64,33 @@
 #include "unserding-ctx.h"
 /* our private bits */
 #include "unserding-private.h"
-/* worker pool */
-#include "wpool.h"
 #include "protocore-private.h"
 
 #define USE_COROUTINES		1
+
+#if defined DEBUG_FLAG
+# define UD_CRITICAL_MCAST(args...)					\
+	do {								\
+		UD_LOGOUT("[unserding/input/mcast] CRITICAL " args);	\
+		UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args);	\
+	} while (0)
+# define UD_DEBUG_MCAST(args...)					\
+	do {								\
+		UD_LOGOUT("[unserding/input/mcast] " args);		\
+		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
+	} while (0)
+# define UD_INFO_MCAST(args...)						\
+	do {								\
+		UD_LOGOUT("[unserding/input/mcast] " args);		\
+		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
+	} while (0)
+#else  /* !DEBUG_FLAG */
+# define UD_CRITICAL_MCAST(args...)				\
+	UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args)
+# define UD_INFO_MCAST(args...)					\
+	UD_SYSLOG(LOG_INFO, "[input/mcast] " args)
+# define UD_DEBUG_MCAST(args...)
+#endif	/* DEBUG_FLAG */
 
 FILE *logout;
 static FILE *monout;
@@ -123,7 +145,54 @@ mon_pkt_cb(job_t j)
 	} else {
 		fputs("NAUGHT message\n", logout);
 	}
-	jpool_release(j);
+	return;
+}
+
+static void
+mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
+{
+	ssize_t nread;
+	char buf[INET6_ADDRSTRLEN];
+	/* the address in human readable form */
+	const char *a;
+	/* the port (in host-byte order) */
+	uint16_t p;
+	/* a job */
+	struct job_s j[1];
+	socklen_t lsa = sizeof(j->sa);
+
+	j->sock = w->fd;
+	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa.sa, &lsa);
+	/* obtain the address in human readable form */
+	a = inet_ntop(
+		ud_sockaddr_fam(&j->sa), ud_sockaddr_addr(&j->sa),
+		buf, sizeof(buf));
+	p = ud_sockaddr_port(&j->sa);
+	UD_INFO_MCAST(
+		":sock %d connect :from [%s]:%d  "
+		":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+		w->fd, a, p,
+		(unsigned int)nread,
+		udpc_pkt_cno(JOB_PACKET(j)),
+		udpc_pkt_pno(JOB_PACKET(j)),
+		udpc_pkt_cmd(JOB_PACKET(j)),
+		ntohs(((const uint16_t*)j->buf)[3]));
+
+	/* handle the reading */
+	if (UNLIKELY(nread < 0)) {
+		UD_CRITICAL_MCAST("could not handle incoming connection\n");
+		goto out_revok;
+	} else if (nread == 0) {
+		/* no need to bother */
+		goto out_revok;
+	}
+
+	j->blen = nread;
+
+	/* enqueue t3h job and copy the input buffer over to
+	 * the job's work space, also trigger the lazy bastards */
+	(void)mon_pkt_cb(j);
+out_revok:
 	return;
 }
 
@@ -134,14 +203,6 @@ static ev_signal ALGN16(__sigterm_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
 static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
-
-/* worker magic */
-static int nworkers = 1;
-
-/* the global job queue */
-jpool_t gjpool;
-/* holds worker pool */
-wpool_t gwpool;
 
 static void
 sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
@@ -174,36 +235,6 @@ triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
 }
 
 
-/* helper for daemon mode */
-static bool prefer6p = true;
-
-
-/* helper function for the worker pool */
-static int
-get_num_proc(void)
-{
-#if defined HAVE_PTHREAD_AFFINITY_NP
-	long int self = pthread_self();
-	cpu_set_t cpuset;
-
-	if (pthread_getaffinity_np(self, sizeof(cpuset), &cpuset) == 0) {
-		int ret = cpuset_popcount(&cpuset);
-		if (ret > 0) {
-			return ret;
-		} else {
-			return 1;
-		}
-	}
-#endif	/* HAVE_PTHREAD_AFFINITY_NP */
-#if defined _SC_NPROCESSORS_ONLN
-	return sysconf(_SC_NPROCESSORS_ONLN);
-#else  /* !_SC_NPROCESSORS_ONLN */
-/* any ideas? */
-	return 1;
-#endif	/* _SC_NPROCESSORS_ONLN */
-}
-
-
 #if defined __INTEL_COMPILER
 # pragma warning (disable:593)
 # pragma warning (disable:181)
@@ -230,6 +261,8 @@ main(int argc, char *argv[])
 	ev_signal *sighup_watcher = &__sighup_watcher;
 	ev_signal *sigterm_watcher = &__sigterm_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+	ev_io *beef = NULL;
+	size_t nbeef = 0;
 	struct ud_ctx_s __ctx;
 	struct ud_handle_s __hdl;
 	/* args */
@@ -240,28 +273,15 @@ main(int argc, char *argv[])
 	monout = stdout;
 	/* wipe stack pollution */
 	memset(&__ctx, 0, sizeof(__ctx));
-	/* obtain the number of cpus */
-	nworkers = get_num_proc();
 
 	/* parse the command line */
 	if (cmdline_parser(argc, argv, argi)) {
 		exit(1);
 	}
 
-	/* check if nworkers is not too large */
-	if (nworkers > MAX_WORKERS) {
-		nworkers = MAX_WORKERS;
-	}
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);
 	__ctx.mainloop = loop;
-
-	/* create the job pool, here because we may want to offload stuff
-	 * the name job pool is misleading, it's a bucket pool with
-	 * equally sized buckets of memory */
-	gjpool = make_jpool(NJOBS, sizeof(struct job_s));
-	/* create the worker pool */
-	gwpool = make_wpool(nworkers, NJOBS);
 
 	/* initialise the lib handle */
 	init_unserding_handle(&__hdl, PF_INET6, true);
@@ -285,28 +305,42 @@ main(int argc, char *argv[])
 	ev_async_init(glob_notify, triv_cb);
 	ev_async_start(EV_A_ glob_notify);
 
+	/* make some room for the control channel and the beef chans */
+	nbeef = argi->beef_given + 1;
+	beef = malloc(nbeef * sizeof(*beef));
+
 	/* attach a multicast listener
 	 * we add this quite late so that it's unlikely that a plethora of
 	 * events has already been injected into our precious queue
 	 * causing the libev main loop to crash. */
-	ud_attach_mcast(EV_A_ mon_pkt_cb, prefer6p);
+	{
+		int s = ud_mcast_init(UD_NETWORK_SERVICE);
+		ev_io_init(beef, mon_beef_cb, s, EV_READ);
+		ev_io_start(EV_A_ beef);
+	}
 
-	/* rock the wpool queue to trigger anything on there */
-	wpool_trigger(gwpool);
+	/* go through all beef channels */
+	for (unsigned int i = 0; i < argi->beef_given; i++) {
+		int s = ud_mcast_init(argi->beef_arg[i]);
+		ev_io_init(beef + i + 1, mon_beef_cb, s, EV_READ);
+		ev_io_start(EV_A_ beef + i);
+	}
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
 	UD_LOG_NOTI("shutting down unsermon\n");
 
-	/* close the socket */
-	ud_detach_mcast(EV_A);
+	/* detaching beef channels */
+
+	for (unsigned int i = 0; i < nbeef; i++) {
+		int s = beef[i].fd;
+		ev_io_stop(EV_A_ beef + i);
+		ud_mcast_fini(s);
+	}
 
 	/* destroy the default evloop */
 	ev_default_destroy();
-
-	/* kill our buckets */
-	free_jpool(gjpool);
 
 	/* kick the config context */
 	cmdline_parser_free(argi);

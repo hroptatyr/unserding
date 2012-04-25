@@ -112,28 +112,28 @@
 # error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
 #endif
 
-#if !defined UNSERLIB
+#if defined UNSERSRV
 static int lsock4 __attribute__((used));
 static int lsock6 __attribute__((used));
 
 static ev_timer ALGN16(__s2s_watcher);
-#endif	/* !UNSERLIB */
+#endif	/* UNSERSRV */
 
 /* v4 stuff */
-#if !defined UNSERLIB
+#if defined UNSERSRV
 static ev_io ALGN16(__srv4_watcher);
 static struct ip_mreq ALGN16(mreq4);
 /* server to client goodness */
 static ud_sockaddr_u __sa4 = {
 	.sa4.sin_addr = {0}
 };
-#endif	/* !UNSERLIB */
+#endif	/* UNSERSRV */
 
 /* dual-stack v6 stuff */
 #if defined IPPROTO_IPV6
-#if !defined UNSERLIB
+#if defined UNSERSRV
 static ev_io ALGN16(__srv6_watcher);
-#endif	/* !UNSERLIB */
+#endif	/* UNSERSRV */
 /* node local, site local and link local */
 static struct ipv6_mreq ALGN16(mreq6_nolo);
 static struct ipv6_mreq ALGN16(mreq6_silo);
@@ -255,7 +255,7 @@ __linger_sock(int sock)
 	return;
 }
 
-#if !defined UNSERLIB
+#if defined UNSERSRV
 static void
 __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 {
@@ -284,7 +284,7 @@ __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 	}
 	return;
 }
-#endif	/* !UNSERLIB */
+#endif	/* UNSERSRV */
 
 #if defined IPPROTO_IPV6
 static void
@@ -314,7 +314,7 @@ __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *mreq)
 }
 #endif	/* IPPROTO_IPV6 */
 
-#if !defined UNSERLIB
+#if defined UNSERSRV
 static void
 __mcast4_leave_group(int s, struct ip_mreq *mreq)
 {
@@ -322,7 +322,7 @@ __mcast4_leave_group(int s, struct ip_mreq *mreq)
 	setsockopt(s, IPPROTO_IP, IP_DROP_MEMBERSHIP, mreq, sizeof(*mreq));
 	return;
 }
-#endif	/* !UNSERLIB */
+#endif	/* UNSERSRV */
 
 #if defined IPPROTO_IPV6
 static void
@@ -334,7 +334,7 @@ __mcast6_leave_group(int s, struct ipv6_mreq *mreq)
 }
 #endif	/* IPPROTO_IPV6 */
 
-#if !defined UNSERLIB
+#if defined UNSERSRV
 static int
 mcast4_listener_init(void)
 {
@@ -442,7 +442,7 @@ static void
 mcast_listener_deinit(int sock)
 {
 	/* drop multicast group membership */
-#if !defined UNSERLIB
+#if defined UNSERSRV
 	__mcast4_leave_group(sock, &mreq4);
 #endif	/* !UNSERLIB */
 #if defined IPPROTO_IPV6
@@ -459,7 +459,7 @@ mcast_listener_deinit(int sock)
 }
 
 
-#if !defined UNSERLIB
+#if defined UNSERSRV
 static char scratch_buf[UDPC_PKTLEN];
 static wpool_work_f wpcb = NULL;
 
@@ -525,10 +525,10 @@ out_revok:
 	jpool_release(j);
 	return;
 }
-#endif	/* !UNSERLIB */
+#endif	/* UNSERSRV */
 
 
-#if !defined UNSERLIB
+#if defined UNSERSRV
 void
 send_cl(job_t j)
 {
@@ -585,7 +585,7 @@ send_m46(job_t j)
 #endif	/* !UNSERLIB */
 
 
-#if !defined UNSERLIB
+#if defined UNSERSRV
 int
 ud_attach_mcast(EV_P_ ud_work_f cb, bool prefer_ipv6_p)
 {
@@ -649,7 +649,7 @@ ud_detach_mcast(EV_P)
 	ev_timer_stop(EV_A_ s2s_watcher);
 	return 0;
 }
-#endif	/* !UNSERLIB */
+#endif	/* UNSERSRV */
 
 /* public raw mcast socks */
 int

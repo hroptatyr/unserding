@@ -72,7 +72,7 @@
 #endif	/* DEBUG_FLAG */
 
 struct xmit_s {
-	ud_handle_t ud;
+	ud_chan_t ud;
 	utectx_t ute;
 	float speed;
 	bool restampp;
@@ -149,7 +149,7 @@ work(const struct xmit_s *ctx)
 		    (status = '/', plen + scom_byte_size(ti) > UDPC_PLLEN)) {
 			pkt.plen = UDPC_HDRLEN + plen;
 			XMIT_STUP(status);
-			ud_send_raw(ctx->ud, pkt);
+			ud_chan_send(ctx->ud, pkt);
 			XMIT_STUP('\n');
 			/* reset ser */
 			RESET_SER;
@@ -192,7 +192,7 @@ work(const struct xmit_s *ctx)
 	if (udpc_seria_msglen(ser)) {
 		pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
 		XMIT_STUP('/');
-		ud_send_raw(ctx->ud, pkt);
+		ud_chan_send(ctx->ud, pkt);
 		XMIT_STUP('\n');
 	}
 	return;
@@ -219,7 +219,7 @@ work(const struct xmit_s *ctx)
 int
 main(int argc, char *argv[])
 {
-	static struct ud_handle_s hdl[1];
+	static struct ud_chan_s hdl;
 	struct gengetopt_args_info argi[1];
 	struct xmit_s ctx[1];
 	int res = 0;
@@ -242,12 +242,12 @@ main(int argc, char *argv[])
 	signal(SIGINT, handle_sigint);
 
 	/* obtain a new handle, somehow we need to use the port number innit? */
-	init_unserding_handle(hdl, PF_INET6, false);
+	hdl = ud_chan_init(8584);
 
 	/* the actual work */
 	switch (setjmp(jb)) {
 	case 0:
-		ctx->ud = hdl;
+		ctx->ud = &hdl;
 		ctx->speed = argi->speed_arg;
 		ctx->restampp = argi->restamp_given;
 		work(ctx);
@@ -258,7 +258,7 @@ main(int argc, char *argv[])
 	}
 
 	/* and lose the handle again */
-	free_unserding_handle(hdl);
+	ud_chan_fini(hdl);
 
 	/* and close the file */
 	ute_close(ctx->ute);

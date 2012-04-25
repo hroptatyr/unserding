@@ -172,8 +172,8 @@ AS_HELP_STRING([--enable-cliapps], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 AC_ARG_ENABLE([library], [
-AS_HELP_STRING([--enable-library], [Build the library component, default: no.])],
-	[enable_library="${enableval}"], [enable_library="no"])
+AS_HELP_STRING([--enable-library], [Build the library component, default: yes.])],
+	[enable_library="${enableval}"], [enable_library="yes"])
 AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
 
 AC_CONFIG_FILES([Makefile])

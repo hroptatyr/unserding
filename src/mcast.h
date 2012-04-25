@@ -1,8 +1,8 @@
-/*** mcast.h -- unserding network intrinsics
+/*** mcast.h -- ipv6 multicast handlers
  *
- * Copyright (C) 2009 Sebastian Freundt
+ * Copyright (C) 2008-2012 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -54,9 +54,6 @@ extern "C" {
 
 #define UD_NETWORK_SERVICE	8653
 #define UD_NETWORK_SERVSTR	"8653"
-/* 239.0.0.0/8 are organisational solicited v4 mcast addrs */
-#define UD_MCAST4_ADDR		"239.86.53.1"
-#define UD_MCAST4S2S_ADDR	"239.86.53.3"
 /* http://www.iana.org/assignments/ipv6-multicast-addresses/ lists us 
  * as ff0x:0:0:0:0:0:0:134 */
 /* node-local */
@@ -77,7 +74,6 @@ typedef const union ud_sockaddr_u *ud_const_sockaddr_t;
 union ud_sockaddr_u {
 		struct sockaddr_storage sas;
 		struct sockaddr sa;
-		struct sockaddr_in sa4;
 		struct sockaddr_in6 sa6;
 };
 
@@ -93,69 +89,15 @@ ud_sockaddr_fam(ud_const_sockaddr_t sa)
 }
 
 static inline short unsigned int
-ud_sockaddr_4port(ud_const_sockaddr_t sa)
-{
-	return ntohs(sa->sa4.sin_port);
-}
-
-static inline short unsigned int
-ud_sockaddr_6port(ud_const_sockaddr_t sa)
-{
-	return ntohs(sa->sa6.sin6_port);
-}
-
-static inline short unsigned int
 ud_sockaddr_port(ud_const_sockaddr_t sa)
 {
-	/* should be properly switched? */
 	return ntohs(sa->sa6.sin6_port);
-}
-
-static inline void
-ud_sockaddr_set_6port(ud_sockaddr_t sa, uint16_t port)
-{
-	sa->sa6.sin6_port = htons(port);
-	return;
-}
-
-static inline void
-ud_sockaddr_set_4port(ud_sockaddr_t sa, uint16_t port)
-{
-	sa->sa4.sin_port = htons(port);
-	return;
-}
-
-static inline void
-ud_sockaddr_set_port(ud_sockaddr_t sa, uint16_t port)
-{
-	/* should be properly switched? */
-	sa->sa6.sin6_port = htons(port);
-	return;
-}
-
-static inline const void*
-ud_sockaddr_4addr(ud_const_sockaddr_t sa)
-{
-	return &sa->sa4.sin_addr;
-}
-
-static inline const void*
-ud_sockaddr_6addr(ud_const_sockaddr_t sa)
-{
-	return &sa->sa6.sin6_addr;
 }
 
 static inline const void*
 ud_sockaddr_addr(ud_const_sockaddr_t sa)
 {
-	switch (ud_sockaddr_fam(sa)) {
-	case AF_INET6:
-		return ud_sockaddr_6addr(sa);
-	case AF_INET:
-		return ud_sockaddr_4addr(sa);
-	default:
-		return NULL;
-	}
+	return &sa->sa6.sin6_addr;
 }
 
 static inline void

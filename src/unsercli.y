@@ -542,6 +542,13 @@ TOK_UINT {
 %%
 
 
+static inline void
+ud_sockaddr_set_port(ud_sockaddr_t sa, uint16_t port)
+{
+	sa->sa6.sin6_port = htons(port);
+	return;
+}
+
 static void
 sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
@@ -723,7 +730,8 @@ main(int argc, char *argv[])
 		init_unserding_handle(&__hdl, PF_INET, false);
 	}
 	if (argi->port_arg != UD_NETWORK_SERVICE) {
-		ud_handle_set_port(&__hdl, argi->port_arg);
+		/* grrrrr */
+		ud_sockaddr_set_port(&__hdl.sa, argi->port_arg);
 	}
 	/* store our global packet */
 	__hdl.pktchn = &__pkt;

@@ -97,7 +97,32 @@
 #define UDP_MULTICAST_TTL	16
 #define SOCK_INVALID		(int)0xffffff
 
+static inline void
+ud_sockaddr_set_port(ud_sockaddr_t sa, uint16_t port)
+{
+	sa->sa6.sin6_port = htons(port);
+	return;
+}
+
 
+static inline void
+ud_chan_set_port(struct ud_chan_s *c, uint16_t port)
+{
+	ud_sockaddr_set_port(&c->sa, port);
+	return;
+}
+
+static inline void
+ud_chan_set_svc(struct ud_chan_s *c)
+{
+	c->sa.sa6.sin6_family = AF_INET6;
+	/* we pick link-local here for simplicity */
+	inet_pton(AF_INET6, UD_MCAST6_LINK_LOCAL, &c->sa.sa6.sin6_addr);
+	/* set the flowinfo */
+	c->sa.sa6.sin6_flowinfo = 0;
+	return;
+}
+
 static void
 fiddle_with_mtu(int __attribute__((unused)) s)
 {
@@ -133,46 +158,30 @@ fiddle_with_mtu(int __attribute__((unused)) s)
 }
 
 static int
-mcast6_init(ud_handle_t hdl)
+mcast6_init(struct ud_chan_s *tgt)
 {
 #if defined IPPROTO_IPV6
-	volatile int s;
 	int opt = 0;
 
 	/* try v6 first */
-	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
-		return SOCK_INVALID;
+	if ((tgt->sock = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
+		tgt->sock = SOCK_INVALID;
+		return -1;
 	}
 
 #if defined IPV6_V6ONLY
 	opt = 1;
-	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
+	setsockopt(tgt->sock, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
 #endif	/* IPV6_V6ONLY */
 
-	fiddle_with_mtu(s);
-	ud_handle_set_6svc(hdl);
-	ud_handle_set_port(hdl, UD_NETWORK_SERVICE);
-	return s;
+	fiddle_with_mtu(tgt->sock);
+	ud_chan_set_svc(tgt);
+	return 0;
 
 #else  /* !IPPROTO_IPV6 */
-
-	return SOCK_INVALID;
+out:
+	return -1;
 #endif	/* IPPROTO_IPV6 */
-}
-
-static int
-mcast4_init(ud_handle_t hdl)
-{
-	volatile int s;
-
-	/* try v6 first */
-	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0) {
-		return SOCK_INVALID;
-	}
-
-	ud_handle_set_4svc(hdl);
-	ud_handle_set_port(hdl, UD_NETWORK_SERVICE);
-	return s;
 }
 
 /* pseudo constructor, singleton */
@@ -238,6 +247,13 @@ ud_send_raw(ud_handle_t hdl, ud_packet_t pkt)
 
 	/* always send to the mcast addresses */
 	return sendto(s, pkt.pbuf, pkt.plen, 0, &hdl->sa.sa, sizeof(hdl->sa));
+}
+
+ssize_t
+ud_chan_send(ud_chan_t c, ud_packet_t pkt)
+{
+	/* always send to the mcast addresses */
+	return sendto(c->sock, pkt.pbuf, pkt.plen, 0, &c->sa.sa, sizeof(c->sa));
 }
 
 ssize_t
@@ -331,25 +347,33 @@ ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd)
 void
 init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop)
 {
-	hdl->convo = 0;
+	struct ud_chan_s c[1];
+
 	/* initialise our sockaddr structure upfront */
-	memset(&hdl->sa, 0, sizeof(hdl->sa));
+	memset(&c->sa, 0, sizeof(c->sa));
 	/* transport protocol independence */
 	switch (pref_fam) {
 	default:
 	case PF_UNSPEC:
-		if (mcast6_init(hdl) != SOCK_INVALID) {
+		if (mcast6_init(c) != SOCK_INVALID) {
 			break;
 		}
 	case PF_INET:
-		hdl->sock = mcast4_init(hdl);
+		hdl->sock = -1;
 		break;
 	case PF_INET6:
-		hdl->sock = mcast6_init(hdl);
+		hdl->sock = mcast6_init(c);
 		break;
 	}
+	/* set UD_NETWORK_SVC as channel */
+	ud_chan_set_port(c, UD_NETWORK_SERVICE);
 	/* operate in non-blocking mode */
-	setsock_nonblock(hdl->sock);
+	setsock_nonblock(c->sock);
+
+	/* copy from C to HDL */
+	hdl->sock = c->sock;
+	hdl->sa = c->sa;
+	hdl->convo = 0;
 	if (negop) {
 		/* fiddle with the mart slot */
 		hdl->mart = UD_SENDRECV_TIMEOUT;
@@ -373,6 +397,27 @@ free_unserding_handle(ud_handle_t hdl)
 	}
 	/* also free the epoll cruft */
 	free_epoll_guts();
+	return;
+}
+
+/* lower level connection */
+struct ud_chan_s
+ud_chan_init(short unsigned int port)
+{
+	struct ud_chan_s res;
+
+	(void)mcast6_init(&res);
+	setsock_nonblock(res.sock);
+	ud_chan_set_port(&res, port);
+	return res;
+}
+
+void
+ud_chan_fini(struct ud_chan_s c)
+{
+	/* and kick the socket */
+	shutdown(c.sock, SHUT_RDWR);
+	close(c.sock);
 	return;
 }
 

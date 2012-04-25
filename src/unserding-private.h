@@ -145,10 +145,6 @@ extern wpool_t gwpool;
 extern bool cli_waiting_p;
 #endif	/* UNSERCLI */
 
-/* more socket goodness, defined in mcast4.c */
-extern int ud_attach_mcast(EV_P_ ud_work_f cb, bool prefer_ipv6_p);
-extern int ud_detach_mcast(EV_P);
-
 /* even more socket goodness, defined in tcp-unix.c */
 extern int ud_attach_tcp_unix(EV_P_ bool prefer_ipv6_p);
 extern int ud_detach_tcp_unix(EV_P);

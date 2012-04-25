@@ -112,111 +112,13 @@
 # error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
 #endif
 
-#if defined UNSERSRV
-static int lsock6 __attribute__((used));
-
-static ev_timer ALGN16(__s2s_watcher);
-#endif	/* UNSERSRV */
-
 /* dual-stack v6 stuff */
 #if defined IPPROTO_IPV6
-#if defined UNSERSRV
-static ev_io ALGN16(__srv6_watcher);
-#endif	/* UNSERSRV */
 /* node local, site local and link local */
 static struct ipv6_mreq ALGN16(mreq6_nolo);
 static struct ipv6_mreq ALGN16(mreq6_silo);
 static struct ipv6_mreq ALGN16(mreq6_lilo);
-/* server to client goodness */
-static ud_sockaddr_u __sa6 = {
-	.sa6.sin6_addr = IN6ADDR_ANY_INIT
-};
 #endif	/* AF_INET */
-
-
-#if defined UNSERSRV
-/* a simple packet queue and the re-tx service */
-#define MAX_PKTQ_LEN	65536
-#define UD_SVC_RETX	0x0002
-
-struct pktq_slot_s {
-	size_t len;
-	char buf[UDPC_PKTLEN];
-};
-
-static struct pktq_slot_s pktq[MAX_PKTQ_LEN];
-static size_t pktq_idx = 0;
-
-static inline index_t
-next_slot(void)
-{
-	index_t res;
-
-	if ((res = pktq_idx++) >= MAX_PKTQ_LEN) {
-		res = pktq_idx = 0;
-	}
-	return res;
-}
-
-#if 0
-static inline index_t
-curr_slot(void)
-{
-	index_t res;
-	if ((res = pktq_idx) == 0) {
-		res = MAX_PKTQ_LEN;
-	}
-	return res - 1;
-}
-#endif	/* 0 */
-
-static void
-add_packet(const char *buf, size_t len)
-{
-	index_t slot = next_slot();
-	pktq[slot].len = len;
-	memcpy(&pktq[slot].buf, buf, len);
-	return;
-}
-
-static index_t
-find_packet(ud_convo_t cno, ud_pkt_no_t pno)
-{
-	index_t res;
-	for (res = 0; res < MAX_PKTQ_LEN; res++) {
-		ud_packet_t pkt = {
-			.plen = pktq[res].len,
-			.pbuf = pktq[res].buf
-		};
-		ud_convo_t pcno = udpc_pkt_cno(pkt);
-		ud_pkt_no_t ppno = udpc_pkt_pno(pkt);
-
-		if (cno == pcno && pno == ppno) {
-			return res;
-		}
-	}
-	return 0;
-}
-
-static void
-ud_retx(job_t j)
-{
-	struct udpc_seria_s sctx;
-	/* in args */
-	int32_t cno, pno;
-	index_t slot;
-
-	/* prepare the iterator for the incoming packet */
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(j->buf), UDPC_PLLEN);
-	cno = udpc_seria_des_ui32(&sctx);
-	pno = udpc_seria_des_ui32(&sctx);
-
-	slot = find_packet(cno, pno);
-	memcpy(j->buf, &pktq[slot].buf, j->blen = pktq[slot].len);
-	send_cl(j);
-	return;
-}
-#endif	/* UNSERSRV */
 
 
 /* socket goodies */
@@ -291,8 +193,10 @@ __mcast6_join(int s, short unsigned int UNUSED(port))
 			UD_DEBUG_MCAST("  could not join the group\n");
 		}
 	}
+#if 0
 	/* endow our s2c and s2s structs */
-	//__sa6.sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+	__sa6.sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+#endif	/* 0 */
 	return 0;
 }
 #endif	/* IPPROTO_IPV6 */
@@ -303,6 +207,9 @@ mcast6_listener_init(short unsigned int port)
 #if defined IPPROTO_IPV6
 	int retval;
 	volatile int s;
+	ud_sockaddr_u __sa6 = {
+		.sa6.sin6_addr = IN6ADDR_ANY_INIT
+	};
 
 	__sa6.sa6.sin6_family = AF_INET6;
 	__sa6.sa6.sin6_port = htons(port);
@@ -376,152 +283,6 @@ mcast_listener_deinit(int sock)
 }
 
 
-#if defined UNSERSRV
-static char scratch_buf[UDPC_PKTLEN];
-static wpool_work_f wpcb = NULL;
-
-/* this callback is called when data is readable on the main server socket */
-static void
-mcast_inco_cb(EV_P_ ev_io *w, int UNUSED(revents))
-{
-	ssize_t nread;
-	char buf[INET6_ADDRSTRLEN];
-	/* the address in human readable form */
-	const char *a;
-	/* the port (in host-byte order) */
-	uint16_t p;
-	/* a job */
-	job_t j;
-	socklen_t lsa = sizeof(j->sa);
-
-	if (UNLIKELY((j = jpool_acquire(gjpool)) == NULL)) {
-		UD_CRITICAL("no job slots ... leaping\n");
-		/* just read the packet off of the wire */
-		(void)recv(w->fd, scratch_buf, UDPC_PKTLEN, 0);
-		wpool_trigger(gwpool);
-		return;
-	}
-
-	j->sock = w->fd;
-	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa.sa, &lsa);
-	/* obtain the address in human readable form */
-	a = inet_ntop(ud_sockaddr_fam(&j->sa),
-		      ud_sockaddr_addr(&j->sa), buf, sizeof(buf));
-	p = ud_sockaddr_port(&j->sa);
-	UD_INFO_MCAST(
-		":sock %d connect :from [%s]:%d  "
-		":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-		w->fd, a, p,
-		(unsigned int)nread,
-		udpc_pkt_cno(JOB_PACKET(j)),
-		udpc_pkt_pno(JOB_PACKET(j)),
-		udpc_pkt_cmd(JOB_PACKET(j)),
-		ntohs(((const uint16_t*)j->buf)[3]));
-
-	/* handle the reading */
-	if (UNLIKELY(nread < 0)) {
-		UD_CRITICAL_MCAST("could not handle incoming connection\n");
-		goto out_revok;
-	} else if (nread == 0) {
-		/* no need to bother */
-		goto out_revok;
-	}
-
-	j->blen = nread;
-
-#if defined DEBUG_FLAG && defined LOG_RAW
-	/* spit the packet in its raw shape */
-	ud_fprint_pkt_raw(JOB_PACKET(j), logout);
-#endif	/* DEBUG_FLAG */
-
-	/* enqueue t3h job and copy the input buffer over to
-	 * the job's work space, also trigger the lazy bastards */
-	wpool_enq(gwpool, wpcb, j, true);
-	return;
-out_revok:
-	jpool_release(j);
-	return;
-}
-#endif	/* UNSERSRV */
-
-
-#if defined UNSERSRV
-void
-send_cl(job_t j)
-{
-	/* prepare */
-	if (UNLIKELY(j->blen == 0)) {
-		return;
-	}
-	/* write back to whoever sent the packet */
-	(void)sendto(j->sock, j->buf, j->blen, 0, &j->sa.sa, sizeof(j->sa));
-#if defined UNSERSRV
-	/* also store a copy of the packet for the re-tx service */
-	add_packet(j->buf, j->blen);
-#endif	/* UNSERSRV */
-	return;
-}
-
-void __attribute__((unused))
-send_m6(job_t j)
-{
-	/* prepare */
-	if (UNLIKELY(j->blen == 0)) {
-		return;
-	}
-	/* send to the m6cast address */
-	(void)sendto(lsock6, j->buf, j->blen, 0, &__sa6.sa, sizeof(__sa6.sa6));
-	return;
-}
-#endif	/* !UNSERLIB */
-
-
-#if defined UNSERSRV
-int
-ud_attach_mcast(EV_P_ ud_work_f cb, bool prefer_ipv6_p)
-{
-	/* get us a global sock */
-	lsock6 = mcast6_listener_init(UD_NETWORK_SERVICE);
-
-	/* store the callback */
-	wpcb = (wpool_work_f)cb;
-
-	if (LIKELY(lsock6 >= 0)) {
-		ev_io *srv_watcher = &__srv6_watcher;
-		/* initialise an io watcher, then start it */
-		ev_io_init(srv_watcher, mcast_inco_cb, lsock6, EV_READ);
-		ev_io_start(EV_A_ srv_watcher);
-	}
-
-#if defined UNSERSRV
-	/* announce our packet queuing service */
-	ud_set_service(UD_SVC_RETX, ud_retx, NULL);
-#endif	/* UNSERSRV */
-	return 0;
-}
-
-int
-ud_detach_mcast(EV_P)
-{
-	ev_io *srv_watcher;
-	ev_timer *s2s_watcher = &__s2s_watcher;
-
-	/* close the sockets before we stop the watchers */
-	if (LIKELY(lsock6 >= 0)) {
-		/* and kick the socket */
-		mcast_listener_deinit(lsock6);
-	}
-
-	/* stop the guy that watches the socket */
-	srv_watcher = &__srv6_watcher;
-	ev_io_stop(EV_A_ srv_watcher);
-
-	/* stop the timer */
-	ev_timer_stop(EV_A_ s2s_watcher);
-	return 0;
-}
-#endif	/* UNSERSRV */
-
 /* public raw mcast socks */
 int
 ud_mcast_init(short unsigned int port)

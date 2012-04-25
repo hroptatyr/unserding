@@ -41,10 +41,12 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <string.h>
+/* for gettimeofday() */
+#include <sys/time.h>
 /* for struct timespec */
 #include <time.h>
 
-#if defined __USE_POSIX199309
+#if defined __USE_POSIX199309 && !defined UNSERLIB
 /* returns the current CLOCK_REALTIME time stamp */
 static inline struct timespec
 __stamp(void)
@@ -58,18 +60,44 @@ __stamp(void)
 static inline struct timespec
 __lapse(struct timespec then)
 {
-	struct timespec now, res;
-	clock_gettime(CLOCK_REALTIME, &now);
+	struct timespec now = __stamp();
+	struct timespec res;
+
+	res.tv_sec = now.tv_sec - then.tv_sec;
+	res.tv_nsec = now.tv_nsec - then.tv_nsec;
+	/* deal with overflow */
 	if (now.tv_nsec < then.tv_nsec) {
-		res.tv_sec = now.tv_sec - then.tv_sec - 1;
-		res.tv_nsec = 1000000000 + now.tv_nsec - then.tv_nsec;
-	} else {
-		res.tv_sec = now.tv_sec - then.tv_sec;
-		res.tv_nsec = now.tv_nsec - then.tv_nsec;
+		res.tv_sec--;
+		res.tv_nsec += 1000000000U;
 	}
 	return res;
 }
-#endif	/* __USE_POSIX199309 */
+#endif	/* __USE_POSIX199309 && !UNSERLIB */
+
+static inline struct timeval
+__ustamp(void)
+{
+	struct timeval res;
+	gettimeofday(&res, NULL);
+	return res;
+}
+
+/* given a stamp THEN, return the difference between __ustamp() and THEN. */
+static inline struct timeval
+__ulapse(struct timeval then)
+{
+	struct timeval now = __ustamp();
+	struct timeval res;
+
+	res.tv_sec = now.tv_sec - then.tv_sec;
+	res.tv_usec = now.tv_usec - then.tv_usec;
+	/* deal with overflow */
+	if (now.tv_usec < then.tv_usec) {
+		res.tv_sec--;
+		res.tv_usec += 1000000U;
+	}
+	return res;
+}
 
 static inline double
 __as_f(struct timespec src)

@@ -64,8 +64,6 @@
 #include "unserding-ctx.h"
 /* our private bits */
 #include "unserding-private.h"
-/* worker pool */
-#include "wpool.h"
 #include "protocore-private.h"
 
 #define USE_COROUTINES		1
@@ -147,11 +145,8 @@ mon_pkt_cb(job_t j)
 	} else {
 		fputs("NAUGHT message\n", logout);
 	}
-	jpool_release(j);
 	return;
 }
-
-static char scratch_buf[UDPC_PKTLEN];
 
 static void
 mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
@@ -163,22 +158,15 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	/* the port (in host-byte order) */
 	uint16_t p;
 	/* a job */
-	job_t j;
+	struct job_s j[1];
 	socklen_t lsa = sizeof(j->sa);
-
-	if (UNLIKELY((j = jpool_acquire(gjpool)) == NULL)) {
-		UD_CRITICAL("no job slots ... leaping\n");
-		/* just read the packet off of the wire */
-		(void)recv(w->fd, scratch_buf, UDPC_PKTLEN, 0);
-		wpool_trigger(gwpool);
-		return;
-	}
 
 	j->sock = w->fd;
 	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa.sa, &lsa);
 	/* obtain the address in human readable form */
-	a = inet_ntop(ud_sockaddr_fam(&j->sa),
-		      ud_sockaddr_addr(&j->sa), buf, sizeof(buf));
+	a = inet_ntop(
+		ud_sockaddr_fam(&j->sa), ud_sockaddr_addr(&j->sa),
+		buf, sizeof(buf));
 	p = ud_sockaddr_port(&j->sa);
 	UD_INFO_MCAST(
 		":sock %d connect :from [%s]:%d  "
@@ -201,17 +189,10 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 
 	j->blen = nread;
 
-#if defined DEBUG_FLAG && defined LOG_RAW
-	/* spit the packet in its raw shape */
-	ud_fprint_pkt_raw(JOB_PACKET(j), logout);
-#endif	/* DEBUG_FLAG */
-
 	/* enqueue t3h job and copy the input buffer over to
 	 * the job's work space, also trigger the lazy bastards */
-	wpool_enq(gwpool, (wpool_work_f)mon_pkt_cb, j, true);
-	return;
+	(void)mon_pkt_cb(j);
 out_revok:
-	jpool_release(j);
 	return;
 }
 
@@ -222,14 +203,6 @@ static ev_signal ALGN16(__sigterm_watcher);
 static ev_signal ALGN16(__sigpipe_watcher);
 static ev_async ALGN16(__wakeup_watcher);
 ev_async *glob_notify;
-
-/* worker magic */
-static int nworkers = 1;
-
-/* the global job queue */
-jpool_t gjpool;
-/* holds worker pool */
-wpool_t gwpool;
 
 static void
 sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
@@ -259,36 +232,6 @@ static void
 triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
 {
 	return;
-}
-
-
-/* helper for daemon mode */
-static bool prefer6p = true;
-
-
-/* helper function for the worker pool */
-static int
-get_num_proc(void)
-{
-#if defined HAVE_PTHREAD_AFFINITY_NP
-	long int self = pthread_self();
-	cpu_set_t cpuset;
-
-	if (pthread_getaffinity_np(self, sizeof(cpuset), &cpuset) == 0) {
-		int ret = cpuset_popcount(&cpuset);
-		if (ret > 0) {
-			return ret;
-		} else {
-			return 1;
-		}
-	}
-#endif	/* HAVE_PTHREAD_AFFINITY_NP */
-#if defined _SC_NPROCESSORS_ONLN
-	return sysconf(_SC_NPROCESSORS_ONLN);
-#else  /* !_SC_NPROCESSORS_ONLN */
-/* any ideas? */
-	return 1;
-#endif	/* _SC_NPROCESSORS_ONLN */
 }
 
 
@@ -330,28 +273,15 @@ main(int argc, char *argv[])
 	monout = stdout;
 	/* wipe stack pollution */
 	memset(&__ctx, 0, sizeof(__ctx));
-	/* obtain the number of cpus */
-	nworkers = get_num_proc();
 
 	/* parse the command line */
 	if (cmdline_parser(argc, argv, argi)) {
 		exit(1);
 	}
 
-	/* check if nworkers is not too large */
-	if (nworkers > MAX_WORKERS) {
-		nworkers = MAX_WORKERS;
-	}
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);
 	__ctx.mainloop = loop;
-
-	/* create the job pool, here because we may want to offload stuff
-	 * the name job pool is misleading, it's a bucket pool with
-	 * equally sized buckets of memory */
-	gjpool = make_jpool(NJOBS, sizeof(struct job_s));
-	/* create the worker pool */
-	gwpool = make_wpool(nworkers, NJOBS);
 
 	/* initialise the lib handle */
 	init_unserding_handle(&__hdl, PF_INET6, true);
@@ -375,22 +305,26 @@ main(int argc, char *argv[])
 	ev_async_init(glob_notify, triv_cb);
 	ev_async_start(EV_A_ glob_notify);
 
+	/* make some room for the control channel and the beef chans */
+	nbeef = argi->beef_given + 1;
+	beef = malloc(nbeef * sizeof(*beef));
+
 	/* attach a multicast listener
 	 * we add this quite late so that it's unlikely that a plethora of
 	 * events has already been injected into our precious queue
 	 * causing the libev main loop to crash. */
-	ud_attach_mcast(EV_A_ mon_pkt_cb, prefer6p);
-
-	/* go through all beef channels */
-	beef = malloc((nbeef = argi->beef_given) * sizeof(*beef));
-	for (unsigned int i = 0; i < argi->beef_given; i++) {
-		int s = ud_mcast_init(argi->beef_arg[i]);
-		ev_io_init(beef + i, mon_beef_cb, s, EV_READ);
-		ev_io_start(EV_A_ beef + i);
+	{
+		int s = ud_mcast_init(UD_NETWORK_SERVICE);
+		ev_io_init(beef, mon_beef_cb, s, EV_READ);
+		ev_io_start(EV_A_ beef);
 	}
 
-	/* rock the wpool queue to trigger anything on there */
-	wpool_trigger(gwpool);
+	/* go through all beef channels */
+	for (unsigned int i = 0; i < argi->beef_given; i++) {
+		int s = ud_mcast_init(argi->beef_arg[i]);
+		ev_io_init(beef + i + 1, mon_beef_cb, s, EV_READ);
+		ev_io_start(EV_A_ beef + i);
+	}
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
@@ -405,14 +339,8 @@ main(int argc, char *argv[])
 		ud_mcast_fini(s);
 	}
 
-	/* close the socket */
-	ud_detach_mcast(EV_A);
-
 	/* destroy the default evloop */
 	ev_default_destroy();
-
-	/* kill our buckets */
-	free_jpool(gjpool);
 
 	/* kick the config context */
 	cmdline_parser_free(argi);

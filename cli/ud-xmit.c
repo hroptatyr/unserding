@@ -43,6 +43,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <setjmp.h>
+/* for gettimeofday() */
+#include <sys/time.h>
 #include <uterus.h>
 #include "unserding.h"
 #include "protocore.h"
@@ -73,6 +75,7 @@ struct xmit_s {
 	ud_handle_t ud;
 	utectx_t ute;
 	float speed;
+	bool restampp;
 };
 
 static jmp_buf jb;
@@ -134,25 +137,26 @@ work(const struct xmit_s *ctx)
 		time_t stmp = scom_thdr_sec(ti);
 		unsigned int msec = scom_thdr_msec(ti);
 		size_t plen;
-		size_t bs;
+		char status;
 
 		if (UNLIKELY(!reft)) {
 			/* singleton */
 			reft = stmp;
 		}
-		/* artifical break */
+		/* disseminate */
+		plen = udpc_seria_msglen(ser);
+		if (((stmp > reft || msec > refm) && (status = '!', plen)) ||
+		    (status = '/', plen + scom_byte_size(ti) > UDPC_PLLEN)) {
+			pkt.plen = UDPC_HDRLEN + plen;
+			XMIT_STUP(status);
+			ud_send_raw(ctx->ud, pkt);
+			XMIT_STUP('\n');
+			/* reset ser */
+			RESET_SER;
+		}
+		/* sleep, well maybe */
 		if (stmp > reft || msec > refm) {
 			useconds_t slp;
-
-			/* send previous pack */
-			if (udpc_seria_msglen(ser)) {
-				pkt.plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
-				XMIT_STUP('!');
-				ud_send_raw(ctx->ud, pkt);
-				XMIT_STUP('\n');
-				/* re-set up pkt */
-				RESET_SER;
-			}
 			/* and sleep */
 			slp = ((stmp - reft) * 1000 + msec - refm) * speed;
 			for (unsigned int i = slp, j = 0; i; i /= 2, j++) {
@@ -163,19 +167,26 @@ work(const struct xmit_s *ctx)
 			refm = msec;
 			reft = stmp;
 		}
-		/* disseminate */
-		bs = scom_byte_size(ti);
-		plen = UDPC_HDRLEN + udpc_seria_msglen(ser);
-		if (plen + bs > UDPC_PKTLEN) {
-			pkt.plen = plen;
-			XMIT_STUP('/');
-			ud_send_raw(ctx->ud, pkt);
-			XMIT_STUP('\n');
-			/* reset ser */
-			RESET_SER;
-		}
+		/* add the scom in question to the pool */
 		XMIT_STUP('+');
-		udpc_seria_add_data(ser, ti, bs);
+		{
+			struct sndwch_s sto[4];
+			size_t bs = scom_byte_size(ti);
+
+			/* copy the scom, not strictly necessary but ah well */
+			memcpy(sto, ti, bs);
+
+			if (ctx->restampp) {
+				struct timeval now[1];
+
+				gettimeofday(now, NULL);
+				/* replace the time stamp */
+				AS_SCOM_THDR(sto)->sec = now->tv_sec;
+				AS_SCOM_THDR(sto)->msec = now->tv_usec / 1000;
+			}
+			/* add the copied guy */
+			udpc_seria_add_data(ser, sto, bs);
+		}
 		nt++;
 	}
 	if (udpc_seria_msglen(ser)) {
@@ -238,6 +249,7 @@ main(int argc, char *argv[])
 	case 0:
 		ctx->ud = hdl;
 		ctx->speed = argi->speed_arg;
+		ctx->restampp = argi->restamp_given;
 		work(ctx);
 	case SIGINT:
 	default:

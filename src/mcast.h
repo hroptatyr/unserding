@@ -167,6 +167,16 @@ ud_sockaddr_ntop(char *restrict buf, size_t len, ud_const_sockaddr_t sa)
 	return;
 }
 
+
+/* public offerings */
+/**
+ * Subscribe to service PORT in the unserding network.
+ * Return a socket that can be select()'d or poll()'d. */
+extern int ud_mcast_init(short unsigned int port);
+/**
+ * Unsubscribe from socket SOCK. */
+extern void ud_mcast_fini(int sock);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

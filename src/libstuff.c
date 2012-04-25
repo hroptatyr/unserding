@@ -97,6 +97,13 @@
 #define UDP_MULTICAST_TTL	16
 #define SOCK_INVALID		(int)0xffffff
 
+static inline void
+ud_sockaddr_set_port(ud_sockaddr_t sa, uint16_t port)
+{
+	sa->sa6.sin6_port = htons(port);
+	return;
+}
+
 
 static inline void
 ud_chan_set_port(struct ud_chan_s *c, uint16_t port)
@@ -106,21 +113,13 @@ ud_chan_set_port(struct ud_chan_s *c, uint16_t port)
 }
 
 static inline void
-ud_chan_set_6svc(struct ud_chan_s *c)
+ud_chan_set_svc(struct ud_chan_s *c)
 {
 	c->sa.sa6.sin6_family = AF_INET6;
 	/* we pick link-local here for simplicity */
 	inet_pton(AF_INET6, UD_MCAST6_LINK_LOCAL, &c->sa.sa6.sin6_addr);
 	/* set the flowinfo */
 	c->sa.sa6.sin6_flowinfo = 0;
-	return;
-}
-
-static inline void
-ud_chan_set_4svc(struct ud_chan_s *c)
-{
-	c->sa.sa.sa_family = AF_INET;
-	inet_pton(AF_INET, UD_MCAST4_ADDR, &c->sa.sa4.sin_addr);
 	return;
 }
 
@@ -176,25 +175,13 @@ mcast6_init(struct ud_chan_s *tgt)
 #endif	/* IPV6_V6ONLY */
 
 	fiddle_with_mtu(tgt->sock);
-	ud_chan_set_6svc(tgt);
+	ud_chan_set_svc(tgt);
 	return 0;
 
 #else  /* !IPPROTO_IPV6 */
 out:
 	return -1;
 #endif	/* IPPROTO_IPV6 */
-}
-
-static int
-mcast4_init(struct ud_chan_s *tgt)
-{
-	if ((tgt->sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0) {
-		tgt->sock = SOCK_INVALID;
-		return -1;
-	}
-
-	ud_chan_set_4svc(tgt);
-	return 0;
 }
 
 /* pseudo constructor, singleton */
@@ -372,7 +359,7 @@ init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop)
 			break;
 		}
 	case PF_INET:
-		hdl->sock = mcast4_init(c);
+		hdl->sock = -1;
 		break;
 	case PF_INET6:
 		hdl->sock = mcast6_init(c);

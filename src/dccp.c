@@ -92,6 +92,13 @@ set_dccp_service(int s, int service)
 	return;
 }
 
+static inline void
+ud_sockaddr_set_port(ud_sockaddr_t sa, uint16_t port)
+{
+	sa->sa6.sin6_port = htons(port);
+	return;
+}
+
 /* pseudo constructor, singleton */
 static ep_ctx_t
 epoll_guts(void)
@@ -179,7 +186,7 @@ dccp_connect(int s, ud_sockaddr_u host, uint16_t port, int timeout)
 	int res = 0;
 	ep_ctx_t epg = epoll_guts();
 
-	host.sa4.sin_port = htons(port);
+	ud_sockaddr_set_port(&host, port);
 
 	/* prepare, connect and wait for the magic to happen */
 	ep_prep_writer(epg, s);

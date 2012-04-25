@@ -72,6 +72,13 @@ __lapse(struct timespec then)
 	}
 	return res;
 }
+
+static inline double
+__as_f(struct timespec src)
+{
+/* return time as float in milliseconds */
+	return src.tv_sec * 1000.f + src.tv_nsec / 1000000.f;
+}
 #endif	/* __USE_POSIX199309 && !UNSERLIB */
 
 static inline struct timeval
@@ -100,10 +107,10 @@ __ulapse(struct timeval then)
 }
 
 static inline double
-__as_f(struct timespec src)
+__uas_f(struct timeval src)
 {
 /* return time as float in milliseconds */
-	return src.tv_sec * 1000.f + src.tv_nsec / 1000000.f;
+	return src.tv_sec * 1000.f + src.tv_usec / 1000.f;
 }
 
 /* printers */

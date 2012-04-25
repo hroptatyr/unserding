@@ -287,8 +287,8 @@ __mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
 #endif	/* UNSERSRV */
 
 #if defined IPPROTO_IPV6
-static void
-__mcast6_join_group(int s, const char *addr, struct ipv6_mreq *mreq)
+static int
+__mcast6_join_group(int s, const char *addr, struct ipv6_mreq *r)
 {
 	int opt = 0;
 	unsigned char ttl = UDP_MULTICAST_TTL;
@@ -299,18 +299,11 @@ __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *mreq)
 	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
 
 	/* set up the multicast group and join it */
-	inet_pton(AF_INET6, addr, &mreq->ipv6mr_multiaddr.s6_addr);
-	mreq->ipv6mr_interface = 0;
+	inet_pton(AF_INET6, addr, &r->ipv6mr_multiaddr.s6_addr);
+	r->ipv6mr_interface = 0;
 
 	/* now truly join */
-	if (UNLIKELY(setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-				mreq, sizeof(*mreq)) < 0)) {
-		UD_DEBUG_MCAST("could not join the multi6cast group\n");
-	} else {
-		UD_DEBUG_MCAST("port %d listening to udp://[%s]"
-			       ":" UD_NETWORK_SERVSTR "\n", s, addr);
-	}
-	return;
+	return setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, r, sizeof(*r));
 }
 #endif	/* IPPROTO_IPV6 */
 
@@ -373,6 +366,32 @@ mcast4_listener_init(void)
 }
 #endif	/* !UNSERLIB */
 
+#if defined IPPROTO_IPV6
+static int
+__mcast6_join(int s, short unsigned int UNUSED(port))
+{
+	struct {
+		const char *a;
+		struct ipv6_mreq *r;
+	} g[] = {
+		{UD_MCAST6_NODE_LOCAL, &mreq6_nolo},
+		{UD_MCAST6_LINK_LOCAL, &mreq6_lilo},
+		{UD_MCAST6_SITE_LOCAL, &mreq6_silo},
+	};
+
+	for (size_t i = 0; i < countof(g); i++) {
+		UD_DEBUG_MCAST(
+			"sock %d joining udp://[%s]:%hu\n", s, g[i].a, port);
+		if (UNLIKELY(__mcast6_join_group(s, g[i].a, g[i].r) < 0)) {
+			UD_DEBUG_MCAST("  could not join the group\n");
+		}
+	}
+	/* endow our s2c and s2s structs */
+	//__sa6.sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+	return 0;
+}
+#endif	/* IPPROTO_IPV6 */
+
 static int
 mcast6_listener_init(short unsigned int port)
 {
@@ -422,12 +441,8 @@ mcast6_listener_init(short unsigned int port)
 		return -1;
 	}
 
-	/* join the mcast group */
-	__mcast6_join_group(s, UD_MCAST6_NODE_LOCAL, &mreq6_nolo);
-	__mcast6_join_group(s, UD_MCAST6_LINK_LOCAL, &mreq6_lilo);
-	__mcast6_join_group(s, UD_MCAST6_SITE_LOCAL, &mreq6_silo);
-	/* endow our s2c and s2s structs */
-	//__sa6.sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+	/* join the mcast group(s) */
+	__mcast6_join(s, port);
 
 	/* return the socket we've got */
 	/* succeeded if > 0 */

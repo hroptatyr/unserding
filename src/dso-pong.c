@@ -44,19 +44,13 @@
 #include "unserding-private.h"
 #include "seria-proto-glue.h"
 #include "svc-pong.h"
+#include "ud-time.h"
 
 #define TRUNC_HOST_NAME_LEN	16
 
 static ud_handle_t my_hdl;
 static size_t my_hnmlen;
 static char my_hname[TRUNC_HOST_NAME_LEN];
-
-static void
-hrclock_stamp(struct timespec *ts)
-{
-	clock_gettime(CLOCK_REALTIME, ts);
-	return;
-}
 
 static void
 ping(job_t j)
@@ -67,7 +61,7 @@ ping(job_t j)
 	/* clear out the packet */
 	clear_pkt(&sctx, j);
 	/* escrow hostname, mac-addr, score and time */
-	hrclock_stamp(&ts);
+	ts = __stamp();
 	udpc_seria_add_str(&sctx, my_hname, my_hnmlen);
 	udpc_seria_add_ui32(&sctx, ts.tv_sec);
 	udpc_seria_add_ui32(&sctx, ts.tv_nsec);

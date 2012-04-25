@@ -17,3 +17,7 @@ section "Transmission options"
 option "speed" -
 	"Slow down transmission by this factor"
 	float default="1.0" optional
+
+option "restamp" -
+	"Use current time stamps when transmitting ute scoms"
+	optional

@@ -43,6 +43,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <setjmp.h>
+/* for gettimeofday() */
+#include <sys/time.h>
 #include <uterus.h>
 #include "unserding.h"
 #include "protocore.h"
@@ -73,6 +75,7 @@ struct xmit_s {
 	ud_handle_t ud;
 	utectx_t ute;
 	float speed;
+	bool restampp;
 };
 
 static jmp_buf jb;
@@ -166,7 +169,24 @@ work(const struct xmit_s *ctx)
 		}
 		/* add the scom in question to the pool */
 		XMIT_STUP('+');
-		udpc_seria_add_data(ser, ti, scom_byte_size(ti));
+		{
+			struct sndwch_s sto[4];
+			size_t bs = scom_byte_size(ti);
+
+			/* copy the scom, not strictly necessary but ah well */
+			memcpy(sto, ti, bs);
+
+			if (ctx->restampp) {
+				struct timeval now[1];
+
+				gettimeofday(now, NULL);
+				/* replace the time stamp */
+				AS_SCOM_THDR(sto)->sec = now->tv_sec;
+				AS_SCOM_THDR(sto)->msec = now->tv_usec / 1000;
+			}
+			/* add the copied guy */
+			udpc_seria_add_data(ser, sto, bs);
+		}
 		nt++;
 	}
 	if (udpc_seria_msglen(ser)) {
@@ -229,6 +249,7 @@ main(int argc, char *argv[])
 	case 0:
 		ctx->ud = hdl;
 		ctx->speed = argi->speed_arg;
+		ctx->restampp = argi->restamp_given;
 		work(ctx);
 	case SIGINT:
 	default:

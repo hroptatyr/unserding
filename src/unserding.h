@@ -61,6 +61,11 @@ typedef long unsigned int ud_flags_t;
  * thread-safe.
  * For multiple concurrent connexions obtain multiple handles. */
 typedef struct ud_handle_s *ud_handle_t;
+
+/**
+ * Structure that just consists of socket and destination. */
+typedef const struct ud_chan_s *ud_chan_t;
+
 /**
  * Simple packet structure.
  * Attention, this is a structure passed by value. */
@@ -100,6 +105,13 @@ struct ud_handle_s {
 	int mart;
 	/* system score */
 	int score;
+};
+
+/**
+ * Lower-level structure to handle convos. */
+struct ud_chan_s {
+	int sock;
+	ud_sockaddr_u sa;
 };
 
 
@@ -155,31 +167,13 @@ ud_handle_sock(ud_handle_t hdl)
 	return hdl->sock;
 }	
 
-static inline void
-ud_handle_set_port(ud_handle_t hdl, uint16_t port)
-{
-	ud_sockaddr_set_port(&hdl->sa, port);
-	return;
-}
-
-static inline void
-ud_handle_set_6svc(ud_handle_t hdl)
-{
-	hdl->sa.sa6.sin6_family = AF_INET6;
-	/* we pick link-local here for simplicity */
-	inet_pton(AF_INET6, UD_MCAST6_LINK_LOCAL, &hdl->sa.sa6.sin6_addr);
-	/* set the flowinfo */
-	hdl->sa.sa6.sin6_flowinfo = 0;
-	return;
-}
-
-static inline void
-ud_handle_set_4svc(ud_handle_t hdl)
-{
-	hdl->sa.sa.sa_family = AF_INET;
-	inet_pton(AF_INET, UD_MCAST4_ADDR, &hdl->sa.sa4.sin_addr);
-	return;
-}
+/* lower level connexion stuff */
+/**
+ * Get a socket to communicate with service PORT. */
+extern struct ud_chan_s ud_chan_init(short unsigned int port);
+/**
+ * Free resources associated with a connection. */
+extern void ud_chan_fini(struct ud_chan_s);
 
 
 /* specific services */

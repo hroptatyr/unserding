@@ -113,20 +113,9 @@
 #endif
 
 #if defined UNSERSRV
-static int lsock4 __attribute__((used));
 static int lsock6 __attribute__((used));
 
 static ev_timer ALGN16(__s2s_watcher);
-#endif	/* UNSERSRV */
-
-/* v4 stuff */
-#if defined UNSERSRV
-static ev_io ALGN16(__srv4_watcher);
-static struct ip_mreq ALGN16(mreq4);
-/* server to client goodness */
-static ud_sockaddr_u __sa4 = {
-	.sa4.sin_addr = {0}
-};
 #endif	/* UNSERSRV */
 
 /* dual-stack v6 stuff */
@@ -255,37 +244,6 @@ __linger_sock(int sock)
 	return;
 }
 
-#if defined UNSERSRV
-static void
-__mcast4_join_group(int s, const char *addr, struct ip_mreq *mreq)
-{
-	int UNUSED(one) = 1, UNUSED(zero) = 0;
-
-#if defined IP_PKTINFO && 0
-	/* turn on packet info, very linux-ish!!! */
-	setsockopt(s, IPPROTO_IPV6, IP_PKTINFO, &one, sizeof(one)) ;
-#endif
-#if defined IP_RECVSTDADDR && 0
-	/* turn on destination addr */
-	setsockopt(s, IPPROTO_IPV6, IP_RECVSTDADDR, &one, sizeof(one)) ;
-#endif
-	/* turn off loopback */
-	setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &zero, sizeof(zero));
-
-	/* set up the multicast group and join it */
-	inet_pton(AF_INET, addr, &mreq->imr_multiaddr.s_addr);
-	mreq->imr_interface.s_addr = htonl(INADDR_ANY);
-	/* now truly join */
-	if (UNLIKELY(setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
-				mreq, sizeof(*mreq)) < 0)) {
-		UD_DEBUG_MCAST("could not join the multicast group\n");
-	} else {
-		UD_DEBUG_MCAST("port %d listening to udp://%s:0\n", s, addr);
-	}
-	return;
-}
-#endif	/* UNSERSRV */
-
 #if defined IPPROTO_IPV6
 static int
 __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *r)
@@ -305,19 +263,7 @@ __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *r)
 	/* now truly join */
 	return setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, r, sizeof(*r));
 }
-#endif	/* IPPROTO_IPV6 */
 
-#if defined UNSERSRV
-static void
-__mcast4_leave_group(int s, struct ip_mreq *mreq)
-{
-	/* drop multicast group membership */
-	setsockopt(s, IPPROTO_IP, IP_DROP_MEMBERSHIP, mreq, sizeof(*mreq));
-	return;
-}
-#endif	/* UNSERSRV */
-
-#if defined IPPROTO_IPV6
 static void
 __mcast6_leave_group(int s, struct ipv6_mreq *mreq)
 {
@@ -325,48 +271,7 @@ __mcast6_leave_group(int s, struct ipv6_mreq *mreq)
 	setsockopt(s, IPPROTO_IPV6, IPV6_LEAVE_GROUP, mreq, sizeof(*mreq));
 	return;
 }
-#endif	/* IPPROTO_IPV6 */
 
-#if defined UNSERSRV
-static int
-mcast4_listener_init(void)
-{
-	int retval;
-	volatile int s;
-
-	__sa4.sa4.sin_family = AF_INET;
-	__sa4.sa4.sin_port = htons(UD_NETWORK_SERVICE);
-
-	if (LIKELY((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) >= 0)) {
-		/* likely case upfront */
-		;
-	} else {
-		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
-		return s;
-	}
-	/* allow many many many servers on that port */
-	__reuse_sock(s);
-
-	/* we used to retry upon failure, but who cares */
-	retval = bind(s, (struct sockaddr*)&__sa4, sizeof(__sa4));
-	if (retval == -1) {
-		UD_DEBUG_MCAST("bind() failed %d %d\n", errno, EINVAL);
-		close(s);
-		return -1;
-	}
-
-	/* join the mcast group */
-	__mcast4_join_group(s, UD_MCAST4_ADDR, &mreq4);
-	/* endow our s2c and s2s structs */
-	__sa4.sa4.sin_addr = mreq4.imr_multiaddr;
-
-	/* return the socket we've got */
-	/* succeeded if > 0 */
-	return s;
-}
-#endif	/* !UNSERLIB */
-
-#if defined IPPROTO_IPV6
 static int
 __mcast6_join(int s, short unsigned int UNUSED(port))
 {
@@ -457,9 +362,6 @@ static void
 mcast_listener_deinit(int sock)
 {
 	/* drop multicast group membership */
-#if defined UNSERSRV
-	__mcast4_leave_group(sock, &mreq4);
-#endif	/* !UNSERLIB */
 #if defined IPPROTO_IPV6
 	__mcast6_leave_group(sock, &mreq6_silo);
 	__mcast6_leave_group(sock, &mreq6_lilo);
@@ -560,18 +462,6 @@ send_cl(job_t j)
 	return;
 }
 
-void
-send_m4(job_t j)
-{
-	/* prepare */
-	if (UNLIKELY(j->blen == 0)) {
-		return;
-	}
-	/* send to the m4cast address */
-	(void)sendto(lsock4, j->buf, j->blen, 0, &__sa4.sa, sizeof(__sa4.sa4));
-	return;
-}
-
 void __attribute__((unused))
 send_m6(job_t j)
 {
@@ -580,20 +470,6 @@ send_m6(job_t j)
 		return;
 	}
 	/* send to the m6cast address */
-	(void)sendto(lsock6, j->buf, j->blen, 0, &__sa6.sa, sizeof(__sa6.sa6));
-	return;
-}
-
-void __attribute__((unused))
-send_m46(job_t j)
-{
-	/* prepare */
-	if (UNLIKELY(j->blen == 0)) {
-		return;
-	}
-	/* always send to the mcast addresses */
-	(void)sendto(lsock4, j->buf, j->blen, 0, &__sa4.sa, sizeof(__sa4.sa4));
-	/* ship to m6cast addr */
 	(void)sendto(lsock6, j->buf, j->blen, 0, &__sa6.sa, sizeof(__sa6.sa6));
 	return;
 }
@@ -610,20 +486,6 @@ ud_attach_mcast(EV_P_ ud_work_f cb, bool prefer_ipv6_p)
 	/* store the callback */
 	wpcb = (wpool_work_f)cb;
 
-	if (!prefer_ipv6_p) {
-		/* if we prefer IPv6 we actually mean it's v6 only */
-		lsock4 = mcast4_listener_init();
-
-		if (UNLIKELY(lsock4 < 0 && lsock6 < 0)) {
-			return -1;
-		}
-		if (LIKELY(lsock4 >= 0)) {
-			ev_io *srv_watcher = &__srv4_watcher;
-			/* initialise an io watcher, then start it */
-			ev_io_init(srv_watcher, mcast_inco_cb, lsock4, EV_READ);
-			ev_io_start(EV_A_ srv_watcher);
-		}
-	}
 	if (LIKELY(lsock6 >= 0)) {
 		ev_io *srv_watcher = &__srv6_watcher;
 		/* initialise an io watcher, then start it */
@@ -645,18 +507,12 @@ ud_detach_mcast(EV_P)
 	ev_timer *s2s_watcher = &__s2s_watcher;
 
 	/* close the sockets before we stop the watchers */
-	if (LIKELY(lsock4 >= 0)) {
-		/* and kick the socket */
-		mcast_listener_deinit(lsock4);
-	}
 	if (LIKELY(lsock6 >= 0)) {
 		/* and kick the socket */
 		mcast_listener_deinit(lsock6);
 	}
 
 	/* stop the guy that watches the socket */
-	srv_watcher = &__srv4_watcher;
-	ev_io_stop(EV_A_ srv_watcher);
 	srv_watcher = &__srv6_watcher;
 	ev_io_stop(EV_A_ srv_watcher);
 

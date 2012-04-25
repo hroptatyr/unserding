@@ -71,7 +71,12 @@
 #include "ud-sock.h"
 #include "unserding-dbg.h"
 
-#if defined DEBUG_FLAG
+#if defined UNSERLIB
+/* no output at all in lib mode */
+# define UD_CRITICAL_MCAST(args...)
+# define UD_INFO_MCAST(args...)
+# define UD_DEBUG_MCAST(args...)
+#elif defined DEBUG_FLAG
 # define UD_CRITICAL_MCAST(args...)					\
 	do {								\
 		UD_LOGOUT("[unserding/input/mcast] CRITICAL " args);	\

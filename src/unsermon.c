@@ -70,6 +70,30 @@
 
 #define USE_COROUTINES		1
 
+#if defined DEBUG_FLAG
+# define UD_CRITICAL_MCAST(args...)					\
+	do {								\
+		UD_LOGOUT("[unserding/input/mcast] CRITICAL " args);	\
+		UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args);	\
+	} while (0)
+# define UD_DEBUG_MCAST(args...)					\
+	do {								\
+		UD_LOGOUT("[unserding/input/mcast] " args);		\
+		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
+	} while (0)
+# define UD_INFO_MCAST(args...)						\
+	do {								\
+		UD_LOGOUT("[unserding/input/mcast] " args);		\
+		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
+	} while (0)
+#else  /* !DEBUG_FLAG */
+# define UD_CRITICAL_MCAST(args...)				\
+	UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args)
+# define UD_INFO_MCAST(args...)					\
+	UD_SYSLOG(LOG_INFO, "[input/mcast] " args)
+# define UD_DEBUG_MCAST(args...)
+#endif	/* DEBUG_FLAG */
+
 FILE *logout;
 static FILE *monout;
 
@@ -123,6 +147,70 @@ mon_pkt_cb(job_t j)
 	} else {
 		fputs("NAUGHT message\n", logout);
 	}
+	jpool_release(j);
+	return;
+}
+
+static char scratch_buf[UDPC_PKTLEN];
+
+static void
+mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
+{
+	ssize_t nread;
+	char buf[INET6_ADDRSTRLEN];
+	/* the address in human readable form */
+	const char *a;
+	/* the port (in host-byte order) */
+	uint16_t p;
+	/* a job */
+	job_t j;
+	socklen_t lsa = sizeof(j->sa);
+
+	if (UNLIKELY((j = jpool_acquire(gjpool)) == NULL)) {
+		UD_CRITICAL("no job slots ... leaping\n");
+		/* just read the packet off of the wire */
+		(void)recv(w->fd, scratch_buf, UDPC_PKTLEN, 0);
+		wpool_trigger(gwpool);
+		return;
+	}
+
+	j->sock = w->fd;
+	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa.sa, &lsa);
+	/* obtain the address in human readable form */
+	a = inet_ntop(ud_sockaddr_fam(&j->sa),
+		      ud_sockaddr_addr(&j->sa), buf, sizeof(buf));
+	p = ud_sockaddr_port(&j->sa);
+	UD_INFO_MCAST(
+		":sock %d connect :from [%s]:%d  "
+		":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
+		w->fd, a, p,
+		(unsigned int)nread,
+		udpc_pkt_cno(JOB_PACKET(j)),
+		udpc_pkt_pno(JOB_PACKET(j)),
+		udpc_pkt_cmd(JOB_PACKET(j)),
+		ntohs(((const uint16_t*)j->buf)[3]));
+
+	/* handle the reading */
+	if (UNLIKELY(nread < 0)) {
+		UD_CRITICAL_MCAST("could not handle incoming connection\n");
+		goto out_revok;
+	} else if (nread == 0) {
+		/* no need to bother */
+		goto out_revok;
+	}
+
+	j->blen = nread;
+
+#if defined DEBUG_FLAG && defined LOG_RAW
+	/* spit the packet in its raw shape */
+	ud_fprint_pkt_raw(JOB_PACKET(j), logout);
+#endif	/* DEBUG_FLAG */
+
+	/* enqueue t3h job and copy the input buffer over to
+	 * the job's work space, also trigger the lazy bastards */
+	wpool_enq(gwpool, (wpool_work_f)mon_pkt_cb, j, true);
+	return;
+out_revok:
 	jpool_release(j);
 	return;
 }
@@ -230,6 +318,8 @@ main(int argc, char *argv[])
 	ev_signal *sighup_watcher = &__sighup_watcher;
 	ev_signal *sigterm_watcher = &__sigterm_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+	ev_io *beef = NULL;
+	size_t nbeef = 0;
 	struct ud_ctx_s __ctx;
 	struct ud_handle_s __hdl;
 	/* args */
@@ -291,6 +381,14 @@ main(int argc, char *argv[])
 	 * causing the libev main loop to crash. */
 	ud_attach_mcast(EV_A_ mon_pkt_cb, prefer6p);
 
+	/* go through all beef channels */
+	beef = malloc((nbeef = argi->beef_given) * sizeof(*beef));
+	for (unsigned int i = 0; i < argi->beef_given; i++) {
+		int s = ud_mcast_init(argi->beef_arg[i]);
+		ev_io_init(beef + i, mon_beef_cb, s, EV_READ);
+		ev_io_start(EV_A_ beef + i);
+	}
+
 	/* rock the wpool queue to trigger anything on there */
 	wpool_trigger(gwpool);
 
@@ -298,6 +396,14 @@ main(int argc, char *argv[])
 	ev_loop(EV_A_ 0);
 
 	UD_LOG_NOTI("shutting down unsermon\n");
+
+	/* detaching beef channels */
+
+	for (unsigned int i = 0; i < nbeef; i++) {
+		int s = beef[i].fd;
+		ev_io_stop(EV_A_ beef + i);
+		ud_mcast_fini(s);
+	}
 
 	/* close the socket */
 	ud_detach_mcast(EV_A);

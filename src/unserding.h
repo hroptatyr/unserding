@@ -150,6 +150,10 @@ ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int timeout, ud_convo_t cno);
 extern void
 ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo);
 
+/**
+ * Send packet to channel. */
+extern ssize_t ud_chan_send(ud_chan_t, ud_packet_t);
+
 /* inlines */
 /**
  * Return the current conversation id of HDL. */

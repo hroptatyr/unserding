@@ -231,7 +231,7 @@ ud_retx(job_t j)
 
 
 /* socket goodies */
-static inline void
+static void
 __reuse_sock(int sock)
 {
 	UD_DEBUG_MCAST("setting option SO_REUSEADDR for sock %d\n", sock);
@@ -245,7 +245,7 @@ __reuse_sock(int sock)
 	return;
 }
 
-static inline void
+static void
 __linger_sock(int sock)
 {
 	UD_DEBUG_MCAST("setting option SO_LINGER for sock %d\n", sock);

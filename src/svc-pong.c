@@ -39,12 +39,13 @@
 #include "unserding-nifty.h"
 #include "svc-pong.h"
 #include "seria-proto-glue.h"
+#include "ud-time.h"
 
 typedef struct __clo_s {
 	ud_handle_t hdl;
 	ud_pong_set_t seen;
 	ud_convo_t cno;
-	struct timespec rtref;
+	struct timeval rtref;
 } *__clo_t;
 
 static void
@@ -62,6 +63,20 @@ seria_skip_ui32(udpc_seria_t sctx)
 	return;
 }
 
+static void
+ud_svc_update_mart(ud_handle_t hdl, struct timeval then)
+{
+	struct timeval rtts = __ulapse(then);
+	if (rtts.tv_sec != 0) {
+		/* more than a second difference?! ignore */
+		return;
+	}
+	/* update hdl->mart */
+	hdl->mart = 1 + (hdl->mart + rtts.tv_usec / 1000U) / 2;
+	return;
+}
+
+
 /* conforms to ud_subscr_f */
 static bool
 cb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
@@ -90,19 +105,6 @@ cb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
 	return true;
 }
 
-void
-ud_svc_update_mart(ud_handle_t hdl, struct timespec then)
-{
-	struct timespec rtts = __lapse(then);
-	if (rtts.tv_sec != 0) {
-		/* more than a second difference?! ignore */
-		return;
-	}
-	/* update hdl->mart */
-	hdl->mart = 1 + (hdl->mart + rtts.tv_nsec / 1000000) / 2;
-	return;
-}
-
 ud_pong_score_t
 ud_svc_nego_score(ud_handle_t hdl, int timeout)
 {
@@ -110,7 +112,7 @@ ud_svc_nego_score(ud_handle_t hdl, int timeout)
 
 	/* fill in the closure */
 	clo.seen = ud_empty_pong_set();
-	clo.rtref = __stamp();
+	clo.rtref = __ustamp();
 	clo.hdl = hdl;
 	/* send off the bugger */
 	clo.cno = ud_send_simple(hdl, UD_SVC_PING);

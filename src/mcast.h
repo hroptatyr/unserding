@@ -1,8 +1,8 @@
-/*** mcast.h -- unserding network intrinsics
+/*** mcast.h -- ipv6 multicast handlers
  *
- * Copyright (C) 2009 Sebastian Freundt
+ * Copyright (C) 2008-2012 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *

@@ -323,7 +323,7 @@ main(int argc, char *argv[])
 	for (unsigned int i = 0; i < argi->beef_given; i++) {
 		int s = ud_mcast_init(argi->beef_arg[i]);
 		ev_io_init(beef + i + 1, mon_beef_cb, s, EV_READ);
-		ev_io_start(EV_A_ beef + i);
+		ev_io_start(EV_A_ beef + i + 1);
 	}
 
 	/* now wait for events to arrive */

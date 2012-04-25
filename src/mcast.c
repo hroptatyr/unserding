@@ -127,10 +127,6 @@ static ev_io ALGN16(__srv6_watcher);
 static struct ipv6_mreq ALGN16(mreq6_nolo);
 static struct ipv6_mreq ALGN16(mreq6_silo);
 static struct ipv6_mreq ALGN16(mreq6_lilo);
-/* server to client goodness */
-static ud_sockaddr_u __sa6 = {
-	.sa6.sin6_addr = IN6ADDR_ANY_INIT
-};
 #endif	/* AF_INET */
 
 
@@ -291,8 +287,10 @@ __mcast6_join(int s, short unsigned int UNUSED(port))
 			UD_DEBUG_MCAST("  could not join the group\n");
 		}
 	}
+#if 0
 	/* endow our s2c and s2s structs */
-	//__sa6.sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+	__sa6.sa6.sin6_addr = mreq6.ipv6mr_multiaddr;
+#endif	/* 0 */
 	return 0;
 }
 #endif	/* IPPROTO_IPV6 */
@@ -303,6 +301,9 @@ mcast6_listener_init(short unsigned int port)
 #if defined IPPROTO_IPV6
 	int retval;
 	volatile int s;
+	ud_sockaddr_u __sa6 = {
+		.sa6.sin6_addr = IN6ADDR_ANY_INIT
+	};
 
 	__sa6.sa6.sin6_family = AF_INET6;
 	__sa6.sa6.sin6_port = htons(port);

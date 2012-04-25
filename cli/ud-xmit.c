@@ -219,9 +219,9 @@ work(const struct xmit_s *ctx)
 int
 main(int argc, char *argv[])
 {
-	static struct ud_chan_s hdl;
 	struct gengetopt_args_info argi[1];
 	struct xmit_s ctx[1];
+	ud_chan_t hdl;
 	int res = 0;
 
 	/* parse the command line */
@@ -247,7 +247,7 @@ main(int argc, char *argv[])
 	/* the actual work */
 	switch (setjmp(jb)) {
 	case 0:
-		ctx->ud = &hdl;
+		ctx->ud = hdl;
 		ctx->speed = argi->speed_arg;
 		ctx->restampp = argi->restamp_given;
 		work(ctx);

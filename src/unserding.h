@@ -174,10 +174,10 @@ ud_handle_sock(ud_handle_t hdl)
 /* lower level connexion stuff */
 /**
  * Get a socket to communicate with service PORT. */
-extern struct ud_chan_s ud_chan_init(short unsigned int port);
+extern ud_chan_t ud_chan_init(short unsigned int port);
 /**
  * Free resources associated with a connection. */
-extern void ud_chan_fini(struct ud_chan_s);
+extern void ud_chan_fini(ud_chan_t);
 
 
 /* specific services */

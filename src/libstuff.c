@@ -401,23 +401,25 @@ free_unserding_handle(ud_handle_t hdl)
 }
 
 /* lower level connection */
-struct ud_chan_s
+ud_chan_t
 ud_chan_init(short unsigned int port)
 {
-	struct ud_chan_s res;
+	struct ud_chan_s *res;
 
-	(void)mcast6_init(&res);
-	setsock_nonblock(res.sock);
-	ud_chan_set_port(&res, port);
+	res = malloc(sizeof(*res));
+	(void)mcast6_init(res);
+	setsock_nonblock(res->sock);
+	ud_chan_set_port(res, port);
 	return res;
 }
 
 void
-ud_chan_fini(struct ud_chan_s c)
+ud_chan_fini(ud_chan_t c)
 {
 	/* and kick the socket */
-	shutdown(c.sock, SHUT_RDWR);
-	close(c.sock);
+	shutdown(c->sock, SHUT_RDWR);
+	close(c->sock);
+	free((struct ud_chan_s*)c);
 	return;
 }
 

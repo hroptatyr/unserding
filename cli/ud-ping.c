@@ -44,11 +44,12 @@
 #include "unserding-nifty.h"
 #include "protocore.h"
 #include "seria.h"
+#include "ud-time.h"
 #include "svc-pong.h"
 
 typedef struct clks_s {
-	struct timespec rt;
-	struct timespec pt;
+	struct timeval rt;
+	struct timeval pt;
 } *clks_t;
 
 /* this is the callback closure for the classic mode */
@@ -81,7 +82,7 @@ static bool
 cb(ud_packet_t pkt, ud_const_sockaddr_t sa, void *clo)
 {
 	ccb_clo_t ccb = clo;
-	struct timespec lap;
+	struct timeval lap;
 	struct udpc_seria_s sctx;
 	static char hnname[16];
 	ud_pong_score_t score;
@@ -95,20 +96,21 @@ cb(ud_packet_t pkt, ud_const_sockaddr_t sa, void *clo)
 		return false;
 	}
 	/* otherwise the packet is meaningful */
-	lap = __lapse(ccb->clks.rt);
+	lap = __ulapse(ccb->clks.rt);
 	/* count this response */
 	ccb->seen++;
 	/* fetch fields */
 	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
 	/* fetch the host name */
 	fetch_hnname(&sctx, hnname, sizeof(hnname));
-	/* skip the next two */
+	/* skip the next two, they're a struct timespec,
+	 * serialised as two consecutive ui32s */
 	(void)udpc_seria_des_ui32(&sctx);
 	(void)udpc_seria_des_ui32(&sctx);
 	score = udpc_seria_des_byte(&sctx);
 	/* print */
 	{
-		double lapf = __as_f(lap);
+		double lapf = __uas_f(lap);
 		char psa[INET6_ADDRSTRLEN];
 
 		ud_sockaddr_ntop(psa, sizeof(psa), sa);
@@ -134,7 +136,7 @@ ping1(ud_handle_t hdl)
 	struct ccb_clo_s clo;
 
 	/* record the current time */
-	clo.clks.rt = __stamp();
+	clo.clks.rt = __ustamp();
 	/* and we've seen noone yet */
 	clo.seen = 0;
 	/* send off the bugger */

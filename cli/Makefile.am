@@ -14,6 +14,7 @@ endif
 
 BUILT_SOURCES =
 CLEANFILES =
+EXTRA_DIST = $(BUILT_SOURCES)
 
 if BUILD_LIBRARY
 UD_LIBS = $(top_builddir)/src/libunserding.la

@@ -79,7 +79,7 @@ extern "C" {
 #define UDPC_PKTLEN		1280
 #define UDPC_HDRLEN		0x08
 #define UDPC_PLLEN		(UDPC_PKTLEN - UDPC_HDRLEN)
-#define UDPC_PAYLOAD(_x)	(void*)((char*)(_x) + UDPC_HDRLEN)
+#define UDPC_PAYLOAD(_x)	((_x) + UDPC_HDRLEN / sizeof(*(_x)))
 #define UDPC_PAYLLEN(_x)	((_x) - UDPC_HDRLEN)
 
 #define UDPC_PKT_INVALID_P(_x)	((_x).plen == 0 || (_x).plen > UDPC_PKTLEN)

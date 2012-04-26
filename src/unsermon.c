@@ -132,6 +132,38 @@ struct ud_loopclo_s {
 };
 
 
+#if defined HAVE_UTERUS_H
+# include <time.h>
+# include <uterus.h>
+/* to get a take on them m30s and m62s */
+# define DEFINE_GORY_STUFF
+# include <m30.h>
+# include <m62.h>
+
+/* helpers */
+static inline size_t
+pr_tsmstz(char *restrict buf, time_t sec, uint32_t msec, char sep)
+{
+	struct tm *tm;
+
+	tm = gmtime(&sec);
+	strftime(buf, 32, "%F %T", tm);
+	buf[10] = sep;
+	buf[19] = '.';
+	buf[20] = (char)(((msec / 100) % 10) + '0');
+	buf[21] = (char)(((msec / 10) % 10) + '0');
+	buf[22] = (char)(((msec / 1) % 10) + '0');
+	buf[23] = '+';
+	buf[24] = '0';
+	buf[25] = '0';
+	buf[26] = ':';
+	buf[27] = '0';
+	buf[28] = '0';
+	return 29;
+}
+#endif	/* HAVE_UTERUS_H */
+
+
 /* the actual worker function, exec'd in a different thread */
 static void
 mon_pkt_cb(job_t j)
@@ -139,11 +171,96 @@ mon_pkt_cb(job_t j)
 	static char buf[8192];
 	size_t psz;
 
-	if ((psz = ud_sprint_pkt_pretty(buf, JOB_PACKET(j)))) {
-		buf[psz] = '\0';
+	/* intercept special channels */
+	switch (udpc_pkt_cmd(JOB_PACKET(j))) {
+	case 0x7574:
+	case 0x7575: {
+#if defined HAVE_UTERUS_H
+		char *pbuf = UDPC_PAYLOAD(JOB_PACKET(j).pbuf);
+		size_t plen = UDPC_PAYLLEN(JOB_PACKET(j).plen);
+		char *p = buf;
+
+		for (scom_t sp = (void*)pbuf, ep = (void*)(pbuf + plen);
+		     sp < ep;
+		     sp += scom_tick_size(sp) *
+			     (sizeof(struct sndwch_s) / sizeof(*sp))) {
+			uint32_t sec = scom_thdr_sec(sp);
+			uint16_t msec = scom_thdr_msec(sp);
+			uint16_t ttf = scom_thdr_ttf(sp);
+
+			p += pr_tsmstz(p, sec, msec, 'T');
+			*p++ = '\t';
+			/* index into the sym table */
+			p += sprintf(p, "%x", scom_thdr_tblidx(sp));
+			*p++ = '\t';
+			/* tick type */
+			p += sprintf(p, "%x", ttf);
+			*p++ = '\t';
+			switch (ttf) {
+				const_sl1t_t l1t;
+
+			case SL1T_TTF_BID:
+			case SL1T_TTF_ASK:
+			case SL1T_TTF_TRA:
+			case SL1T_TTF_FIX:
+			case SL1T_TTF_STL:
+			case SL1T_TTF_AUC:
+				l1t = (const void*)sp;
+				/* price value */
+				p += ffff_m30_s(p, (m30_t)l1t->v[0]);
+				*p++ = '\t';
+				/* size value */
+				p += ffff_m30_s(p, (m30_t)l1t->v[1]);
+				break;
+			case SL1T_TTF_VOL:
+			case SL1T_TTF_VPR:
+			case SL1T_TTF_OI:
+				/* just one huge value, will there be a m62? */
+				l1t = (const void*)sp;
+				p += ffff_m62_s(p, (m62_t)l1t->w[0]);
+				break;
+
+				/* candles?! fuck off */
+			case SL1T_TTF_BID | SCOM_FLAG_LM:
+			case SL1T_TTF_ASK | SCOM_FLAG_LM:
+			case SL1T_TTF_TRA | SCOM_FLAG_LM:
+			case SL1T_TTF_FIX | SCOM_FLAG_LM:
+			case SL1T_TTF_STL | SCOM_FLAG_LM:
+			case SL1T_TTF_AUC | SCOM_FLAG_LM:
+				;
+				break;
+
+				/* snaps, hahaha, even worse */
+			case SSNP_FLAVOUR:
+			case SBAP_FLAVOUR:
+				;
+				break;
+
+			case SCOM_TTF_UNK:
+			default:
+				break;
+			}
+			*p++ = '\n';
+			*p = '\0';
+		}
 		fputs(buf, logout);
-	} else {
-		fputs("NAUGHT message\n", logout);
+#else  /* HAVE_UTERUS */
+		fputs("UTE/le message, no decoding support\n", logout);
+#endif	/* HAVE_UTERUS */
+		break;
+	}
+	case 0x5554:
+	case 0x5555:
+		fputs("UTE/be message, no decoding support\n", logout);
+		break;
+	default:
+		if ((psz = ud_sprint_pkt_pretty(buf, JOB_PACKET(j)))) {
+			buf[psz] = '\0';
+			fputs(buf, logout);
+		} else {
+			fputs("NAUGHT message\n", logout);
+		}
+		break;
 	}
 	return;
 }

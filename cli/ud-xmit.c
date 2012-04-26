@@ -116,6 +116,23 @@ error(int eno, const char *fmt, ...)
 static unsigned int pno = 0;
 static size_t nt = 0;
 
+static inline void
+udpc_seria_add_scom(udpc_seria_t sctx, scom_t s, size_t len)
+{
+	memcpy(sctx->msg + sctx->msgoff, s, len);
+	sctx->msgoff += len;
+	return;
+}
+
+/* ute services come in 2 flavours little endian "ut" and big endian "UT" */
+#define UTE_CMD_LE	0x7574
+#define UTE_CMD_BE	0x5554
+#if defined WORDS_BIGENDIAN
+# define UTE_CMD	UTE_CMD_BE
+#else  /* !WORDS_BIGENDIAN */
+# define UTE_CMD	UTE_CMD_LE
+#endif	/* WORDS_BIGENDIAN */
+
 static void
 work(const struct xmit_s *ctx)
 {
@@ -127,7 +144,7 @@ work(const struct xmit_s *ctx)
 	const unsigned int speed = (unsigned int)(1000 * ctx->speed);
 
 #define RESET_SER						\
-	udpc_make_pkt(pkt, 0, pno++, 0x2000);			\
+	udpc_make_pkt(pkt, 0, pno++, UTE_CMD);			\
 	udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN)
 
 	/* initial set up of pkt */
@@ -170,22 +187,20 @@ work(const struct xmit_s *ctx)
 		/* add the scom in question to the pool */
 		XMIT_STUP('+');
 		{
-			struct sndwch_s sto[4];
+			scom_thdr_t sto = (void*)(ser->msg + ser->msgoff);
 			size_t bs = scom_byte_size(ti);
 
-			/* copy the scom, not strictly necessary but ah well */
-			memcpy(sto, ti, bs);
+			/* add the original guy */
+			udpc_seria_add_scom(ser, ti, bs);
 
 			if (ctx->restampp) {
 				struct timeval now[1];
 
 				gettimeofday(now, NULL);
 				/* replace the time stamp */
-				AS_SCOM_THDR(sto)->sec = now->tv_sec;
-				AS_SCOM_THDR(sto)->msec = now->tv_usec / 1000;
+				sto->sec = now->tv_sec;
+				sto->msec = now->tv_usec / 1000;
 			}
-			/* add the copied guy */
-			udpc_seria_add_data(ser, sto, bs);
 		}
 		nt++;
 	}

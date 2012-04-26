@@ -124,6 +124,15 @@ udpc_seria_add_scom(udpc_seria_t sctx, scom_t s, size_t len)
 	return;
 }
 
+/* ute services come in 2 flavours little endian "ut" and big endian "UT" */
+#define UTE_CMD_LE	0x7574
+#define UTE_CMD_BE	0x5554
+#if defined WORDS_BIGENDIAN
+# define UTE_CMD	UTE_CMD_BE
+#else  /* !WORDS_BIGENDIAN */
+# define UTE_CMD	UTE_CMD_LE
+#endif	/* WORDS_BIGENDIAN */
+
 static void
 work(const struct xmit_s *ctx)
 {
@@ -135,7 +144,7 @@ work(const struct xmit_s *ctx)
 	const unsigned int speed = (unsigned int)(1000 * ctx->speed);
 
 #define RESET_SER						\
-	udpc_make_pkt(pkt, 0, pno++, 0x2000);			\
+	udpc_make_pkt(pkt, 0, pno++, UTE_CMD);			\
 	udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PLLEN)
 
 	/* initial set up of pkt */

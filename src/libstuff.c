@@ -406,7 +406,7 @@ ud_chan_init(short unsigned int port)
 {
 	struct ud_chan_s *res;
 
-	res = malloc(sizeof(*res));
+	res = calloc(1, sizeof(*res));
 	(void)mcast6_init(res);
 	setsock_nonblock(res->sock);
 	ud_chan_set_port(res, port);

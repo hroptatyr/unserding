@@ -161,6 +161,70 @@ pr_tsmstz(char *restrict buf, time_t sec, uint32_t msec, char sep)
 	buf[28] = '0';
 	return 29;
 }
+
+static size_t
+__pr_snap(char *tgt, scom_t st)
+{
+	const_ssnp_t snp = (const void*)st;
+	char *p = tgt;
+
+	/* bid price */
+	p += ffff_m30_s(p, (m30_t)snp->bp);
+	*p++ = '\t';
+	/* ask price */
+	p += ffff_m30_s(p, (m30_t)snp->ap);
+	if (scom_thdr_ttf(st) == SSNP_FLAVOUR) {
+		/* real snaps reach out further */
+		*p++ = '\t';
+		/* bid quantity */
+		p += ffff_m30_s(p, (m30_t)snp->bq);
+		*p++ = '\t';
+		/* ask quantity */
+		p += ffff_m30_s(p, (m30_t)snp->aq);
+		*p++ = '\t';
+		/* volume-weighted trade price */
+		p += sprintf(p, "%08x", snp->tvpr);
+		*p++ = '|';
+		p += ffff_m30_s(p, (m30_t)snp->tvpr);
+		*p++ = '\t';
+		/* trade quantity */
+		p += sprintf(p, "%08x", snp->tq);
+		*p++ = '|';
+		p += ffff_m30_s(p, (m30_t)snp->tq);
+	}
+	return p - tgt;
+}
+
+static size_t
+__attribute__((noinline))
+__pr_cdl(char *tgt, scom_t st)
+{
+	const_scdl_t cdl = (const void*)st;
+	char *p = tgt;
+
+	/* h(igh) */
+	p += ffff_m30_s(p, (m30_t)cdl->h);
+	*p++ = '\t';
+	/* l(ow) */
+	p += ffff_m30_s(p, (m30_t)cdl->l);
+	*p++ = '\t';
+	/* o(pen) */
+	p += ffff_m30_s(p, (m30_t)cdl->o);
+	*p++ = '\t';
+	/* c(lose) */
+	p += ffff_m30_s(p, (m30_t)cdl->c);
+	*p++ = '\t';
+	/* start of the candle */
+	p += sprintf(p, "%08x", cdl->sta_ts);
+	*p++ = '|';
+	p += pr_tsmstz(p, cdl->sta_ts, 0, 'T');
+	*p++ = '\t';
+	/* event count in candle, print 3 times */
+	p += sprintf(p, "%08x", cdl->cnt);
+	*p++ = '|';
+	p += ffff_m30_s(p, (m30_t)cdl->cnt);
+	return p - tgt;
+}
 #endif	/* HAVE_UTERUS_H */
 
 
@@ -220,20 +284,20 @@ mon_pkt_cb(job_t j)
 				p += ffff_m62_s(p, (m62_t)l1t->w[0]);
 				break;
 
-				/* candles?! fuck off */
+				/* snaps */
+			case SSNP_FLAVOUR:
+			case SBAP_FLAVOUR:
+				p += __pr_snap(p, sp);
+				break;
+
+				/* candles */
 			case SL1T_TTF_BID | SCOM_FLAG_LM:
 			case SL1T_TTF_ASK | SCOM_FLAG_LM:
 			case SL1T_TTF_TRA | SCOM_FLAG_LM:
 			case SL1T_TTF_FIX | SCOM_FLAG_LM:
 			case SL1T_TTF_STL | SCOM_FLAG_LM:
 			case SL1T_TTF_AUC | SCOM_FLAG_LM:
-				;
-				break;
-
-				/* snaps, hahaha, even worse */
-			case SSNP_FLAVOUR:
-			case SBAP_FLAVOUR:
-				;
+				p += __pr_cdl(p, sp);
 				break;
 
 			case SCOM_TTF_UNK:

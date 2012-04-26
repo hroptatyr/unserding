@@ -162,6 +162,43 @@ pr_tsmstz(char *restrict buf, time_t sec, uint32_t msec, char sep)
 	return 29;
 }
 
+static inline size_t
+pr_ttf(char *restrict buf, uint16_t ttf)
+{
+	switch (ttf & ~(SCOM_FLAG_LM | SCOM_FLAG_L2M)) {
+	case SL1T_TTF_BID:
+		*buf = 'b';
+		break;
+	case SL1T_TTF_ASK:
+		*buf = 'a';
+		break;
+	case SL1T_TTF_TRA:
+		*buf = 't';
+		break;
+	case SL1T_TTF_FIX:
+		*buf = 'f';
+		break;
+	case SL1T_TTF_STL:
+		*buf = 'x';
+		break;
+	case SL1T_TTF_AUC:
+		*buf = 'k';
+		break;
+
+	case SBAP_FLAVOUR:
+		*buf++ = 'b';
+		*buf++ = 'a';
+		*buf++ = 'p';
+		return 3;
+
+	case SCOM_TTF_UNK:
+	default:
+		ttf = '0' + ttf;
+		break;
+	}
+	return 1;
+}
+
 static size_t
 __pr_snap(char *tgt, scom_t st)
 {
@@ -258,7 +295,7 @@ mon_pkt_cb(job_t j)
 			p += sprintf(p, "%x", scom_thdr_tblidx(sp));
 			*p++ = '\t';
 			/* tick type */
-			p += sprintf(p, "%x", ttf);
+			p += pr_ttf(p, ttf);
 			*p++ = '\t';
 			switch (ttf) {
 				const_sl1t_t l1t;

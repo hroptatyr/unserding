@@ -106,8 +106,8 @@ typedef long unsigned int bscomp_t;
 typedef bscomp_t *bitset_t;
 
 struct level_s {
-	double p;
-	double q;
+	m30_t p;
+	m30_t q;
 };
 
 struct strat_ctx_s {
@@ -152,15 +152,42 @@ bitset_get(bitset_t bs, unsigned int bit)
 }
 
 static struct strat_ctx_s ctx[1];
-static uint16_t subs[] = {
-	16, 17, 23, 29,  32, 40, 41, 45,
-	69, 118, 135, 148,  179, 190, 215, 241,
-};
 
 static void
 strat_init(void)
 {
 	memset(ctx, 0, sizeof(*ctx));
+	return;
+}
+
+static void
+strat(void)
+{
+	/* the actual strategy */
+	static const uint16_t subs[] = {
+		16, 17, 23, 29,  32, 40, 41, 45,
+		69, 118, 135, 148,  179, 190, 215, 241,
+	};
+
+	/* check if there's movement in our preferred contracts */
+	for (unsigned int i = 0; i < countof(subs); i++) {
+		unsigned int idx = subs[i];
+		if (!bitset_get(ctx->change, idx)) {
+			continue;
+		}
+		if (ctx->mkt_bid[idx].p.u) {
+			m30_t new = ctx->mkt_bid[idx].p;
+
+			new.mant -= 1000;
+			fprintf(stderr, "%.6f for 1\n", ffff_m30_d(new));
+		}
+		if (ctx->mkt_ask[idx].p.u) {
+			m30_t new = ctx->mkt_ask[idx].p;
+
+			new.mant += 1000;
+			fprintf(stderr, "1 at %.6f\n", ffff_m30_d(new));
+		}
+	}
 	return;
 }
 
@@ -186,18 +213,18 @@ ute_dec(char *pkt, size_t pktlen)
 
 		switch (ttf) {
 		case SL1T_TTF_BID:
-			mkt_bid[idx].p = ffff_m30_d(p);
-			mkt_bid[idx].q = ffff_m30_d(q);
+			mkt_bid[idx].p = p;
+			mkt_bid[idx].q = q;
 			bitset_set(pktbs, idx);
 			break;
 		case SL1T_TTF_ASK:
-			mkt_ask[idx].p = ffff_m30_d(p);
-			mkt_ask[idx].q = ffff_m30_d(q);
+			mkt_ask[idx].p = p;
+			mkt_ask[idx].q = q;
 			bitset_set(pktbs, idx);
 			break;
 		case SBAP_FLAVOUR:
-			mkt_bid[idx].p = ffff_m30_d(p);
-			mkt_ask[idx].p = ffff_m30_d(q);
+			mkt_bid[idx].p = p;
+			mkt_ask[idx].p = q;
 			bitset_set(pktbs, idx);
 			break;
 		default:
@@ -248,6 +275,8 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	case 0x7574:
 		/* decode ute info */
 		ute_dec(UDPC_PAYLOAD(pkt), UDPC_PAYLLEN(nrd));
+		/* call the strategy */
+		strat();
 		break;
 	default:
 		/* probably just rubbish innit */

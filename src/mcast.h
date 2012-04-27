@@ -77,6 +77,17 @@ union ud_sockaddr_u {
 		struct sockaddr_in6 sa6;
 };
 
+/**
+ * Structure that just consists of socket and destination. */
+typedef const struct ud_chan_s *ud_chan_t;
+
+/**
+ * Lower-level structure to handle convos. */
+struct ud_chan_s {
+	int sock;
+	ud_sockaddr_u sa;
+};
+
 
 #if defined __INTEL_COMPILER
 #pragma warning (disable:2259)
@@ -118,6 +129,14 @@ extern int ud_mcast_init(short unsigned int port);
 /**
  * Unsubscribe from socket SOCK. */
 extern void ud_mcast_fini(int sock);
+
+/**
+ * Subscribe to services on CHAN in the unserding network.
+ * Return a socket that can be select()'d or poll()'d. */
+extern int ud_chan_init_mcast(ud_chan_t chan);
+/**
+ * Unsubscribe from multicast on CHAN. */
+extern void ud_chan_fini_mcast(ud_chan_t chan);
 
 #ifdef __cplusplus
 }

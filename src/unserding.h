@@ -63,10 +63,6 @@ typedef long unsigned int ud_flags_t;
 typedef struct ud_handle_s *ud_handle_t;
 
 /**
- * Structure that just consists of socket and destination. */
-typedef const struct ud_chan_s *ud_chan_t;
-
-/**
  * Simple packet structure.
  * Attention, this is a structure passed by value. */
 typedef struct {
@@ -105,13 +101,6 @@ struct ud_handle_s {
 	int mart;
 	/* system score */
 	int score;
-};
-
-/**
- * Lower-level structure to handle convos. */
-struct ud_chan_s {
-	int sock;
-	ud_sockaddr_u sa;
 };
 
 

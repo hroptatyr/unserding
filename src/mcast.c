@@ -202,11 +202,11 @@ __mcast6_join(int s, short unsigned int UNUSED(port))
 #endif	/* IPPROTO_IPV6 */
 
 static int
-mcast6_listener_init(short unsigned int port)
+mcast6_listener_init(int s, short unsigned int port)
 {
 #if defined IPPROTO_IPV6
 	int retval;
-	volatile int s;
+	int opt;
 	ud_sockaddr_u __sa6 = {
 		.sa6.sin6_addr = IN6ADDR_ANY_INIT
 	};
@@ -214,18 +214,18 @@ mcast6_listener_init(short unsigned int port)
 	__sa6.sa6.sin6_family = AF_INET6;
 	__sa6.sa6.sin6_port = htons(port);
 
-	if (LIKELY((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) >= 0)) {
-		/* likely case upfront */
-		;
-	} else {
-		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
-		return s;
-	}
 	/* allow many many many servers on that port */
 	__reuse_sock(s);
 
+#if defined IPV6_MULTICAST_LOOP
+	/* don't loop */
+	opt = 0;
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &opt, sizeof(opt));
+#else  /* !IPV6_MULTICAST_LOOP */
+# warning multicast looping cannot be turned off
+#endif	/* IPV6_MULTICAST_LOOP */
 #if defined IPV6_V6ONLY
-	retval = 1;
+	opt = 1;
 	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &retval, sizeof(retval));
 #endif	/* IPV6_V6ONLY */
 #if defined IPV6_USE_MIN_MTU
@@ -249,7 +249,6 @@ mcast6_listener_init(short unsigned int port)
 
 	if (retval == -1) {
 		UD_DEBUG_MCAST("bind() failed %d %d\n", errno, EINVAL);
-		close(s);
 		return -1;
 	}
 
@@ -258,7 +257,7 @@ mcast6_listener_init(short unsigned int port)
 
 	/* return the socket we've got */
 	/* succeeded if > 0 */
-	return s;
+	return 0;
 
 #else  /* !IPPROTO_IPV6 */
 	return -1;
@@ -276,9 +275,6 @@ mcast_listener_deinit(int sock)
 #endif	/* IPPROTO_IPV6 */
 	/* linger the sink sock */
 	__linger_sock(sock);
-	UD_DEBUG_MCAST("closing listening socket %d...\n", sock);
-	shutdown(sock, SHUT_RDWR);
-	close(sock);
 	return;
 }
 
@@ -287,13 +283,41 @@ mcast_listener_deinit(int sock)
 int
 ud_mcast_init(short unsigned int port)
 {
-	return mcast6_listener_init(port);
+	volatile int s;
+
+	if (UNLIKELY((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)) {
+		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
+	} else if (mcast6_listener_init(s, port) < 0) {
+		close(s);
+	}
+	return s;
 }
 
 void
 ud_mcast_fini(int sock)
 {
 	mcast_listener_deinit(sock);
+	UD_DEBUG_MCAST("closing listening socket %d...\n", sock);
+	shutdown(sock, SHUT_RDWR);
+	close(sock);
+	return;
+}
+
+int
+ud_chan_init_mcast(ud_chan_t c)
+{
+	short unsigned int port = ud_sockaddr_port(&c->sa);
+
+	if (mcast6_listener_init(c->sock, port) < 0) {
+		return -1;
+	}
+	return c->sock;
+}
+
+void
+ud_chan_fini_mcast(ud_chan_t c)
+{
+	mcast_listener_deinit(c->sock);
 	return;
 }
 

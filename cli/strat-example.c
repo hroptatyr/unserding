@@ -114,7 +114,7 @@ struct strat_ctx_s {
 #define MAX_NPOS	(4096)
 	struct level_s mkt_bid[MAX_NPOS];
 	struct level_s mkt_ask[MAX_NPOS];	
-	bscomp_t filter[MAX_NPOS / sizeof(bscomp_t)];
+	bscomp_t change[MAX_NPOS / sizeof(bscomp_t)];
 };
 
 /* bitset goodness */
@@ -152,28 +152,15 @@ bitset_get(bitset_t bs, unsigned int bit)
 }
 
 static struct strat_ctx_s ctx[1];
+static uint16_t subs[] = {
+	16, 17, 23, 29,  32, 40, 41, 45,
+	69, 118, 135, 148,  179, 190, 215, 241,
+};
 
 static void
 strat_init(void)
 {
 	memset(ctx, 0, sizeof(*ctx));
-	/* all the EURUSDs in the standard stream */
-	bitset_set(ctx->filter, 16);
-	bitset_set(ctx->filter, 17);
-	bitset_set(ctx->filter, 23);
-	bitset_set(ctx->filter, 29);
-	bitset_set(ctx->filter, 32);
-	bitset_set(ctx->filter, 40);
-	bitset_set(ctx->filter, 41);
-	bitset_set(ctx->filter, 45);
-	bitset_set(ctx->filter, 69);
-	bitset_set(ctx->filter, 118);
-	bitset_set(ctx->filter, 135);
-	bitset_set(ctx->filter, 148);
-	bitset_set(ctx->filter, 179);
-	bitset_set(ctx->filter, 190);
-	bitset_set(ctx->filter, 215);
-	bitset_set(ctx->filter, 241);
 	return;
 }
 
@@ -182,7 +169,12 @@ ute_dec(char *pkt, size_t pktlen)
 {
 	level_t mkt_bid = ctx->mkt_bid;
 	level_t mkt_ask = ctx->mkt_ask;
+	bitset_t pktbs = ctx->change;
 
+	/* rinse */
+	memset(pktbs, 0, sizeof(ctx->change));
+
+	/* traverse the packet */
 	for (scom_t sp = (scom_t)pkt, ep = sp + pktlen / sizeof(*ep);
 	     sp < ep;
 	     sp += scom_tick_size(sp) *
@@ -196,14 +188,17 @@ ute_dec(char *pkt, size_t pktlen)
 		case SL1T_TTF_BID:
 			mkt_bid[idx].p = ffff_m30_d(p);
 			mkt_bid[idx].q = ffff_m30_d(q);
+			bitset_set(pktbs, idx);
 			break;
 		case SL1T_TTF_ASK:
 			mkt_ask[idx].p = ffff_m30_d(p);
 			mkt_ask[idx].q = ffff_m30_d(q);
+			bitset_set(pktbs, idx);
 			break;
 		case SBAP_FLAVOUR:
 			mkt_bid[idx].p = ffff_m30_d(p);
 			mkt_ask[idx].p = ffff_m30_d(q);
+			bitset_set(pktbs, idx);
 			break;
 		default:
 			continue;

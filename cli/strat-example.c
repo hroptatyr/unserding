@@ -325,7 +325,15 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		udpc_make_pkt((ud_packet_t){0, pkt}, 0, pno++, UTE_CMD);
 		udpc_seria_init(ser, UDPC_PAYLOAD(pkt), UDPC_PLLEN);
 		/* call the strategy */
-		strat(ser);
+		if (strat(ser) < 0) {
+			break;
+		} else if ((nrd = udpc_seria_msglen(ser)) == 0) {
+			break;
+		} else if (w->data == NULL) {
+			break;
+		}
+		/* yaaay we can send him */
+		ud_chan_send(w->data, (ud_packet_t){nrd, pkt});
 		break;
 	default:
 		/* probably just rubbish innit */
@@ -430,6 +438,8 @@ main(int argc, char *argv[])
 		int s = ud_mcast_init(argi->beef_arg);
 		ev_io_init(beef + 1, mon_beef_cb, s, EV_READ);
 		ev_io_start(EV_A_ beef + 1);
+		/* also get a channel back to the network */
+		beef[1].data = ud_chan_init(argi->beef_arg);
 	}
 
 	/* initialise the strategy */
@@ -443,6 +453,8 @@ main(int argc, char *argv[])
 		int s = beef[1].fd;
 		ev_io_stop(EV_A_ beef + 1);
 		ud_mcast_fini(s);
+		/* free channel resources */
+		ud_chan_fini(beef[1].data);
 	}
 	{
 		int s = beef[0].fd;

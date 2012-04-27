@@ -56,10 +56,21 @@ umod_example_LDFLAGS = -static
 umod_example_LDFLAGS += $(uterus_LIBS)
 umod_example_LDFLAGS += $(LIBEV_LIBS)
 umod_example_LDADD = $(UD_LIBS) $(UD_LDXFLAGS)
+
+bin_PROGRAMS += strat-example
+strat_example_clo = strat-example-clo.c strat-example-clo.h
+strat_example_CPPFLAGS = $(AM_CPPFLAGS)
+strat_example_CPPFLAGS += $(uterus_CFLAGS)
+strat_example_CPPFLAGS += $(LIBEV_CFLAGS)
+strat_example_LDFLAGS = -static
+strat_example_LDFLAGS += $(uterus_LIBS)
+strat_example_LDFLAGS += $(LIBEV_LIBS)
+strat_example_LDADD = $(UD_LIBS) $(UD_LDXFLAGS)
 endif  ## HAVE_UTERUS
 endif  ## BUILD_CLIAPPS
 BUILT_SOURCES += $(ud_xmit_clo)
 BUILT_SOURCES += $(umod_example_clo)
+BUILT_SOURCES += $(strat_example_clo)
 
 ## our rule for gengetopt
 %.c %.h: %.ggo

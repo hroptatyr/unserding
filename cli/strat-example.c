@@ -435,11 +435,12 @@ main(int argc, char *argv[])
 	}
 
 	if (argi->beef_given) {
-		int s = ud_mcast_init(argi->beef_arg);
+		ud_chan_t ch = ud_chan_init(argi->beef_arg);
+		int s = ud_chan_init_mcast(ch);
 		ev_io_init(beef + 1, mon_beef_cb, s, EV_READ);
 		ev_io_start(EV_A_ beef + 1);
 		/* also get a channel back to the network */
-		beef[1].data = ud_chan_init(argi->beef_arg);
+		beef[1].data = ch;
 	}
 
 	/* initialise the strategy */
@@ -450,9 +451,9 @@ main(int argc, char *argv[])
 
 	/* detaching beef channels */
 	if (argi->beef_given) {
-		int s = beef[1].fd;
+		ud_chan_t ch = beef[1].data;
 		ev_io_stop(EV_A_ beef + 1);
-		ud_mcast_fini(s);
+		ud_chan_fini_mcast(ch);
 		/* free channel resources */
 		ud_chan_fini(beef[1].data);
 	}

@@ -67,6 +67,7 @@
 #include "protocore-private.h"
 
 /* to decode ute messages */
+#include <sys/time.h>
 #if defined HAVE_UTERUS_H
 # include <uterus.h>
 /* to get a take on them m30s and m62s */
@@ -114,7 +115,8 @@ struct strat_ctx_s {
 #define MAX_NPOS	(4096)
 	struct level_s mkt_bid[MAX_NPOS];
 	struct level_s mkt_ask[MAX_NPOS];	
-	bscomp_t change[MAX_NPOS / sizeof(bscomp_t)];
+	bscomp_t bchange[MAX_NPOS / sizeof(bscomp_t)];
+	bscomp_t achange[MAX_NPOS / sizeof(bscomp_t)];
 };
 
 /* bitset goodness */
@@ -151,6 +153,15 @@ bitset_get(bitset_t bs, unsigned int bit)
 	return (bs[div] >> rem) & 1;
 }
 
+static inline void
+udpc_seria_add_scom(udpc_seria_t sctx, scom_t s, size_t len)
+{
+	memcpy(sctx->msg + sctx->msgoff, s, len);
+	sctx->msgoff += len;
+	return;
+}
+
+
 static struct strat_ctx_s ctx[1];
 
 static void
@@ -160,35 +171,55 @@ strat_init(void)
 	return;
 }
 
-static void
-strat(void)
+static int
+strat(udpc_seria_t ser)
 {
 	/* the actual strategy */
 	static const uint16_t subs[] = {
 		16, 17, 23, 29,  32, 40, 41, 45,
 		69, 118, 135, 148,  179, 190, 215, 241,
 	};
+	static m30_t strat_q = {.u = 0x80000001};
+	struct timeval now;
+	struct sl1t_s rpl[1];
+
+	/* yay, we can order some schnapps and prostitutes */
+	if (gettimeofday(&now, NULL) < 0) {
+		/* fuck off right away */
+		return -1;
+	}
+
+	/* set up the head part of the rpl */
+	rpl->hdr->sec = now.tv_sec;
+	rpl->hdr->msec = now.tv_usec / 1000U;
 
 	/* check if there's movement in our preferred contracts */
 	for (unsigned int i = 0; i < countof(subs); i++) {
 		unsigned int idx = subs[i];
-		if (!bitset_get(ctx->change, idx)) {
-			continue;
-		}
-		if (ctx->mkt_bid[idx].p.u) {
+
+		rpl->hdr->idx = (uint16_t)idx;
+		if (bitset_get(ctx->bchange, idx)) {
 			m30_t new = ctx->mkt_bid[idx].p;
 
 			new.mant -= 1000;
-			fprintf(stderr, "%.6f for 1\n", ffff_m30_d(new));
+			/* serialise */
+			rpl->hdr->ttf = SL1T_TTF_BID;
+			rpl->bid = new.u;
+			rpl->bsz = strat_q.u;
+			udpc_seria_add_scom(ser, AS_SCOM(rpl), sizeof(*rpl));
 		}
-		if (ctx->mkt_ask[idx].p.u) {
+		if (bitset_get(ctx->achange, idx)) {
 			m30_t new = ctx->mkt_ask[idx].p;
 
 			new.mant += 1000;
-			fprintf(stderr, "1 at %.6f\n", ffff_m30_d(new));
+			/* serialise */
+			rpl->hdr->ttf = SL1T_TTF_ASK;
+			rpl->ask = new.u;
+			rpl->asz = strat_q.u;
+			udpc_seria_add_scom(ser, AS_SCOM(rpl), sizeof(*rpl));
 		}
 	}
-	return;
+	return 0;
 }
 
 static void
@@ -196,10 +227,12 @@ ute_dec(char *pkt, size_t pktlen)
 {
 	level_t mkt_bid = ctx->mkt_bid;
 	level_t mkt_ask = ctx->mkt_ask;
-	bitset_t pktbs = ctx->change;
+	bitset_t bchng;
+	bitset_t achng;
 
 	/* rinse */
-	memset(pktbs, 0, sizeof(ctx->change));
+	memset(bchng = ctx->bchange, 0, sizeof(ctx->bchange));
+	memset(achng = ctx->achange, 0, sizeof(ctx->achange));
 
 	/* traverse the packet */
 	for (scom_t sp = (scom_t)pkt, ep = sp + pktlen / sizeof(*ep);
@@ -215,17 +248,18 @@ ute_dec(char *pkt, size_t pktlen)
 		case SL1T_TTF_BID:
 			mkt_bid[idx].p = p;
 			mkt_bid[idx].q = q;
-			bitset_set(pktbs, idx);
+			bitset_set(bchng, idx);
 			break;
 		case SL1T_TTF_ASK:
 			mkt_ask[idx].p = p;
 			mkt_ask[idx].q = q;
-			bitset_set(pktbs, idx);
+			bitset_set(achng, idx);
 			break;
 		case SBAP_FLAVOUR:
 			mkt_bid[idx].p = p;
 			mkt_ask[idx].p = q;
-			bitset_set(pktbs, idx);
+			bitset_set(bchng, idx);
+			bitset_set(achng, idx);
 			break;
 		default:
 			continue;
@@ -235,10 +269,20 @@ ute_dec(char *pkt, size_t pktlen)
 }
 
 
+/* ute services come in 2 flavours little endian "ut" and big endian "UT" */
+#define UTE_CMD_LE	0x7574
+#define UTE_CMD_BE	0x5554
+#if defined WORDS_BIGENDIAN
+# define UTE_CMD	UTE_CMD_BE
+#else  /* !WORDS_BIGENDIAN */
+# define UTE_CMD	UTE_CMD_LE
+#endif	/* WORDS_BIGENDIAN */
+
 static void
 mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	static char pkt[UDPC_PKTLEN];
+	static unsigned int pno = 0;
 	ssize_t nrd;
 	char buf[INET6_ADDRSTRLEN];
 	/* the address in human readable form */
@@ -247,6 +291,8 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	uint16_t p;
 	union ud_sockaddr_u sa;
 	socklen_t nsa = sizeof(sa);
+	/* for replies */
+	struct udpc_seria_s ser[1];
 
 	nrd = recvfrom(w->fd, pkt, sizeof(pkt), 0, &sa.sa, &nsa);
 	/* obtain the address in human readable form */
@@ -275,8 +321,11 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	case 0x7574:
 		/* decode ute info */
 		ute_dec(UDPC_PAYLOAD(pkt), UDPC_PAYLLEN(nrd));
+		/* prepare the reply */
+		udpc_make_pkt((ud_packet_t){0, pkt}, 0, pno++, UTE_CMD);
+		udpc_seria_init(ser, UDPC_PAYLOAD(pkt), UDPC_PLLEN);
 		/* call the strategy */
-		strat();
+		strat(ser);
 		break;
 	default:
 		/* probably just rubbish innit */

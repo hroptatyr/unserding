@@ -66,6 +66,15 @@
 #include "unserding-private.h"
 #include "protocore-private.h"
 
+/* to decode ute messages */
+#include <sys/time.h>
+#if defined HAVE_UTERUS_H
+# include <uterus.h>
+/* to get a take on them m30s and m62s */
+# include <m30.h>
+# include <m62.h>
+#endif	/* HAVE_UTERUS_H */
+
 #define USE_COROUTINES		1
 
 #if defined DEBUG_FLAG
@@ -91,40 +100,84 @@
 FILE *logout;
 static FILE *monout;
 
+struct umod_flt_s {
+	short unsigned int pfilt;
+};
+
 
+static void
+ute_dec(char *pkt, size_t pktlen)
+{
+	struct timeval now;
+
+	if (gettimeofday(&now, NULL) < 0) {
+		/* fuck off right away */
+		return;
+	}
+
+	/* traverse the packet */
+	for (scom_t sp = (scom_t)pkt, ep = sp + pktlen / sizeof(*ep);
+	     sp < ep;
+	     sp += scom_tick_size(sp) *
+		     (sizeof(struct sndwch_s) / sizeof(*sp))) {
+		uint16_t idx = scom_thdr_tblidx(sp);
+		uint16_t ttf = scom_thdr_ttf(sp);
+		m30_t p = {((const_sl1t_t)sp)->v[0]};
+		m30_t q = {((const_sl1t_t)sp)->v[1]};
+
+		switch (ttf) {
+		case SL1T_TTF_BID:
+			UD_INFO_MCAST("%ld.%06u\t%.6f\tfor\t%.0f\t%hx\n",
+				      (long int)now.tv_sec,
+				      (unsigned int)now.tv_usec,
+				      ffff_m30_d(p), ffff_m30_d(q), idx);
+			break;
+		case SL1T_TTF_ASK:
+			UD_INFO_MCAST("%ld.%06u\t%.0f\tat\t%.6f\t%hx\n",
+				      (long int)now.tv_sec,
+				      (unsigned int)now.tv_usec,
+				      ffff_m30_d(q), ffff_m30_d(p), idx);
+			break;
+		default:
+			continue;
+		}
+	}
+	return;
+}
+
 static void
 mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
 	static char pkt[UDPC_PKTLEN];
 	ssize_t nrd;
-	char buf[INET6_ADDRSTRLEN];
-	/* the address in human readable form */
-	const char *a;
 	/* the port (in host-byte order) */
 	uint16_t p;
 	union ud_sockaddr_u sa;
 	socklen_t nsa = sizeof(sa);
+	/* our context */
+	struct umod_flt_s *f = w->data;
 
 	nrd = recvfrom(w->fd, pkt, sizeof(pkt), 0, &sa.sa, &nsa);
-	/* obtain the address in human readable form */
-	a = inet_ntop(AF_INET6, ud_sockaddr_addr(&sa), buf, sizeof(buf));
 	p = ud_sockaddr_port(&sa);
-	UD_INFO_MCAST(
-		":sock %d connect :from [%s]:%d  "
-		":len %04zx :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-		w->fd, a, p, nrd,
-		udpc_pkt_cno((ud_packet_t){nrd, pkt}),
-		udpc_pkt_pno((ud_packet_t){nrd, pkt}),
-		udpc_pkt_cmd((ud_packet_t){nrd, pkt}),
-		ntohs(((const uint16_t*)pkt)[3]));
-
-	/* handle the reading */
-	if (UNLIKELY(nrd < 0)) {
+	if (LIKELY(f && p != f->pfilt)) {
+		goto out_revok;
+	} else if (UNLIKELY(nrd < 0)) {
 		UD_CRITICAL_MCAST("could not handle incoming connection\n");
 		goto out_revok;
 	} else if (nrd == 0) {
 		/* no need to bother */
 		goto out_revok;
+	}
+
+	/* message decoding, could be interesting innit */
+	switch (udpc_pkt_cmd((ud_packet_t){nrd, pkt})) {
+	case 0x7574:
+		/* decode ute info */
+		ute_dec(UDPC_PAYLOAD(pkt), UDPC_PAYLLEN(nrd));
+		break;
+	default:
+		/* probably just rubbish innit */
+		break;
 	}
 
 out_revok:
@@ -185,6 +238,8 @@ main(int argc, char *argv[])
 	ev_io beef[2];
 	/* args */
 	struct gengetopt_args_info argi[1];
+	/* filter context */
+	struct umod_flt_s ctx[1];
 
 	/* whither to log */
 	logout = stderr;
@@ -225,6 +280,9 @@ main(int argc, char *argv[])
 		int s = ud_mcast_init(argi->beef_arg);
 		ev_io_init(beef + 1, mon_beef_cb, s, EV_READ);
 		ev_io_start(EV_A_ beef + 1);
+		/* put some context into it */
+		ctx->pfilt = argi->beef_arg;
+		beef[1].data = ctx;
 	}
 
 	/* now wait for events to arrive */

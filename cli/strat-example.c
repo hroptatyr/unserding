@@ -333,7 +333,7 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 			break;
 		}
 		/* yaaay we can send him */
-		ud_chan_send(w->data, (ud_packet_t){nrd, pkt});
+		ud_chan_send(w->data, (ud_packet_t){UDPC_HDRLEN + nrd, pkt});
 		break;
 	default:
 		/* probably just rubbish innit */

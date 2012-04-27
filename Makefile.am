@@ -7,7 +7,7 @@ SUBDIRS =
 if DESCEND_LIBLTDL
 SUBDIRS += libltdl
 endif
-SUBDIRS += src cli
+SUBDIRS += src cli info
 
 if BUILD_LIBRARY
 pkgconfigdir = @libdir@/pkgconfig

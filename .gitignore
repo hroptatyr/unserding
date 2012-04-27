@@ -38,3 +38,5 @@ config.log
 config.status
 cpuid
 libtool
+texinfo.tex
+*.info

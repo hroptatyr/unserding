@@ -7,5 +7,10 @@ LC_ALL=C
 BUILT_SOURCES = $(built_texis)
 EXTRA_DIST = $(BUILT_SOURCES)
 
-info_TEXINFOS =
+info_TEXINFOS = unserding.texi
+unserding_TEXINFOS =
+unserding_TEXINFOS += $(built_texis)
+unserding_TEXINFOS += unserding.texi
+
+built_texis =
 

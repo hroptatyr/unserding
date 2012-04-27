@@ -66,6 +66,14 @@
 #include "unserding-private.h"
 #include "protocore-private.h"
 
+/* to decode ute messages */
+#if defined HAVE_UTERUS_H
+# include <uterus.h>
+/* to get a take on them m30s and m62s */
+# include <m30.h>
+# include <m62.h>
+#endif	/* HAVE_UTERUS_H */
+
 #define USE_COROUTINES		1
 
 #if defined DEBUG_FLAG
@@ -90,6 +98,126 @@
 
 FILE *logout;
 static FILE *monout;
+
+
+/* the actual strategy */
+typedef struct level_s *level_t;
+typedef long unsigned int bscomp_t;
+typedef bscomp_t *bitset_t;
+
+struct level_s {
+	double p;
+	double q;
+};
+
+struct strat_ctx_s {
+#define MAX_NPOS	(4096)
+	struct level_s mkt_bid[MAX_NPOS];
+	struct level_s mkt_ask[MAX_NPOS];	
+	bscomp_t filter[MAX_NPOS / sizeof(bscomp_t)];
+};
+
+/* bitset goodness */
+#if !defined CHAR_BIT
+# define CHAR_BIT	(8U)
+#endif	/* !CHAR_BIT */
+
+static inline void
+bitset_set(bitset_t bs, unsigned int bit)
+{
+	unsigned int div = bit / (sizeof(*bs) * CHAR_BIT);
+	unsigned int rem = bit % (sizeof(*bs) * CHAR_BIT);
+	bs[div] |= (1UL << rem);
+	return;
+}
+
+static inline void
+bitset_unset(bitset_t bs, unsigned int bit)
+{
+	unsigned int div = bit / (sizeof(*bs) * CHAR_BIT);
+	unsigned int rem = bit % (sizeof(*bs) * CHAR_BIT);
+	bs[div] &= ~(1UL << rem);
+	return;
+}
+
+static inline int
+bitset_get(bitset_t bs, unsigned int bit)
+{
+	unsigned int div = bit / (sizeof(*bs) * CHAR_BIT);
+	unsigned int rem = bit % (sizeof(*bs) * CHAR_BIT);
+	return (bs[div] >> rem) & 1;
+}
+
+static inline void
+bitset_clear(bitset_t bs, size_t nbits)
+{
+	if (nbits == 0) {
+		return;
+	}
+	memset(bs, 0, ((nbits / (sizeof(*bs) * CHAR_BIT)) ?: 1) * sizeof(*bs));
+	return;
+}
+
+static struct strat_ctx_s ctx[1];
+
+static void
+strat_init(void)
+{
+	memset(ctx, 0, sizeof(*ctx));
+	/* all the EURUSDs in the standard stream */
+	bitset_set(ctx->filter, 16);
+	bitset_set(ctx->filter, 17);
+	bitset_set(ctx->filter, 23);
+	bitset_set(ctx->filter, 29);
+	bitset_set(ctx->filter, 32);
+	bitset_set(ctx->filter, 40);
+	bitset_set(ctx->filter, 41);
+	bitset_set(ctx->filter, 45);
+	bitset_set(ctx->filter, 69);
+	bitset_set(ctx->filter, 118);
+	bitset_set(ctx->filter, 135);
+	bitset_set(ctx->filter, 148);
+	bitset_set(ctx->filter, 179);
+	bitset_set(ctx->filter, 190);
+	bitset_set(ctx->filter, 215);
+	bitset_set(ctx->filter, 241);
+	return;
+}
+
+static void
+ute_dec(char *pkt, size_t pktlen)
+{
+	level_t mkt_bid = ctx->mkt_bid;
+	level_t mkt_ask = ctx->mkt_ask;
+
+	for (scom_t sp = (scom_t)pkt, ep = sp + pktlen / sizeof(*ep);
+	     sp < ep;
+	     sp += scom_tick_size(sp) *
+		     (sizeof(struct sndwch_s) / sizeof(*sp))) {
+		uint16_t idx = scom_thdr_tblidx(sp);
+		uint16_t ttf = scom_thdr_ttf(sp);
+		m30_t p = {((const_sl1t_t)sp)->v[0]};
+		m30_t q = {((const_sl1t_t)sp)->v[1]};
+
+		switch (ttf) {
+		case SL1T_TTF_BID:
+			mkt_bid[idx].p = ffff_m30_d(p);
+			mkt_bid[idx].q = ffff_m30_d(q);
+			break;
+		case SL1T_TTF_ASK:
+			mkt_ask[idx].p = ffff_m30_d(p);
+			mkt_ask[idx].q = ffff_m30_d(q);
+			break;
+		case SBAP_FLAVOUR:
+			mkt_bid[idx].p = ffff_m30_d(p);
+			mkt_ask[idx].p = ffff_m30_d(q);
+			break;
+		default:
+			continue;
+		}
+	}
+	return;
+}
 
 
 static void
@@ -125,6 +253,17 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	} else if (nrd == 0) {
 		/* no need to bother */
 		goto out_revok;
+	}
+
+	/* message decoding, could be interesting innit */
+	switch (udpc_pkt_cmd((ud_packet_t){nrd, pkt})) {
+	case 0x7574:
+		/* decode ute info */
+		ute_dec(UDPC_PAYLOAD(pkt), UDPC_PAYLLEN(nrd));
+		break;
+	default:
+		/* probably just rubbish innit */
+		break;
 	}
 
 out_revok:
@@ -226,6 +365,9 @@ main(int argc, char *argv[])
 		ev_io_init(beef + 1, mon_beef_cb, s, EV_READ);
 		ev_io_start(EV_A_ beef + 1);
 	}
+
+	/* initialise the strategy */
+	strat_init();
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);

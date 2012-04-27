@@ -46,9 +46,20 @@ ud_xmit_CPPFLAGS += $(uterus_CFLAGS)
 ud_xmit_LDFLAGS = -static
 ud_xmit_LDFLAGS += $(uterus_LIBS)
 ud_xmit_LDADD = $(UD_LIBS) $(UD_LDXFLAGS)
+
+bin_PROGRAMS += umod-example
+umod_example_clo = umod-example-clo.c umod-example-clo.h
+umod_example_CPPFLAGS = $(AM_CPPFLAGS)
+umod_example_CPPFLAGS += $(uterus_CFLAGS)
+umod_example_CPPFLAGS += $(LIBEV_CFLAGS)
+umod_example_LDFLAGS = -static
+umod_example_LDFLAGS += $(uterus_LIBS)
+umod_example_LDFLAGS += $(LIBEV_LIBS)
+umod_example_LDADD = $(UD_LIBS) $(UD_LDXFLAGS)
 endif  ## HAVE_UTERUS
 endif  ## BUILD_CLIAPPS
 BUILT_SOURCES += $(ud_xmit_clo)
+BUILT_SOURCES += $(umod_example_clo)
 
 ## our rule for gengetopt
 %.c %.h: %.ggo

@@ -123,6 +123,7 @@ struct strat_ctx_s {
 #endif	/* !CHAR_BIT */
 
 static inline void
+__attribute__((unused))
 bitset_set(bitset_t bs, unsigned int bit)
 {
 	unsigned int div = bit / (sizeof(*bs) * CHAR_BIT);
@@ -132,6 +133,7 @@ bitset_set(bitset_t bs, unsigned int bit)
 }
 
 static inline void
+__attribute__((unused))
 bitset_unset(bitset_t bs, unsigned int bit)
 {
 	unsigned int div = bit / (sizeof(*bs) * CHAR_BIT);
@@ -141,21 +143,12 @@ bitset_unset(bitset_t bs, unsigned int bit)
 }
 
 static inline int
+__attribute__((unused))
 bitset_get(bitset_t bs, unsigned int bit)
 {
 	unsigned int div = bit / (sizeof(*bs) * CHAR_BIT);
 	unsigned int rem = bit % (sizeof(*bs) * CHAR_BIT);
 	return (bs[div] >> rem) & 1;
-}
-
-static inline void
-bitset_clear(bitset_t bs, size_t nbits)
-{
-	if (nbits == 0) {
-		return;
-	}
-	memset(bs, 0, ((nbits / (sizeof(*bs) * CHAR_BIT)) ?: 1) * sizeof(*bs));
-	return;
 }
 
 static struct strat_ctx_s ctx[1];

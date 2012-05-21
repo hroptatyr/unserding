@@ -45,6 +45,7 @@
 #include <setjmp.h>
 /* for gettimeofday() */
 #include <sys/time.h>
+#include <sys/epoll.h>
 #include <uterus.h>
 #include "unserding.h"
 #include "protocore.h"
@@ -76,6 +77,7 @@ struct xmit_s {
 	utectx_t ute;
 	float speed;
 	bool restampp;
+	int epfd;
 };
 
 static jmp_buf jb;
@@ -173,14 +175,23 @@ work(const struct xmit_s *ctx)
 		}
 		/* sleep, well maybe */
 		if (stmp > reft || msec > refm) {
+			struct epoll_event ev[1];
 			useconds_t slp;
+
 			/* and sleep */
 			slp = ((stmp - reft) * 1000 + msec - refm) * speed;
 			for (unsigned int i = slp, j = 0; i; i /= 2, j++) {
 				XMIT_STUP('0' + (j % 10));
 			}
 			XMIT_STUP('\n');
-			usleep(slp);
+
+			if (epoll_wait(ctx->epfd, ev, 1, slp / 1000) > 0) {
+				char tmp[256];
+				XMIT_STUP('?');
+				XMIT_STUP('\n');
+				while (read(ev->data.fd, tmp, sizeof(tmp)) > 0);
+			}
+
 			refm = msec;
 			reft = stmp;
 		}
@@ -211,6 +222,15 @@ work(const struct xmit_s *ctx)
 		XMIT_STUP('\n');
 	}
 	return;
+}
+
+static int
+rebind_chan(ud_chan_t ch)
+{
+	union ud_sockaddr_u sa;
+	socklen_t len = sizeof(sa);
+	getsockname(ch->sock, &sa.sa, &len);
+	return bind(ch->sock, (struct sockaddr*)&sa, sizeof(sa));
 }
 
 
@@ -259,6 +279,18 @@ main(int argc, char *argv[])
 	/* obtain a new handle, somehow we need to use the port number innit? */
 	hdl = ud_chan_init(8584);
 
+	/* also accept connections on that socket */
+	if (rebind_chan(hdl) < 0) {
+		perror("cannot bind ud-xmit socket for meta data queries");
+	} else if ((ctx->epfd = epoll_create(1)) < 0) {
+		perror("cannot instantiate epoll on ud-xmit socket");
+	} else {
+		struct epoll_event ev[1];
+		ev->events = EPOLLIN | EPOLLET;
+		ev->data.fd = hdl->sock;
+		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, hdl->sock, ev);
+	}
+
 	/* the actual work */
 	switch (setjmp(jb)) {
 	case 0:
@@ -271,6 +303,9 @@ main(int argc, char *argv[])
 		printf("sent %zu ticks in %u packets\n", nt, pno);
 		break;	
 	}
+
+	/* close epoll */
+	close(ctx->epfd);
 
 	/* and lose the handle again */
 	ud_chan_fini(hdl);

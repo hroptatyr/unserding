@@ -151,7 +151,7 @@ static int
 __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *r)
 {
 	int opt = 0;
-	unsigned char ttl = UDP_MULTICAST_TTL;
+	int ttl = UDP_MULTICAST_TTL;
 
 	/* turn into a mcast sock and set a TTL */
 	opt = 0;

@@ -332,7 +332,6 @@ main(int argc, char *argv[])
 {
 	struct gengetopt_args_info argi[1];
 	struct xmit_s ctx[1];
-	ud_chan_t hdl;
 	int res = 0;
 
 	/* parse the command line */
@@ -353,24 +352,23 @@ main(int argc, char *argv[])
 	signal(SIGINT, handle_sigint);
 
 	/* obtain a new handle, somehow we need to use the port number innit? */
-	hdl = ud_chan_init(8584);
+	ctx->ud = ud_chan_init(8584);
 
 	/* also accept connections on that socket */
-	if (rebind_chan(hdl) < 0) {
+	if (rebind_chan(ctx->ud) < 0) {
 		error(0, "cannot bind ud-xmit socket for meta data queries");
 	} else if ((ctx->epfd = epoll_create(1)) < 0) {
 		error(0, "cannot instantiate epoll on ud-xmit socket");
 	} else {
 		struct epoll_event ev[1];
 		ev->events = EPOLLIN | EPOLLET;
-		ev->data.fd = hdl->sock;
-		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, hdl->sock, ev);
+		ev->data.fd = ctx->ud->sock;
+		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->ud->sock, ev);
 	}
 
 	/* the actual work */
 	switch (setjmp(jb)) {
 	case 0:
-		ctx->ud = hdl;
 		ctx->speed = argi->speed_arg;
 		ctx->restampp = argi->restamp_given;
 		work(ctx);
@@ -384,7 +382,7 @@ main(int argc, char *argv[])
 	close(ctx->epfd);
 
 	/* and lose the handle again */
-	ud_chan_fini(hdl);
+	ud_chan_fini(ctx->ud);
 
 	/* and close the file */
 	ute_close(ctx->ute);

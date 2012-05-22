@@ -212,8 +212,7 @@ mcast6_listener_init(int s, short unsigned int port)
 	};
 
 	__sa6.sa6.sin6_family = AF_INET6;
-	/* listen on all ports */
-	__sa6.sa6.sin6_port = 0;
+	__sa6.sa6.sin6_port = htons(port);
 
 	/* allow many many many servers on that port */
 	__reuse_sock(s);

@@ -40,3 +40,4 @@ cpuid
 libtool
 texinfo.tex
 *.info
+test-driver

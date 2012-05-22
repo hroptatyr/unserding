@@ -220,13 +220,9 @@ __pr_snap(char *tgt, scom_t st)
 		p += ffff_m30_s(p, (m30_t)snp->aq);
 		*p++ = '\t';
 		/* volume-weighted trade price */
-		p += sprintf(p, "%08x", snp->tvpr);
-		*p++ = '|';
 		p += ffff_m30_s(p, (m30_t)snp->tvpr);
 		*p++ = '\t';
 		/* trade quantity */
-		p += sprintf(p, "%08x", snp->tq);
-		*p++ = '|';
 		p += ffff_m30_s(p, (m30_t)snp->tq);
 	}
 	return p - tgt;

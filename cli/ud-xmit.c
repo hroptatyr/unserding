@@ -72,12 +72,15 @@
 # define XMIT_STUP(arg)
 #endif	/* DEBUG_FLAG */
 
+#define UD_CMD_QMETA	(0x7572)
+
 struct xmit_s {
 	ud_chan_t ud;
 	utectx_t ute;
 	float speed;
 	bool restampp;
 	int epfd;
+	int mcfd;
 };
 
 static jmp_buf jb;
@@ -167,7 +170,6 @@ party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
 			break;
 		}
 		default:
-			XMIT_STUP('#');
 			break;
 		}
 	}
@@ -186,23 +188,22 @@ party(const struct xmit_s *ctx, useconds_t tm)
 {
 	struct epoll_event ev[1];
 
-	if (epoll_wait(ctx->epfd, ev, 1, 1) > 0) {
+	while (epoll_wait(ctx->epfd, ev, 1, 0) > 0) {
 		char inq[UDPC_PKTLEN];
 		ssize_t nrd;
 
 		/* otherwise be nosey and look at the packet */
-		while ((nrd = read(ev->data.fd, inq, sizeof(inq))) > 0) {
-			ud_packet_t pkt = {
-				.pbuf = inq,
-				.plen = nrd,
-			};
-
+		if ((nrd = read(ev->data.fd, inq, sizeof(inq))) <= 0) {
+			;
+		} else if (!udpc_pkt_valid_p((ud_packet_t){nrd, inq})) {
+			;
+		} else if (udpc_pkt_cmd((ud_packet_t){nrd, inq}) != UD_CMD_QMETA) {
+			;
+		} else {
 			XMIT_STUP('?');
-			if (udpc_pkt_valid_p(pkt)) {
-				party_deser(ctx, pkt);
-			}
+			party_deser(ctx, (ud_packet_t){nrd, inq});
+			XMIT_STUP('\n');
 		}
-		XMIT_STUP('\n');
 	}
 	usleep(tm);
 	return;
@@ -306,7 +307,7 @@ rebind_chan(ud_chan_t ch)
 	union ud_sockaddr_u sa;
 	socklen_t len = sizeof(sa);
 	getsockname(ch->sock, &sa.sa, &len);
-	return bind(ch->sock, (struct sockaddr*)&sa, sizeof(sa));
+	return bind(ch->sock, &sa.sa, sizeof(sa));
 }
 
 
@@ -332,6 +333,7 @@ main(int argc, char *argv[])
 {
 	struct gengetopt_args_info argi[1];
 	struct xmit_s ctx[1];
+	short unsigned int port = 8584;
 	int res = 0;
 
 	/* parse the command line */
@@ -352,18 +354,29 @@ main(int argc, char *argv[])
 	signal(SIGINT, handle_sigint);
 
 	/* obtain a new handle, somehow we need to use the port number innit? */
-	ctx->ud = ud_chan_init(8584);
+	ctx->ud = ud_chan_init(port);
 
-	/* also accept connections on that socket */
-	if (rebind_chan(ctx->ud) < 0) {
-		error(0, "cannot bind ud-xmit socket for meta data queries");
-	} else if ((ctx->epfd = epoll_create(1)) < 0) {
+	/* also accept connections on that socket and the mcast network */
+	if ((ctx->epfd = epoll_create(2)) < 0) {
 		error(0, "cannot instantiate epoll on ud-xmit socket");
 	} else {
 		struct epoll_event ev[1];
-		ev->events = EPOLLIN | EPOLLET;
-		ev->data.fd = ctx->ud->sock;
-		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->ud->sock, ev);
+
+		if (rebind_chan(ctx->ud) < 0) {
+			error(0, "cannot bind ud-xmit socket");
+		} else {
+			ev->events = EPOLLIN;
+			ev->data.fd = ctx->ud->sock;
+			epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->ud->sock, ev);
+		}
+
+		if ((ctx->mcfd = ud_mcast_init(port)) < 0) {
+			error(0, "cannot instantiate mcast listener");
+		} else {
+			ev->events = EPOLLIN;
+			ev->data.fd = ctx->mcfd;
+			epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->mcfd, ev);
+		}
 	}
 
 	/* the actual work */
@@ -382,6 +395,7 @@ main(int argc, char *argv[])
 	close(ctx->epfd);
 
 	/* and lose the handle again */
+	ud_mcast_fini(ctx->mcfd);
 	ud_chan_fini(ctx->ud);
 
 	/* and close the file */

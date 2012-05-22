@@ -376,6 +376,22 @@ ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt)
 	udpc_seria_t sctx = &__sctx;
 	uint8_t tag;
 
+	/* some checks beforehand */
+	if (pkt.plen < UDPC_HDRLEN) {
+		return 0;
+	}
+
+	switch (udpc_pkt_flags(pkt)) {
+	case UDPC_PKTFLO_NOW_ONE:
+	case UDPC_PKTFLO_NOW_MANY:
+	case UDPC_PKTFLO_SOON_ONE:
+	case UDPC_PKTFLO_SOON_MANY:
+		break;
+	default:
+		return 0;
+	}
+
+	/* otherwise it seems to be a real packet */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen - UDPC_HDRLEN);
 
 	while ((tag = udpc_seria_tag(sctx))) {

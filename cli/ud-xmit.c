@@ -357,9 +357,9 @@ main(int argc, char *argv[])
 
 	/* also accept connections on that socket */
 	if (rebind_chan(hdl) < 0) {
-		perror("cannot bind ud-xmit socket for meta data queries");
+		error(0, "cannot bind ud-xmit socket for meta data queries");
 	} else if ((ctx->epfd = epoll_create(1)) < 0) {
-		perror("cannot instantiate epoll on ud-xmit socket");
+		error(0, "cannot instantiate epoll on ud-xmit socket");
 	} else {
 		struct epoll_event ev[1];
 		ev->events = EPOLLIN | EPOLLET;

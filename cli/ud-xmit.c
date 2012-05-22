@@ -96,6 +96,7 @@ error(int eno, const char *fmt, ...)
 {
 	va_list vap;
 	va_start(vap, fmt);
+	fputs("[ud-xmit]: ", stderr);
 	vfprintf(stderr, fmt, vap);
 	va_end(vap);
 	if (eno || errno) {

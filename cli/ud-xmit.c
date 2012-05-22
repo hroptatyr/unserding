@@ -126,6 +126,87 @@ udpc_seria_add_scom(udpc_seria_t sctx, scom_t s, size_t len)
 	return;
 }
 
+static void
+party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
+{
+	struct udpc_seria_s ser[2];
+	char rpl[UDPC_PKTLEN];
+	size_t nsyms = ute_nsyms(ctx->ute);
+
+	/* make a reply packet */
+	memcpy(rpl, pkt.pbuf, pkt.plen);
+	udpc_make_rpl_pkt((ud_packet_t){.pbuf = rpl, .plen = sizeof(rpl)});
+
+	/* get the serialisers and deserialisers ready */
+	udpc_seria_init(ser, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	udpc_seria_init(ser + 1, UDPC_PAYLOAD(rpl), UDPC_PAYLLEN(sizeof(rpl)));
+
+	for (uint8_t tag; (tag = udpc_seria_tag(ser)); ) {
+		switch (tag) {
+		case UDPC_TYPE_UI16: {
+			uint16_t idx = udpc_seria_des_ui16(ser);
+			const char *sym = ute_idx2sym(ctx->ute, idx);
+
+			udpc_seria_add_ui16(ser + 1, idx);
+			udpc_seria_add_str(ser + 1, sym, strlen(sym));
+			XMIT_STUP('!');
+			break;
+		}
+		case UDPC_TYPE_STR: {
+			char sym[64];
+			uint16_t idx;
+			size_t len;
+
+			len = udpc_seria_des_str_into(sym, sizeof(sym), ser);
+			if ((idx = ute_sym2idx(ctx->ute, sym)) <= nsyms) {
+				udpc_seria_add_ui16(ser + 1, idx);
+				udpc_seria_add_str(ser + 1, sym, len);
+				XMIT_STUP('!');
+			}
+			break;
+		}
+		default:
+			XMIT_STUP('#');
+			break;
+		}
+	}
+	if (udpc_seria_msglen(ser + 1)) {
+		ud_packet_t rplpkt = {
+			.pbuf = rpl,
+			.plen = udpc_seria_msglen(ser + 1) + UDPC_HDRLEN,
+		};
+		ud_chan_send(ctx->ud, rplpkt);
+	}
+	return;
+}
+
+static void
+party(const struct xmit_s *ctx, useconds_t tm)
+{
+	struct epoll_event ev[1];
+	char inq[UDPC_PKTLEN];
+	ssize_t nrd;
+
+	if (epoll_wait(ctx->epfd, ev, 1, tm / 1000) <= 0) {
+		usleep(tm % 1000);
+		return;
+	}
+	/* otherwise be nosey and look at the packet */
+	while ((nrd = read(ev->data.fd, inq, sizeof(inq))) > 0) {
+		ud_packet_t pkt = {
+			.pbuf = inq,
+			.plen = nrd,
+		};
+
+		XMIT_STUP('?');
+		if (udpc_pkt_valid_p(pkt)) {
+			party_deser(ctx, pkt);
+		}
+	}
+	XMIT_STUP('\n');
+	return;
+}
+
 /* ute services come in 2 flavours little endian "ut" and big endian "UT" */
 #define UTE_CMD_LE	0x7574
 #define UTE_CMD_BE	0x5554
@@ -175,22 +256,16 @@ work(const struct xmit_s *ctx)
 		}
 		/* sleep, well maybe */
 		if (stmp > reft || msec > refm) {
-			struct epoll_event ev[1];
 			useconds_t slp;
 
-			/* and sleep */
+			/* and party hard for some microseconds */
 			slp = ((stmp - reft) * 1000 + msec - refm) * speed;
 			for (unsigned int i = slp, j = 0; i; i /= 2, j++) {
 				XMIT_STUP('0' + (j % 10));
 			}
 			XMIT_STUP('\n');
 
-			if (epoll_wait(ctx->epfd, ev, 1, slp / 1000) > 0) {
-				char tmp[256];
-				XMIT_STUP('?');
-				XMIT_STUP('\n');
-				while (read(ev->data.fd, tmp, sizeof(tmp)) > 0);
-			}
+			party(ctx, slp);
 
 			refm = msec;
 			reft = stmp;

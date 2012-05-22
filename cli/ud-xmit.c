@@ -185,26 +185,26 @@ static void
 party(const struct xmit_s *ctx, useconds_t tm)
 {
 	struct epoll_event ev[1];
-	char inq[UDPC_PKTLEN];
-	ssize_t nrd;
 
-	if (epoll_wait(ctx->epfd, ev, 1, tm / 1000) <= 0) {
-		usleep(tm % 1000);
-		return;
-	}
-	/* otherwise be nosey and look at the packet */
-	while ((nrd = read(ev->data.fd, inq, sizeof(inq))) > 0) {
-		ud_packet_t pkt = {
-			.pbuf = inq,
-			.plen = nrd,
-		};
+	if (epoll_wait(ctx->epfd, ev, 1, 1) > 0) {
+		char inq[UDPC_PKTLEN];
+		ssize_t nrd;
 
-		XMIT_STUP('?');
-		if (udpc_pkt_valid_p(pkt)) {
-			party_deser(ctx, pkt);
+		/* otherwise be nosey and look at the packet */
+		while ((nrd = read(ev->data.fd, inq, sizeof(inq))) > 0) {
+			ud_packet_t pkt = {
+				.pbuf = inq,
+				.plen = nrd,
+			};
+
+			XMIT_STUP('?');
+			if (udpc_pkt_valid_p(pkt)) {
+				party_deser(ctx, pkt);
+			}
 		}
+		XMIT_STUP('\n');
 	}
-	XMIT_STUP('\n');
+	usleep(tm);
 	return;
 }
 

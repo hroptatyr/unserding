@@ -58,6 +58,8 @@
 struct meta_s {
 	ud_chan_t ud;
 	int epfd;
+	int mcfd;
+	int timeo;
 };
 
 
@@ -79,13 +81,27 @@ error(int eno, const char *fmt, ...)
 	return;
 }
 
-static int
-rebind_chan(ud_chan_t ch)
+static void
+wait(const struct meta_s *ctx)
 {
-	union ud_sockaddr_u sa;
-	socklen_t len = sizeof(sa);
-	getsockname(ch->sock, &sa.sa, &len);
-	return bind(ch->sock, (struct sockaddr*)&sa, sizeof(sa));
+	struct epoll_event ev[1];
+	char rpl[UDPC_PKTLEN];
+	ssize_t nrd;
+
+	if (epoll_wait(ctx->epfd, ev, 1, ctx->timeo) <= 0) {
+		META_DEBUG("TIMEOUT\n");
+		return;
+	}
+	/* otherwise read like there's no tomorrow */
+	while ((nrd = read(ev->data.fd, rpl, sizeof(rpl))) > 0) {
+		ud_packet_t pkt = {.pbuf = rpl, .plen = nrd};
+
+		if (udpc_pkt_valid_p(pkt) &&
+		    udpc_pkt_cmd(pkt) == UDPC_PKT_RPL(UD_CMD_QMETA)) {
+			META_DEBUG("YAY\n");
+		}
+	}
+	return;
 }
 
 static int
@@ -131,6 +147,9 @@ work(const struct meta_s *ctx, const char *const inp[], size_t len)
 	}
 	/* send the final pack */
 	SEND_PACK;
+
+	/* wait for replies */
+	wait(ctx);
 	return 0;
 }
 
@@ -163,20 +182,23 @@ main(int argc, char *argv[])
 		res = 1;
 		goto out;
 	}
+	/* make me an argument */
+	ctx->timeo = 5000;
 
 	/* obtain a new handle, somehow we need to use the port number innit? */
 	ctx->ud = ud_chan_init(argi->beef_given ? argi->beef_arg : 8584);
 
 	/* also accept connections on that socket */
-	if (rebind_chan(ctx->ud) < 0) {
-		error(0, "cannot bind ud-xmit socket for meta data queries");
+	if ((ctx->mcfd = ud_chan_init_mcast(ctx->ud)) < 0) {
+		error(0, "cannot instantiate mcast for meta data queries");
 	} else if ((ctx->epfd = epoll_create(1)) < 0) {
-		error(0, "cannot instantiate epoll on ud-xmit socket");
+		error(0, "cannot instantiate epoll on ud-meta socket");
 	} else {
 		struct epoll_event ev[1];
+		
 		ev->events = EPOLLIN | EPOLLET;
-		ev->data.fd = ctx->ud->sock;
-		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->ud->sock, ev);
+		ev->data.fd = ctx->mcfd;
+		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->mcfd, ev);
 	}
 
 	/* init the serialiser */

@@ -131,6 +131,11 @@ extern int ud_mcast_init(short unsigned int port);
 extern void ud_mcast_fini(int sock);
 
 /**
+ * Turn looping of packets on or off.
+ * Packets to the socket itself will be repeated. */
+extern int ud_mcast_loop(int s, int on);
+
+/**
  * Subscribe to services on CHAN in the unserding network.
  * Return a socket that can be select()'d or poll()'d. */
 extern int ud_chan_init_mcast(ud_chan_t chan);

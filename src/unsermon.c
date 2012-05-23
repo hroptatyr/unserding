@@ -265,13 +265,56 @@ __pr_cdl(char *tgt, scom_t st)
 }
 #endif	/* HAVE_UTERUS_H */
 
+static inline size_t
+hrclock_print(char *buf, size_t len)
+{
+	struct timespec tsp;
+	clock_gettime(CLOCK_REALTIME, &tsp);
+	return snprintf(buf, len, "%ld.%09li", tsp.tv_sec, tsp.tv_nsec);
+}
+
 
-/* the actual worker function, exec'd in a different thread */
+/* the actual worker function */
 static void
 mon_pkt_cb(job_t j)
 {
-	static char buf[8192];
-	size_t psz;
+	char buf[8192], *epi = buf;
+
+	/* print a time stamp */
+	epi += hrclock_print(buf, sizeof(buf));
+	*epi++ = '\t';
+
+	/* obtain the address in human readable form */
+	{
+		int fam = ud_sockaddr_fam(&j->sa);
+		const struct sockaddr *sa = ud_sockaddr_addr(&j->sa);
+		uint16_t port = ud_sockaddr_port(&j->sa);
+
+		*epi++ = '[';
+		if (inet_ntop(fam, sa, epi, 128)) {
+			epi += strlen(epi);
+		}
+		*epi++ = ']';
+		epi += snprintf(epi, 16, ":%hu", port);
+	}
+	*epi++ = '\t';
+
+	{
+		unsigned int nrd = j->blen;
+		unsigned int cno = udpc_pkt_cno(JOB_PACKET(j));
+		unsigned int pno = udpc_pkt_pno(JOB_PACKET(j));
+		unsigned int cmd = udpc_pkt_cmd(JOB_PACKET(j));
+		unsigned int mag = ntohs(((const uint16_t*)j->buf)[3]);
+
+		epi += snprintf(
+			epi, 256,
+			/*len*/"%04x\t"
+			/*cno*/"%02x\t"
+			/*pno*/"%06x\t"
+			/*cmd*/"%04x\t"
+			/*mag*/"%04x\t",
+			nrd, cno, pno, cmd, mag);
+	}
 
 	/* intercept special channels */
 	switch (udpc_pkt_cmd(JOB_PACKET(j))) {
@@ -280,7 +323,6 @@ mon_pkt_cb(job_t j)
 #if defined HAVE_UTERUS_H
 		char *pbuf = UDPC_PAYLOAD(JOB_PACKET(j).pbuf);
 		size_t plen = UDPC_PAYLLEN(JOB_PACKET(j).plen);
-		char *p = buf;
 
 		for (scom_t sp = (void*)pbuf, ep = (void*)(pbuf + plen);
 		     sp < ep;
@@ -289,6 +331,7 @@ mon_pkt_cb(job_t j)
 			uint32_t sec = scom_thdr_sec(sp);
 			uint16_t msec = scom_thdr_msec(sp);
 			uint16_t ttf = scom_thdr_ttf(sp);
+			char *p = epi;
 
 			p += pr_tsmstz(p, sec, msec, 'T');
 			*p++ = '\t';
@@ -344,22 +387,29 @@ mon_pkt_cb(job_t j)
 			}
 			*p++ = '\n';
 			*p = '\0';
+			fwrite(buf, sizeof(char), p - buf, monout);
 		}
-		fputs(buf, monout);
 #else  /* HAVE_UTERUS */
+		fwrite(buf, sizeof(char), epi - buf, monout);
 		fputs("UTE/le message, no decoding support\n", monout);
 #endif	/* HAVE_UTERUS */
 		break;
 	}
 	case 0x5554:
 	case 0x5555:
+		fwrite(buf, sizeof(char), epi - buf, monout);
 		fputs("UTE/be message, no decoding support\n", monout);
 		break;
 	default:
-		if ((psz = ud_sprint_pkt_pretty(buf, JOB_PACKET(j)))) {
-			buf[psz] = '\0';
-			fputs(buf, monout);
+		if (ud_sprint_pkt_pretty(epi, JOB_PACKET(j))) {
+			for (char *p = epi, *np;
+			     (np = strchr(p, '\n'));
+			     p = np + 1) {
+				fwrite(buf, sizeof(char), epi - buf, monout);
+				fwrite(p, sizeof(char), np - p + 1, monout);
+			}
 		} else {
+			fwrite(buf, sizeof(char), epi - buf, monout);
 			fputs("NAUGHT message\n", monout);
 		}
 		break;
@@ -408,8 +458,7 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 
 	j->blen = nread;
 
-	/* enqueue t3h job and copy the input buffer over to
-	 * the job's work space, also trigger the lazy bastards */
+	/* decode the guy */
 	(void)mon_pkt_cb(j);
 out_revok:
 	return;

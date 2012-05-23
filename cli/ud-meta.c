@@ -42,6 +42,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <sys/time.h>
 #include "unserding.h"
 #include "protocore.h"
 
@@ -114,24 +115,38 @@ out:
 	return;
 }
 
+static int
+tv_diff(struct timeval *t1, struct timeval *t2)
+{
+	useconds_t res = (t2->tv_sec - t1->tv_sec) * 1000000;
+	res += (t2->tv_usec - t1->tv_usec);
+	return res / 1000;
+}
+
+static int
+__qmeta_rpl_p(ud_packet_t pkt)
+{
+	return udpc_pkt_cmd(pkt) == UDPC_PKT_RPL(UD_CMD_QMETA);
+}
+
 static void
 wait(const struct meta_s *ctx)
 {
 	struct epoll_event ev[1];
+	struct timeval tv[2];
 	char rpl[UDPC_PKTLEN];
 	ssize_t nrd;
 
-	if (epoll_wait(ctx->epfd, ev, 1, ctx->timeo) <= 0) {
-		META_DEBUG("TIMEOUT\n");
-		return;
-	}
-	/* otherwise read like there's no tomorrow */
-	while ((nrd = read(ev->data.fd, rpl, sizeof(rpl))) > 0) {
-		ud_packet_t pkt = {.pbuf = rpl, .plen = nrd};
+	gettimeofday(tv + 0, NULL);
+	for (int mil = ctx->timeo;
+	     mil >= 0 && epoll_wait(ctx->epfd, ev, 1, mil) > 0;
+	     gettimeofday(tv + 1, NULL), mil -= tv_diff(tv + 0, tv + 1)) {
 
-		if (udpc_pkt_valid_p(pkt) &&
-		    udpc_pkt_cmd(pkt) == UDPC_PKT_RPL(UD_CMD_QMETA)) {
-			prnt(ctx, pkt);
+		while ((ev->events & EPOLLIN) &&
+		       (nrd = read(ev->data.fd, rpl, sizeof(rpl))) > 0 &&
+		       udpc_pkt_valid_p((ud_packet_t){nrd, rpl}) &&
+		       __qmeta_rpl_p((ud_packet_t){nrd, rpl})) {
+			prnt(ctx, (ud_packet_t){nrd, rpl});
 		}
 	}
 	return;
@@ -228,8 +243,8 @@ main(int argc, char *argv[])
 		error(0, "cannot instantiate epoll on ud-meta socket");
 	} else {
 		struct epoll_event ev[1];
-		
-		ev->events = EPOLLIN | EPOLLET;
+
+		ev->events = EPOLLIN;
 		ev->data.fd = ctx->mcfd;
 		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->mcfd, ev);
 	}

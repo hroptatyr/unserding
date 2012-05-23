@@ -490,6 +490,7 @@ main(int argc, char *argv[])
 	/* whither to log */
 	logout = stderr;
 	monout = stdout;
+	ud_openlog();
 	/* wipe stack pollution */
 	memset(&__ctx, 0, sizeof(__ctx));
 
@@ -569,6 +570,7 @@ main(int argc, char *argv[])
 	fflush(logout);
 	fclose(monout);
 	fclose(logout);
+	ud_closelog();
 	/* unloop was called, so exit */
 	return 0;
 }

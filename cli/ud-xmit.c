@@ -151,9 +151,11 @@ party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
 			uint16_t idx = udpc_seria_des_ui16(ser);
 			const char *sym = ute_idx2sym(ctx->ute, idx);
 
-			udpc_seria_add_ui16(ser + 1, idx);
-			udpc_seria_add_str(ser + 1, sym, strlen(sym));
-			XMIT_STUP('!');
+			if ((sym = ute_idx2sym(ctx->ute, idx))) {
+				udpc_seria_add_ui16(ser + 1, idx);
+				udpc_seria_add_str(ser + 1, sym, strlen(sym));
+				XMIT_STUP('!');
+			}
 			break;
 		}
 		case UDPC_TYPE_STR: {

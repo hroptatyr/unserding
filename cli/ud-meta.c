@@ -138,15 +138,17 @@ wait(const struct meta_s *ctx)
 	ssize_t nrd;
 
 	gettimeofday(tv + 0, NULL);
-	for (int mil = ctx->timeo;
+	for (int mil = ctx->timeo, prntp = 0;
 	     mil >= 0 && epoll_wait(ctx->epfd, ev, 1, mil) > 0;
-	     gettimeofday(tv + 1, NULL), mil -= tv_diff(tv + 0, tv + 1)) {
-
+	     gettimeofday(tv + 1, NULL),
+		     mil = prntp ?: ctx->timeo - tv_diff(tv + 0, tv + 1)) {
 		while ((ev->events & EPOLLIN) &&
-		       (nrd = read(ev->data.fd, rpl, sizeof(rpl))) > 0 &&
-		       udpc_pkt_valid_p((ud_packet_t){nrd, rpl}) &&
-		       __qmeta_rpl_p((ud_packet_t){nrd, rpl})) {
-			prnt(ctx, (ud_packet_t){nrd, rpl});
+		       (nrd = read(ev->data.fd, rpl, sizeof(rpl))) > 0) {
+			if (udpc_pkt_valid_p((ud_packet_t){nrd, rpl}) &&
+			    __qmeta_rpl_p((ud_packet_t){nrd, rpl})) {
+				prnt(ctx, (ud_packet_t){nrd, rpl});
+				prntp = 1;
+			}
 		}
 	}
 	return;
@@ -244,7 +246,7 @@ main(int argc, char *argv[])
 	} else {
 		struct epoll_event ev[1];
 
-		ev->events = EPOLLIN;
+		ev->events = EPOLLIN | EPOLLET;
 		ev->data.fd = ctx->mcfd;
 		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->mcfd, ev);
 	}

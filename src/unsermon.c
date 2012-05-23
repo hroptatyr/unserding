@@ -532,7 +532,6 @@ main(int argc, char *argv[])
 	ev_io *beef = NULL;
 	size_t nbeef = 0;
 	struct ud_ctx_s __ctx;
-	struct ud_handle_s __hdl;
 	/* args */
 	struct gengetopt_args_info argi[1];
 
@@ -551,10 +550,6 @@ main(int argc, char *argv[])
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);
 	__ctx.mainloop = loop;
-
-	/* initialise the lib handle */
-	init_unserding_handle(&__hdl, PF_INET6, true);
-	__ctx.hdl = &__hdl;
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);

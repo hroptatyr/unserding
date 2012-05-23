@@ -106,7 +106,7 @@
 /**
  * Negotiation timeout in seconds. */
 #define S2S_NEGO_TIMEOUT	2
-#define UDP_MULTICAST_TTL	16
+#define UDP_MULTICAST_TTL	64
 
 #if !defined HAVE_GETADDRINFO
 # error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
@@ -150,13 +150,6 @@ __linger_sock(int sock)
 static int
 __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *r)
 {
-	int lop = 0;
-	int ttl = UDP_MULTICAST_TTL;
-
-	/* turn into a mcast sock and set a TTL */
-	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &lop, sizeof(lop));
-	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
-
 	/* set up the multicast group and join it */
 	inet_pton(AF_INET6, addr, &r->ipv6mr_multiaddr.s6_addr);
 	r->ipv6mr_interface = 0;
@@ -216,13 +209,8 @@ mcast6_listener_init(int s, short unsigned int port)
 	/* allow many many many servers on that port */
 	__reuse_sock(s);
 
-#if defined IPV6_MULTICAST_LOOP
-	/* don't loop */
-	opt = 0;
-	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &opt, sizeof(opt));
-#else  /* !IPV6_MULTICAST_LOOP */
-# warning multicast looping cannot be turned off
-#endif	/* IPV6_MULTICAST_LOOP */
+	/* turn multicast looping on */
+	ud_mcast_loop(s, 1);
 #if defined IPV6_V6ONLY
 	opt = 1;
 	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &retval, sizeof(retval));
@@ -242,6 +230,11 @@ mcast6_listener_init(int s, short unsigned int port)
 	opt = 1;
 	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU, &opt, sizeof(opt));
 #endif
+#if defined IPV6_MULTICAST_HOPS
+	opt = UDP_MULTICAST_TTL;
+	/* turn into a mcast sock and set a TTL */
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &opt, sizeof(opt));
+#endif	/* IPV6_MULTICAST_HOPS */
 
 	/* we used to retry upon failure, but who cares */
 	if ((retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6))) < 0) {
@@ -298,6 +291,18 @@ ud_mcast_fini(int sock)
 	shutdown(sock, SHUT_RDWR);
 	close(sock);
 	return;
+}
+
+int
+ud_mcast_loop(int s, int on)
+{
+#if defined IPV6_MULTICAST_LOOP
+	/* don't loop */
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &on, sizeof(on));
+#else  /* !IPV6_MULTICAST_LOOP */
+# warning multicast looping cannot be turned on or off
+#endif	/* IPV6_MULTICAST_LOOP */
+	return on;
 }
 
 int

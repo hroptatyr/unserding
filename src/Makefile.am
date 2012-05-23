@@ -94,7 +94,6 @@ unsermon_SOURCES += wpool.h wpool.c fsarrqueue.h
 unsermon_SOURCES += jpool.h jpool.c
 unsermon_SOURCES += protocore.c protocore.h protocore-private.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
-unsermon_CPPFLAGS += $(LIBEV_CFLAGS)
 unsermon_CPPFLAGS += $(uterus_CFLAGS)
 unsermon_LDFLAGS = $(AM_LDFLAGS)
 unsermon_LDFLAGS += $(LIBEV_LIBS)

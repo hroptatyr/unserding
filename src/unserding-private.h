@@ -57,14 +57,6 @@
 # include <unistd.h>
 #endif
 
-#if defined HAVE_EV_H
-# include <ev.h>
-# undef EV_P
-# define EV_P	struct ev_loop *loop __attribute__((unused))
-#else  /* !HAVE_EV_H */
-# error "We need an event loop, give us one."
-#endif	/* HAVE_EV_H */
-
 #include "unserding.h"
 #include "protocore.h"
 #include "wpool.h"
@@ -146,8 +138,10 @@ extern bool cli_waiting_p;
 #endif	/* UNSERCLI */
 
 /* even more socket goodness, defined in tcp-unix.c */
+#if defined EV_P
 extern int ud_attach_tcp_unix(EV_P_ bool prefer_ipv6_p);
 extern int ud_detach_tcp_unix(EV_P);
+#endif	/* EV_P */
 
 /* more mainloop magic */
 extern void

@@ -49,7 +49,11 @@
 #include <arpa/inet.h>
 #include <errno.h>
 /* we just need the headers hereof and hope that unserding used the same ones */
-#include <ev.h>
+#if defined HAVE_EV_H
+# include <ev.h>
+# undef EV_P
+# define EV_P  struct ev_loop *loop __attribute__((unused))
+#endif	/* HAVE_EV_H */
 #include "unserding-private.h"
 #include "unserding-nifty.h"
 #include "unserding-dbg.h"

@@ -72,6 +72,11 @@
 #if defined HAVE_FCNTL_H
 # include <fcntl.h>
 #endif
+#if defined HAVE_EV_H
+# include <ev.h>
+# undef EV_P
+# define EV_P  struct ev_loop *loop __attribute__((unused))
+#endif	/* HAVE_EV_H */
 
 #define USE_LUA
 /* our master include file */

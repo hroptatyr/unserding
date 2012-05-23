@@ -495,7 +495,6 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 	return;
 }
 
-
 static void
 triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
 {

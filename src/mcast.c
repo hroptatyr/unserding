@@ -150,12 +150,11 @@ __linger_sock(int sock)
 static int
 __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *r)
 {
-	int opt = 0;
+	int lop = 0;
 	int ttl = UDP_MULTICAST_TTL;
 
 	/* turn into a mcast sock and set a TTL */
-	opt = 0;
-	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &opt, sizeof(opt));
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &lop, sizeof(lop));
 	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &ttl, sizeof(ttl));
 
 	/* set up the multicast group and join it */

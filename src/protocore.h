@@ -48,6 +48,10 @@
 extern "C" {
 #endif /* __cplusplus */
 
+#if !defined UNLIKELY
+# define UNLIKELY(_x)	__builtin_expect(!!(_x), 0)
+#endif	/* !UNLIKELY */
+
 /***
  * The unserding protocol in detail:
  *
@@ -130,8 +134,21 @@ udpc_pkt_set_flags(ud_packet_t pkt, uint16_t flags)
 static inline bool
 udpc_pkt_valid_p(const ud_packet_t pkt)
 {
-	/* be trivial for now */
-	return pkt.plen > 0;
+	if (UNLIKELY(pkt.plen < UDPC_HDRLEN)) {
+		return false;
+	}
+
+	switch (udpc_pkt_flags(pkt)) {
+	case UDPC_PKTFLO_NOW_ONE:
+	case UDPC_PKTFLO_NOW_MANY:
+	case UDPC_PKTFLO_SOON_ONE:
+	case UDPC_PKTFLO_SOON_MANY:
+		break;
+	default:
+		return false;
+	}
+	/* be positive */
+	return true;
 }
 
 static inline udpc_pktstorminess_t

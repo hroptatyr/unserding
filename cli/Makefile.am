@@ -67,8 +67,18 @@ strat_example_LDFLAGS += $(uterus_LIBS)
 strat_example_LDFLAGS += $(LIBEV_LIBS)
 strat_example_LDADD = $(UD_LIBS) $(UD_LDXFLAGS)
 endif  ## HAVE_UTERUS
+
+bin_PROGRAMS += ud-meta
+ud_meta_clo = ud-meta-clo.c ud-meta-clo.h
+ud_meta_SOURCES = ud-meta.c
+ud_meta_CPPFLAGS = $(AM_CPPFLAGS)
+ud_meta_CPPFLAGS += $(uterus_CFLAGS)
+ud_meta_LDFLAGS = -static
+ud_meta_LDFLAGS += $(uterus_LIBS)
+ud_meta_LDADD = $(UD_LIBS) $(UD_LDXFLAGS)
 endif  ## BUILD_CLIAPPS
 BUILT_SOURCES += $(ud_xmit_clo)
+BUILT_SOURCES += $(ud_meta_clo)
 BUILT_SOURCES += $(umod_example_clo)
 BUILT_SOURCES += $(strat_example_clo)
 

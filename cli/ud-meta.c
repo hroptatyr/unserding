@@ -52,6 +52,9 @@
 # define META_DEBUG(args...)
 # define META_STUP(arg)
 #endif	/* DEBUG_FLAG */
+#if !defined UNUSED
+# define UNUSED(_x)	__attribute__((unused)) _x
+#endif	/* !UNUSED */
 
 #define UD_CMD_QMETA	(0x7572)
 
@@ -82,6 +85,36 @@ error(int eno, const char *fmt, ...)
 }
 
 static void
+prnt(const struct meta_s *UNUSED(ctx), ud_packet_t pkt)
+{
+	struct udpc_seria_s ser[1];
+
+	/* reply packet should look like UI16, STR */
+	udpc_seria_init(ser, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
+	while (1) {
+		switch (udpc_seria_tag(ser)) {
+			uint16_t idx;
+		case UDPC_TYPE_UI16:
+			idx = udpc_seria_des_ui16(ser);
+			continue;
+		case UDPC_TYPE_STR: {
+			const char *str;
+			size_t len;
+			len = udpc_seria_des_str(ser, &str);
+			fprintf(stdout, "%hu\t", idx);
+			fwrite(str, sizeof(*str), len, stdout);
+			fputc('\n', stdout);
+			break;
+		}
+		default:
+			goto out;
+		}
+	}
+out:
+	return;
+}
+
+static void
 wait(const struct meta_s *ctx)
 {
 	struct epoll_event ev[1];
@@ -98,7 +131,7 @@ wait(const struct meta_s *ctx)
 
 		if (udpc_pkt_valid_p(pkt) &&
 		    udpc_pkt_cmd(pkt) == UDPC_PKT_RPL(UD_CMD_QMETA)) {
-			META_DEBUG("YAY\n");
+			prnt(ctx, pkt);
 		}
 	}
 	return;

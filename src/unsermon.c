@@ -345,22 +345,22 @@ mon_pkt_cb(job_t j)
 			*p++ = '\n';
 			*p = '\0';
 		}
-		fputs(buf, logout);
+		fputs(buf, monout);
 #else  /* HAVE_UTERUS */
-		fputs("UTE/le message, no decoding support\n", logout);
+		fputs("UTE/le message, no decoding support\n", monout);
 #endif	/* HAVE_UTERUS */
 		break;
 	}
 	case 0x5554:
 	case 0x5555:
-		fputs("UTE/be message, no decoding support\n", logout);
+		fputs("UTE/be message, no decoding support\n", monout);
 		break;
 	default:
 		if ((psz = ud_sprint_pkt_pretty(buf, JOB_PACKET(j)))) {
 			buf[psz] = '\0';
-			fputs(buf, logout);
+			fputs(buf, monout);
 		} else {
-			fputs("NAUGHT message\n", logout);
+			fputs("NAUGHT message\n", monout);
 		}
 		break;
 	}
@@ -490,6 +490,7 @@ main(int argc, char *argv[])
 	/* whither to log */
 	logout = stderr;
 	monout = stdout;
+	ud_openlog();
 	/* wipe stack pollution */
 	memset(&__ctx, 0, sizeof(__ctx));
 
@@ -569,6 +570,7 @@ main(int argc, char *argv[])
 	fflush(logout);
 	fclose(monout);
 	fclose(logout);
+	ud_closelog();
 	/* unloop was called, so exit */
 	return 0;
 }

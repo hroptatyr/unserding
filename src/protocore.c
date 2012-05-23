@@ -377,17 +377,7 @@ ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt)
 	uint8_t tag;
 
 	/* some checks beforehand */
-	if (pkt.plen < UDPC_HDRLEN) {
-		return 0;
-	}
-
-	switch (udpc_pkt_flags(pkt)) {
-	case UDPC_PKTFLO_NOW_ONE:
-	case UDPC_PKTFLO_NOW_MANY:
-	case UDPC_PKTFLO_SOON_ONE:
-	case UDPC_PKTFLO_SOON_MANY:
-		break;
-	default:
+	if (UNLIKELY(!udpc_pkt_valid_p(pkt))) {
 		return 0;
 	}
 

@@ -151,7 +151,7 @@ static int
 __mcast6_join_group(int s, const char *addr, struct ipv6_mreq *r)
 {
 	int opt = 0;
-	unsigned char ttl = UDP_MULTICAST_TTL;
+	int ttl = UDP_MULTICAST_TTL;
 
 	/* turn into a mcast sock and set a TTL */
 	opt = 0;
@@ -245,10 +245,8 @@ mcast6_listener_init(int s, short unsigned int port)
 #endif
 
 	/* we used to retry upon failure, but who cares */
-	retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6));
-
-	if (retval == -1) {
-		UD_DEBUG_MCAST("bind() failed %d %d\n", errno, EINVAL);
+	if ((retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6))) < 0) {
+		UD_DEBUG_MCAST("bind() failed\n");
 		return -1;
 	}
 

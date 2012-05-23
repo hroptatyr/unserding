@@ -130,6 +130,14 @@ udpc_seria_add_scom(udpc_seria_t sctx, scom_t s, size_t len)
 	return;
 }
 
+static useconds_t
+tv_diff(struct timeval *t1, struct timeval *t2)
+{
+	useconds_t res = (t2->tv_sec - t1->tv_sec) * 1000000;
+	res += (t2->tv_usec - t1->tv_usec);
+	return res;
+}
+
 static void
 party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
 {
@@ -189,13 +197,21 @@ static void
 party(const struct xmit_s *ctx, useconds_t tm)
 {
 	struct epoll_event ev[1];
+	struct timeval tv[2];
+	int mil = tm / 1000;
+	int mic = tm % 1000;
 
-	while (epoll_wait(ctx->epfd, ev, 1, 0) > 0) {
+	gettimeofday(tv + 0, NULL);
+	while (epoll_wait(ctx->epfd, ev, 1, mil) > 0) {
 		char inq[UDPC_PKTLEN];
 		ssize_t nrd;
+		useconds_t elps;
 
 		/* otherwise be nosey and look at the packet */
-		if ((nrd = read(ev->data.fd, inq, sizeof(inq))) <= 0) {
+		if ((ev->events & EPOLLIN) == 0) {
+			/* must be HUP or ERR, don't bother reading it */
+			;
+		} else if ((nrd = read(ev->data.fd, inq, sizeof(inq))) <= 0) {
 			;
 		} else if (!udpc_pkt_valid_p((ud_packet_t){nrd, inq})) {
 			;
@@ -206,8 +222,19 @@ party(const struct xmit_s *ctx, useconds_t tm)
 			party_deser(ctx, (ud_packet_t){nrd, inq});
 			XMIT_STUP('\n');
 		}
+
+		/* check how long it took us */
+		gettimeofday(tv + 1, NULL);
+		elps = tv_diff(tv + 0, tv + 1);
+		if (tm > elps + 1000) {
+			mil = (tm - elps) / 1000 - 1;
+			mic = (tm - elps) % 1000;
+		} else if (tm > elps) {
+			mil = 0;
+			mic = (tm - elps);
+		}
 	}
-	usleep(tm);
+	usleep(mic);
 	return;
 }
 

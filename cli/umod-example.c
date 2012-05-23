@@ -57,6 +57,11 @@
 #if defined HAVE_ERRNO_H
 # include <errno.h>
 #endif
+#if defined HAVE_EV_H
+# include <ev.h>
+# undef EV_P
+# define EV_P  struct ev_loop *loop __attribute__((unused))
+#endif	/* HAVE_EV_H */
 
 /* our master include file */
 #include "unserding.h"

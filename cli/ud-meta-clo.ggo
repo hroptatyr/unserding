@@ -13,3 +13,6 @@ option "beef" -
 	"Multicast payload channel  (default determined by network)"
 	int optional
 
+option "timeout" -
+	"Wait at most N milliseconds"
+	int optional typestr="N" default="500"

@@ -209,7 +209,8 @@ mcast6_listener_init(int s, short unsigned int port)
 	/* allow many many many servers on that port */
 	__reuse_sock(s);
 
-	ud_mcast_loop(s, 0);
+	/* turn multicast looping on */
+	ud_mcast_loop(s, 1);
 #if defined IPV6_V6ONLY
 	opt = 1;
 	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &retval, sizeof(retval));

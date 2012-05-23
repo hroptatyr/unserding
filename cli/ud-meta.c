@@ -231,7 +231,7 @@ main(int argc, char *argv[])
 		goto out;
 	}
 	/* make me an argument */
-	ctx->timeo = 5000;
+	ctx->timeo = argi->timeout_arg;
 
 	/* obtain a new handle, somehow we need to use the port number innit? */
 	ctx->ud = ud_chan_init(argi->beef_given ? argi->beef_arg : 8584);

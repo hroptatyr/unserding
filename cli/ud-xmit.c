@@ -157,7 +157,7 @@ party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
 		switch (tag) {
 		case UDPC_TYPE_UI16: {
 			uint16_t idx = udpc_seria_des_ui16(ser);
-			const char *sym = ute_idx2sym(ctx->ute, idx);
+			const char *sym;
 
 			if ((sym = ute_idx2sym(ctx->ute, idx))) {
 				udpc_seria_add_ui16(ser + 1, idx);

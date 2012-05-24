@@ -238,17 +238,23 @@ main(int argc, char *argv[])
 	/* obtain a new handle, somehow we need to use the port number innit? */
 	ctx->ud = ud_chan_init(argi->beef_given ? argi->beef_arg : 8584);
 
-	/* also accept connections on that socket */
-	if ((ctx->mcfd = ud_chan_init_mcast(ctx->ud)) < 0) {
-		error(0, "cannot instantiate mcast for meta data queries");
-	} else if ((ctx->epfd = epoll_create(1)) < 0) {
-		error(0, "cannot instantiate epoll on ud-meta socket");
+	/* also accept connections on that socket and the mcast network */
+	if ((ctx->epfd = epoll_create(2)) < 0) {
+		error(0, "cannot instantiate epoll on ud-xmit socket");
 	} else {
 		struct epoll_event ev[1];
 
-		ev->events = EPOLLIN | EPOLLET;
-		ev->data.fd = ctx->mcfd;
-		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->mcfd, ev);
+		ev->events = EPOLLIN;
+		ev->data.fd = ctx->ud->sock;
+		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->ud->sock, ev);
+
+		if ((ctx->mcfd = ud_chan_init_mcast(ctx->ud)) < 0) {
+			error(0, "cannot instantiate mcast listener");
+		} else {
+			ev->events = EPOLLIN;
+			ev->data.fd = ctx->mcfd;
+			epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->mcfd, ev);
+		}
 	}
 
 	/* init the serialiser */

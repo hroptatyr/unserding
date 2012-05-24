@@ -334,6 +334,7 @@ work(const struct xmit_s *ctx)
 		ud_chan_send(ctx->ud, pkt);
 		XMIT_STUP('\n');
 	}
+#undef RESET_SER
 	return;
 }
 

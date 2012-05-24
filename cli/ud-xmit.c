@@ -73,6 +73,7 @@
 #endif	/* DEBUG_FLAG */
 
 #define UD_CMD_QMETA	(0x7572)
+#define PKT(x)		(ud_packet_t){sizeof(x), x}
 
 struct xmit_s {
 	ud_chan_t ud;
@@ -82,6 +83,13 @@ struct xmit_s {
 	int epfd;
 	int mcfd;
 };
+
+typedef struct ud_pktsa_s {
+	size_t plen;
+	char *pbuf;
+	ud_const_sockaddr_t sa;
+	socklen_t sz;
+} ud_pktsa_t;
 
 static jmp_buf jb;
 
@@ -139,7 +147,7 @@ tv_diff(struct timeval *t1, struct timeval *t2)
 }
 
 static void
-party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
+party_deser(const struct xmit_s *ctx, ud_pktsa_t pkt)
 {
 	struct udpc_seria_s ser[2];
 	char rpl[UDPC_PKTLEN];
@@ -147,50 +155,75 @@ party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
 
 	/* make a reply packet */
 	memcpy(rpl, pkt.pbuf, pkt.plen);
-	udpc_make_rpl_pkt((ud_packet_t){.pbuf = rpl, .plen = sizeof(rpl)});
+	udpc_make_rpl_pkt(PKT(rpl));
 
 	/* get the serialisers and deserialisers ready */
-	udpc_seria_init(ser, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	udpc_seria_init(ser + 1, UDPC_PAYLOAD(rpl), UDPC_PAYLLEN(sizeof(rpl)));
+#define MAKE_PKT							\
+	udpc_seria_init(ser, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen)); \
+	udpc_seria_init(ser + 1, UDPC_PAYLOAD(rpl), UDPC_PAYLLEN(sizeof(rpl)))
+#define SEND_PKT							\
+	if (udpc_seria_msglen(ser + 1)) {				\
+		const int fd = ctx->ud->sock;				\
+		size_t rpllen = udpc_seria_msglen(ser + 1) + UDPC_HDRLEN; \
+		sendto(fd, rpl, rpllen, 0, &pkt.sa->sa, pkt.sz);	\
+	}
 
+	MAKE_PKT;
 	for (uint8_t tag; (tag = udpc_seria_tag(ser)); ) {
+		size_t msglen = udpc_seria_msglen(ser + 1);
+
 		switch (tag) {
-		case UDPC_TYPE_UI16: {
-			uint16_t idx = udpc_seria_des_ui16(ser);
-			const char *sym = ute_idx2sym(ctx->ute, idx);
+			const char *sym;
+			size_t len;
+			uint16_t idx;
+
+		case UDPC_TYPE_UI16:
+			idx = udpc_seria_des_ui16(ser);
 
 			if ((sym = ute_idx2sym(ctx->ute, idx))) {
-				udpc_seria_add_ui16(ser + 1, idx);
-				udpc_seria_add_str(ser + 1, sym, strlen(sym));
-				XMIT_STUP('!');
+				len = strlen(sym);
+				goto ser;
 			}
 			break;
-		}
-		case UDPC_TYPE_STR: {
-			char sym[64];
-			uint16_t idx;
-			size_t len;
 
-			len = udpc_seria_des_str_into(sym, sizeof(sym), ser);
-			if ((idx = ute_sym2idx(ctx->ute, sym)) <= nsyms) {
-				udpc_seria_add_ui16(ser + 1, idx);
-				udpc_seria_add_str(ser + 1, sym, len);
-				XMIT_STUP('!');
+		case UDPC_TYPE_STR: {
+			char __s[64];
+
+			len = udpc_seria_des_str_into(__s, sizeof(__s), ser);
+			if ((idx = ute_sym2idx(ctx->ute, __s)) <= nsyms) {
+				sym = __s;
+				goto ser;
 			}
 			break;
+
 		}
+		ser:
+			if (idx && sym && msglen + len + 2 + 4 > UDPC_PLLEN) {
+				/* need to send the former off */
+				SEND_PKT;
+				/* and make a new packet */
+				MAKE_PKT;
+			}
+			/* add what we've got */
+			udpc_seria_add_ui16(ser + 1, idx);
+			udpc_seria_add_str(ser + 1, sym, len);
+			XMIT_STUP('!');
+
 		default:
 			break;
 		}
 	}
-	if (udpc_seria_msglen(ser + 1)) {
-		ud_packet_t rplpkt = {
-			.pbuf = rpl,
-			.plen = udpc_seria_msglen(ser + 1) + UDPC_HDRLEN,
-		};
-		ud_chan_send(ctx->ud, rplpkt);
-	}
+	SEND_PKT;
+
+#undef MAKE_PKT
+#undef SEND_PKT
 	return;
+}
+
+static int
+__qmetap(ud_packet_t pkt)
+{
+	return udpc_pkt_cmd(pkt) == UD_CMD_QMETA;
 }
 
 static void
@@ -204,6 +237,8 @@ party(const struct xmit_s *ctx, useconds_t tm)
 	gettimeofday(tv + 0, NULL);
 	while (epoll_wait(ctx->epfd, ev, 1, mil) > 0) {
 		char inq[UDPC_PKTLEN];
+		union ud_sockaddr_u sa;
+		socklen_t salen = sizeof(sa);
 		ssize_t nrd;
 		useconds_t elps;
 
@@ -211,15 +246,17 @@ party(const struct xmit_s *ctx, useconds_t tm)
 		if ((ev->events & EPOLLIN) == 0) {
 			/* must be HUP or ERR, don't bother reading it */
 			;
-		} else if ((nrd = read(ev->data.fd, inq, sizeof(inq))) <= 0) {
+		} else if ((nrd = recvfrom(
+				    ev->data.fd, inq, sizeof(inq),
+				    0, &sa.sa, &salen)) <= 0) {
 			;
 		} else if (!udpc_pkt_valid_p((ud_packet_t){nrd, inq})) {
 			;
-		} else if (udpc_pkt_cmd((ud_packet_t){nrd, inq}) != UD_CMD_QMETA) {
+		} else if (!__qmetap((ud_packet_t){nrd, inq})) {
 			;
 		} else {
 			XMIT_STUP('?');
-			party_deser(ctx, (ud_packet_t){nrd, inq});
+			party_deser(ctx, (ud_pktsa_t){nrd, inq, &sa, salen});
 			XMIT_STUP('\n');
 		}
 
@@ -327,7 +364,59 @@ work(const struct xmit_s *ctx)
 		ud_chan_send(ctx->ud, pkt);
 		XMIT_STUP('\n');
 	}
+#undef RESET_SER
 	return;
+}
+
+static int
+pre_work(const struct xmit_s *ctx)
+{
+/* convenience has us shouting out all the symbols (along with their
+ * indices) in advance so that logging monitors actually know what
+ * we're on about */
+	struct udpc_seria_s ser[1];
+	static char buf[UDPC_PKTLEN];
+	size_t nsyms = ute_nsyms(ctx->ute);
+
+#define MAKE_PKT							\
+	udpc_make_pkt(PKT(buf), -1, pno++, UDPC_PKT_RPL(UD_CMD_QMETA));	\
+	udpc_seria_init(ser, UDPC_PAYLOAD(buf), UDPC_PAYLLEN(sizeof(buf)))
+#define SEND_PKT				\
+	if (udpc_seria_msglen(ser)) {					\
+		ud_packet_t p = {UDPC_HDRLEN + udpc_seria_msglen(ser), buf}; \
+		ud_chan_send(ctx->ud, p);				\
+	}
+
+	MAKE_PKT;
+	for (size_t i = 1; i <= nsyms; i++) {
+		const char *sym;
+		size_t len;
+
+		if ((sym = ute_idx2sym(ctx->ute, i)) &&
+		    (len = strlen(sym),
+		     udpc_seria_msglen(ser) + len + 2 + 4 > UDPC_PLLEN)) {
+			/* send the old guy off */
+			SEND_PKT;
+			/* and init the new guy */
+			MAKE_PKT;
+		}
+		if (sym) {
+			udpc_seria_add_ui16(ser, i);
+			udpc_seria_add_str(ser, sym, len);
+		}
+	}
+	/* and send the remains now */
+	SEND_PKT;
+
+#undef SEND_PKT
+#undef MAKE_PKT
+	return 0;
+}
+
+static int
+post_work(const struct xmit_s *UNUSED(ctx))
+{
+	return 0;
 }
 
 static int
@@ -413,9 +502,15 @@ main(int argc, char *argv[])
 	case 0:
 		ctx->speed = argi->speed_arg;
 		ctx->restampp = argi->restamp_given;
-		work(ctx);
+		if (pre_work(ctx) == 0) {
+			/* do the actual work */
+			work(ctx);
+		}
 	case SIGINT:
 	default:
+		if (post_work(ctx) < 0) {
+			res = 1;
+		}
 		printf("sent %zu ticks in %u packets\n", nt, pno);
 		break;	
 	}

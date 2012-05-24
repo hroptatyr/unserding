@@ -73,6 +73,7 @@
 #endif	/* DEBUG_FLAG */
 
 #define UD_CMD_QMETA	(0x7572)
+#define PKT(x)		(ud_packet_t){sizeof(x), x}
 
 struct xmit_s {
 	ud_chan_t ud;
@@ -147,7 +148,7 @@ party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
 
 	/* make a reply packet */
 	memcpy(rpl, pkt.pbuf, pkt.plen);
-	udpc_make_rpl_pkt((ud_packet_t){.pbuf = rpl, .plen = sizeof(rpl)});
+	udpc_make_rpl_pkt(PKT(rpl));
 
 	/* get the serialisers and deserialisers ready */
 	udpc_seria_init(ser, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));

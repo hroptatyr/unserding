@@ -312,6 +312,8 @@ mc6_socket(void)
 		setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes));
 	}
 #endif	/* IPV6_V6ONLY */
+	/* be less blocking */
+	setsock_nonblock(s);
 	return s;
 
 #else  /* !IPPROTO_IPV6 */
@@ -403,7 +405,6 @@ ud_chan_init(short unsigned int port)
 
 	res = calloc(1, sizeof(*res));
 	if ((res->sock = mc6_socket()) > 0) {
-		setsock_nonblock(res->sock);
 		ud_chan_set_svc(res);
 		ud_chan_set_port(res, port);
 	}

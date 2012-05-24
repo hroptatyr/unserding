@@ -298,7 +298,6 @@ mc6_socket(void)
 {
 #if defined IPPROTO_IPV6
 	volatile int s;
-	int opt = 0;
 
 	/* try v6 first */
 	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {

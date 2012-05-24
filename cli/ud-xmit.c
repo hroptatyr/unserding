@@ -170,31 +170,45 @@ party_deser(const struct xmit_s *ctx, ud_pktsa_t pkt)
 
 	MAKE_PKT;
 	for (uint8_t tag; (tag = udpc_seria_tag(ser)); ) {
+		size_t msglen = udpc_seria_msglen(ser + 1);
+
 		switch (tag) {
-		case UDPC_TYPE_UI16: {
-			uint16_t idx = udpc_seria_des_ui16(ser);
 			const char *sym;
+			size_t len;
+			uint16_t idx;
+
+		case UDPC_TYPE_UI16:
+			idx = udpc_seria_des_ui16(ser);
 
 			if ((sym = ute_idx2sym(ctx->ute, idx))) {
-				udpc_seria_add_ui16(ser + 1, idx);
-				udpc_seria_add_str(ser + 1, sym, strlen(sym));
-				XMIT_STUP('!');
+				len = strlen(sym);
+				goto ser;
 			}
 			break;
-		}
-		case UDPC_TYPE_STR: {
-			char sym[64];
-			uint16_t idx;
-			size_t len;
 
-			len = udpc_seria_des_str_into(sym, sizeof(sym), ser);
-			if ((idx = ute_sym2idx(ctx->ute, sym)) <= nsyms) {
-				udpc_seria_add_ui16(ser + 1, idx);
-				udpc_seria_add_str(ser + 1, sym, len);
-				XMIT_STUP('!');
+		case UDPC_TYPE_STR: {
+			char __s[64];
+
+			len = udpc_seria_des_str_into(__s, sizeof(__s), ser);
+			if ((idx = ute_sym2idx(ctx->ute, __s)) <= nsyms) {
+				sym = __s;
+				goto ser;
 			}
 			break;
+
 		}
+		ser:
+			if (idx && sym && msglen + len + 2 + 4 > UDPC_PLLEN) {
+				/* need to send the former off */
+				SEND_PKT;
+				/* and make a new packet */
+				MAKE_PKT;
+			}
+			/* add what we've got */
+			udpc_seria_add_ui16(ser + 1, idx);
+			udpc_seria_add_str(ser + 1, sym, len);
+			XMIT_STUP('!');
+
 		default:
 			break;
 		}

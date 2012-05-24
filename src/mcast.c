@@ -268,6 +268,92 @@ mcast_listener_deinit(int sock)
 	return;
 }
 
+static inline void
+ud_sockaddr_set_port(ud_sockaddr_t sa, uint16_t port)
+{
+	sa->sa6.sin6_port = htons(port);
+	return;
+}
+
+
+static inline void
+ud_chan_set_port(struct ud_chan_s *c, uint16_t port)
+{
+	ud_sockaddr_set_port(&c->sa, port);
+	return;
+}
+
+static inline void
+ud_chan_set_svc(struct ud_chan_s *c)
+{
+	c->sa.sa6.sin6_family = AF_INET6;
+	/* we pick link-local here for simplicity */
+	inet_pton(AF_INET6, UD_MCAST6_LINK_LOCAL, &c->sa.sa6.sin6_addr);
+	/* set the flowinfo */
+	c->sa.sa6.sin6_flowinfo = 0;
+	return;
+}
+
+static void
+fiddle_with_mtu(int __attribute__((unused)) s)
+{
+#if defined IPV6_PATHMTU
+	struct ip6_mtuinfo mtui;
+	socklen_t mtuilen = sizeof(mtui);
+#endif	/* IPV6_PATHMTU */
+
+#if defined IPV6_USE_MIN_MTU
+	/* use minimal mtu */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU, &opt, sizeof(opt));
+#endif
+#if defined IPV6_DONTFRAG
+	/* rather drop a packet than to fragment it */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_DONTFRAG, &opt, sizeof(opt));
+#endif
+#if defined IPV6_RECVPATHMTU
+	/* obtain path mtu to send maximum non-fragmented packet */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU, &opt, sizeof(opt));
+#endif
+#if defined IPV6_PATHMTU
+	/* obtain current pmtu */
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_PATHMTU, &mtui, &mtuilen) < 0) {
+		perror("could not obtain pmtu");
+	} else {
+		fprintf(stderr, "pmtu is %d\n", mtui.ip6m_mtu);
+	}
+#endif
+	return;
+}
+
+static int
+mcast6_init(void)
+{
+#if defined IPPROTO_IPV6
+	volatile int s;
+	int opt = 0;
+
+	/* try v6 first */
+	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
+		return -1;
+	}
+
+#if defined IPV6_V6ONLY
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
+#endif	/* IPV6_V6ONLY */
+
+	fiddle_with_mtu(s);
+	return s;
+
+#else  /* !IPPROTO_IPV6 */
+out:
+	return -1;
+#endif	/* IPPROTO_IPV6 */
+}
+
 
 /* public raw mcast socks */
 int
@@ -305,21 +391,79 @@ ud_mcast_loop(int s, int on)
 	return on;
 }
 
+
+/* chan stuff */
 int
 ud_chan_init_mcast(ud_chan_t c)
 {
+	/* we need a modifiable object */
+	union {
+		ud_chan_t c;
+		struct ud_chan_s *p;
+	} u = {c};
 	short unsigned int port = ud_sockaddr_port(&c->sa);
+	volatile int s;
 
-	if (mcast6_listener_init(c->sock, port) < 0) {
+	if (UNLIKELY((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)) {
+		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
+	} else if (mcast6_listener_init(s, port) < 0) {
 		return -1;
 	}
-	return c->sock;
+	return u.p->mcfd = s;
 }
 
 void
 ud_chan_fini_mcast(ud_chan_t c)
 {
-	mcast_listener_deinit(c->sock);
+	/* we need a modifiable object */
+	union {
+		ud_chan_t c;
+		struct ud_chan_s *p;
+	} u = {c};
+
+	if (c->mcfd > 0) {
+		mcast_listener_deinit(c->sock);
+		close(c->mcfd);
+		u.p->mcfd = -1;
+	}
+	return;
+}
+
+ud_chan_t
+ud_chan_init(short unsigned int port)
+{
+	struct ud_chan_s *res;
+
+	res = calloc(1, sizeof(*res));
+	if ((res->sock = mcast6_init()) > 0) {
+		setsock_nonblock(res->sock);
+		ud_chan_set_svc(res);
+		ud_chan_set_port(res, port);
+	}
+	return res;
+}
+
+void
+ud_chan_fini(ud_chan_t c)
+{
+	/* we need a modifiable object */
+	union {
+		ud_chan_t c;
+		struct ud_chan_s *p;
+	} u = {c};
+
+	/* and kick the socket */
+	if (c->mcfd > 0) {
+		/* kick multicast listener */
+		close(c->mcfd);
+		u.p->mcfd = -1;
+	}
+	if (c->sock > 0) {
+		/* kick channel socket */
+		close(c->sock);
+		u.p->sock = -1;
+	}
+	free(u.p);
 	return;
 }
 

@@ -400,27 +400,4 @@ free_unserding_handle(ud_handle_t hdl)
 	return;
 }
 
-/* lower level connection */
-ud_chan_t
-ud_chan_init(short unsigned int port)
-{
-	struct ud_chan_s *res;
-
-	res = calloc(1, sizeof(*res));
-	(void)mcast6_init(res);
-	setsock_nonblock(res->sock);
-	ud_chan_set_port(res, port);
-	return res;
-}
-
-void
-ud_chan_fini(ud_chan_t c)
-{
-	/* and kick the socket */
-	shutdown(c->sock, SHUT_RDWR);
-	close(c->sock);
-	free((struct ud_chan_s*)c);
-	return;
-}
-
 /* libstuff.c ends here */

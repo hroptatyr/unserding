@@ -407,6 +407,7 @@ ud_chan_init_mcast(ud_chan_t c)
 	if (UNLIKELY((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)) {
 		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
 	} else if (mcast6_listener_init(s, port) < 0) {
+		close(s);
 		return -1;
 	}
 	return u.p->mcfd = s;

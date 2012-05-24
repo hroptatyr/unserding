@@ -199,12 +199,11 @@ mcast6_listener_init(int s, short unsigned int port)
 #if defined IPPROTO_IPV6
 	int retval;
 	int opt;
-	ud_sockaddr_u __sa6 = {
-		.sa6.sin6_addr = IN6ADDR_ANY_INIT
+	union ud_sockaddr_u sa = {
+		.sa6.sin6_family = AF_INET6,
+		.sa6.sin6_addr = IN6ADDR_ANY_INIT,
+		.sa6.sin6_port = htons(port),
 	};
-
-	__sa6.sa6.sin6_family = AF_INET6;
-	__sa6.sa6.sin6_port = htons(port);
 
 	/* allow many many many servers on that port */
 	__reuse_sock(s);
@@ -237,7 +236,7 @@ mcast6_listener_init(int s, short unsigned int port)
 #endif	/* IPV6_MULTICAST_HOPS */
 
 	/* we used to retry upon failure, but who cares */
-	if ((retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6))) < 0) {
+	if ((retval = bind(s, &sa.sa, sizeof(sa))) < 0) {
 		UD_DEBUG_MCAST("bind() failed\n");
 		return -1;
 	}
@@ -268,6 +267,59 @@ mcast_listener_deinit(int sock)
 	return;
 }
 
+static inline void
+ud_sockaddr_set_port(ud_sockaddr_t sa, uint16_t port)
+{
+	sa->sa6.sin6_port = htons(port);
+	return;
+}
+
+
+static inline void
+ud_chan_set_port(struct ud_chan_s *c, uint16_t port)
+{
+	ud_sockaddr_set_port(&c->sa, port);
+	return;
+}
+
+static inline void
+ud_chan_set_svc(struct ud_chan_s *c)
+{
+	c->sa.sa6.sin6_family = AF_INET6;
+	/* we pick link-local here for simplicity */
+	inet_pton(AF_INET6, UD_MCAST6_LINK_LOCAL, &c->sa.sa6.sin6_addr);
+	/* set the flowinfo */
+	c->sa.sa6.sin6_flowinfo = 0;
+	return;
+}
+
+static int
+mc6_socket(void)
+{
+#if defined IPPROTO_IPV6
+	volatile int s;
+
+	/* try v6 first */
+	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
+		return -1;
+	}
+
+#if defined IPV6_V6ONLY
+	{
+		int yes = 1;
+		setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes));
+	}
+#endif	/* IPV6_V6ONLY */
+	/* be less blocking */
+	setsock_nonblock(s);
+	return s;
+
+#else  /* !IPPROTO_IPV6 */
+out:
+	return -1;
+#endif	/* IPPROTO_IPV6 */
+}
+
 
 /* public raw mcast socks */
 int
@@ -275,7 +327,7 @@ ud_mcast_init(short unsigned int port)
 {
 	volatile int s;
 
-	if (UNLIKELY((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)) {
+	if (UNLIKELY((s = mc6_socket()) < 0)) {
 		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
 	} else if (mcast6_listener_init(s, port) < 0) {
 		close(s);
@@ -305,22 +357,97 @@ ud_mcast_loop(int s, int on)
 	return on;
 }
 
+
+/* chan stuff */
 int
 ud_chan_init_mcast(ud_chan_t c)
 {
+	/* we need a modifiable object */
+	union {
+		ud_chan_t c;
+		struct ud_chan_s *p;
+	} u = {c};
 	short unsigned int port = ud_sockaddr_port(&c->sa);
+	volatile int s;
 
-	if (mcast6_listener_init(c->sock, port) < 0) {
+	if (UNLIKELY((s = mc6_socket()) < 0)) {
+		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
+	} else if (mcast6_listener_init(s, port) < 0) {
+		close(s);
 		return -1;
 	}
-	return c->sock;
+	return u.p->mcfd = s;
 }
 
 void
 ud_chan_fini_mcast(ud_chan_t c)
 {
-	mcast_listener_deinit(c->sock);
+	/* we need a modifiable object */
+	union {
+		ud_chan_t c;
+		struct ud_chan_s *p;
+	} u = {c};
+
+	if (c->mcfd > 0) {
+		mcast_listener_deinit(c->sock);
+		close(c->mcfd);
+		u.p->mcfd = -1;
+	}
 	return;
+}
+
+ud_chan_t
+ud_chan_init(short unsigned int port)
+{
+	struct ud_chan_s *res;
+
+	res = calloc(1, sizeof(*res));
+	if ((res->sock = mc6_socket()) > 0) {
+		union ud_sockaddr_u sa = {
+			.sa6.sin6_family = AF_INET6,
+			.sa6.sin6_addr = IN6ADDR_ANY_INIT,
+			.sa6.sin6_port = 0,
+		};
+
+		/* as a courtesy to tools bind the channel */
+		bind(res->sock, &sa.sa, sizeof(sa));
+
+		/* set destination and port */
+		ud_chan_set_svc(res);
+		ud_chan_set_port(res, port);
+	}
+	return res;
+}
+
+void
+ud_chan_fini(ud_chan_t c)
+{
+	/* we need a modifiable object */
+	union {
+		ud_chan_t c;
+		struct ud_chan_s *p;
+	} u = {c};
+
+	/* and kick the socket */
+	if (c->mcfd > 0) {
+		/* kick multicast listener */
+		close(c->mcfd);
+		u.p->mcfd = -1;
+	}
+	if (c->sock > 0) {
+		/* kick channel socket */
+		close(c->sock);
+		u.p->sock = -1;
+	}
+	free(u.p);
+	return;
+}
+
+ssize_t
+ud_chan_send(ud_chan_t c, ud_packet_t pkt)
+{
+	/* always send to the mcast addresses */
+	return sendto(c->sock, pkt.pbuf, pkt.plen, 0, &c->sa.sa, sizeof(c->sa));
 }
 
 /* mcast.c ends here */

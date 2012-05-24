@@ -199,12 +199,11 @@ mcast6_listener_init(int s, short unsigned int port)
 #if defined IPPROTO_IPV6
 	int retval;
 	int opt;
-	ud_sockaddr_u __sa6 = {
-		.sa6.sin6_addr = IN6ADDR_ANY_INIT
+	union ud_sockaddr_u sa = {
+		.sa6.sin6_family = AF_INET6,
+		.sa6.sin6_addr = IN6ADDR_ANY_INIT,
+		.sa6.sin6_port = htons(port),
 	};
-
-	__sa6.sa6.sin6_family = AF_INET6;
-	__sa6.sa6.sin6_port = htons(port);
 
 	/* allow many many many servers on that port */
 	__reuse_sock(s);
@@ -237,7 +236,7 @@ mcast6_listener_init(int s, short unsigned int port)
 #endif	/* IPV6_MULTICAST_HOPS */
 
 	/* we used to retry upon failure, but who cares */
-	if ((retval = bind(s, (struct sockaddr*)&__sa6, sizeof(__sa6))) < 0) {
+	if ((retval = bind(s, &sa.sa, sizeof(sa))) < 0) {
 		UD_DEBUG_MCAST("bind() failed\n");
 		return -1;
 	}
@@ -299,7 +298,6 @@ mc6_socket(void)
 {
 #if defined IPPROTO_IPV6
 	volatile int s;
-	int opt = 0;
 
 	/* try v6 first */
 	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
@@ -312,6 +310,8 @@ mc6_socket(void)
 		setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes));
 	}
 #endif	/* IPV6_V6ONLY */
+	/* be less blocking */
+	setsock_nonblock(s);
 	return s;
 
 #else  /* !IPPROTO_IPV6 */
@@ -403,7 +403,16 @@ ud_chan_init(short unsigned int port)
 
 	res = calloc(1, sizeof(*res));
 	if ((res->sock = mc6_socket()) > 0) {
-		setsock_nonblock(res->sock);
+		union ud_sockaddr_u sa = {
+			.sa6.sin6_family = AF_INET6,
+			.sa6.sin6_addr = IN6ADDR_ANY_INIT,
+			.sa6.sin6_port = 0,
+		};
+
+		/* as a courtesy to tools bind the channel */
+		bind(res->sock, &sa.sa, sizeof(sa));
+
+		/* set destination and port */
 		ud_chan_set_svc(res);
 		ud_chan_set_port(res, port);
 	}

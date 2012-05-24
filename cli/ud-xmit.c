@@ -419,15 +419,6 @@ post_work(const struct xmit_s *UNUSED(ctx))
 	return 0;
 }
 
-static int
-rebind_chan(ud_chan_t ch)
-{
-	union ud_sockaddr_u sa;
-	socklen_t len = sizeof(sa);
-	getsockname(ch->sock, &sa.sa, &len);
-	return bind(ch->sock, &sa.sa, sizeof(sa));
-}
-
 
 #if defined __INTEL_COMPILER
 # pragma warning (disable:593)
@@ -480,13 +471,9 @@ main(int argc, char *argv[])
 	} else {
 		struct epoll_event ev[1];
 
-		if (rebind_chan(ctx->ud) < 0) {
-			error(0, "cannot bind ud-xmit socket");
-		} else {
-			ev->events = EPOLLIN;
-			ev->data.fd = ctx->ud->sock;
-			epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->ud->sock, ev);
-		}
+		ev->events = EPOLLIN;
+		ev->data.fd = ctx->ud->sock;
+		epoll_ctl(ctx->epfd, EPOLL_CTL_ADD, ctx->ud->sock, ev);
 
 		if ((ctx->mcfd = ud_mcast_init(port)) < 0) {
 			error(0, "cannot instantiate mcast listener");

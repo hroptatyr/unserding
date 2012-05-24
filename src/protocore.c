@@ -384,7 +384,7 @@ ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt)
 	/* otherwise it seems to be a real packet */
 	udpc_seria_init(sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen - UDPC_HDRLEN);
 
-	while ((tag = udpc_seria_tag(sctx))) {
+	while (sctx->msgoff < pkt.plen && (tag = udpc_seria_tag(sctx))) {
 		res += __pretty_one(&buf[res], sctx, tag);
 	}
 	return res;

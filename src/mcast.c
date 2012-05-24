@@ -467,4 +467,11 @@ ud_chan_fini(ud_chan_t c)
 	return;
 }
 
+ssize_t
+ud_chan_send(ud_chan_t c, ud_packet_t pkt)
+{
+	/* always send to the mcast addresses */
+	return sendto(c->sock, pkt.pbuf, pkt.plen, 0, &c->sa.sa, sizeof(c->sa));
+}
+
 /* mcast.c ends here */

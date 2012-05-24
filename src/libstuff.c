@@ -250,13 +250,6 @@ ud_send_raw(ud_handle_t hdl, ud_packet_t pkt)
 }
 
 ssize_t
-ud_chan_send(ud_chan_t c, ud_packet_t pkt)
-{
-	/* always send to the mcast addresses */
-	return sendto(c->sock, pkt.pbuf, pkt.plen, 0, &c->sa.sa, sizeof(c->sa));
-}
-
-ssize_t
 ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 {
 	int s = ud_handle_sock(hdl);

@@ -294,40 +294,6 @@ ud_chan_set_svc(struct ud_chan_s *c)
 	return;
 }
 
-static void
-fiddle_with_mtu(int __attribute__((unused)) s)
-{
-#if defined IPV6_PATHMTU
-	struct ip6_mtuinfo mtui;
-	socklen_t mtuilen = sizeof(mtui);
-#endif	/* IPV6_PATHMTU */
-
-#if defined IPV6_USE_MIN_MTU
-	/* use minimal mtu */
-	opt = 1;
-	setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU, &opt, sizeof(opt));
-#endif
-#if defined IPV6_DONTFRAG
-	/* rather drop a packet than to fragment it */
-	opt = 1;
-	setsockopt(s, IPPROTO_IPV6, IPV6_DONTFRAG, &opt, sizeof(opt));
-#endif
-#if defined IPV6_RECVPATHMTU
-	/* obtain path mtu to send maximum non-fragmented packet */
-	opt = 1;
-	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU, &opt, sizeof(opt));
-#endif
-#if defined IPV6_PATHMTU
-	/* obtain current pmtu */
-	if (getsockopt(s, IPPROTO_IPV6, IPV6_PATHMTU, &mtui, &mtuilen) < 0) {
-		perror("could not obtain pmtu");
-	} else {
-		fprintf(stderr, "pmtu is %d\n", mtui.ip6m_mtu);
-	}
-#endif
-	return;
-}
-
 static int
 mcast6_init(void)
 {
@@ -344,8 +310,6 @@ mcast6_init(void)
 	opt = 1;
 	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
 #endif	/* IPV6_V6ONLY */
-
-	fiddle_with_mtu(s);
 	return s;
 
 #else  /* !IPPROTO_IPV6 */

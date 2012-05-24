@@ -193,6 +193,12 @@ party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
 	return;
 }
 
+static int
+__qmetap(ud_packet_t pkt)
+{
+	return udpc_pkt_cmd(pkt) == UD_CMD_QMETA;
+}
+
 static void
 party(const struct xmit_s *ctx, useconds_t tm)
 {
@@ -215,7 +221,7 @@ party(const struct xmit_s *ctx, useconds_t tm)
 			;
 		} else if (!udpc_pkt_valid_p((ud_packet_t){nrd, inq})) {
 			;
-		} else if (udpc_pkt_cmd((ud_packet_t){nrd, inq}) != UD_CMD_QMETA) {
+		} else if (!__qmetap((ud_packet_t){nrd, inq})) {
 			;
 		} else {
 			XMIT_STUP('?');

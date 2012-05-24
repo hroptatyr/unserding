@@ -403,6 +403,16 @@ ud_chan_init(short unsigned int port)
 
 	res = calloc(1, sizeof(*res));
 	if ((res->sock = mc6_socket()) > 0) {
+		union ud_sockaddr_u sa = {
+			.sa6.sin6_family = AF_INET6,
+			.sa6.sin6_addr = IN6ADDR_ANY_INIT,
+			.sa6.sin6_port = 0,
+		};
+
+		/* as a courtesy to tools bind the channel */
+		bind(res->sock, &sa.sa, sizeof(sa));
+
+		/* set destination and port */
 		ud_chan_set_svc(res);
 		ud_chan_set_port(res, port);
 	}

@@ -345,7 +345,7 @@ pre_work(const struct xmit_s *ctx)
 }
 
 static int
-post_work(const struct xmit_s *ctx)
+post_work(const struct xmit_s *UNUSED(ctx))
 {
 	return 0;
 }

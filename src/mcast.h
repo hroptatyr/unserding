@@ -85,6 +85,7 @@ typedef const struct ud_chan_s *ud_chan_t;
  * Lower-level structure to handle convos. */
 struct ud_chan_s {
 	int sock;
+	int mcfd;
 	ud_sockaddr_u sa;
 };
 

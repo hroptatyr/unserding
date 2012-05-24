@@ -250,13 +250,6 @@ ud_send_raw(ud_handle_t hdl, ud_packet_t pkt)
 }
 
 ssize_t
-ud_chan_send(ud_chan_t c, ud_packet_t pkt)
-{
-	/* always send to the mcast addresses */
-	return sendto(c->sock, pkt.pbuf, pkt.plen, 0, &c->sa.sa, sizeof(c->sa));
-}
-
-ssize_t
 ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout)
 {
 	int s = ud_handle_sock(hdl);
@@ -397,29 +390,6 @@ free_unserding_handle(ud_handle_t hdl)
 	}
 	/* also free the epoll cruft */
 	free_epoll_guts();
-	return;
-}
-
-/* lower level connection */
-ud_chan_t
-ud_chan_init(short unsigned int port)
-{
-	struct ud_chan_s *res;
-
-	res = calloc(1, sizeof(*res));
-	(void)mcast6_init(res);
-	setsock_nonblock(res->sock);
-	ud_chan_set_port(res, port);
-	return res;
-}
-
-void
-ud_chan_fini(ud_chan_t c)
-{
-	/* and kick the socket */
-	shutdown(c->sock, SHUT_RDWR);
-	close(c->sock);
-	free((struct ud_chan_s*)c);
 	return;
 }
 

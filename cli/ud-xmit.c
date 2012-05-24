@@ -337,6 +337,18 @@ work(const struct xmit_s *ctx)
 }
 
 static int
+pre_work(const struct xmit_s *ctx)
+{
+	return 0;
+}
+
+static int
+post_work(const struct xmit_s *ctx)
+{
+	return 0;
+}
+
+static int
 rebind_chan(ud_chan_t ch)
 {
 	union ud_sockaddr_u sa;
@@ -419,9 +431,15 @@ main(int argc, char *argv[])
 	case 0:
 		ctx->speed = argi->speed_arg;
 		ctx->restampp = argi->restamp_given;
-		work(ctx);
+		if (pre_work(ctx) == 0) {
+			/* do the actual work */
+			work(ctx);
+		}
 	case SIGINT:
 	default:
+		if (post_work(ctx) < 0) {
+			res = 1;
+		}
 		printf("sent %zu ticks in %u packets\n", nt, pno);
 		break;	
 	}

@@ -295,7 +295,7 @@ ud_chan_set_svc(struct ud_chan_s *c)
 }
 
 static int
-mcast6_init(void)
+mc6_socket(void)
 {
 #if defined IPPROTO_IPV6
 	volatile int s;
@@ -307,8 +307,10 @@ mcast6_init(void)
 	}
 
 #if defined IPV6_V6ONLY
-	opt = 1;
-	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
+	{
+		int yes = 1;
+		setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes));
+	}
 #endif	/* IPV6_V6ONLY */
 	return s;
 
@@ -325,7 +327,7 @@ ud_mcast_init(short unsigned int port)
 {
 	volatile int s;
 
-	if (UNLIKELY((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)) {
+	if (UNLIKELY((s = mc6_socket()) < 0)) {
 		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
 	} else if (mcast6_listener_init(s, port) < 0) {
 		close(s);
@@ -368,7 +370,7 @@ ud_chan_init_mcast(ud_chan_t c)
 	short unsigned int port = ud_sockaddr_port(&c->sa);
 	volatile int s;
 
-	if (UNLIKELY((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)) {
+	if (UNLIKELY((s = mc6_socket()) < 0)) {
 		UD_DEBUG_MCAST("socket() failed ... I'm clueless now\n");
 	} else if (mcast6_listener_init(s, port) < 0) {
 		close(s);
@@ -400,7 +402,7 @@ ud_chan_init(short unsigned int port)
 	struct ud_chan_s *res;
 
 	res = calloc(1, sizeof(*res));
-	if ((res->sock = mcast6_init()) > 0) {
+	if ((res->sock = mc6_socket()) > 0) {
 		setsock_nonblock(res->sock);
 		ud_chan_set_svc(res);
 		ud_chan_set_port(res, port);

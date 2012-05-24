@@ -84,6 +84,13 @@ struct xmit_s {
 	int mcfd;
 };
 
+typedef struct ud_pktsa_s {
+	size_t plen;
+	char *pbuf;
+	ud_const_sockaddr_t sa;
+	socklen_t sz;
+} ud_pktsa_t;
+
 static jmp_buf jb;
 
 
@@ -140,7 +147,7 @@ tv_diff(struct timeval *t1, struct timeval *t2)
 }
 
 static void
-party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
+party_deser(const struct xmit_s *ctx, ud_pktsa_t pkt)
 {
 	struct udpc_seria_s ser[2];
 	char rpl[UDPC_PKTLEN];
@@ -151,9 +158,17 @@ party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
 	udpc_make_rpl_pkt(PKT(rpl));
 
 	/* get the serialisers and deserialisers ready */
-	udpc_seria_init(ser, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	udpc_seria_init(ser + 1, UDPC_PAYLOAD(rpl), UDPC_PAYLLEN(sizeof(rpl)));
+#define MAKE_PKT							\
+	udpc_seria_init(ser, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen)); \
+	udpc_seria_init(ser + 1, UDPC_PAYLOAD(rpl), UDPC_PAYLLEN(sizeof(rpl)))
+#define SEND_PKT							\
+	if (udpc_seria_msglen(ser + 1)) {				\
+		const int fd = ctx->ud->sock;				\
+		size_t rpllen = udpc_seria_msglen(ser + 1) + UDPC_HDRLEN; \
+		sendto(fd, rpl, rpllen, 0, &pkt.sa->sa, pkt.sz);	\
+	}
 
+	MAKE_PKT;
 	for (uint8_t tag; (tag = udpc_seria_tag(ser)); ) {
 		switch (tag) {
 		case UDPC_TYPE_UI16: {
@@ -184,13 +199,10 @@ party_deser(const struct xmit_s *ctx, ud_packet_t pkt)
 			break;
 		}
 	}
-	if (udpc_seria_msglen(ser + 1)) {
-		ud_packet_t rplpkt = {
-			.pbuf = rpl,
-			.plen = udpc_seria_msglen(ser + 1) + UDPC_HDRLEN,
-		};
-		ud_chan_send(ctx->ud, rplpkt);
-	}
+	SEND_PKT;
+
+#undef MAKE_PKT
+#undef SEND_PKT
 	return;
 }
 
@@ -211,6 +223,8 @@ party(const struct xmit_s *ctx, useconds_t tm)
 	gettimeofday(tv + 0, NULL);
 	while (epoll_wait(ctx->epfd, ev, 1, mil) > 0) {
 		char inq[UDPC_PKTLEN];
+		union ud_sockaddr_u sa;
+		socklen_t salen = sizeof(sa);
 		ssize_t nrd;
 		useconds_t elps;
 
@@ -218,7 +232,9 @@ party(const struct xmit_s *ctx, useconds_t tm)
 		if ((ev->events & EPOLLIN) == 0) {
 			/* must be HUP or ERR, don't bother reading it */
 			;
-		} else if ((nrd = read(ev->data.fd, inq, sizeof(inq))) <= 0) {
+		} else if ((nrd = recvfrom(
+				    ev->data.fd, inq, sizeof(inq),
+				    0, &sa.sa, &salen)) <= 0) {
 			;
 		} else if (!udpc_pkt_valid_p((ud_packet_t){nrd, inq})) {
 			;
@@ -226,7 +242,7 @@ party(const struct xmit_s *ctx, useconds_t tm)
 			;
 		} else {
 			XMIT_STUP('?');
-			party_deser(ctx, (ud_packet_t){nrd, inq});
+			party_deser(ctx, (ud_pktsa_t){nrd, inq, &sa, salen});
 			XMIT_STUP('\n');
 		}
 
@@ -355,7 +371,7 @@ pre_work(const struct xmit_s *ctx)
 	if (udpc_seria_msglen(ser)) {					\
 		ud_packet_t p = {UDPC_HDRLEN + udpc_seria_msglen(ser), buf}; \
 		ud_chan_send(ctx->ud, p);				\
-	}								\
+	}
 
 	MAKE_PKT;
 	for (size_t i = 1; i <= nsyms; i++) {

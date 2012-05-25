@@ -62,6 +62,8 @@
 # undef EV_P
 # define EV_P  struct ev_loop *loop __attribute__((unused))
 #endif	/* HAVE_EV_H */
+/* for clock_gettime() */
+#include <time.h>
 
 /* our master include file */
 #include "unserding.h"
@@ -138,7 +140,6 @@ struct ud_loopclo_s {
 
 
 #if defined HAVE_UTERUS_H
-# include <time.h>
 # include <uterus.h>
 /* to get a take on them m30s and m62s */
 # define DEFINE_GORY_STUFF

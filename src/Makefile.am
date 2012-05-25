@@ -94,6 +94,7 @@ unsermon_SOURCES += wpool.h wpool.c fsarrqueue.h
 unsermon_SOURCES += jpool.h jpool.c
 unsermon_SOURCES += protocore.c protocore.h protocore-private.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
+unsermon_CPPFLAGS += $(LIBEV_CFLAGS)
 unsermon_CPPFLAGS += $(uterus_CFLAGS)
 unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(LIBEV_LIBS)
@@ -114,7 +115,6 @@ libunserding_la_SOURCES = libstuff.c dccp.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
-libunserding_la_CPPFLAGS += $(LIBEV_CFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
 else
 libunserding_a_SOURCES = libstuff.c dccp.c

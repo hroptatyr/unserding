@@ -115,7 +115,6 @@ libunserding_la_SOURCES = libstuff.c dccp.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
-libunserding_la_CPPFLAGS += $(LIBEV_CFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
 else
 libunserding_a_SOURCES = libstuff.c dccp.c

@@ -170,8 +170,10 @@ __pretty_hex(char *restrict buf, const char *s, size_t len)
 	char *bp = buf;
 
 	for (size_t i = 0; i < len; i += 16) {
+		size_t j;
+
 		bp += sprintf(bp, "%04zx ", i);
-		for (size_t j = i; j < len && j < i + 16; j++) {
+		for (j = i; j < len && j < i + 16; j++) {
 			unsigned char hi = ((unsigned char)s[j] >> 4) & 0xf;
 			unsigned char lo = ((unsigned char)s[j] >> 0) & 0xf;
 
@@ -182,16 +184,30 @@ __pretty_hex(char *restrict buf, const char *s, size_t len)
 			*bp++ = lo < 10 ? '0' + lo : 'a' + lo - 10;
 			*bp++ = ' ';
 		}
+		/* insert padding if that didn't work out */
+		for (; j < i + 16; j++) {
+			if (!(j % 8)) {
+				*bp++ = ' ';
+			}
+
+			*bp++ = ' ';
+			*bp++ = ' ';
+			*bp++ = ' ';
+		}
 		/* to be even more hexdump-like, use ascii chars now */
 		*bp++ = ' ';
 		*bp++ = ' ';
 		*bp++ = '|';
-		for (size_t j = i; j < len && j < i + 16; j++) {
+		for (j = i; j < len && j < i + 16; j++) {
 			if (isprint(s[j])) {
 				*bp++ = s[j];
 			} else {
 				*bp++ = '.';
 			}
+		}
+		/* and pad again */
+		for (; j < i + 16; j++) {
+			*bp++ = ' ';
 		}
 		*bp++ = '|';
 		*bp++ = '\n';

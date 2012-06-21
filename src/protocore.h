@@ -113,6 +113,8 @@ typedef enum udpc_pktsched_e {
 #define UDPC_PKTFLO_SOON_ONE	((uint16_t)0xcaff)
 /** pkt storminess: many pkts, delivery: soon */
 #define UDPC_PKTFLO_SOON_MANY	((uint16_t)0xcafe)
+/* noe floe info, just da7a */
+#define UDPC_PKTFLO_DATA	((uint16_t)0xda7a)
 
 static inline uint16_t
 udpc_pkt_flags(const ud_packet_t pkt)
@@ -143,6 +145,7 @@ udpc_pkt_valid_p(const ud_packet_t pkt)
 	case UDPC_PKTFLO_NOW_MANY:
 	case UDPC_PKTFLO_SOON_ONE:
 	case UDPC_PKTFLO_SOON_MANY:
+	case UDPC_PKTFLO_DATA:
 		break;
 	default:
 		return false;
@@ -311,28 +314,35 @@ udpc_set_immed_fina_pkt(ud_packet_t p)
 {
 	udpc_pkt_set_flags(p, UDPC_PKTFLO_NOW_ONE);
 	return;
-}	
+}
 
 static inline void __attribute__((always_inline))
 udpc_set_immed_frag_pkt(ud_packet_t p)
 {
 	udpc_pkt_set_flags(p, UDPC_PKTFLO_NOW_MANY);
 	return;
-}	
+}
 
 static inline void __attribute__((always_inline))
 udpc_set_defer_fina_pkt(ud_packet_t p)
 {
 	udpc_pkt_set_flags(p, UDPC_PKTFLO_SOON_ONE);
 	return;
-}	
+}
 
 static inline void __attribute__((always_inline))
 udpc_set_defer_frag_pkt(ud_packet_t p)
 {
 	udpc_pkt_set_flags(p, UDPC_PKTFLO_SOON_MANY);
 	return;
-}	
+}
+
+static inline void __attribute__((always_inline))
+udpc_set_data_pkt(ud_packet_t p)
+{
+	udpc_pkt_set_flags(p, UDPC_PKTFLO_DATA);
+	return;
+}
 
 static inline bool __attribute__((always_inline))
 udpc_pkt_for_us_p(const ud_packet_t pkt, ud_convo_t cno)

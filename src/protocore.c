@@ -196,6 +196,8 @@ __pretty_hex(char *restrict buf, const char *s, size_t len)
 		*bp++ = '|';
 		*bp++ = '\n';
 	}
+	/* finalise */
+	*bp = '\0';
 	return bp - buf;
 }
 
@@ -360,8 +362,12 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		return sprintf(buf, "(fltd)%f\n", v);
 	}
 
-	case UDPC_TYPE_FLTH:
+	case UDPC_TYPE_FLTH: {
+		uint16_t v = udpc_seria_des_ui16(sctx);
+		return sprintf(buf, "(half)%04hx", v);
+	}
 	default:
+		sctx->msgoff = sctx->len;
 		fprintf(stderr, "type %d\n", tag);
 		memcpy(buf, "(unknown)\n", 10);
 		return 10;
@@ -372,13 +378,14 @@ size_t
 ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt)
 {
 	size_t res = 0;
-	struct udpc_seria_s __sctx;
-	udpc_seria_t sctx = &__sctx;
+	struct udpc_seria_s sctx[1];
 	uint8_t tag;
 
 	/* some checks beforehand */
 	if (UNLIKELY(!udpc_pkt_valid_p(pkt))) {
 		return 0;
+	} else if (udpc_pkt_flags(pkt) == UDPC_PKTFLO_DATA) {
+		return __pretty_hex(buf, pkt.pbuf, pkt.plen);
 	}
 
 	/* otherwise it seems to be a real packet */

@@ -360,6 +360,20 @@ udpc_seria_des_asn1(udpc_seria_t sctx, const void **s)
 	return len;
 }
 
+#if defined INCLUDED_unserding_h_
+static inline ssize_t
+ud_chan_send_ser(ud_chan_t chan, udpc_seria_t ser)
+{
+	size_t plen;
+
+	if ((plen = udpc_seria_msglen(ser))) {
+		ud_packet_t pkt = {UDPC_HDRLEN + plen, ser->msg - UDPC_HDRLEN};
+		return ud_chan_send(chan, pkt);
+	}
+	return 0;
+}
+#endif	/* INCLUDED_unserding_h_ */
+
 
 /* public funs */
 #if defined SIG_UPFRONT

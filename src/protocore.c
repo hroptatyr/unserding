@@ -367,6 +367,7 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		return sprintf(buf, "(half)%04hx", v);
 	}
 	default:
+		sctx->msgoff = sctx->len;
 		fprintf(stderr, "type %d\n", tag);
 		memcpy(buf, "(unknown)\n", 10);
 		return 10;

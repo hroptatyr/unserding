@@ -362,7 +362,10 @@ __pretty_one(char *restrict buf, udpc_seria_t sctx, uint8_t tag)
 		return sprintf(buf, "(fltd)%f\n", v);
 	}
 
-	case UDPC_TYPE_FLTH:
+	case UDPC_TYPE_FLTH: {
+		uint16_t v = udpc_seria_des_ui16(sctx);
+		return sprintf(buf, "(half)%04hx", v);
+	}
 	default:
 		fprintf(stderr, "type %d\n", tag);
 		memcpy(buf, "(unknown)\n", 10);

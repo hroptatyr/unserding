@@ -196,6 +196,8 @@ __pretty_hex(char *restrict buf, const char *s, size_t len)
 		*bp++ = '|';
 		*bp++ = '\n';
 	}
+	/* finalise */
+	*bp = '\0';
 	return bp - buf;
 }
 

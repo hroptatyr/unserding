@@ -204,7 +204,9 @@ __pretty_hex(char *restrict buf, const char *s, size_t len)
 size_t
 ud_sprint_pkt_raw(char *restrict buf, ud_packet_t pkt)
 {
-	return __pretty_hex(buf, pkt.pbuf, pkt.plen);
+	const char *pbuf = UDPC_PAYLOAD(pkt.pbuf);
+	const size_t plen = UDPC_PAYLLEN(pkt.plen);
+	return __pretty_hex(buf, pbuf, plen);
 }
 
 static size_t
@@ -385,7 +387,9 @@ ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt)
 	if (UNLIKELY(!udpc_pkt_valid_p(pkt))) {
 		return 0;
 	} else if (udpc_pkt_flags(pkt) == UDPC_PKTFLO_DATA) {
-		return __pretty_hex(buf, pkt.pbuf, pkt.plen);
+		const char *pbuf = UDPC_PAYLOAD(pkt.pbuf);
+		const size_t plen = UDPC_PAYLLEN(pkt.plen);
+		return __pretty_hex(buf, pbuf, plen);
 	}
 
 	/* otherwise it seems to be a real packet */

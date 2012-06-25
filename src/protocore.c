@@ -398,21 +398,21 @@ ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt)
 	size_t res = 0;
 	struct udpc_seria_s sctx[1];
 	uint8_t tag;
+	char *pbuf = UDPC_PAYLOAD(pkt.pbuf);
+	const size_t plen = UDPC_PAYLLEN(pkt.plen);
 
 	/* some checks beforehand */
 	if (UNLIKELY(!udpc_pkt_valid_p(pkt))) {
 		return 0;
 	} else if (udpc_pkt_flags(pkt) == UDPC_PKTFLO_DATA) {
-		const char *pbuf = UDPC_PAYLOAD(pkt.pbuf);
-		const size_t plen = UDPC_PAYLLEN(pkt.plen);
 		return __pretty_hex(buf, pbuf, plen);
 	}
 
 	/* otherwise it seems to be a real packet */
-	udpc_seria_init(sctx, UDPC_PAYLOAD(pkt.pbuf), pkt.plen - UDPC_HDRLEN);
+	udpc_seria_init(sctx, pbuf, plen);
 
-	while (sctx->msgoff < pkt.plen && (tag = udpc_seria_tag(sctx))) {
-		res += __pretty_one(&buf[res], sctx, tag);
+	while (sctx->msgoff < plen && (tag = udpc_seria_tag(sctx))) {
+		res += __pretty_one(buf + res, sctx, tag);
 	}
 	return res;
 }

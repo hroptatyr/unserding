@@ -414,6 +414,7 @@ ud_sprint_pkt_pretty(char *restrict buf, ud_packet_t pkt)
 	while (sctx->msgoff < plen && (tag = udpc_seria_tag(sctx))) {
 		res += __pretty_one(buf + res, sctx, tag);
 	}
+	buf[res] = '\0';
 	return res;
 }
 

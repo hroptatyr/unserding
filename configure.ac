@@ -169,6 +169,12 @@ if test "${have_uterus}"; then
 fi
 AM_CONDITIONAL([HAVE_UTERUS], [test "${have_uterus}" = "yes"])
 
+## some deps
+if test "${sxe_cv_feat_libev}" != "yes"; then
+	enable_server="no"
+	enable_cliapps="no"
+fi
+
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
 AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],

@@ -54,6 +54,7 @@ AC_CHECK_HEADERS([fcntl.h])
 
 ## event loop
 SXE_CHECK_LIBEV
+AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 
 ### Check Input stuff
 with_inputs_file="yes"
@@ -169,15 +170,29 @@ if test "${have_uterus}"; then
 fi
 AM_CONDITIONAL([HAVE_UTERUS], [test "${have_uterus}" = "yes"])
 
+## some deps
+if test "${sxe_cv_feat_libev}" != "yes"; then
+	if test "${enable_server}" = "yes"; then
+		disable_server_reason="libev required "
+	fi
+	if test "${enable_cliapps}" = "yes"; then
+		disable_cliapps_reason="libev required "
+	fi
+	enable_server="no"
+	enable_cliapps="no"
+fi
+
 ## just so we know what to build
 AC_ARG_ENABLE([server], [
 AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
 	[enable_server="${enableval}"], [enable_server="yes"])
 AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
+
 AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-cliapps], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
 AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
+
 AC_ARG_ENABLE([library], [
 AS_HELP_STRING([--enable-library], [Build the library component, default: yes.])],
 	[enable_library="${enableval}"], [enable_library="yes"])
@@ -194,16 +209,25 @@ if test -n "${BUILD_SERVER_FALSE}"; then
 	BUILD_SRV="yes"
 else
 	BUILD_SRV="no"
+	if test -n "${disable_server_reason}"; then
+		BUILD_SRV="${BUILD_SRV} (${disable_server_reason})"
+	fi
 fi
 if test -n "${BUILD_LIBRARY_FALSE}"; then
 	BUILD_LIB="yes"
 else
 	BUILD_LIB="no"
+	if test -n "${disable_library_reason}"; then
+		BUILD_SRV="${BUILD_LIB} (${disable_library_reason})"
+	fi
 fi
 if test -n "${BUILD_CLIAPPS_FALSE}"; then
 	BUILD_CLI="yes"
 else
 	BUILD_CLI="no"
+	if test -n "${disable_cliapps_reason}"; then
+		BUILD_SRV="${BUILD_SRV} (${disable_cliapps_reason})"
+	fi
 fi
 
 echo

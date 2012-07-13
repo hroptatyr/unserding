@@ -173,17 +173,11 @@ AM_CONDITIONAL([HAVE_UTERUS], [test "${have_uterus}" = "yes"])
 AC_ARG_ENABLE([server], [
 AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
 	[enable_server="${enableval}"], [enable_server="yes"])
-AM_CONDITIONAL([BUILD_SERVER], [dnl
-	test "${enable_server}" = "yes" -a "${sxe_cv_feat_libev}" = "yes" dnl
-])
-
+AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
 AC_ARG_ENABLE([cliapps], [
 AS_HELP_STRING([--enable-cliapps], [Build the client apps, default: yes.])],
 	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
-AM_CONDITIONAL([BUILD_CLIAPPS], [dnl
-	test "${enable_cliapps}" = "yes" -a "${sxe_cv_feat_libev}" = "yes" dnl
-])
-
+AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
 AC_ARG_ENABLE([library], [
 AS_HELP_STRING([--enable-library], [Build the library component, default: yes.])],
 	[enable_library="${enableval}"], [enable_library="yes"])

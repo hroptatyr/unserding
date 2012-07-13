@@ -54,6 +54,7 @@ AC_CHECK_HEADERS([fcntl.h])
 
 ## event loop
 SXE_CHECK_LIBEV
+AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 
 ### Check Input stuff
 with_inputs_file="yes"

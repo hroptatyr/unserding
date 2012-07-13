@@ -172,6 +172,12 @@ AM_CONDITIONAL([HAVE_UTERUS], [test "${have_uterus}" = "yes"])
 
 ## some deps
 if test "${sxe_cv_feat_libev}" != "yes"; then
+	if test "${enable_server}" = "yes"; then
+		disable_server_reason="libev required "
+	fi
+	if test "${enable_cliapps}" = "yes"; then
+		disable_cliapps_reason="libev required "
+	fi
 	enable_server="no"
 	enable_cliapps="no"
 fi
@@ -203,16 +209,25 @@ if test -n "${BUILD_SERVER_FALSE}"; then
 	BUILD_SRV="yes"
 else
 	BUILD_SRV="no"
+	if test -n "${disable_server_reason}"; then
+		BUILD_SRV="${BUILD_SRV} (${disable_server_reason})"
+	fi
 fi
 if test -n "${BUILD_LIBRARY_FALSE}"; then
 	BUILD_LIB="yes"
 else
 	BUILD_LIB="no"
+	if test -n "${disable_library_reason}"; then
+		BUILD_SRV="${BUILD_LIB} (${disable_library_reason})"
+	fi
 fi
 if test -n "${BUILD_CLIAPPS_FALSE}"; then
 	BUILD_CLI="yes"
 else
 	BUILD_CLI="no"
+	if test -n "${disable_cliapps_reason}"; then
+		BUILD_SRV="${BUILD_SRV} (${disable_cliapps_reason})"
+	fi
 fi
 
 echo

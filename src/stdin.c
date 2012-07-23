@@ -128,7 +128,7 @@ void
 stdin_print_async(const char *buf, size_t UNUSED(len))
 {
 	/* clear the current bugger */
-	(void)_rl_erase_entire_line();
+	rl_crlf();
 	/* plug ourselves */
 	fputs(buf, stdout);
 	/* hm, let's hope they put a newline last */

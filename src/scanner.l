@@ -36,17 +36,13 @@
  ***/
 
 %{
-#define YY_EXTRA_TYPE	void*
 %}
 
-%option reentrant
 %option noyywrap
 %option warn
 %option yylineno
 %option nounput
 %option noinput
-%option bison-bridge
-%option header-file="lex.yy.h"
 %option outfile="lex.yy.c"
 %option pointer
 %option nodebug
@@ -56,12 +52,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "cli-common.h"
-#include "unsercli-unsercli.h"
 #include "unserding-dbg.h"
-
-extern int cli_yyget_column(yyscan_t);
-extern void cli_yyset_column(int, yyscan_t);
 
 #define RETURN_TOKEN(_x)			\
 	do {					\
@@ -107,15 +98,15 @@ abs		\|
 <ARGS>\"	{ BEGIN(STRING); }
 <STRING>[^\"]*\"	{
 	BEGIN(INITIAL);
-	yylval->slen = cli_yyget_leng(yyscanner) - /* the final quote */ 1;
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng() - /* the final quote */ 1;
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_STRING);
 }
 
 {hexdgt}{4,4}	{
 	BEGIN(ARGS);
-	yylval->slen = cli_yyget_leng(yyscanner);
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng();
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_HEXCMD);
 }	
 
@@ -130,38 +121,38 @@ logout		{ BEGIN(ARGS); RETURN_TOKEN(TOK_CYA); }
 alias		{ BEGIN(ARGS); RETURN_TOKEN(TOK_ALI); }
 
 <ARGS>0x{hexdgt}{9,16}	{ 
-	yylval->slen = cli_yyget_leng(yyscanner);
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng();
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_UI64H);
 }
 
 <ARGS>0x{hexdgt}{5,8}	{ 
-	yylval->slen = cli_yyget_leng(yyscanner);
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng();
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_UI32H);
 }
 
 <ARGS>0x{hexdgt}{3,4}	{ 
-	yylval->slen = cli_yyget_leng(yyscanner);
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng();
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_UI16H);
 }
 
 <ARGS>0x{hexdgt}{1,2}	{ 
-	yylval->slen = cli_yyget_leng(yyscanner);
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng();
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_UI8H);
 }
 
 <ARGS>[-+]?{intdgt}+[uU]	{
-	yylval->slen = cli_yyget_leng(yyscanner);
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng();
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_UINT);
 }
 
 <ARGS>[-+]?{intdgt}+	{
-	yylval->slen = cli_yyget_leng(yyscanner);
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng();
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_INT);
 }
 
@@ -169,13 +160,13 @@ alias		{ BEGIN(ARGS); RETURN_TOKEN(TOK_ALI); }
   * ourselves, and much more efficiently */
  /*{int}		{ RETURN_TOKEN(TOK_INTEGER); }*/
 <ARGS>{key}	{
-	yylval->slen = cli_yyget_leng(yyscanner);
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng();
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_KEY);
 }
 <ARGS>{val}	{
-	yylval->slen = cli_yyget_leng(yyscanner);
-	yylval->sval = cli_yyget_text(yyscanner);
+	yylval.slen = yyget_leng();
+	yylval.sval = yyget_text();
 	RETURN_TOKEN(TOK_VAL);
 }
 

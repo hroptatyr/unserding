@@ -35,14 +35,6 @@
  *
  ***/
 
-%defines
-%output="y.tab.c"
-%pure-parser
-%name-prefix="cli_yy"
-%lex-param{void *scanner}
-%parse-param{void *scanner}
-%parse-param{ud_handle_t hdl}
-
 %{
 #include "config.h"
 #include <string.h>
@@ -70,8 +62,6 @@
 #include "unserding-private.h"
 #include "protocore.h"
 #include "protocore-private.h"
-#include "cli-common.h"
-#include "unsercli-scanner.h"
 #include "stdin.h"
 
 #if 0
@@ -100,8 +90,7 @@
 
 #include "tedious.h"
 
-/* declarations */
-extern int cli_yyparse(void *scanner, ud_handle_t hdl);
+static ud_handle_t hdl;
 
 
 typedef struct ud_worker_s *ud_worker_t;
@@ -131,14 +120,14 @@ static char __pktbuf[UDPC_PKTLEN];
 static ud_packet_t __pkt = {.plen = countof(__pktbuf), .pbuf = __pktbuf};
 
 /* these delcarations are provided to suppress compiler warnings */
-extern int cli_yylex();
-extern int cli_yyget_lineno();
-extern char *cli_yyget_text();
-extern void cli_yyerror(void *scanner, ud_handle_t hdl, char const *errmsg);
+extern int yylex();
+extern int yyget_lineno();
+extern char *yyget_text();
+extern void yyerror(char const *errmsg);
 
 
 void
-cli_yyerror(void *UNUSED(s), ud_handle_t UNUSED(hdl), char const *UNUSED(t))
+yyerror(char const *UNUSED(t))
 {
 	fputs("syntax error\n", logout);
 	return;
@@ -456,6 +445,14 @@ out:
 	TOK_UI8H
 	TOK_INT
 	TOK_UINT
+
+%union {
+	struct {
+		long int slen;
+		const char *sval;
+	};
+};
+
 %%
 
 
@@ -682,20 +679,22 @@ init_cmd_list(void)
 }
 
 
+/* the whole scanner here */
+#include "scanner.c"
+
 static void
-ud_parse(const char *line, size_t UNUSED(len))
+ud_parse(const char *line, size_t len)
 {
-        yyscan_t scanner;
         YY_BUFFER_STATE buf;
 
 	/* set up our packet, just take the obligatory header for granted */
 	__pkt.plen = 8;
 	/* set up the lexer */
-        cli_yylex_init(&scanner);
-        buf = cli_yy_scan_string(line, scanner);
-	/* parse him */
-        (void)cli_yyparse(scanner, &__hdl);
-        cli_yylex_destroy(scanner);
+	yy_init_globals();
+	buf = yy_scan_bytes(line, len);
+	yyparse();
+	yy_delete_buffer(buf);
+	yylex_destroy();
 	return;
 }
 

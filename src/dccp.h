@@ -43,6 +43,15 @@
 #include <unistd.h>
 #include "mcast.h"
 
+#if defined __cplusplus
+extern "C" {
+# if defined __GNUC__
+#  define restrict	__restrict__
+# else
+#  define restrict
+# endif
+#endif /* __cplusplus */
+
 extern int dccp_open(void); 
 extern int dccp_listen(int s, uint16_t port);
 extern int dccp_accept(int socket, int timeout);
@@ -52,5 +61,9 @@ extern void dccp_close(int socket);
 extern ssize_t dccp_recv(int s, char *restrict buf, size_t bsz);
 extern ssize_t dccp_send(int s, const char *buf, size_t bsz);
 extern ssize_t dccp_splice(int in_s, int out_s);
+
+#if defined __cplusplus
+}
+#endif	/* __cplusplus */
 
 #endif	/* INCLUDED_dccp_h_ */

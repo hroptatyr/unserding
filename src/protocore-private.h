@@ -41,6 +41,15 @@
 #include <stdio.h>
 #include "protocore.h"
 
+#if defined __cplusplus
+extern "C" {
+# if defined __GNUC__
+#  define restrict	__restrict__
+# else
+#  define restrict
+# endif
+#endif /* __cplusplus */
+
 static inline void __attribute__((always_inline))
 ud_fputs(uint8_t len, const char *s, FILE *f)
 {
@@ -71,5 +80,9 @@ udpc_print_pkt(const ud_packet_t pkt)
 	       ntohs(((const uint16_t*)pkt.pbuf)[3]));
 	return;
 }
+
+#if defined __cplusplus
+}
+#endif	/* __cplusplus */
 
 #endif	/* INCLUDED_protocore_private_h_ */

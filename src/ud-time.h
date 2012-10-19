@@ -46,6 +46,15 @@
 /* for struct timespec */
 #include <time.h>
 
+#if defined __cplusplus
+extern "C" {
+# if defined __GNUC__
+#  define restrict	__restrict__
+# else
+#  define restrict
+# endif
+#endif /* __cplusplus */
+
 #if defined __USE_POSIX199309 && !defined UNSERLIB
 /* returns the current CLOCK_REALTIME time stamp */
 static inline struct timespec
@@ -175,5 +184,9 @@ __dayofweek(time32_t t)
 	t = __daydiff((time32_t)442972800, t);
 	return (dow_t)(t % 7);
 }
+
+#if defined __cplusplus
+}
+#endif	/* __cplusplus */
 
 #endif	/* INCLUDED_ud_time_h_ */

@@ -124,7 +124,7 @@ endif
 
 ## our rule for gengetopt
 %.c %.h: %.ggo
-	gengetopt -l -i $< -F $*
+	$(AM_V_GEN) gengetopt -l -i $< -F $*
 
 #
 # Help the developers get nice post-processed source files

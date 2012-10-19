@@ -683,7 +683,7 @@ init_cmd_list(void)
 #include "scanner.c"
 
 static void
-ud_parse(const char *line, size_t UNUSED(len))
+ud_parse(const char *line, size_t len)
 {
         YY_BUFFER_STATE buf;
 
@@ -691,7 +691,7 @@ ud_parse(const char *line, size_t UNUSED(len))
 	__pkt.plen = 8;
 	/* set up the lexer */
 	yy_init_globals();
-	buf = yy_scan_string(line);
+	buf = yy_scan_bytes(line, len);
 	yyparse();
 	yy_delete_buffer(buf);
 	yylex_destroy();

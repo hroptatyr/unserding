@@ -41,8 +41,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef __cplusplus
+#if defined __cplusplus
 extern "C" {
+# if defined __GNUC__
+#  define restrict	__restrict__
+# else
+#  define restrict
+# endif
 #endif /* __cplusplus */
 
 /* old shit, to be deleted */
@@ -381,7 +386,7 @@ extern uint16_t udpc_msg_size(const char *sig);
 extern void udpc_sig_string(char *restrict out, const char *sig);
 #endif
 
-#ifdef __cplusplus
+#if defined __cplusplus
 }
 #endif /* __cplusplus */
 

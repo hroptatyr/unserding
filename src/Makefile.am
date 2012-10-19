@@ -73,7 +73,7 @@ if BUILD_CLIAPPS
 ## the main client binary
 bin_PROGRAMS += unsercli
 unsercli_SOURCES = unsercli.y
-unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
+unsercli_SOURCES += stdin.c stdin.h protocore.c tedious.h
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CFLAGS) $(LIBEDIT_CPPFLAGS)
 unsercli_CPPFLAGS += -imacros tedious.h
 unsercli_LDFLAGS = $(AM_LDFLAGS)

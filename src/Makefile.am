@@ -68,13 +68,12 @@ endif
 mod_LTLIBRARIES =
 
 ## fucking automake
-unsercli_YFLAGS = -d -p "cli_yy"
+unsercli_YFLAGS = -d
 if BUILD_CLIAPPS
 ## the main client binary
 bin_PROGRAMS += unsercli
-unsercli_SOURCES = unsercli.y scanner.l
-unsercli_SOURCES += stdin.c stdin.h protocore.c cli-common.h tedious.h
-unsercli_LFLAGS = --prefix="cli_yy"
+unsercli_SOURCES = unsercli.y
+unsercli_SOURCES += stdin.c stdin.h protocore.c tedious.h
 unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CFLAGS) $(LIBEDIT_CPPFLAGS)
 unsercli_CPPFLAGS += -imacros tedious.h
 unsercli_LDFLAGS = $(AM_LDFLAGS)
@@ -82,8 +81,9 @@ unsercli_LDFLAGS += $(LIBEV_LIBS)
 unsercli_LDFLAGS += $(LIBREADLINE_LIBS)
 unsercli_LDADD = $(unserding_LIBS)
 unsercli_LDADD += -lrt
+EXTRA_unsercli_SOURCES = scanner.l
 endif ## BUILD_CLIAPPS
-BUILT_SOURCES += unsercli-unsercli.h unsercli-scanner.h
+BUILT_SOURCES += scanner.c
 BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
 
 if BUILD_CLIAPPS
@@ -103,12 +103,6 @@ unsermon_LDADD = $(unserding_LIBS)
 endif ## BUILD_CLIAPPS
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 
-## fucking automake refuses to replay my flex patch
-unsercli-scanner.h: scanner.l
-	$(LEX) $(unsercli_LFLAGS) --header-file=$@ $<
-	test -e lex.yy.c && $(RM) lex.yy.c
-	test -e lex.yy.h && mv lex.yy.h $@
-
 ## the lib, or its archive counterpart
 if BUILD_LIBRARY
 libunserding_la_SOURCES = libstuff.c dccp.c
@@ -124,7 +118,7 @@ endif
 
 ## our rule for gengetopt
 %.c %.h: %.ggo
-	gengetopt -l -i $< -F $*
+	$(AM_V_GEN) gengetopt -l -i $< -F $*
 
 #
 # Help the developers get nice post-processed source files

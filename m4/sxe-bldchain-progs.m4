@@ -18,18 +18,13 @@ AC_DEFUN([SXE_PROG_AR], [dnl
 ])dnl SXE_PROG_AR
 
 
-AC_DEFUN([SXE_PROG_BISON], [
-	AC_PROG_YACC()
-	AC_MSG_CHECKING(for bison)
-	if test "$YACC" != "bison -y"; then
-		AC_MSG_RESULT(no)
-		have_bison="no"
-		dnl AC_MSG_ERROR([bison not found but required])
-	else
-		AC_MSG_RESULT(bison)
-		AC_SUBST(BISON,[bison],[location of bison])
-		have_bison="yes"
+AC_DEFUN([SXE_PROG_BYACC], [
+	## try byacc first
+	if test -z "${YACC}"; then
+		ac_cv_prog_yacc="byacc"
+		YACC="byacc"
 	fi
+	AC_PROG_YACC
 ])dnl SXE_PROG_BISON
 
 
@@ -91,7 +86,7 @@ dnl 	dnl m4_ifdef([LT_INIT], [LT_INIT], [AC_PROG_LIBTOOL])
 
 dnl recommended interface macro for parser/lexer
 AC_DEFUN([SXE_CHECK_PARSER_LEXER], [dnl
-	SXE_PROG_BISON
+	SXE_PROG_BYACC
 	AC_PROG_LEX
 	AM_PROG_LEX
 ])dnl SXE_CHECK_PARSER_LEXER

@@ -43,7 +43,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#ifdef __cplusplus
+#if defined __cplusplus
 extern "C" {
 # if defined __GNUC__
 #  define restrict	__restrict__
@@ -144,7 +144,7 @@ extern int ud_chan_init_mcast(ud_chan_t chan);
  * Unsubscribe from multicast on CHAN. */
 extern void ud_chan_fini_mcast(ud_chan_t chan);
 
-#ifdef __cplusplus
+#if defined __cplusplus
 }
 #endif /* __cplusplus */
 

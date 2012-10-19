@@ -18,14 +18,24 @@ AC_DEFUN([SXE_PROG_AR], [dnl
 ])dnl SXE_PROG_AR
 
 
-AC_DEFUN([SXE_PROG_BYACC], [
-	## try byacc first
-	if test -z "${YACC}"; then
-		ac_cv_prog_yacc="byacc"
-		YACC="byacc"
-	fi
-	AC_PROG_YACC
-])dnl SXE_PROG_BISON
+# AC_PROG_YACC
+# ------------
+AN_MAKEVAR([BISON], [SXE_PROG_YACC])
+AN_MAKEVAR([YACC], [SXE_PROG_YACC])
+AN_MAKEVAR([YFLAGS], [SXE_PROG_YACC])
+AN_PROGRAM([yacc], [SXE_PROG_YACC])
+AN_PROGRAM([byacc], [SXE_PROG_YACC])
+AN_PROGRAM([bison], [SXE_PROG_YACC])
+AC_DEFUN([SXE_PROG_YACC], [dnl
+	AC_CHECK_PROGS([YACC], [byacc 'bison -y'], [yacc])
+	AC_ARG_VAR([YACC],
+[The `Yet Another Compiler Compiler' implementation to use.  Defaults to
+the first program found out of: `byacc' `bison -y' `yacc'.])
+	AC_ARG_VAR([YFLAGS],
+[The list of arguments that will be passed by default to $YACC.  This script
+will default YFLAGS to the empty string to avoid a default value of `-d' given
+by some make applications.])
+])dnl SXE_PROG_YACC
 
 
 AC_DEFUN([SXE_CHECK_AUTOTOOL], [dnl
@@ -86,7 +96,7 @@ dnl 	dnl m4_ifdef([LT_INIT], [LT_INIT], [AC_PROG_LIBTOOL])
 
 dnl recommended interface macro for parser/lexer
 AC_DEFUN([SXE_CHECK_PARSER_LEXER], [dnl
-	SXE_PROG_BYACC
+	SXE_PROG_YACC
 	AC_PROG_LEX
 	AM_PROG_LEX
 ])dnl SXE_CHECK_PARSER_LEXER

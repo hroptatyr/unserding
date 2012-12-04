@@ -438,7 +438,8 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		ud_sockaddr_fam(&j->sa), ud_sockaddr_addr(&j->sa),
 		buf, sizeof(buf));
 	p = ud_sockaddr_port(&j->sa);
-	UD_INFO_MCAST(
+	/* in debugging mode give it full blast */
+	UD_DEBUG_MCAST(
 		":sock %d connect :from [%s]:%d  "
 		":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
 		w->fd, a, p,
@@ -447,6 +448,23 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		udpc_pkt_pno(JOB_PACKET(j)),
 		udpc_pkt_cmd(JOB_PACKET(j)),
 		ntohs(((const uint16_t*)j->buf)[3]));
+	/* otherwise just report activity */
+	{
+		static time_t last_act;
+		static time_t last_rpt;
+		time_t this_act = time(NULL);
+
+		if (last_act + 1 < this_act) {
+			UD_INFO_MCAST(":sock %d shows activity\n", w->fd);
+			last_rpt = this_act;
+		} else if (last_rpt + 60 < this_act) {
+			UD_INFO_MCAST(
+				":sock %d (still) shows activity ... "
+				"1 minute reminder\n", w->fd);
+			last_rpt = this_act;
+		}
+		last_act = this_act;
+	}
 
 	/* handle the reading */
 	if (UNLIKELY(nread < 0)) {

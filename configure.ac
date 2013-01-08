@@ -158,16 +158,9 @@ PKG_CHECK_MODULES([LUA], [lua >= 5.1], [have_lua="yes"], [
 ])
 AM_CONDITIONAL([HAVE_LUA], [test "${have_lua}" = "yes"])
 
-## check for lua, critical
-PKG_CHECK_MODULES([uterus], [libuterus >= 0.2.1],
-	[have_uterus="yes"], [have_uterus="no"])
-if test "${have_uterus}"; then
-	## check for the header
-	SXE_DUMP_LIBS
-	CPPFLAGS="${CPPFLAGS} ${uterus_CFLAGS}"
-	AC_CHECK_HEADERS([uterus.h])
-	SXE_RESTORE_LIBS
-fi
+## check for ute
+PKG_CHECK_MODULES_HEADERS([uterus], [uterus >= 0.2.3],
+	[uterus.h uterus/uterus.h], [have_uterus="yes"], [have_uterus="no"])
 AM_CONDITIONAL([HAVE_UTERUS], [test "${have_uterus}" = "yes"])
 
 ## some deps

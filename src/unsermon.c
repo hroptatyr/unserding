@@ -64,6 +64,19 @@
 #endif	/* HAVE_EV_H */
 /* for clock_gettime() */
 #include <time.h>
+/* to get a take on them m30s and m62s */
+# define DEFINE_GORY_STUFF
+#if defined HAVE_UTERUS_UTERUS_H
+# include <uterus/uterus.h>
+# include <uterus/m30.h>
+# include <uterus/m62.h>
+# define HAVE_UTERUS
+#elif defined HAVE_UTERUS_H
+# include <uterus.h>
+# include <m30.h>
+# include <m62.h>
+# define HAVE_UTERUS
+#endif	/* HAVE_UTERUS_UTERUS_H || HAVE_UTERUS_H */
 
 /* our master include file */
 #include "unserding.h"
@@ -139,13 +152,7 @@ struct ud_loopclo_s {
 };
 
 
-#if defined HAVE_UTERUS_H
-# include <uterus.h>
-/* to get a take on them m30s and m62s */
-# define DEFINE_GORY_STUFF
-# include <m30.h>
-# include <m62.h>
-
+#if defined HAVE_UTERUS
 /* helpers */
 static inline size_t
 pr_tsmstz(char *restrict buf, time_t sec, uint32_t msec, char sep)
@@ -264,7 +271,7 @@ __pr_cdl(char *tgt, scom_t st)
 	p += ffff_m30_s(p, (m30_t)cdl->cnt);
 	return p - tgt;
 }
-#endif	/* HAVE_UTERUS_H */
+#endif	/* HAVE_UTERUS */
 
 static inline size_t
 hrclock_print(char *buf, size_t len)
@@ -321,7 +328,7 @@ mon_pkt_cb(job_t j)
 	switch (udpc_pkt_cmd(JOB_PACKET(j))) {
 	case 0x7574:
 	case 0x7575: {
-#if defined HAVE_UTERUS_H
+#if defined HAVE_UTERUS
 		char *pbuf = UDPC_PAYLOAD(JOB_PACKET(j).pbuf);
 		size_t plen = UDPC_PAYLLEN(JOB_PACKET(j).plen);
 
@@ -390,7 +397,7 @@ mon_pkt_cb(job_t j)
 			*p = '\0';
 			fwrite(buf, sizeof(char), p - buf, monout);
 		}
-#else  /* HAVE_UTERUS */
+#else  /* !HAVE_UTERUS */
 		fwrite(buf, sizeof(char), epi - buf, monout);
 		fputs("UTE/le message, no decoding support\n", monout);
 #endif	/* HAVE_UTERUS */

@@ -42,8 +42,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "mcast.h"
-#include "dccp.h"
-#include "logger.h"
 
 #ifdef __cplusplus
 extern "C" {

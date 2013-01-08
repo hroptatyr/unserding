@@ -73,12 +73,17 @@
 
 /* to decode ute messages */
 #include <sys/time.h>
-#if defined HAVE_UTERUS_H
+#if defined HAVE_UTERUS_UTERUS_H
+# include <uterus/uterus.h>
+# include <uterus/m30.h>
+# include <uterus/m62.h>
+# define HAVE_UTERUS
+#elif defined HAVE_UTERUS_H
 # include <uterus.h>
-/* to get a take on them m30s and m62s */
 # include <m30.h>
 # include <m62.h>
-#endif	/* HAVE_UTERUS_H */
+# define HAVE_UTERUS
+#endif	/* HAVE_UTERUS_UTERUS_H || HAVE_UTERUS_H */
 
 #define USE_COROUTINES		1
 

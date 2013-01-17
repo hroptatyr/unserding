@@ -44,10 +44,6 @@ SXE_CHECK_ANON_STRUCTS_INIT
 
 SXE_CHECK_PARSER_LEXER
 
-## libtool goddess^Wgoodness
-SXE_CHECK_LIBTOOL
-SXE_CHECK_LIBLTDL
-
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
 
@@ -192,6 +188,11 @@ if test "${sxe_cv_feat_libev}" != "yes"; then
 	enable_server="no"
 	enable_cliapps="no"
 fi
+
+dnl must come after all AC_LINK_IFELSE clauses
+## check for the ldflags
+SXE_CHECK_LDFLAGS
+SXE_CHECK_LIBTOOL
 
 ## just so we know what to build
 AC_ARG_ENABLE([server], [

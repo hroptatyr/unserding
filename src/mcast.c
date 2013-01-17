@@ -64,7 +64,7 @@
 # define SA_STRUCT		struct sockaddr_in
 #endif	/* AF_INET6 */
 #include "unserding.h"
-#include "unserding-private.h"
+#include "unserding-nifty.h"
 #include "mcast.h"
 #include "protocore.h"
 #include "protocore-private.h"

@@ -83,8 +83,9 @@
 /* context goodness, passed around internally */
 #include "unserding-ctx.h"
 /* our private bits */
-#include "unserding-private.h"
 #include "protocore-private.h"
+#include "unserding-nifty.h"
+#include "unserding-dbg.h"
 
 #define USE_COROUTINES		1
 

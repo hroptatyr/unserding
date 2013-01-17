@@ -47,6 +47,12 @@ unsermon_LDFLAGS += $(uterus_LIBS)
 unsermon_LDADD = $(unserding_LIBS)
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 
+bin_PROGRAMS += ud-ping
+ud_ping_SOURCES = ud-ping.c
+ud_ping_CPPFLAGS = $(AM_CPPFLAGS)
+ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
+ud_ping_LDADD = $(unserding_LIBS)
+
 ## the lib, or its archive counterpart
 lib_LTLIBRARIES += libunserding.la
 libunserding_la_SOURCES = libstuff.c dccp.c

@@ -17,11 +17,6 @@ EXTRA_DIST = $(BUILT_SOURCES)
 UD_LIBS = $(top_builddir)/src/libunserding.la
 UD_LDXFLAGS = -lrt
 
-ud_ping_SOURCES = ud-ping.c
-ud_ping_CPPFLAGS = $(AM_CPPFLAGS) 
-ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
-ud_ping_LDADD = $(UD_LIBS)
-ud_ping_LDADD += $(UD_LDXFLAGS)
 
 ud_itan_SOURCES = ud-itan.c
 ud_itan_CPPFLAGS = $(AM_CPPFLAGS)

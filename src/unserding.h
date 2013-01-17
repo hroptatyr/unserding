@@ -45,8 +45,13 @@
 # include "mcast.h"
 #endif	/* UD_COMPAT */
 
-#ifdef __cplusplus
+#if defined __cplusplus
 extern "C" {
+# if defined __GNUC__
+#  define restrict	__restrict__
+# else
+#  define restrict
+# endif
 #endif /* __cplusplus */
 
 /**

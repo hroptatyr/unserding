@@ -7,23 +7,16 @@ AM_CPPFLAGS += -I$(top_srcdir)/src
 AM_CFLAGS = -pthread
 AM_LDFLAGS = -lpthread
 
-if BUILD_CLIAPPS
 bin_PROGRAMS = ud-ping
 noinst_PROGRAMS = ud-itan
-endif
 
 BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
-if BUILD_LIBRARY
 UD_LIBS = $(top_builddir)/src/libunserding.la
-else
-UD_LIBS = $(top_builddir)/src/libunserding.a
-endif
 UD_LDXFLAGS = -lrt
 
-if BUILD_CLIAPPS
 ud_ping_SOURCES = ud-ping.c
 ud_ping_CPPFLAGS = $(AM_CPPFLAGS) 
 ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
@@ -67,7 +60,6 @@ ud_meta_CPPFLAGS += $(uterus_CFLAGS)
 ud_meta_LDFLAGS = -static
 ud_meta_LDFLAGS += $(uterus_LIBS)
 ud_meta_LDADD = $(UD_LIBS) $(UD_LDXFLAGS)
-endif  ## BUILD_CLIAPPS
 BUILT_SOURCES += $(ud_meta_clo)
 BUILT_SOURCES += $(umod_example_clo)
 BUILT_SOURCES += $(strat_example_clo)

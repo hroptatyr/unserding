@@ -73,80 +73,19 @@ PKG_CHECK_MODULES_HEADERS([uterus], [uterus >= 0.2.3],
 	[uterus.h uterus/uterus.h], [have_uterus="yes"], [have_uterus="no"])
 AM_CONDITIONAL([HAVE_UTERUS], [test "${have_uterus}" = "yes"])
 
-## some deps
-if test "${sxe_cv_feat_libev}" != "yes"; then
-	if test "${enable_server}" = "yes"; then
-		disable_server_reason="libev required "
-	fi
-	if test "${enable_cliapps}" = "yes"; then
-		disable_cliapps_reason="libev required "
-	fi
-	enable_server="no"
-	enable_cliapps="no"
-fi
-
 dnl must come after all AC_LINK_IFELSE clauses
 ## check for the ldflags
 SXE_CHECK_LDFLAGS
 SXE_CHECK_LIBTOOL
 
-## just so we know what to build
-AC_ARG_ENABLE([server], [
-AS_HELP_STRING([--enable-server], [Build the server component, default: yes.])],
-	[enable_server="${enableval}"], [enable_server="yes"])
-AM_CONDITIONAL([BUILD_SERVER], [test "${enable_server}" = "yes"])
-
-AC_ARG_ENABLE([cliapps], [
-AS_HELP_STRING([--enable-cliapps], [Build the client apps, default: yes.])],
-	[enable_cliapps="${enableval}"], [enable_cliapps="yes"])
-AM_CONDITIONAL([BUILD_CLIAPPS], [test "${enable_cliapps}" = "yes"])
-
-AC_ARG_ENABLE([library], [
-AS_HELP_STRING([--enable-library], [Build the library component, default: yes.])],
-	[enable_library="${enableval}"], [enable_library="yes"])
-AM_CONDITIONAL([BUILD_LIBRARY], [test "${enable_library}" = "yes"])
-
+dnl -------------------------------------------------------------------------
+dnl final output
+dnl -------------------------------------------------------------------------
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([cli/Makefile])
 AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([info/Makefile])
 AC_CONFIG_FILES([unserding.pc])
 AC_OUTPUT
-
-if test -n "${BUILD_SERVER_FALSE}"; then
-	BUILD_SRV="yes"
-else
-	BUILD_SRV="no"
-	if test -n "${disable_server_reason}"; then
-		BUILD_SRV="${BUILD_SRV} (${disable_server_reason})"
-	fi
-fi
-if test -n "${BUILD_LIBRARY_FALSE}"; then
-	BUILD_LIB="yes"
-else
-	BUILD_LIB="no"
-	if test -n "${disable_library_reason}"; then
-		BUILD_SRV="${BUILD_LIB} (${disable_library_reason})"
-	fi
-fi
-if test -n "${BUILD_CLIAPPS_FALSE}"; then
-	BUILD_CLI="yes"
-else
-	BUILD_CLI="no"
-	if test -n "${disable_cliapps_reason}"; then
-		BUILD_SRV="${BUILD_SRV} (${disable_cliapps_reason})"
-	fi
-fi
-
-echo
-echo
-echo "Build summary"
-echo "============="
-echo
-echo "Build cliapps: ${BUILD_CLI}"
-echo "Build server: ${BUILD_SRV}"
-echo "Build library: ${BUILD_LIB}"
-echo "Scripting engine: ${HAVE_LUA_FALSE:+lua}"
-echo
 
 dnl configure.ac ends here

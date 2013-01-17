@@ -10,19 +10,13 @@ noinst_PROGRAMS =
 noinst_HEADERS =
 bin_PROGRAMS =
 sbin_PROGRAMS =
-if BUILD_LIBRARY
 lib_LTLIBRARIES = libunserding.la
 unserding_LIBS = libunserding.la
-else
-unserding_LIBS = libunserding.a
-noinst_LIBRARIES = libunserding.a
-endif
 
 BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
-if BUILD_LIBRARY
 headerdir = $(includedir)/unserding
 header_HEADERS =
 header_HEADERS += unserding.h protocore.h seria.h module.h
@@ -31,7 +25,6 @@ header_HEADERS += logger.h
 header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
 header_HEADERS += lua-config.h
-endif
 noinst_HEADERS += unserding-private.h protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h ud-time.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
@@ -40,7 +33,6 @@ noinst_HEADERS += seria-proto-glue.h
 EXTRA_DIST += svc-itanl.h
 EXTRA_DIST += btea.c
 
-if BUILD_SERVER
 ## the main server binary
 sbin_PROGRAMS += unserdingd
 unserdingd_SOURCES = unserdingd.c mcast.c dccp.c tcp-unix.c
@@ -62,14 +54,12 @@ BUILT_SOURCES += unserdingd-clo.c unserdingd-clo.h
 
 ## server static modules
 unserdingd_SOURCES += dso-pong.c
-endif
 
 ## server dynamic modules
 mod_LTLIBRARIES =
 
 ## fucking automake
 unsercli_YFLAGS = -d
-if BUILD_CLIAPPS
 ## the main client binary
 bin_PROGRAMS += unsercli
 unsercli_SOURCES = unsercli.y
@@ -82,11 +72,9 @@ unsercli_LDFLAGS += $(LIBREADLINE_LIBS)
 unsercli_LDADD = $(unserding_LIBS)
 unsercli_LDADD += -lrt
 EXTRA_unsercli_SOURCES = scanner.l
-endif ## BUILD_CLIAPPS
 BUILT_SOURCES += scanner.c
 BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
 
-if BUILD_CLIAPPS
 bin_PROGRAMS += unsermon
 unsermon_SOURCES = unsermon.c unsermon-clo.ggo
 unsermon_SOURCES += mcast.c mcast.h
@@ -100,21 +88,14 @@ unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(LIBEV_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)
 unsermon_LDADD = $(unserding_LIBS)
-endif ## BUILD_CLIAPPS
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 
 ## the lib, or its archive counterpart
-if BUILD_LIBRARY
 libunserding_la_SOURCES = libstuff.c dccp.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
-else
-libunserding_a_SOURCES = libstuff.c dccp.c
-libunserding_a_SOURCES += svc-pong.c svc-pong.h
-libunserding_a_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERLIB
-endif
 
 ## our rule for gengetopt
 %.c %.h: %.ggo

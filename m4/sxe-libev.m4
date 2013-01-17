@@ -1,8 +1,8 @@
-dnl sxe-events.m4 -- Event queue and things like that
+dnl sxe-libev.m4 -- Event queue and things like that
 dnl
-dnl Copyright (C) 2005, 2006, 2007, 2008 Sebastian Freundt
+dnl Copyright (C) 2005-2013 Sebastian Freundt
 dnl
-dnl Author: Sebastian Freundt <hroptatyr@sxemacs.org>
+dnl Author: Sebastian Freundt <freundt@ga-group.nl>
 dnl
 dnl Redistribution and use in source and binary forms, with or without
 dnl modification, are permitted provided that the following conditions
@@ -31,35 +31,31 @@ dnl WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 dnl OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 dnl IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 dnl
-dnl This file is part of SXEmacs.
+dnl This file is part of unserding
 
 AC_DEFUN([SXE_CHECK_LIBEV], [
-	## defines sxe_cv_feat_libev
-	PKG_CHECK_MODULES([LIBEV], [libev >= 4.0], [have_libev="yes"],
-		[have_libev="no"; LIBEV_LIBS="-lev"])
-	SXE_DUMP_LIBS
-	CPPFLAGS="$CPPFLAGS $LIBEV_CFLAGS"
-	LDFLAGS="$LDFLAGS $LIBEV_LIBS"
-	SXE_CHECK_HEADERS([ev.h])
-	SXE_LANG_WERROR([push+off])
-	SXE_CHECK_LIB_FUNCS([ev], [ev_loop_new])
-	SXE_LANG_WERROR([pop])
-	SXE_RESTORE_LIBS
+dnl Usage: SXE_CHECK_LIBEV([ACTION_IF_FOUND], [ACTION_IF_NOT_FOUND])
+dnl   def: sxe_cv_feat_libev yes|no
 
-	if test "$ac_cv_header_ev_h" = "yes" -a \
-		"$ac_cv_lib_ev___ev_loop_new" = "yes"; then
-		AC_DEFINE([HAVE_LIBEV], [1], [Whether libev is fully functional])
-		sxe_cv_feat_libev="yes"
-		have_libev="yes"
-	else
+	AC_CACHE_VAL([sxe_cv_feat_libev], [
 		sxe_cv_feat_libev="no"
-		have_libev="no"
-		LIBEV_CFLAGS=
-		LIBEV_LIBS=
-	fi
+		PKG_CHECK_MODULES_HEADERS([libev], [libev >= 4.0], [ev.h], [
+			sxe_cv_feat_libev="yes"
+			$1
+		], [
+			## grrr, for all the distros without an libev.pc file
+			AC_CHECK_HEADERS([ev.h])
 
-	AC_SUBST([LIBEV_CFLAGS])
-	AC_SUBST([LIBEV_LIBS])
+			if test "${ac_cv_header_ev_h}" = "yes"; then
+				## assume expat is out there somewhere
+				sxe_cv_feat_libev="yes"
+				libev_LIBS="-lev"
+				libev_CFLAGS=""
+			else
+				$2
+				AC_MSG_ERROR([lib headers not found])
+			fi
+		])
+	])
+
 ])dnl SXE_CHECK_LIBEV
-
-dnl sxe-events.m4 ends here

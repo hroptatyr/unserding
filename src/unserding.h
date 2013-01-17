@@ -54,6 +54,21 @@ extern "C" {
 # endif
 #endif /* __cplusplus */
 
+#define UD_NETWORK_SERVICE	8364/*UDNG on the phone*/
+
+/* http://www.iana.org/assignments/ipv6-multicast-addresses/ lists us 
+ * as ff0x:0:0:0:0:0:0:134 */
+/* node-local */
+#define UD_MCAST6_NODE_LOCAL	"ff01::134"
+/* link-local */
+#define UD_MCAST6_LINK_LOCAL	"ff02::134"
+/* site-local */
+#define UD_MCAST6_SITE_LOCAL	"ff05::134"
+
+/* just offer a default address for some tools */
+#define UD_MCAST6_ADDR		UD_MCAST6_SITE_LOCAL
+
+
 /**
  * Flags. */
 typedef long unsigned int ud_flags_t;

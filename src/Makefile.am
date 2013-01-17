@@ -4,8 +4,6 @@ AM_CPPFLAGS = -D_BSD_SOURCE -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=600
 AM_CFLAGS = -pthread
 AM_LDFLAGS = -lpthread
 
-moddir = $(libdir)/unserding
-
 noinst_PROGRAMS =
 noinst_HEADERS =
 bin_PROGRAMS =
@@ -32,31 +30,7 @@ noinst_HEADERS += seria-proto-glue.h
 ## stuff that really does not belong here, expect this to be kicked
 EXTRA_DIST += svc-itanl.h
 EXTRA_DIST += btea.c
-
-## the main server binary
-sbin_PROGRAMS += unserdingd
-unserdingd_SOURCES = unserdingd.c mcast.c dccp.c tcp-unix.c
-unserdingd_SOURCES += protocore.c seria.c
-unserdingd_SOURCES += module.h module.c
-unserdingd_SOURCES += wpool.h wpool.c fsarrqueue.h
-unserdingd_SOURCES += jpool.h jpool.c
-unserdingd_SOURCES += lua-config.c
-unserdingd_CPPFLAGS = -DUNSERSRV $(AM_CPPFLAGS)
-unserdingd_CPPFLAGS += $(LUA_CFLAGS)
-unserdingd_CPPFLAGS += $(LIBEV_CFLAGS)
-unserdingd_LDFLAGS = $(AM_LDFLAGS)
-unserdingd_LDFLAGS += $(LUA_LIBS)
-unserdingd_LDFLAGS += $(LIBEV_LIBS)
-unserdingd_LDFLAGS += $(LIBLTDL)
-unserdingd_LDADD = $(unserding_LIBS)
-unserdingd_LDADD += -lrt
-BUILT_SOURCES += unserdingd-clo.c unserdingd-clo.h
-
-## server static modules
-unserdingd_SOURCES += dso-pong.c
-
-## server dynamic modules
-mod_LTLIBRARIES =
+EXTRA_DIST += dso-pong.c
 
 bin_PROGRAMS += unsermon
 unsermon_SOURCES = unsermon.c unsermon-clo.ggo

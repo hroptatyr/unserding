@@ -108,10 +108,6 @@
 #define S2S_NEGO_TIMEOUT	2
 #define UDP_MULTICAST_TTL	64
 
-#if !defined HAVE_GETADDRINFO
-# error "Listen bloke, need getaddrinfo() bad, give me one or I'll stab myself."
-#endif
-
 /* dual-stack v6 stuff */
 #if defined IPPROTO_IPV6
 /* node local, site local and link local */

@@ -58,23 +58,6 @@ unserdingd_SOURCES += dso-pong.c
 ## server dynamic modules
 mod_LTLIBRARIES =
 
-## fucking automake
-unsercli_YFLAGS = -d
-## the main client binary
-bin_PROGRAMS += unsercli
-unsercli_SOURCES = unsercli.y
-unsercli_SOURCES += stdin.c stdin.h protocore.c tedious.h
-unsercli_CPPFLAGS = -DUNSERCLI $(AM_CPPFLAGS) $(LIBEV_CFLAGS) $(LIBEDIT_CPPFLAGS)
-unsercli_CPPFLAGS += -imacros tedious.h
-unsercli_LDFLAGS = $(AM_LDFLAGS)
-unsercli_LDFLAGS += $(LIBEV_LIBS)
-unsercli_LDFLAGS += $(LIBREADLINE_LIBS)
-unsercli_LDADD = $(unserding_LIBS)
-unsercli_LDADD += -lrt
-EXTRA_unsercli_SOURCES = scanner.l
-BUILT_SOURCES += scanner.c
-BUILT_SOURCES += unsercli-clo.c unsercli-clo.h
-
 bin_PROGRAMS += unsermon
 unsermon_SOURCES = unsermon.c unsermon-clo.ggo
 unsermon_SOURCES += mcast.c mcast.h

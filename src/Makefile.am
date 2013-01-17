@@ -4,19 +4,19 @@ AM_CPPFLAGS = -D_BSD_SOURCE -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=600
 AM_CFLAGS = -pthread
 AM_LDFLAGS = -lpthread
 
+headerdir = $(includedir)/unserding
+
 noinst_PROGRAMS =
-noinst_HEADERS =
 bin_PROGRAMS =
 sbin_PROGRAMS =
-lib_LTLIBRARIES = libunserding.la
-unserding_LIBS = libunserding.la
+lib_LTLIBRARIES =
+noinst_HEADERS =
+header_HEADERS =
 
 BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
-headerdir = $(includedir)/unserding
-header_HEADERS =
 header_HEADERS += unserding.h protocore.h seria.h module.h
 header_HEADERS += mcast.h dccp.h tcp-unix.h
 header_HEADERS += logger.h
@@ -48,11 +48,13 @@ unsermon_LDADD = $(unserding_LIBS)
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 
 ## the lib, or its archive counterpart
+lib_LTLIBRARIES += libunserding.la
 libunserding_la_SOURCES = libstuff.c dccp.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
+unserding_LIBS = libunserding.la
 
 ## our rule for gengetopt
 %.c %.h: %.ggo

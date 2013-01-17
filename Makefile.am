@@ -4,7 +4,7 @@ LC_ALL = C
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS =
-SUBDIRS += src cli info
+SUBDIRS += src info
 
 pkgconfigdir = @libdir@/pkgconfig
 pkgconfig_DATA = unserding.pc

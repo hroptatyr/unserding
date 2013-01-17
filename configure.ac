@@ -32,16 +32,11 @@ AC_COPYRIGHT(
 AM_INIT_AUTOMAKE([foreign dist-xz])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
-## initialise our cool message nest levels
-SXE_INIT_MSG_LEVEL
-
 ## the build chain
 AC_PROG_CC([icc gcc tcc cc])
 SXE_CHECK_CC([c11 c1x c99 gnu99])
 AC_C_BIGENDIAN
 SXE_CHECK_CFLAGS
-## check for ld flags that we might need
-SXE_CHECK_LDFLAGS
 
 ## check for working c11 features
 SXE_CHECK_ANON_STRUCTS_DECL

@@ -1,8 +1,8 @@
 /*** unserding.h -- unserding network service
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -34,14 +34,16 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
 #if !defined INCLUDED_unserding_h_
 #define INCLUDED_unserding_h_
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "mcast.h"
+#include <sys/types.h>
+#if defined UD_COMPAT
+# include "mcast.h"
+#endif	/* UD_COMPAT */
 
 #ifdef __cplusplus
 extern "C" {

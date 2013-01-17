@@ -18,11 +18,9 @@ CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
 header_HEADERS += unserding.h protocore.h seria.h module.h
-header_HEADERS += mcast.h dccp.h tcp-unix.h
+header_HEADERS += mcast.h
 header_HEADERS += logger.h
-header_HEADERS += unserding-cfg.h
 header_HEADERS += unserding-ctx.h
-header_HEADERS += lua-config.h
 noinst_HEADERS += unserding-private.h protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h ud-time.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
@@ -56,7 +54,7 @@ ud_ping_LDADD = $(unserding_LIBS)
 
 ## the lib, or its archive counterpart
 lib_LTLIBRARIES += libunserding.la
-libunserding_la_SOURCES = libstuff.c dccp.c
+libunserding_la_SOURCES = libstuff.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)

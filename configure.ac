@@ -36,12 +36,16 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 SXE_INIT_MSG_LEVEL
 
 ## the build chain
-AC_PROG_CC([icc gcc clang tcc cc])
-AC_PROG_CC_C99
-AM_PROG_CC_C_O
+AC_PROG_CC([icc gcc tcc cc])
+SXE_CHECK_CC([c11 c1x c99 gnu99])
+AC_C_BIGENDIAN
 SXE_CHECK_CFLAGS
 ## check for ld flags that we might need
 SXE_CHECK_LDFLAGS
+
+## check for working c11 features
+SXE_CHECK_ANON_STRUCTS_DECL
+SXE_CHECK_ANON_STRUCTS_INIT
 
 SXE_CHECK_PARSER_LEXER
 

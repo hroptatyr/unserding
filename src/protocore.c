@@ -57,7 +57,7 @@
 
 /* our master include */
 #include "unserding.h"
-#include "unserding-private.h"
+#include "unserding-nifty.h"
 #include "protocore.h"
 #include "protocore-private.h"
 

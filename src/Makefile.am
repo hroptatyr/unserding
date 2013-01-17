@@ -51,6 +51,7 @@ bin_PROGRAMS += ud-ping
 ud_ping_SOURCES = ud-ping.c
 ud_ping_CPPFLAGS = $(AM_CPPFLAGS)
 ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
+ud_ping_LDFLAGS += -lrt
 ud_ping_LDADD = $(unserding_LIBS)
 
 ## the lib, or its archive counterpart

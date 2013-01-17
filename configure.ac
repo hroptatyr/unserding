@@ -68,29 +68,6 @@ dnl -------------------------------------------------------------------------
 ## event lib
 SXE_CHECK_LIBEV
 
-## readline and friends
-SXE_DUMP_LIBS
-VL_LIB_READLINE
-if test "${vl_cv_lib_readline}" != "no"; then
-	LIBREADLINE_LIBS=${vl_cv_lib_readline}
-fi
-SXE_RESTORE_LIBS
-AC_SUBST([LIBREADLINE_LIBS])
-AC_SUBST([LIBREADLINE_LDFLAGS])
-AC_SUBST([LIBREADLINE_CPPFLAGS])
-
-## check if we've got libedit, we don't use it though at the moment
-PKG_CHECK_MODULES([LIBEDIT], [libedit], [:], [:])
-## check for lua, critical
-PKG_CHECK_MODULES([LUA], [lua >= 5.1], [have_lua="yes"], [
-	have_lua="no"
-	if test "${enable_server}" = "yes"; then
-		AC_MSG_WARN([server build request but lua missing.])
-		enable_server="no"
-	fi
-])
-AM_CONDITIONAL([HAVE_LUA], [test "${have_lua}" = "yes"])
-
 ## check for ute
 PKG_CHECK_MODULES_HEADERS([uterus], [uterus >= 0.2.3],
 	[uterus.h uterus/uterus.h], [have_uterus="yes"], [have_uterus="no"])

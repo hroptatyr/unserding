@@ -51,9 +51,28 @@ SXE_CHECK_LIBLTDL
 AC_CHECK_HEADERS([stdbool.h])
 AC_CHECK_HEADERS([fcntl.h])
 
-## event loop
+## check for byteorder utils
+AC_CHECK_HEADERS([endian.h sys/endian.h byteorder.h byteswap.h])
+
+## some sizes we need
+AC_CHECK_SIZEOF([long])
+AC_CHECK_SIZEOF([int])
+AC_CHECK_SIZEOF([size_t])
+
+AC_CHECK_HEADERS([stdbool.h])
+AC_CHECK_HEADERS([fcntl.h])
+AC_CHECK_HEADERS([sys/types.h])
+AC_CHECK_HEADERS([sys/socket.h])
+AC_CHECK_HEADERS([netinet/in.h])
+AC_CHECK_HEADERS([netinet/tcp.h])
+AC_CHECK_HEADERS([arpa/inet.h])
+AC_CHECK_HEADERS([netdb.h])
+
+dnl -------------------------------------------------------------------------
+dnl packages we allow/support
+dnl -------------------------------------------------------------------------
+## event lib
 SXE_CHECK_LIBEV
-AM_CONDITIONAL([HAVE_LIBEV], [test "${sxe_cv_feat_libev}" = "yes"])
 
 ### Check Input stuff
 with_inputs_file="yes"

@@ -34,285 +34,138 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
 #include <stdio.h>
 #include <stdbool.h>
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
+#if defined HAVE_EV_H
+# include <ev.h>
+# undef EV_P
+# define EV_P  struct ev_loop *loop __attribute__((unused))
+#endif	/* HAVE_EV_H */
 #include "unserding.h"
-#include "unserding-nifty.h"
-#include "protocore.h"
-#include "seria.h"
-#include "ud-time.h"
 #include "svc-pong.h"
-
-typedef struct clks_s {
-	struct timeval rt;
-	struct timeval pt;
-} *clks_t;
-
-/* this is the callback closure for the classic mode */
-typedef struct ccb_clo_s {
-	struct clks_s clks;
-	long int seen;
-	ud_convo_t cno;
-} *ccb_clo_t;
-
-static size_t cnt;
-static long unsigned int timeout;
-static void(*mode)(ud_handle_t);
+#include "ud-time.h"
+#include "unserding-nifty.h"
 
 
-/* field retrievers */
+/* callbacks for libev */
 static void
-fetch_hnname(udpc_seria_t sctx, char *buf, size_t bsz)
+sub_cb(EV_P_ ev_io *w, int UNUSED(rev))
 {
-	const char *p;
-	size_t s;
-	memset(buf, 0, bsz);
-	s = udpc_seria_des_str(sctx, &p);
-	memcpy(buf, p, s);
+	ud_sock_t s = w->data;
+	struct ud_msg_s msg[1];
+
+	if (ud_chck_msg(msg, s) < 0) {
+		/* don't care */
+		return;
+	}
+
+	/* otherwise inspect packet */
+	puts("PONG");
 	return;
 }
 
-
-/* modes we can do, classic mode */
-static bool
-cb(ud_packet_t pkt, ud_const_sockaddr_t sa, void *clo)
-{
-	ccb_clo_t ccb = clo;
-	struct timeval lap;
-	struct udpc_seria_s sctx;
-	static char hnname[16];
-	ud_pong_score_t score;
-
-	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
-		if (ccb->seen == 0) {
-			printf("From " UD_MCAST6_ADDR "  convo=%i  "
-			       "no servers on the network\n",
-			       ccb->cno);
-		}
-		return false;
-	}
-	/* otherwise the packet is meaningful */
-	lap = __ulapse(ccb->clks.rt);
-	/* count this response */
-	ccb->seen++;
-	/* fetch fields */
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	/* fetch the host name */
-	fetch_hnname(&sctx, hnname, sizeof(hnname));
-	/* skip the next two, they're a struct timespec,
-	 * serialised as two consecutive ui32s */
-	(void)udpc_seria_des_ui32(&sctx);
-	(void)udpc_seria_des_ui32(&sctx);
-	score = udpc_seria_des_byte(&sctx);
-	/* print */
-	{
-		double lapf = __uas_f(lap);
-		char psa[INET6_ADDRSTRLEN];
-
-		ud_sockaddr_ntop(psa, sizeof(psa), sa);
-		printf("%zu bytes from %s (%s): "
-		       "convo=%i score=%i time=%2.3f ms\n",
-		       pkt.plen, hnname, psa, udpc_pkt_cno(pkt), score, lapf);
-	}
-	return true;
-}
-
 static void
-handle_sigint(int UNUSED(signum))
+ptm_cb(EV_P_ ev_timer *w, int UNUSED(rev))
 {
-	/* just set cnt to naught and we will exit the main loop */
-	cnt = 0;
-	return;
-}
-
-static int
-ping1(ud_handle_t hdl)
-{
-	/* referential stamp */
-	struct ccb_clo_s clo;
+	ud_sock_t s = w->data;
+	static struct timeval rt;
 
 	/* record the current time */
-	clo.clks.rt = __ustamp();
-	/* and we've seen noone yet */
-	clo.seen = 0;
-	/* send off the bugger */
-	clo.cno = ud_send_simple(hdl, 0x0004);
-	/* wait for replies */
-	ud_subscr_raw(hdl, timeout, cb, &clo);
-	return 0;
+	rt = __ustamp();
+	puts("PING");
+	ud_pack_msg(s, &(struct ud_msg_s){.dlen = sizeof(rt), .data = &rt});
+	ud_flush(s);
+	return;
 }
 
 static void
-classic_mode(ud_handle_t hdl)
+sigall_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(rev))
 {
-	/* install sig handler */
-	(void)signal(SIGINT, handle_sigint);
-	/* to mimic ping(8) even more */
-	puts("ud-ping " UD_MCAST6_ADDR " (" UD_MCAST6_ADDR ") 8 bytes of data");
-	/* enter the `main loop' */
-	while (cnt-- > 0) {
-		ping1(hdl);
-	}
+	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
 }
 
 
-/* another mode, negotiation mode, this will go to libunserding one day */
-typedef struct nego_clo_s {
-	struct timespec rt;
-	ud_pong_set_t seen;
-} *nego_clo_t;
-
-static bool
-ncb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
-{
-	nego_clo_t nclo = clo;
-	struct udpc_seria_s sctx;
-	static char hnname[16];
-	struct timespec us, em;
-	uint8_t score;
-
-	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
-		return false;
-	}
-	/* otherwise the packet is meaningful */
-	us = __lapse(nclo->rt);
-
-	/* fetch fields */
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	/* fetch the host name */
-	fetch_hnname(&sctx, hnname, sizeof(hnname));
-	em.tv_sec = udpc_seria_des_ui32(&sctx);
-	em.tv_nsec = udpc_seria_des_ui32(&sctx);
-	score = udpc_seria_des_byte(&sctx);
-	/* compute their stamp */
-	em = __lapse(em);
-	/* keep track of their score */
-	nclo->seen = ud_pong_set(nclo->seen, score);
-	/* print */
-	{
-		double usf = __as_f(us);
-		double emf = __as_f(em);
-		printf("name %s  roundtrip %2.3f ms  clkskew %2.3f ms  "
-		       "score %u\n",
-		       hnname, usf, emf, (unsigned int)score);
-	}
-	return true;
-}
-
-static int
-nego1(ud_handle_t hdl)
-{
-	/* referential stamp */
-	struct nego_clo_s nclo;
-	ud_pong_score_t s;
-
-	/* record the current time, set wipe `seen' bitset */
-	nclo.rt = __stamp();
-	nclo.seen = ud_empty_pong_set();
-	/* send off the bugger */
-	(void)ud_send_simple(hdl, 0x0004);
-	/* wait for replies */
-	ud_subscr_raw(hdl, timeout, ncb, &nclo);
-	/* after they're all through, try and get a proper score */
-	s = ud_find_score(nclo.seen);
-	printf("score would be %d\n", s);
-	return 0;
-}
-
-static void
-nego_mode(ud_handle_t hdl)
-{
-	puts("ud-ping negotiating in " UD_MCAST6_ADDR);
-	/* enter the `main loop' */
-	nego1(hdl);
-	return;
-}
-
-
-static void
-libnego_mode(ud_handle_t hdl)
-{
-	ud_pong_score_t s;
-	puts("ud-ping negotiating in " UD_MCAST6_ADDR);
-	s = ud_svc_nego_score(hdl, timeout);
-	printf("lib nego'd %d\n", s);
-	printf("mart %d\n", hdl->mart);
-	return;
-}
-
-
-static void __attribute__((noreturn))
-usage(void)
-{
-	fprintf(stderr, "\
-Usage: ud-ping [-c count] [-n|--negotiation] [-i interval]\n");
-	exit(1);
-}
-
-static void
-parse_args(int argc, const char *const *argv)
-{
-	/* set some defaults */
-	timeout = 1000;
-	cnt = -1UL;
-	mode = &classic_mode;
-
-	if (argc <= 0) {
-		usage();
-	}
-	for (int i = 1; i < argc; i++) {
-		if (argv[i][0] != '-') {
-			usage();
-		}
-		switch (argv[i][1]) {
-		case 'n':
-			timeout = 250;
-			mode = nego_mode;
-			break;
-		case 'l':
-			/* secret switch */
-			timeout = 250;
-			mode = libnego_mode;
-			break;
-		case 'i':
-			if (argv[i+1]) {
-				timeout = strtol(argv[i+1], NULL, 10);
-			}
-			i++;
-			break;
-		case 'c':
-			if (argv[i+1]) {
-				cnt = strtol(argv[i+1], NULL, 10);
-			}
-			i++;
-			break;
-		default:
-			usage();
-			break;
-		}
-	}
-	return;
-}
+#if defined __INTEL_COMPILER
+# pragma warning (disable:593)
+# pragma warning (disable:181)
+#elif defined __GNUC__
+# pragma GCC diagnostic ignored "-Wswitch"
+# pragma GCC diagnostic ignored "-Wswitch-enum"
+#endif /* __INTEL_COMPILER */
+#include "ud-ping-clo.h"
+#include "ud-ping-clo.c"
+#if defined __INTEL_COMPILER
+# pragma warning (default:593)
+# pragma warning (default:181)
+#elif defined __GNUC__
+# pragma GCC diagnostic warning "-Wswitch"
+# pragma GCC diagnostic warning "-Wswitch-enum"
+#endif	/* __INTEL_COMPILER */
 
 int
 main(int argc, char *argv[])
 {
-	static struct ud_handle_s __hdl;
+	struct ud_args_info argi[1];
+	/* ev io */
+	struct ev_loop *loop;
+	ev_signal sigint_watcher[1];
+	ev_signal sigterm_watcher[1];
+	ev_io sub[1];
+	ev_timer ptm[1];
+	/* unserding specific */
+	ud_sock_t s;
+	int res = 0;
 
-	/* look what the luser wants */
-	parse_args(argc, argv);
+	/* parse the command line */
+	if (ud_parser(argc, argv, argi)) {
+		res = 1;
+		goto out;
+	}
 	/* obtain a new handle */
-	init_unserding_handle(&__hdl, PF_INET6, false);
-	/* call the mode function */
-	(void)(*mode)(&__hdl);
-	/* and lose the handle again */
-	free_unserding_handle(&__hdl);
-	return 0;
+	if ((s = ud_socket((struct ud_sockopt_s){UD_PUBSUB})) == NULL) {
+		perror("cannot initialise ud socket");
+		return 1;
+	}
+
+	/* initialise the main loop */
+	loop = ev_default_loop(EVFLAG_AUTO);
+
+	/* initialise a sig C-c handler */
+	ev_signal_init(sigint_watcher, sigall_cb, SIGINT);
+	ev_signal_start(EV_A_ sigint_watcher);
+	ev_signal_init(sigterm_watcher, sigall_cb, SIGTERM);
+	ev_signal_start(EV_A_ sigterm_watcher);
+
+	sub->data = s;
+	ev_io_init(sub, sub_cb, s->fd, EV_READ);
+	ev_io_start(EV_A_ sub);
+
+	ptm->data = s;
+	ev_timer_init(ptm, ptm_cb, 0., argi->interval_arg);
+	ev_timer_start(EV_A_ ptm);
+
+	/* classic mode */
+	puts("ud-ping " UD_MCAST6_ADDR " (" UD_MCAST6_ADDR ") 8 bytes of data");
+
+	/* now wait for events to arrive */
+	ev_loop(EV_A_ 0);
+
+	ev_io_stop(EV_A_ sub);
+	ud_close(s);
+
+	/* destroy the default evloop */
+	ev_default_destroy();
+
+out:
+	ud_parser_free(argi);
+	return res;
 }
 
 /* ud-tick.c ends here */

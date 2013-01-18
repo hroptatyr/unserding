@@ -37,6 +37,7 @@ unsermon_SOURCES += protocore.c protocore.h protocore-private.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
 unsermon_CPPFLAGS += $(libev_CFLAGS)
 unsermon_CPPFLAGS += $(uterus_CFLAGS)
+unsermon_CPPFLAGS += -DUD_COMPAT
 unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(libev_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)
@@ -46,19 +47,25 @@ BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 bin_PROGRAMS += ud-ping
 ud_ping_SOURCES = ud-ping.c
 ud_ping_CPPFLAGS = $(AM_CPPFLAGS)
+ud_ping_CPPFLAGS += -DUD_COMPAT
 ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
 ud_ping_LDFLAGS += -lrt
 ud_ping_LDADD = $(unserding_LIBS)
 
 ## the lib, or its archive counterpart
 lib_LTLIBRARIES += libunserding.la
-libunserding_la_SOURCES = libstuff.c
+libunserding_la_SOURCES = unserding.c
+header_HEADERS += unserding.h
+header_HEADERS += ud-sockaddr.h
+libunserding_la_SOURCES += libstuff.c
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
+libunserding_la_CPPFLAGS += -DUD_COMPAT
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
 libunserding_la_LDFLAGS += -version-info 0:1:0
 unserding_LIBS = libunserding.la
+
 
 ## our rule for gengetopt
 %.c %.h: %.ggo

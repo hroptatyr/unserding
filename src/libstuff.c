@@ -1,8 +1,8 @@
-/*** libstuff.c -- unserding library definitions
+/*** libstuff.c -- unserding library definitions, old API
  *
- * Copyright (C) 2008, 2009 Sebastian Freundt
+ * Copyright (C) 2008-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -34,8 +34,9 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
-#include "config.h"
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -43,24 +44,19 @@
 #include <string.h>
 #if defined HAVE_SYS_TYPES_H
 # include <sys/types.h>
-#endif
+#endif	/* HAVE_SYS_TYPES_H */
 #if defined HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
-#endif
+#endif	/* HAVE_SYS_SOCKET_H */
 #if defined HAVE_NETINET_IN_H
 # include <netinet/in.h>
-#endif
+#endif	/* HAVE_NETINET_IN_H */
 #if defined HAVE_ARPA_INET_H
 # include <arpa/inet.h>
-#endif
-#if defined HAVE_NETDB_H
-# include <netdb.h>
-#elif defined HAVE_LWRES_NETDB_H
-# include <lwres/netdb.h>
-#endif	/* NETDB */
+#endif	/* HAVE_ARPA_INET_H */
 #if defined HAVE_ERRNO_H
 # include <errno.h>
-#endif
+#endif	/* HAVE_ERRNO_H */
 
 /* our master include */
 #include "unserding.h"
@@ -71,16 +67,6 @@
 #include "epoll-helpers.h"
 
 #include "svc-pong.h"
-
-#if !defined LIKELY
-# define LIKELY(_x)	__builtin_expect((_x), 1)
-#endif
-#if !defined UNLIKELY
-# define UNLIKELY(_x)	__builtin_expect((_x), 0)
-#endif
-#if !defined countof
-# define countof(_x)	(sizeof(_x) / sizeof(*_x))
-#endif
 
 #if defined DEBUG_FLAG
 # define UD_DEBUG_SENDRECV(args...)		\
@@ -296,7 +282,7 @@ ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo)
 	ssize_t nread;
 	static __thread char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = BUF_PACKET(buf);
-	ud_sockaddr_u __sa;
+	union ud_sockaddr_u __sa;
 	socklen_t lsa = sizeof(__sa);
 	struct sockaddr *sa = (void*)&__sa.sa;
 	ep_ctx_t epg = epoll_guts();

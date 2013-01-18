@@ -1,11 +1,11 @@
-/*** jpool.h -- unserding job pool
+/*** ud-sockaddr.h -- sockaddr unification
  *
- * Copyright (C) 2008, 2009 Sebastian Freundt
+ * Copyright (C) 2011-2013  Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
- * This file is part of unserding.
- *
+ * This file is part of the unserding.
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -33,25 +33,67 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- ***
- * Commentary:
- * We assume that struct job_s and job_t is defined
  ***/
+#if !defined INCLUDED_ud_sockaddr_h_
+#define INCLUDED_ud_sockaddr_h_
 
-#if !defined INCLUDED_jpool_h_
-#define INCLUDED_jpool_h_
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
-#include <stdbool.h>
+#if defined __cplusplus
+extern "C" {
+# if defined __GNUC__
+#  define restrict	__restrict__
+# else
+#  define restrict
+# endif
+#endif /* __cplusplus */
 
-#define NO_JOB		((job_t)0)
+/* sockaddr union */
+typedef union ud_sockaddr_u *ud_sockaddr_t;
+typedef const union ud_sockaddr_u *ud_const_sockaddr_t;
 
-typedef void *jpool_t;
+union ud_sockaddr_u {
+	struct sockaddr_storage sas;
+	struct sockaddr sa;
+	struct sockaddr_in6 sa6;
+};
+
+struct ud_sockaddr_s {
+	socklen_t sz;
+	union ud_sockaddr_u sa;
+};
 
 
-extern jpool_t make_jpool(int njobs, int job_size);
-extern void free_jpool(jpool_t p);
+static inline short unsigned int
+ud_sockaddr_fam(ud_const_sockaddr_t sa)
+{
+	return sa->sa.sa_family;
+}
 
-extern job_t jpool_acquire(jpool_t);
-extern void jpool_release(job_t);
+static inline short unsigned int
+ud_sockaddr_port(ud_const_sockaddr_t sa)
+{
+	return ntohs(sa->sa6.sin6_port);
+}
 
-#endif	/* INCLUDED_jpool_h_ */
+static inline const void*
+ud_sockaddr_addr(ud_const_sockaddr_t sa)
+{
+	return &sa->sa6.sin6_addr;
+}
+
+static inline void
+ud_sockaddr_ntop(char *restrict buf, size_t len, ud_const_sockaddr_t sa)
+{
+	short unsigned int fam = ud_sockaddr_fam(sa);
+	const void *saa = ud_sockaddr_addr(sa);
+	(void)inet_ntop(fam, saa, buf, len);
+	return;
+}
+
+#if defined __cplusplus
+}
+#endif	/* __cplusplus */
+
+#endif	/* INCLUDED_ud_sockaddr_h_ */

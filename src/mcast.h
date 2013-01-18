@@ -42,6 +42,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "ud-sockaddr.h"
 
 #if defined __cplusplus
 extern "C" {
@@ -52,30 +53,7 @@ extern "C" {
 # endif
 #endif /* __cplusplus */
 
-#define UD_NETWORK_SERVICE	8653
 #define UD_NETWORK_SERVSTR	"8653"
-/* http://www.iana.org/assignments/ipv6-multicast-addresses/ lists us 
- * as ff0x:0:0:0:0:0:0:134 */
-/* node-local */
-#define UD_MCAST6_NODE_LOCAL	"ff01::134"
-/* link-local */
-#define UD_MCAST6_LINK_LOCAL	"ff02::134"
-/* site-local */
-#define UD_MCAST6_SITE_LOCAL	"ff05::134"
-
-/* just offer a default address for some tools */
-#define UD_MCAST6_ADDR		UD_MCAST6_LINK_LOCAL
-
-/* our grand unified sockaddr thingie */
-typedef union ud_sockaddr_u ud_sockaddr_u;
-typedef union ud_sockaddr_u *ud_sockaddr_t;
-typedef const union ud_sockaddr_u *ud_const_sockaddr_t;
-
-union ud_sockaddr_u {
-		struct sockaddr_storage sas;
-		struct sockaddr sa;
-		struct sockaddr_in6 sa6;
-};
 
 /**
  * Structure that just consists of socket and destination. */
@@ -86,40 +64,8 @@ typedef const struct ud_chan_s *ud_chan_t;
 struct ud_chan_s {
 	int sock;
 	int mcfd;
-	ud_sockaddr_u sa;
+	union ud_sockaddr_u sa;
 };
-
-
-#if defined __INTEL_COMPILER
-#pragma warning (disable:2259)
-#endif	/* __INTEL_COMPILER */
-/* sockaddr stuff */
-static inline short unsigned int
-ud_sockaddr_fam(ud_const_sockaddr_t sa)
-{
-	return sa->sa.sa_family;
-}
-
-static inline short unsigned int
-ud_sockaddr_port(ud_const_sockaddr_t sa)
-{
-	return ntohs(sa->sa6.sin6_port);
-}
-
-static inline const void*
-ud_sockaddr_addr(ud_const_sockaddr_t sa)
-{
-	return &sa->sa6.sin6_addr;
-}
-
-static inline void
-ud_sockaddr_ntop(char *restrict buf, size_t len, ud_const_sockaddr_t sa)
-{
-	short unsigned int fam = ud_sockaddr_fam(sa);
-	const void *saa = ud_sockaddr_addr(sa);
-	(void)inet_ntop(fam, saa, buf, len);
-	return;
-}
 
 
 /* public offerings */

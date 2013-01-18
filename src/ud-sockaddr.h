@@ -59,6 +59,11 @@ union ud_sockaddr_u {
 	struct sockaddr_in6 sa6;
 };
 
+struct ud_sockaddr_s {
+	socklen_t sz;
+	union ud_sockaddr_u sa;
+};
+
 
 static inline short unsigned int
 ud_sockaddr_fam(ud_const_sockaddr_t sa)

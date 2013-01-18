@@ -319,7 +319,8 @@ ud_sock_t
 ud_socket(struct ud_sockopt_s opt)
 {
 	__sock_t res;
-	int s;
+	int s = -1;
+	int s2 = -1;
 
 #define MODE_SUBP(fl)	(fl & UD_SUB)
 #define MODE_PUBP(fl)	(fl & UD_PUB)
@@ -337,23 +338,34 @@ ud_socket(struct ud_sockopt_s opt)
 	}
 
 	/* do all the socket magic first, so we don't waste memory */
-	if (UNLIKELY((s = mc6_socket()) < 0)) {
+	if (UNLIKELY((s = s2 = mc6_socket()) < 0)) {
 		goto out;
+	} else if (MODE_SUBP(opt.mode) && MODE_PUBP(opt.mode)) {
+		/* we've got a PUBSUB request */
+		if (UNLIKELY((s2 = mc6_socket()) < 0)) {
+			/* oh brilliant, what now?
+			 * technically we could live on just one socket */
+			goto clos_out;
+		}
 	}
-	if (MODE_SUBP(opt.mode) && mc6_set_sub(s, opt.port) < 0) {
-		goto clos_out;
-	}
-	if (MODE_PUBP(opt.mode) && mc6_set_pub(s) < 0) {
-		goto clos_out;
+
+	if (0) {
+		/* for the aesthetical value */
+		;
+	} else if (MODE_SUBP(opt.mode) && mc6_set_sub(s, opt.port) < 0) {
+		goto clos2_out;
+	} else if (MODE_PUBP(opt.mode) && mc6_set_pub(s2) < 0) {
+		goto clos2_out;
 	}
 
 	/* fingers crossed we don't waste memory (on hugepage systems) */
 	if (UNLIKELY((res = mmap_mem(sizeof(*res))) == NULL)) {
-		goto clos_out;
+		goto clos2_out;
 	}
 
 	/* fill in res */
-	res->fd = res->fd_send = s;
+	res->fd = s;
+	res->fd_send = s2;
 	res->fl = 0U;
 	res->data = NULL;
 
@@ -371,6 +383,10 @@ ud_socket(struct ud_sockopt_s opt)
 
 munm_out:
 	munmap_mem(res, sizeof(*res));
+clos2_out:
+	if (s != s2 && s2 >= 0) {
+		close(s2);
+	}
 clos_out:
 	close(s);
 out:

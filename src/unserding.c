@@ -399,12 +399,21 @@ ud_close(ud_sock_t s)
 	__sock_t us = (__sock_t)s;
 	int fd = us->fd;
 
-	mc6_unset_pub(fd);
-	mc6_unset_sub(fd);
-
-	if (MODE_SUBP(us->opt.mode)) {
+	switch (us->opt.mode) {
+	case UD_PUBSUB:
+		mc6_unset_pub(us->fd_send);
+		close(us->fd_send);
+		/*@fallthrough@*/
+	case UD_SUB:
+		mc6_unset_sub(fd);
 		/* leave the mcast group */
 		mc6_leave_group(fd, us->memb);
+		break;
+	case UD_PUB:
+		mc6_unset_pub(fd);
+		break;
+	default:
+		break;
 	}
 
 	munmap_mem(us, sizeof(*us));

@@ -1,8 +1,8 @@
 /*** ud-ping.c -- ping/pong utility
  *
- * Copyright (C) 2009 Sebastian Freundt
+ * Copyright (C) 2009-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *

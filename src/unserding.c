@@ -104,8 +104,8 @@ struct __sock_s {
 	/* packet within */
 	int pno;
 
-	union ud_sockaddr_u src[1];
-	union ud_sockaddr_u dst[1];
+	struct ud_sockaddr_s src[1];
+	struct ud_sockaddr_s dst[1];
 
 	/* our membership */
 	struct ipv6_mreq ALGN16(memb[1]);
@@ -157,10 +157,13 @@ mc6_loop(int s, int on)
 }
 
 static int
-mc6_join_group(int s, ud_sockaddr_t sa, struct ipv6_mreq *r)
+mc6_join_group(int s, struct ud_sockaddr_s *sa, struct ipv6_mreq *r)
 {
+	if (UNLIKELY(sa->sz == 0)) {
+		return -1;
+	}
 	/* set up the multicast group and join it */
-	r->ipv6mr_multiaddr = sa->sa6.sin6_addr;
+	r->ipv6mr_multiaddr = sa->sa.sa6.sin6_addr;
 	r->ipv6mr_interface = 0;
 
 	/* now truly join */
@@ -198,18 +201,24 @@ mc6_socket(void)
 	return s;
 }
 
-static void
-mc6_set_dest(ud_sockaddr_t s, const char *addr, short unsigned int port)
+static int
+mc6_set_dest(struct ud_sockaddr_s *s, const char *addr, short unsigned int port)
 {
-	/* set destination address */
-	s->sa6.sin6_family = AF_INET6;
+	sa_family_t fam = AF_INET6;
+
 	/* we pick link-local here for simplicity */
-	inet_pton(AF_INET6, addr, &s->sa6.sin6_addr);
+	if (inet_pton(fam, addr, &s->sa.sa6.sin6_addr) < 0) {
+		return -1;
+	}
+	/* set destination address */
+	s->sa.sa6.sin6_family = fam;
 	/* port as well innit */
-	s->sa6.sin6_port = htons(port);
+	s->sa.sa6.sin6_port = htons(port);
 	/* set the flowinfo */
-	s->sa6.sin6_flowinfo = 0;
-	return;
+	s->sa.sa6.sin6_flowinfo = 0;
+	/* also store the length */
+	s->sz = sizeof(s->sa.sa6);
+	return 0;
 }
 
 static int

@@ -1,0 +1,372 @@
+/*** unserding.c -- unserding library definitions
+ *
+ * Copyright (C) 2008-2013 Sebastian Freundt
+ *
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
+ *
+ * This file is part of unserding.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the author nor the names of any contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ ***/
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
+#include <stdlib.h>
+#include <stdio.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <string.h>
+#if defined HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif	/* HAVE_SYS_TYPES_H */
+#if defined HAVE_SYS_SOCKET_H
+# include <sys/socket.h>
+#endif	/* HAVE_SYS_SOCKET_H */
+#if defined HAVE_NETINET_IN_H
+# include <netinet/in.h>
+#endif	/* HAVE_NETINET_IN_H */
+#if defined HAVE_ARPA_INET_H
+# include <arpa/inet.h>
+#endif	/* HAVE_ARPA_INET_H */
+#if defined HAVE_ERRNO_H
+# include <errno.h>
+#endif	/* HAVE_ERRNO_H */
+#include <sys/mman.h>
+
+/* our master include */
+#include "unserding.h"
+#include "unserding-nifty.h"
+#include "ud-sock.h"
+#include "ud-sockaddr.h"
+
+#if !defined IPPROTO_IPV6
+# error system not fit for ipv6 transport
+#endif	/* IPPROTO_IPV6 */
+
+/* guaranteed by IPv6 */
+#define MIN_MTU		(1280U)
+/* mtu for ethernet */
+#define ETH_MTU		(1500U)
+/* high-3-bits MTU, 1024 + 512 + 256 */
+#define H3B_MTU		(1024U + 512U + 256U)
+
+#define UDP_MULTICAST_TTL	64
+
+typedef struct __sock_s *__sock_t;
+
+/* our private view on ud_sock_s */
+struct __sock_s {
+	union {
+		struct ud_sock_s pub[1];
+		/* non const version of PUB */
+		struct {
+			int fd;
+			uint32_t fl;
+			const void *data;
+			char priv[];
+		};
+	};
+
+	/* a secondary fd for pub'ing */
+	int fd_send;
+
+	/* stuff used to configure the thing */
+	struct ud_sockopt_s opt;
+
+	/* conversation */
+	int cno;
+	/* packet within */
+	int pno;
+
+	union ud_sockaddr_u src[1];
+	union ud_sockaddr_u dst[1];
+
+	/* our membership */
+	struct ipv6_mreq ALGN16(memb[1]);
+
+	/** total number of received bytes in buffer */
+	size_t nrd;
+	/** offset to which packet has been checked (in B) */
+	size_t nck;
+	char ALGN16(recv[ETH_MTU]);
+
+	/** total number of sent bytes in buffer */
+	size_t nwr;
+	/** offset to which packet has been packed (in B) */
+	size_t npk;
+	char ALGN16(send[ETH_MTU]);
+};
+
+
+/* helpers */
+static inline void*
+mmap_mem(size_t z)
+{
+	void *res = mmap(NULL, z, PROT_MEM, MAP_MEM, -1, 0);
+
+	if (UNLIKELY(res == MAP_FAILED)) {
+		return NULL;
+	}
+	return res;
+}
+
+static inline void
+munmap_mem(void *p, size_t z)
+{
+	munmap(p, z);
+	return;
+}
+
+
+static int
+mc6_loop(int s, int on)
+{
+#if defined IPV6_MULTICAST_LOOP
+	/* don't loop */
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &on, sizeof(on));
+#else  /* !IPV6_MULTICAST_LOOP */
+# warning multicast looping cannot be turned on or off
+#endif	/* IPV6_MULTICAST_LOOP */
+	return on;
+}
+
+static int
+mc6_join_group(int s, ud_sockaddr_t sa, struct ipv6_mreq *r)
+{
+	/* set up the multicast group and join it */
+	r->ipv6mr_multiaddr = sa->sa6.sin6_addr;
+	r->ipv6mr_interface = 0;
+
+	/* now truly join */
+	return setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, r, sizeof(*r));
+}
+
+static void
+mc6_leave_group(int s, struct ipv6_mreq *mreq)
+{
+	/* drop mcast6 group membership */
+	setsockopt(s, IPPROTO_IPV6, IPV6_LEAVE_GROUP, mreq, sizeof(*mreq));
+	return;
+}
+
+
+/* socket goodies */
+static int
+mc6_socket(void)
+{
+	volatile int s;
+
+	/* try v6 first */
+	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_IP)) < 0) {
+		return -1;
+	}
+
+#if defined IPV6_V6ONLY
+	{
+		int yes = 1;
+		setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes));
+	}
+#endif	/* IPV6_V6ONLY */
+	/* be less blocking */
+	setsock_nonblock(s);
+	return s;
+}
+
+static void
+mc6_set_dest(ud_sockaddr_t s, const char *addr, short unsigned int port)
+{
+	/* set destination address */
+	s->sa6.sin6_family = AF_INET6;
+	/* we pick link-local here for simplicity */
+	inet_pton(AF_INET6, addr, &s->sa6.sin6_addr);
+	/* port as well innit */
+	s->sa6.sin6_port = htons(port);
+	/* set the flowinfo */
+	s->sa6.sin6_flowinfo = 0;
+	return;
+}
+
+static int
+mc6_set_pub(int s)
+{
+	union ud_sockaddr_u sa = {
+		.sa6.sin6_family = AF_INET6,
+		.sa6.sin6_addr = IN6ADDR_ANY_INIT,
+		.sa6.sin6_port = 0,
+	};
+
+	/* as a courtesy to tools bind the channel */
+	return bind(s, &sa.sa, sizeof(sa));
+}
+
+static int
+mc6_set_sub(int s, short unsigned int port)
+{
+	union ud_sockaddr_u sa = {
+		.sa6.sin6_family = AF_INET6,
+		.sa6.sin6_addr = IN6ADDR_ANY_INIT,
+		.sa6.sin6_port = htons(port),
+	};
+	int opt;
+
+	/* allow many many many subscribers on that port */
+	setsock_reuseaddr(s);
+
+	/* turn multicast looping on */
+	mc6_loop(s, 1);
+#if defined IPV6_V6ONLY
+	opt = 0;
+	setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
+#endif	/* IPV6_V6ONLY */
+#if defined IPV6_USE_MIN_MTU
+	/* use minimal mtu */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU, &opt, sizeof(opt));
+#endif
+#if defined IPV6_DONTFRAG
+	/* rather drop a packet than to fragment it */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_DONTFRAG, &opt, sizeof(opt));
+#endif
+#if defined IPV6_RECVPATHMTU
+	/* obtain path mtu to send maximum non-fragmented packet */
+	opt = 1;
+	setsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU, &opt, sizeof(opt));
+#endif
+#if defined IPV6_MULTICAST_HOPS
+	opt = UDP_MULTICAST_TTL;
+	/* turn into a mcast sock and set a TTL */
+	setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &opt, sizeof(opt));
+#endif	/* IPV6_MULTICAST_HOPS */
+
+	/* we used to retry upon failure, but who cares */
+	if (bind(s, &sa.sa, sizeof(sa)) < 0) {
+		return -1;
+	}
+	return 0;
+}
+
+static int
+mc6_unset_pub(int UNUSED(s))
+{
+	/* do fuckall */
+	return 0;
+}
+
+static int
+mc6_unset_sub(int s)
+{
+	/* linger the sink sock */
+	setsock_linger(s, 1);
+	return 0;
+}
+
+
+/* implementation of public interface */
+ud_sock_t
+ud_socket(struct ud_sockopt_s opt)
+{
+	__sock_t res;
+	int s;
+
+#define MODE_SUBP(fl)	(fl & UD_SUB)
+#define MODE_PUBP(fl)	(fl & UD_PUB)
+
+	/* check if someone tries to trick us */
+	if (UNLIKELY(opt.mode == UD_NONE)) {
+		goto out;
+	}
+	/* check the rest of opt */
+	if (opt.addr == NULL) {
+		opt.addr = UD_MCAST6_SITE_LOCAL;
+	}
+	if (opt.port == 0) {
+		opt.port = UD_NETWORK_SERVICE;
+	}
+
+	/* do all the socket magic first, so we don't waste memory */
+	if (UNLIKELY((s = mc6_socket()) < 0)) {
+		goto out;
+	}
+	if (MODE_SUBP(opt.mode) && mc6_set_sub(s, opt.port) < 0) {
+		goto clos_out;
+	}
+	if (MODE_PUBP(opt.mode) && mc6_set_pub(s) < 0) {
+		goto clos_out;
+	}
+
+	/* fingers crossed we don't waste memory (on hugepage systems) */
+	if (UNLIKELY((res = mmap_mem(sizeof(*res))) == NULL)) {
+		goto clos_out;
+	}
+
+	/* fill in res */
+	res->fd = res->fd_send = s;
+	res->fl = 0U;
+	res->data = NULL;
+
+	/* keep a copy of how we configured this sockets */
+	res->opt = opt;
+
+	/* destination address now, use SILO by default for now */
+	mc6_set_dest(res->dst, opt.addr, opt.port);
+
+	/* join the mcast group(s) */
+	if (MODE_SUBP(opt.mode) && mc6_join_group(s, res->dst, res->memb) < 0) {
+		goto munm_out;
+	}
+	return (ud_sock_t)res;
+
+munm_out:
+	munmap_mem(res, sizeof(*res));
+clos_out:
+	close(s);
+out:
+	return NULL;
+}
+
+int
+ud_close(ud_sock_t s)
+{
+	__sock_t us = (__sock_t)s;
+	int fd = us->fd;
+
+	mc6_unset_pub(fd);
+	mc6_unset_sub(fd);
+
+	if (MODE_SUBP(us->opt.mode)) {
+		/* leave the mcast group */
+		mc6_leave_group(fd, us->memb);
+	}
+
+	munmap_mem(us, sizeof(*us));
+	return close(fd);
+}
+
+/* unserding.c ends here */

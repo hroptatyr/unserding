@@ -210,7 +210,7 @@ struct job_s {
 	/** for udp based transports,
 	 * use a union here to allow clients to use whatever struct they want */
 	/* will be typically struct sockaddr_in6 */
-	ud_sockaddr_u sa;
+	union ud_sockaddr_u sa;
 	unsigned int sock;
 	/**
 	 * bits 0-1 is job state:

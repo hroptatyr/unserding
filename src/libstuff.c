@@ -282,7 +282,7 @@ ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo)
 	ssize_t nread;
 	static __thread char buf[UDPC_PKTLEN];
 	ud_packet_t pkt = BUF_PACKET(buf);
-	ud_sockaddr_u __sa;
+	union ud_sockaddr_u __sa;
 	socklen_t lsa = sizeof(__sa);
 	struct sockaddr *sa = (void*)&__sa.sa;
 	ep_ctx_t epg = epoll_guts();

@@ -55,6 +55,8 @@ ud_ping_LDADD = $(unserding_LIBS)
 ## the lib, or its archive counterpart
 lib_LTLIBRARIES += libunserding.la
 libunserding_la_SOURCES = libstuff.c
+header_HEADERS += unserding.h
+header_HEADERS += ud-sockaddr.h
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)

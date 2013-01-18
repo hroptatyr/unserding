@@ -41,6 +41,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>
+#include "ud-sockaddr.h"
 #if defined UD_COMPAT
 # include "mcast.h"
 #endif	/* UD_COMPAT */
@@ -116,7 +117,7 @@ struct ud_handle_s {
 	int sock:24;
 	ud_pktchn_t pktchn;
 	/* our connexion later on */
-	ud_sockaddr_u sa;
+	union ud_sockaddr_u sa;
 	/* moving average roundtrip time (in nano seconds) */
 	int mart;
 	/* system score */

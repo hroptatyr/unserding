@@ -32,6 +32,16 @@ TESTS += test_pub_03
 test_pub_03_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
 test_pub_03_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
 
+check_PROGRAMS += test_pub_04
+TESTS += test_pub_04
+test_pub_04_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
+test_pub_04_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
+
+check_PROGRAMS += test_pub_05
+TESTS += test_pub_05
+test_pub_05_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
+test_pub_05_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
+
 .NOTPARALLEL:
 
 ## Makefile.am ends here

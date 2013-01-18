@@ -22,7 +22,7 @@ header_HEADERS += mcast.h
 header_HEADERS += logger.h
 header_HEADERS += unserding-ctx.h
 noinst_HEADERS += protocore-private.h
-noinst_HEADERS += ud-sock.h epoll-helpers.h ud-time.h
+noinst_HEADERS += ud-sock.h epoll-helpers.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
 noinst_HEADERS += seria-proto-glue.h
 ## stuff that really does not belong here, expect this to be kicked
@@ -45,12 +45,16 @@ unsermon_LDADD = $(unserding_LIBS)
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 
 bin_PROGRAMS += ud-ping
-ud_ping_SOURCES = ud-ping.c
+ud_ping_SOURCES = ud-ping.c ud-ping-clo.ggo
+ud_ping_SOURCES += svc-pong.h
+ud_ping_SOURCES += ud-time.h
 ud_ping_CPPFLAGS = $(AM_CPPFLAGS)
-ud_ping_CPPFLAGS += -DUD_COMPAT
+ud_ping_CPPFLAGS += $(libev_CFLAGS)
 ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
 ud_ping_LDFLAGS += -lrt
+ud_ping_LDFLAGS += $(libev_LIBS)
 ud_ping_LDADD = $(unserding_LIBS)
+BUILT_SOURCES += ud-ping-clo.c ud-ping-clo.h
 
 ## the lib, or its archive counterpart
 lib_LTLIBRARIES += libunserding.la

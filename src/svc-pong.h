@@ -1,8 +1,8 @@
 /*** svc-pong.h -- pong service goodies
  *
- * Copyright (C) 2009 Sebastian Freundt
+ * Copyright (C) 2009-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -34,7 +34,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
 #if !defined INCLUDED_svc_pong_h_
 #define INCLUDED_svc_pong_h_
 
@@ -98,8 +97,10 @@ ud_find_score(ud_pong_set_t ps)
 }
 
 
+#if defined UD_COMPAT
 /* exports, will be in libunserding */
 extern ud_pong_score_t
 ud_svc_nego_score(ud_handle_t hdl, int timeout);
+#endif	/* UD_COMPAT */
 
 #endif	/* INCLUDED_svc_pong_h_ */

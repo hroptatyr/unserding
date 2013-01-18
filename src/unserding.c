@@ -80,6 +80,23 @@
 
 typedef struct __sock_s *__sock_t;
 
+struct ud_hdr_s {
+	uint16_t cno;
+	uint16_t pno;
+	uint16_t cmd;
+	uint16_t magic;
+	char pl[];
+};
+
+union ud_buf_u {
+	struct {
+		struct ud_hdr_s hdr;
+		/* payload */
+		char pl[];
+	};
+	char buf[ETH_MTU];
+};
+
 /* our private view on ud_sock_s */
 struct __sock_s {
 	union {
@@ -114,20 +131,13 @@ struct __sock_s {
 	size_t nrd;
 	/** offset to which packet has been checked (in B) */
 	size_t nck;
-	char ALGN16(recv[ETH_MTU]);
+	union ud_buf_u ALGN16(recv);
 
 	/** total number of sent bytes in buffer */
 	size_t nwr;
 	/** offset to which packet has been packed (in B) */
 	size_t npk;
-	char ALGN16(send[ETH_MTU]);
-};
-
-struct ud_proto_hdr_s {
-	uint16_t cno;
-	uint16_t pno;
-	uint16_t cmd;
-	uint16_t magic;
+	union ud_buf_u ALGN16(send);
 };
 
 
@@ -391,18 +401,17 @@ ud_flush(ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
 
-	if (LIKELY(us->npk > sizeof(struct ud_proto_hdr_s))) {
+	if (LIKELY(us->npk > 0U)) {
 		ssize_t nwr;
-		const char *b = us->send;
-		size_t z = us->npk;
+		const void *b = us->send.buf;
+		size_t z = us->npk + sizeof(us->send.hdr);
 		const struct sockaddr *sa = &us->dst->sa.sa;
 		socklen_t sz = us->dst->sz;
-		struct ud_proto_hdr_s *hdr = (void*)us->send;
 
-		hdr->cno = (uint16_t)us->cno;
-		hdr->pno = (uint16_t)us->pno;
-		hdr->cmd = 0U;
-		hdr->magic = htons(0xbeef);
+		us->send.hdr.cno = (uint16_t)us->cno;
+		us->send.hdr.pno = (uint16_t)us->pno;
+		us->send.hdr.cmd = 0U;
+		us->send.hdr.magic = htons(0xbeef);
 
 		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
 			return -1;
@@ -411,7 +420,7 @@ ud_flush(ud_sock_t sock)
 			;
 		}
 		/* update indexes */
-		us->npk = sizeof(struct ud_proto_hdr_s);
+		us->npk = 0U;
 		us->nwr = 0U;
 		us->cno++;
 	}
@@ -428,6 +437,14 @@ ud_dscrd(ud_sock_t sock)
 	return 0;
 }
 
+static inline bool
+__msg_fits_p(__sock_t s, size_t len)
+{
+	const size_t smtu = sizeof(s->send.buf);
+	const size_t plen = smtu - (s->send.pl - s->send.buf);
+	return s->npk + 2U + len <= plen;
+}
+
 int
 ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg)
 {
@@ -436,25 +453,26 @@ ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg)
 	const char *d = msg->data;
 	char *p;
 
-	if (us->npk + z + 2U > sizeof(us->send) &&
-	    /* send what we've got */
-	    ud_flush(sock) < 0) {
-		/* nah, don't pack up new stuff,
-		 * we need to get rid of the old shit first
-		 * actually this should be configurable behaviour*/
-		return -1;
+	if (UNLIKELY(!__msg_fits_p(us, z))) {
+		/* send what we've got */
+		if (UNLIKELY(ud_flush(sock)) < 0) {
+			/* nah, don't pack up new stuff,
+			 * we need to get rid of the old shit first
+			 * actually this should be configurable behaviour */
+			return -1;
+		}
 	}
 
 	/* now copy the blob */
 #define UDPC_TYPE_DATA	(0x0c)
-	p = us->send + us->npk;
+	p = us->send.pl + us->npk;
 	*p++ = UDPC_TYPE_DATA;
 	*p++ = z;
 	memcpy(p, d, z);
 	p += z;
 
 	/* and update counters */
-	us->npk = p - us->send;
+	us->npk = p - us->send.pl;
 	return 0;
 }
 

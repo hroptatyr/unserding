@@ -69,7 +69,95 @@ extern "C" {
 /* just offer a default address for some tools */
 #define UD_MCAST6_ADDR		UD_MCAST6_SITE_LOCAL
 
+typedef struct ud_sock_s *restrict ud_sock_t;
+typedef const struct ud_sock_s *ud_const_sock_t;
 
+/**
+ * Public type for unserding sockets. */
+struct ud_sock_s {
+	/** socket for I/O, can be used as if acquired by `socket()' */
+	const int fd;
+	/** generic socket indicator */
+	const uint32_t fl;
+	/** data ptr the library won't touch, for external use by user */
+	void *data;
+	/** beginning of private section */
+	char priv[0];
+};
+
+/**
+ * Message for packing and unpacking unserding packets. */
+struct ud_msg_s {
+	const char *data;
+	size_t dlen;
+};
+
+/**
+ * Options to be handed to `ud_socket()'. */
+struct ud_sockopt_s {
+	enum {
+		UD_NONE = 0U,
+		UD_PUB = 1U,
+		UD_SUB = 2U,
+		UD_PUBSUB = 3U,
+	} mode;
+	/** mode options, can be |'d as needed */
+	enum {
+		UD_MOPT_NONE,
+		UD_MOPT_BIND_LOCALLY,
+	} mode_opt;
+	/** address to send/subscribe to, UD_MCAST6_SITE_LOCAL if NULL */
+	const char *addr;
+	/** service to send/subscribe to, UD_NETWORK_SERVICE if 0 */
+	short unsigned int port;
+};
+
+
+/* first up socket ctoring and dtoring */
+/**
+ * Return a socket set up for PUB'ing or SUB'ing, according to OPT.
+ * The socket returned in the FD slot of the result object can be used
+ * as if acquired by `socket()' so in particular (e)polling is allowed.
+ * The socket object must be closed by `ud_close()'.
+ *
+ * If ADDRESS and/or SERVICE in OPT is omitted, the site-local address
+ * UD_MCAST6_SITE_LOCAL and/or UD_NETWORK_SERVICE is used.
+ *
+ * MODE must be one of the socket mode specifiers as defined above. */
+extern ud_sock_t ud_socket(struct ud_sockopt_s opt);
+
+/**
+ * Close a socket and free associated resources. */
+extern int ud_close(ud_sock_t sock);
+
+/* next up packing/unpacking messages */
+/**
+ * Produce wire-representation of P (of size Z) in SOCK. */
+extern int ud_pack(ud_sock_t sock, const void *p, size_t z);
+
+/**
+ * Produce wire-representation of MSG in SOCK. */
+extern int ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg);
+
+/**
+ * Flush buffered packs immediately. */
+extern int ud_flush(ud_sock_t sock);
+
+/**
+ * Read messages from SOCK and return a deserialised version in TGT. */
+extern ssize_t ud_chck(void *restrict tgt, ud_sock_t sock);
+
+/**
+ * Read messages from SOCK and return a deserialised version in TGT. */
+extern int ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock);
+
+/**
+ * Discard buffered packs from previous `ud_chck()'. */
+extern int ud_dscrd(ud_sock_t sock);
+
+
+#if defined UD_COMPAT
+/* old api */
 /**
  * Flags. */
 typedef long unsigned int ud_flags_t;
@@ -195,6 +283,7 @@ extern void ud_chan_fini(ud_chan_t);
  * Service 0004:
  * Ping/pong service to determine neighbours. */
 #define UD_SVC_PING	0x0004
+#endif	/* UD_COMPAT */
 
 #ifdef __cplusplus
 }

@@ -1,0 +1,16 @@
+args "--no-handle-error --long-help -a ud_args_info -f ud_parser"
+package "ud-ping"
+usage "ud-ping [OPTION]..."
+description "Send echo requests to unserding networks."
+
+option "count" c
+	"Send exactly NATNUM echo requests"
+	int typestr="NATNUM" optional
+
+option "interval" i
+	"Between echo requests sleep for SEC seconds"
+	int typestr="SEC" optional default="1"
+
+option "negotiation" n
+	"Initiate the negotiation routine for clients."
+	optional

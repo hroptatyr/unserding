@@ -88,7 +88,7 @@ struct ud_sock_s {
 /**
  * Message for packing and unpacking unserding packets. */
 struct ud_msg_s {
-	const char *data;
+	const void *data;
 	size_t dlen;
 };
 

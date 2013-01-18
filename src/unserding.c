@@ -123,6 +123,13 @@ struct __sock_s {
 	char ALGN16(send[ETH_MTU]);
 };
 
+struct ud_proto_hdr_s {
+	uint16_t cno;
+	uint16_t pno;
+	uint16_t cmd;
+	uint16_t magic;
+};
+
 
 /* helpers */
 static inline void*
@@ -376,6 +383,86 @@ ud_close(ud_sock_t s)
 
 	munmap_mem(us, sizeof(*us));
 	return close(fd);
+}
+
+/* actual I/O */
+int
+ud_flush(ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+
+	if (LIKELY(us->npk > sizeof(struct ud_proto_hdr_s))) {
+		ssize_t nwr;
+		const char *b = us->send;
+		size_t z = us->npk;
+		const struct sockaddr *sa = &us->dst->sa.sa;
+		socklen_t sz = us->dst->sz;
+		struct ud_proto_hdr_s *hdr = (void*)us->send;
+
+		hdr->cno = (uint16_t)us->cno;
+		hdr->pno = (uint16_t)us->pno;
+		hdr->cmd = 0U;
+		hdr->magic = htons(0xbeef);
+
+		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
+			return -1;
+		} else if ((size_t)nwr < z) {
+			/* should we try a resend? */
+			;
+		}
+		/* update indexes */
+		us->npk = sizeof(struct ud_proto_hdr_s);
+		us->nwr = 0U;
+		us->cno++;
+	}
+	return 0;
+}
+
+int
+ud_dscrd(ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+
+	/* just update the whole shebang */
+	us->nrd = us->nck = 0U;
+	return 0;
+}
+
+int
+ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg)
+{
+	__sock_t us = (__sock_t)sock;
+	uint8_t z = (uint8_t)msg->dlen;
+	const char *d = msg->data;
+	char *p;
+
+	if (us->npk + z + 2U > sizeof(us->send) &&
+	    /* send what we've got */
+	    ud_flush(sock) < 0) {
+		/* nah, don't pack up new stuff,
+		 * we need to get rid of the old shit first
+		 * actually this should be configurable behaviour*/
+		return -1;
+	}
+
+	/* now copy the blob */
+#define UDPC_TYPE_DATA	(0x0c)
+	p = us->send + us->npk;
+	*p++ = UDPC_TYPE_DATA;
+	*p++ = z;
+	memcpy(p, d, z);
+	p += z;
+
+	/* and update counters */
+	us->npk = p - us->send;
+	return 0;
+}
+
+int
+ud_pack(ud_sock_t sock, const void *data, size_t dlen)
+{
+	return ud_pack_msg(sock, &(struct ud_msg_s){
+				.dlen = dlen, .data = data});
 }
 
 /* unserding.c ends here */

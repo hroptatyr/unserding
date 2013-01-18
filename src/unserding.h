@@ -145,7 +145,7 @@ extern int ud_flush(ud_sock_t sock);
 
 /**
  * Read messages from SOCK and return a deserialised version in TGT. */
-extern ssize_t ud_chck(void *restrict tgt, ud_sock_t sock);
+extern ssize_t ud_chck(void *restrict tgt, size_t tsz, ud_sock_t sock);
 
 /**
  * Read messages from SOCK and return a deserialised version in TGT. */

@@ -431,9 +431,22 @@ int
 ud_dscrd(ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
+	ssize_t nrd = 0;
 
-	/* just update the whole shebang */
-	us->nrd = us->nck = 0U;
+	if (UNLIKELY(us->nrd == 0U)) {
+		/* oh, we shall read the shebang off the wire innit? */
+		void *restrict b = us->recv.buf;
+		size_t z = sizeof(us->recv.buf);
+		struct sockaddr *restrict sa = &us->src->sa.sa;
+		socklen_t *restrict sz = &us->src->sz;
+
+		if ((nrd = recvfrom(us->fd, b, z, 0, sa, sz)) < 0) {
+			return -1;
+		}
+	}
+	/* update indexes */
+	us->nrd = nrd;
+	us->nck = 0U;
 	return 0;
 }
 
@@ -481,6 +494,52 @@ ud_pack(ud_sock_t sock, const void *data, size_t dlen)
 {
 	return ud_pack_msg(sock, &(struct ud_msg_s){
 				.dlen = dlen, .data = data});
+}
+
+int
+ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+	char *p;
+
+	if (us->nrd == 0U) {
+		/* we need a dose */
+		if (UNLIKELY(ud_dscrd(sock)) < 0) {
+			/* nah, don't pack up new stuff,
+			 * we need to get rid of the old shit first
+			 * actually this should be configurable behaviour */
+			return -1;
+		}
+	}
+
+	/* now copy the blob */
+	p = us->recv.pl + us->nck;
+	if ((*p++ != UDPC_TYPE_DATA)) {
+		us->nrd = us->nck = 0U;
+		return -1;
+	}
+	tgt->dlen = *p++;
+	tgt->data = p;
+
+	/* and update counters */
+	us->nck += tgt->dlen;
+	return 0;
+}
+
+ssize_t
+ud_chck(void *restrict tgt, size_t tsz, ud_sock_t sock)
+{
+	struct ud_msg_s msg = {0};
+
+	if (ud_chck_msg(&msg, sock) < 0) {
+		return -1;
+	}
+	/* otherwise copy to user buffer */
+	if (UNLIKELY(msg.dlen > tsz)) {
+		msg.dlen = tsz;
+	}
+	memcpy(tgt, msg.data, msg.dlen);
+	return msg.dlen;
 }
 
 /* unserding.c ends here */

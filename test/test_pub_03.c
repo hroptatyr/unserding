@@ -12,7 +12,10 @@ main(void)
 				   UD_PUB, .addr = UD_MCAST6_NODE_LOCAL,
 					   .port = 8378/*TEST*/}))) {
 		assert(s->fd > 0);
-		ud_close(s);
+
+		res += ud_pack(s, "TEST", 4);
+		res += ud_flush(s);
+		res += ud_close(s);
 	}
 	return res;
 }

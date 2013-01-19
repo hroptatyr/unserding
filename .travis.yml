@@ -8,6 +8,8 @@ before_script:
   - autoreconf -vfi
   - sudo apt-get install -qq gengetopt
   - sudo apt-get install -qq libev-dev
+  - sudo apt-get install -qq texinfo
+  - sudo apt-get install -qq texlive
 
 env:
   - OPTIONS=""

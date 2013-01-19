@@ -13,7 +13,7 @@ before_script:
 
 env:
   - OPTIONS=""
-  - OPTIONS="CPPFLAGS='-DDEBUG_FLAG'"
+  - OPTIONS="CPPFLAGS=-DDEBUG_FLAG"
 
 script:
   - mkdir \=build

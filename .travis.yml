@@ -13,7 +13,12 @@ env:
   - OPTIONS=""
   - OPTIONS="CPPFLAGS='-DDEBUG_FLAG'"
 
-script: ./configure $OPTIONS && make clean all check distcheck || (cat test/test-suite.log && /bin/false)
+script: 
+  - ./configure $OPTIONS
+  - make clean all check distcheck
+
+after_failure:
+  - cat test/test-suite.log
 
 ## whitelist
 branches:

@@ -13,8 +13,10 @@ env:
   - OPTIONS=""
   - OPTIONS="CPPFLAGS='-DDEBUG_FLAG'"
 
-script: 
-  - ./configure $OPTIONS
+script:
+  - mkdir \=build
+  - cd \=build
+  - ../configure $OPTIONS
   - make clean all check distcheck
 
 after_failure:

@@ -9,7 +9,11 @@ before_script:
   - sudo apt-get install -qq gengetopt
   - sudo apt-get install -qq libev-dev
 
-script: ./configure CPPFLAGS="-DDEBUG_FLAG" && make clean all check distcheck || (cat test/test-suite.log && /bin/false)
+env:
+  - OPTIONS=""
+  - OPTIONS="CPPFLAGS='-DDEBUG_FLAG'"
+
+script: ./configure $OPTIONS && make clean all check distcheck || (cat test/test-suite.log && /bin/false)
 
 ## whitelist
 branches:

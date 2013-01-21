@@ -72,6 +72,8 @@ extern "C" {
 typedef struct ud_sock_s *restrict ud_sock_t;
 typedef const struct ud_sock_s *ud_const_sock_t;
 
+typedef union ud_svc_u ud_svc_t;
+
 /**
  * Public type for unserding sockets. */
 struct ud_sock_s {
@@ -110,6 +112,14 @@ struct ud_sockopt_s {
 	const char *addr;
 	/** service to send/subscribe to, UD_NETWORK_SERVICE if 0 */
 	short unsigned int port;
+};
+
+union ud_svc_u {
+	struct {
+		uint8_t chn;
+		uint8_t svc;
+	};
+	uint16_t svcu;
 };
 
 
@@ -276,13 +286,6 @@ extern ud_chan_t ud_chan_init(short unsigned int port);
 /**
  * Free resources associated with a connection. */
 extern void ud_chan_fini(ud_chan_t);
-
-
-/* specific services */
-/**
- * Service 0004:
- * Ping/pong service to determine neighbours. */
-#define UD_SVC_PING	0x0004
 #endif	/* UD_COMPAT */
 
 #ifdef __cplusplus

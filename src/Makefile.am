@@ -25,6 +25,7 @@ noinst_HEADERS += protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
 noinst_HEADERS += seria-proto-glue.h
+noinst_HEADERS += boobs.h
 ## stuff that really does not belong here, expect this to be kicked
 EXTRA_DIST += btea.c
 EXTRA_DIST += dso-pong.c
@@ -61,12 +62,13 @@ libunserding_la_SOURCES = unserding.c
 header_HEADERS += unserding.h
 header_HEADERS += ud-sockaddr.h
 libunserding_la_SOURCES += libstuff.c
+libunserding_la_SOURCES += ud-private.h
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
 libunserding_la_CPPFLAGS += -DUD_COMPAT
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
-libunserding_la_LDFLAGS += -version-info 0:1:0
+libunserding_la_LDFLAGS += -version-info 1:0:1
 unserding_LIBS = libunserding.la
 
 

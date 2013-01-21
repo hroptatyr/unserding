@@ -37,6 +37,7 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#include <unistd.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <signal.h>
@@ -58,15 +59,15 @@ static void
 sub_cb(EV_P_ ev_io *w, int UNUSED(rev))
 {
 	ud_sock_t s = w->data;
-	struct ud_msg_s msg[1];
+	struct svc_ping_s po[1];
 
-	if (ud_chck_msg(msg, s) < 0) {
+	if (ud_chck_ping(po, s) < 0) {
 		/* don't care */
 		return;
 	}
 
 	/* otherwise inspect packet */
-	puts("PONG");
+	fprintf(stdout, "%jd\t%s\n", (intmax_t)po->pid, po->hostname);
 	return;
 }
 
@@ -74,13 +75,8 @@ static void
 ptm_cb(EV_P_ ev_timer *w, int UNUSED(rev))
 {
 	ud_sock_t s = w->data;
-	static struct timeval rt;
 
-	/* record the current time */
-	rt = __ustamp();
-	puts("PING");
-	ud_pack_msg(s, &(struct ud_msg_s){.dlen = sizeof(rt), .data = &rt});
-	ud_flush(s);
+	(void)ud_pack_pong(s, 0/*ping*/);
 	return;
 }
 

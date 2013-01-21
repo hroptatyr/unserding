@@ -179,7 +179,7 @@ ud_svc_nego_score(ud_handle_t hdl, int timeout)
 	clo.rtref = __ustamp();
 	clo.hdl = hdl;
 	/* send off the bugger */
-	clo.cno = ud_send_simple(hdl, UD_SVC_PING);
+	clo.cno = ud_send_simple(hdl, UD_SVC_PING.svcu);
 	/* wait for replies */
 	ud_subscr_raw(hdl, timeout, cb, &clo);
 	/* after they're all through, try and get a proper score */

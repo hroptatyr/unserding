@@ -37,6 +37,7 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#include <limits.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "svc-pong.h"
@@ -132,6 +133,31 @@ ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1])
 			.msg.data = __msg.buf,
 			.msg.dlen = sizeof(__msg.buf),
 		});
+}
+
+int
+ud_pack_pong(ud_sock_t sock, unsigned int pongp)
+{
+/* PINGs can't be packed. */
+	static struct svc_ping_s po;
+
+	if (UNLIKELY(po.hostnlen == 0U)) {
+		static char hname[HOST_NAME_MAX];
+		if (gethostname(hname, sizeof(hname)) < 0) {
+			return -1;
+		}
+		hname[HOST_NAME_MAX - 1] = '\0';
+		po.hostnlen = strlen(hname);
+		po.hostname = hname;
+		po.pid = getpid();
+	}
+
+	if (pongp) {
+		po.what = SVC_PING_PONG;
+	} else {
+		po.what = SVC_PING_PING;
+	}
+	return ud_pack_ping(sock, &po);
 }
 
 int

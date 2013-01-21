@@ -46,6 +46,10 @@ struct svc_ping_s {
 	const char *hostname;
 	size_t hostnlen;
 	pid_t pid;
+	enum {
+		SVC_PING_PING,
+		SVC_PING_PONG,
+	} what;
 };
 
 /**
@@ -115,6 +119,10 @@ ud_svc_nego_score(ud_handle_t hdl, int timeout);
 /**
  * Pack an svc_ping_s object MSG into S. */
 extern int ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1]);
+
+/**
+ * Simply pack a ping or pong message into S. */
+extern int ud_pack_pong(ud_sock_t sock, unsigned int pongp);
 
 /**
  * Unpack a message assumed to be a svc_ping_s object FROM S into TGT. */

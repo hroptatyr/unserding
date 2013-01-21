@@ -1,8 +1,8 @@
 /*** svc-pong.c -- pong service goodies
  *
- * Copyright (C) 2009 Sebastian Freundt
+ * Copyright (C) 2009-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -34,20 +34,36 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "svc-pong.h"
+#include "boobs.h"
+
+#if defined UD_COMPAT
 #include "seria-proto-glue.h"
 #include "ud-time.h"
+#endif	/* UD_COMPAT */
 
+struct __ping_s {
+	uint32_t pid;
+	uint8_t hnz;
+	char hn[];
+};
+
+#if defined UD_COMPAT
 typedef struct __clo_s {
 	ud_handle_t hdl;
 	ud_pong_set_t seen;
 	ud_convo_t cno;
 	struct timeval rtref;
 } *__clo_t;
+#endif	/* UD_COMPAT */
 
+
+#if defined UD_COMPAT
 static void
 seria_skip_str(udpc_seria_t sctx)
 {
@@ -75,8 +91,56 @@ ud_svc_update_mart(ud_handle_t hdl, struct timeval then)
 	hdl->mart = 1 + (hdl->mart + rtts.tv_usec / 1000U) / 2;
 	return;
 }
+#endif	/* UD_COMPAT */
 
 
+/* packing service */
+static union {
+	struct __ping_s wire;
+	char buf[64];
+} __msg;
+
+#define MAX_HNZ		((uint8_t)(sizeof(__msg) - 6U))
+
+int
+ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1])
+{
+	/* 4 bytes for the pid */
+	__msg.wire.pid = htobe32((uint32_t)msg->pid);
+	if ((__msg.wire.hnz = (uint8_t)msg->hostnlen) > MAX_HNZ) {
+		__msg.wire.hnz = sizeof(__msg) - 5;
+	}
+	memcpy(__msg.wire.hn, msg->hostname, __msg.wire.hnz);
+	return ud_pack_msg(sock, &(struct ud_msg_s){
+			.data = __msg.buf,
+			.dlen = sizeof(__msg.buf),
+			});
+}
+
+int
+ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock)
+{
+	struct ud_msg_s msg[1];
+
+	if (ud_chck_msg(msg, sock) < 0) {
+		return -1;
+	} else if (msg->dlen > sizeof(__msg)) {
+		return -1;
+	}
+	/* otherwise memcpy to static buffer for inspection */
+	memcpy(__msg.buf, msg->data, msg->dlen);
+	if (__msg.wire.hnz > MAX_HNZ) {
+		return -1;
+	}
+	tgt->hostnlen = __msg.wire.hnz;
+	tgt->hostname = __msg.wire.hn;
+	tgt->pid = be32toh(__msg.wire.pid);
+	/* as a service, \nul terminate the hostname */
+	__msg.wire.hn[__msg.wire.hnz] = '\0';
+	return 0;
+}
+
+#if defined UD_COMPAT
 /* conforms to ud_subscr_f */
 static bool
 cb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
@@ -115,11 +179,12 @@ ud_svc_nego_score(ud_handle_t hdl, int timeout)
 	clo.rtref = __ustamp();
 	clo.hdl = hdl;
 	/* send off the bugger */
-	clo.cno = ud_send_simple(hdl, UD_SVC_PING);
+	clo.cno = ud_send_simple(hdl, UD_SVC_PING.svcu);
 	/* wait for replies */
 	ud_subscr_raw(hdl, timeout, cb, &clo);
 	/* after they're all through, try and get a proper score */
 	return hdl->score = ud_find_score(clo.seen);
 }
+#endif	/* UD_COMPAT */
 
 /* svc-pong.c ends here */

@@ -25,6 +25,7 @@ noinst_HEADERS += protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
 noinst_HEADERS += seria-proto-glue.h
+noinst_HEADERS += boobs.h
 ## stuff that really does not belong here, expect this to be kicked
 EXTRA_DIST += btea.c
 EXTRA_DIST += dso-pong.c

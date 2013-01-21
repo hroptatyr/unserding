@@ -43,7 +43,6 @@
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
-#include <limits.h>
 #if defined HAVE_EV_H
 # include <ev.h>
 # undef EV_P
@@ -76,24 +75,8 @@ static void
 ptm_cb(EV_P_ ev_timer *w, int UNUSED(rev))
 {
 	ud_sock_t s = w->data;
-	static struct svc_ping_s po;
 
-	if (UNLIKELY(po.hostnlen == 0U)) {
-		/* set up the ping object */
-		static char hname[HOST_NAME_MAX];
-		if (gethostname(hname, sizeof(hname)) < 0) {
-			/* no idea what to do */
-			return;
-		}
-		hname[HOST_NAME_MAX - 1] = '\0';
-		po.hostnlen = strlen(hname);
-		po.hostname = hname;
-		po.pid = getpid();
-	}
-
-	/* record the current time */
-	ud_pack_ping(s, &po);
-	ud_flush(s);
+	(void)ud_pack_pong(s, 0/*ping*/);
 	return;
 }
 

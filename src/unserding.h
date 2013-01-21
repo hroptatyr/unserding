@@ -288,23 +288,6 @@ extern ud_chan_t ud_chan_init(short unsigned int port);
 extern void ud_chan_fini(ud_chan_t);
 #endif	/* UD_COMPAT */
 
-
-/* specific services */
-/**
- * Channel 00, service 00
- * command request/announce service to discover new commands */
-#define UD_SVC_CMD	((ud_svc_t){0x00, 0x00})
-
-/**
- * Channel 00, service 02
- * time request/reply service to get an idea about network lags */
-#define UD_SVC_TIME	((ud_svc_t){0x00, 0x02})
-
-/**
- * Channel 00, service 04:
- * Ping/pong service to determine neighbours. */
-#define UD_SVC_PING	((ud_svc_t){0x00, 0x04})
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

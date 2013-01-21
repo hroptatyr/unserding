@@ -37,9 +37,11 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#include <limits.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "svc-pong.h"
+#include "ud-private.h"
 #include "boobs.h"
 
 #if defined UD_COMPAT
@@ -105,16 +107,57 @@ static union {
 int
 ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1])
 {
+	ud_svc_t cmd;
+
+	switch (msg->what) {
+	case SVC_PING_PING:
+		cmd = UD_SVC(UD_CHN_CTRL, UD_SVC_PING);
+		break;
+	case SVC_PING_PONG:
+		cmd = UD_SVC(UD_CHN_CTRL, UD_SVC_PING + 1/*reply*/);
+		break;
+	default:
+		return -1;
+	}
+
 	/* 4 bytes for the pid */
 	__msg.wire.pid = htobe32((uint32_t)msg->pid);
 	if ((__msg.wire.hnz = (uint8_t)msg->hostnlen) > MAX_HNZ) {
 		__msg.wire.hnz = sizeof(__msg) - 5;
 	}
 	memcpy(__msg.wire.hn, msg->hostname, __msg.wire.hnz);
-	return ud_pack_msg(sock, &(struct ud_msg_s){
-			.data = __msg.buf,
-			.dlen = sizeof(__msg.buf),
-			});
+
+	(void)ud_flush(sock);
+	return ud_pack_cmsg(sock, &(struct ud_cmsg_s){
+			.svc = cmd,
+			.msg.data = __msg.buf,
+			.msg.dlen = sizeof(__msg.buf),
+		});
+}
+
+int
+ud_pack_pong(ud_sock_t sock, unsigned int pongp)
+{
+/* PINGs can't be packed. */
+	static struct svc_ping_s po;
+
+	if (UNLIKELY(po.hostnlen == 0U)) {
+		static char hname[HOST_NAME_MAX];
+		if (gethostname(hname, sizeof(hname)) < 0) {
+			return -1;
+		}
+		hname[HOST_NAME_MAX - 1] = '\0';
+		po.hostnlen = strlen(hname);
+		po.hostname = hname;
+		po.pid = getpid();
+	}
+
+	if (pongp) {
+		po.what = SVC_PING_PONG;
+	} else {
+		po.what = SVC_PING_PING;
+	}
+	return ud_pack_ping(sock, &po);
 }
 
 int
@@ -179,7 +222,7 @@ ud_svc_nego_score(ud_handle_t hdl, int timeout)
 	clo.rtref = __ustamp();
 	clo.hdl = hdl;
 	/* send off the bugger */
-	clo.cno = ud_send_simple(hdl, UD_SVC_PING.svcu);
+	clo.cno = ud_send_simple(hdl, UD_SVC_PING);
 	/* wait for replies */
 	ud_subscr_raw(hdl, timeout, cb, &clo);
 	/* after they're all through, try and get a proper score */

@@ -63,6 +63,7 @@
 #include "unserding-nifty.h"
 #include "ud-sock.h"
 #include "ud-sockaddr.h"
+#include "ud-private.h"
 
 #if !defined IPPROTO_IPV6
 # error system not fit for ipv6 transport
@@ -74,6 +75,8 @@
 #define ETH_MTU		(1500U)
 /* high-3-bits MTU, 1024 + 512 + 256 */
 #define H3B_MTU		(1024U + 512U + 256U)
+/* control messages are shorter */
+#define CTRL_MTU	(80U)
 
 #define UDP_MULTICAST_TTL	64
 
@@ -94,6 +97,15 @@ union ud_buf_u {
 		char pl[];
 	};
 	char buf[ETH_MTU];
+};
+
+union ud_ctrl_u {
+	struct {
+		struct ud_hdr_s hdr;
+		/* payload */
+		char pl[];
+	};
+	char buf[CTRL_MTU];
 };
 
 /* our private view on ud_sock_s */
@@ -564,6 +576,54 @@ ud_chck(void *restrict tgt, size_t tsz, ud_sock_t sock)
 	}
 	memcpy(tgt, msg.data, msg.dlen);
 	return msg.dlen;
+}
+
+
+/* control packs */
+int
+ud_pack_cmsg(ud_sock_t sock, struct ud_cmsg_s *msg)
+{
+	static union ud_ctrl_u ALGN16(ctrl);
+	__sock_t us = (__sock_t)sock;
+	char *p;
+
+	if (UNLIKELY(msg->msg.dlen > sizeof(ctrl) - sizeof(ctrl.hdr))) {
+		/* this would be a protocol deficiency */
+		return -1;
+	}
+
+	/* now copy the blob */
+#define UDPC_TYPE_DATA	(0x0c)
+	p = ctrl.pl;
+	*p++ = UDPC_TYPE_DATA;
+	*p++ = (uint8_t)msg->msg.dlen;
+	memcpy(p, msg->msg.data, msg->msg.dlen);
+	p += msg->msg.dlen;
+
+	/* and flush */
+	{
+		ssize_t nwr;
+		const void *b = ctrl.buf;
+		size_t z = p - ctrl.pl + sizeof(ctrl.hdr);
+		const struct sockaddr *sa = &us->dst->sa.sa;
+		socklen_t sz = us->dst->sz;
+
+		ctrl.hdr.cno = (uint16_t)us->cno;
+		ctrl.hdr.pno = (uint16_t)us->pno;
+		ctrl.hdr.cmd = msg->svc.svcu;
+		ctrl.hdr.magic = htons(0xda7a);
+
+		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
+			return -1;
+		} else if ((size_t)nwr < z) {
+			/* should we try a resend? */
+			;
+		}
+
+		/* update our counters and stuff */
+		us->cno++;
+	}
+	return 0;
 }
 
 /* unserding.c ends here */

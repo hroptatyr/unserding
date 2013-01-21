@@ -40,11 +40,18 @@
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "svc-pong.h"
+#include "boobs.h"
 
 #if defined UD_COMPAT
 #include "seria-proto-glue.h"
 #include "ud-time.h"
 #endif	/* UD_COMPAT */
+
+struct __ping_s {
+	uint32_t pid;
+	uint8_t hnz;
+	char hn[];
+};
 
 #if defined UD_COMPAT
 typedef struct __clo_s {
@@ -87,6 +94,52 @@ ud_svc_update_mart(ud_handle_t hdl, struct timeval then)
 #endif	/* UD_COMPAT */
 
 
+/* packing service */
+static union {
+	struct __ping_s wire;
+	char buf[64];
+} __msg;
+
+#define MAX_HNZ		((uint8_t)(sizeof(__msg) - 6U))
+
+int
+ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1])
+{
+	/* 4 bytes for the pid */
+	__msg.wire.pid = htobe32((uint32_t)msg->pid);
+	if ((__msg.wire.hnz = (uint8_t)msg->hostnlen) > MAX_HNZ) {
+		__msg.wire.hnz = sizeof(__msg) - 5;
+	}
+	memcpy(__msg.wire.hn, msg->hostname, __msg.wire.hnz);
+	return ud_pack_msg(sock, &(struct ud_msg_s){
+			.data = __msg.buf,
+			.dlen = sizeof(__msg.buf),
+			});
+}
+
+int
+ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock)
+{
+	struct ud_msg_s msg[1];
+
+	if (ud_chck_msg(msg, sock) < 0) {
+		return -1;
+	} else if (msg->dlen > sizeof(__msg)) {
+		return -1;
+	}
+	/* otherwise memcpy to static buffer for inspection */
+	memcpy(__msg.buf, msg->data, msg->dlen);
+	if (__msg.wire.hnz > MAX_HNZ) {
+		return -1;
+	}
+	tgt->hostnlen = __msg.wire.hnz;
+	tgt->hostname = __msg.wire.hn;
+	tgt->pid = be32toh(__msg.wire.pid);
+	/* as a service, \nul terminate the hostname */
+	__msg.wire.hn[__msg.wire.hnz] = '\0';
+	return 0;
+}
+
 #if defined UD_COMPAT
 /* conforms to ud_subscr_f */
 static bool

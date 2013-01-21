@@ -1,8 +1,8 @@
 /*** svc-pong.c -- pong service goodies
  *
- * Copyright (C) 2009 Sebastian Freundt
+ * Copyright (C) 2009-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -34,20 +34,29 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "svc-pong.h"
+
+#if defined UD_COMPAT
 #include "seria-proto-glue.h"
 #include "ud-time.h"
+#endif	/* UD_COMPAT */
 
+#if defined UD_COMPAT
 typedef struct __clo_s {
 	ud_handle_t hdl;
 	ud_pong_set_t seen;
 	ud_convo_t cno;
 	struct timeval rtref;
 } *__clo_t;
+#endif	/* UD_COMPAT */
 
+
+#if defined UD_COMPAT
 static void
 seria_skip_str(udpc_seria_t sctx)
 {
@@ -75,8 +84,10 @@ ud_svc_update_mart(ud_handle_t hdl, struct timeval then)
 	hdl->mart = 1 + (hdl->mart + rtts.tv_usec / 1000U) / 2;
 	return;
 }
+#endif	/* UD_COMPAT */
 
 
+#if defined UD_COMPAT
 /* conforms to ud_subscr_f */
 static bool
 cb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
@@ -121,5 +132,6 @@ ud_svc_nego_score(ud_handle_t hdl, int timeout)
 	/* after they're all through, try and get a proper score */
 	return hdl->score = ud_find_score(clo.seen);
 }
+#endif	/* UD_COMPAT */
 
 /* svc-pong.c ends here */

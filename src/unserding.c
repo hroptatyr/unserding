@@ -447,7 +447,7 @@ ud_flush(ud_sock_t sock)
 		us->send.hdr.cno = (uint16_t)us->cno;
 		us->send.hdr.pno = (uint16_t)us->pno;
 		us->send.hdr.cmd = 0U;
-		us->send.hdr.magic = htons(0xbeef);
+		us->send.hdr.magic = htons(0xda7a);
 
 		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
 			return -1;
@@ -455,9 +455,12 @@ ud_flush(ud_sock_t sock)
 			/* should we try a resend? */
 			;
 		}
+
 		/* update indexes */
 		us->npk = 0U;
 		us->nwr = 0U;
+
+		/* update our counters and stuff */
 		us->cno++;
 	}
 	return 0;

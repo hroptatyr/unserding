@@ -38,6 +38,7 @@
 #define INCLUDED_ud_logger_h_
 
 #include <stdarg.h>
+#include <syslog.h>
 
 #if defined __cplusplus
 extern "C" {

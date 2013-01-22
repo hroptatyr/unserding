@@ -70,6 +70,13 @@
 # error system not fit for ipv6 transport
 #endif	/* IPPROTO_IPV6 */
 
+#if defined DEBUG_FLAG
+# include <stdio.h>
+# define UDEBUG(args...)	fprintf(stderr, args)
+# else	/* !DEBUG_FLAG */
+# define UDEBUG(args...)
+#endif	/* DEBUG_FLAG */
+
 /* guaranteed by IPv6 */
 #define MIN_MTU		(1280U)
 /* mtu for ethernet */

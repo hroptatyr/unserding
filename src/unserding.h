@@ -69,7 +69,7 @@ extern "C" {
 /* just offer a default address for some tools */
 #define UD_MCAST6_ADDR		UD_MCAST6_SITE_LOCAL
 
-typedef struct ud_sock_s *restrict ud_sock_t;
+typedef struct ud_sock_s *ud_sock_t;
 typedef const struct ud_sock_s *ud_const_sock_t;
 
 typedef uint16_t ud_svc_t;

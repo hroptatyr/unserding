@@ -476,7 +476,6 @@ int
 ud_dscrd(ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
-	ssize_t nrd = 0;
 
 	if (UNLIKELY(us->nrd == 0U)) {
 		/* oh, we shall read the shebang off the wire innit? */
@@ -484,13 +483,23 @@ ud_dscrd(ud_sock_t sock)
 		size_t z = sizeof(us->recv.buf);
 		struct sockaddr *restrict sa = &us->src->sa.sa;
 		socklen_t *restrict sz = &us->src->sz;
+		ssize_t nrd;
 
 		if ((nrd = recvfrom(us->fd, b, z, 0, sa, sz)) < 0) {
 			return -1;
+		} else if ((nrd -= sizeof(us->recv.hdr)) < 0) {
+			return -1;
+		} else if (be16toh(us->recv.hdr.ini) != UD_PROTO_INI) {
+			return -1;
 		}
+
+		/* update indexes */
+		us->nrd = nrd;
+	} else {
+		/* update indexes */
+		us->nrd = 0U;
 	}
-	/* update indexes */
-	us->nrd = nrd;
+	/* pretend we haven't checked anything */
 	us->nck = 0U;
 	return 0;
 }

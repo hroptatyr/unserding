@@ -569,8 +569,8 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	__sock_t us = (__sock_t)sock;
 	char *p;
 
-	if (us->nrd == 0U) {
-		/* we need a dose */
+	if (UNLIKELY(us->nck >= us->nrd)) {
+		/* we need another dose */
 		if (UNLIKELY(ud_dscrd(sock)) < 0) {
 			/* nah, don't pack up new stuff,
 			 * we need to get rid of the old shit first

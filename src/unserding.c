@@ -64,6 +64,7 @@
 #include "ud-sock.h"
 #include "ud-sockaddr.h"
 #include "ud-private.h"
+#include "boobs.h"
 
 #if !defined IPPROTO_IPV6
 # error system not fit for ipv6 transport
@@ -80,10 +81,13 @@
 
 #define UDP_MULTICAST_TTL	64
 
+/* magic string to identify unserding packets */
+#define UD_PROTO_INI	0x5544/*UD*/
+
 typedef struct __sock_s *__sock_t;
 
 struct ud_hdr_s {
-	uint16_t cno;
+	uint16_t ini;
 	uint16_t pno;
 	uint16_t cmd;
 	uint16_t magic;
@@ -127,8 +131,6 @@ struct __sock_s {
 	/* stuff used to configure the thing */
 	struct ud_sockopt_s opt;
 
-	/* conversation */
-	int cno;
 	/* packet within */
 	int pno;
 	/* service we're after */
@@ -446,10 +448,10 @@ ud_flush(ud_sock_t sock)
 		const struct sockaddr *sa = &us->dst->sa.sa;
 		socklen_t sz = us->dst->sz;
 
-		us->send.hdr.cno = (uint16_t)us->cno;
-		us->send.hdr.pno = (uint16_t)us->pno;
-		us->send.hdr.cmd = us->svc;
-		us->send.hdr.magic = htons(0xda7a);
+		us->send.hdr.ini = htobe16(UD_PROTO_INI);
+		us->send.hdr.pno = htobe16(us->pno);
+		us->send.hdr.cmd = htobe16(us->svc);
+		us->send.hdr.magic = htobe16(0xda7a);
 
 		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
 			return -1;
@@ -463,7 +465,7 @@ ud_flush(ud_sock_t sock)
 		us->nwr = 0U;
 
 		/* update our counters and stuff */
-		us->cno++;
+		us->pno++;
 	}
 	/* definitely reset svc field */
 	us->svc = 0U;
@@ -626,10 +628,10 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 		const struct sockaddr *sa = &us->dst->sa.sa;
 		socklen_t sz = us->dst->sz;
 
-		ctrl.hdr.cno = (uint16_t)us->cno;
-		ctrl.hdr.pno = (uint16_t)us->pno;
-		ctrl.hdr.cmd = msg.svc;
-		ctrl.hdr.magic = htons(0xda7a);
+		ctrl.hdr.ini = htobe16(UD_PROTO_INI);
+		ctrl.hdr.pno = htobe16(us->pno);
+		ctrl.hdr.cmd = htobe16(msg.svc);
+		ctrl.hdr.magic = htobe16(0xda7a);
 
 		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
 			return -1;
@@ -639,7 +641,7 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 		}
 
 		/* update our counters and stuff */
-		us->cno++;
+		us->pno++;
 	}
 	return 0;
 }

@@ -1,8 +1,8 @@
 /*** unsermon.c -- unserding network monitor
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -34,14 +34,14 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
-#include "config.h"
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <unistd.h>
 #include <stdbool.h>
-
 #if defined HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
 #endif

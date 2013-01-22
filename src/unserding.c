@@ -446,7 +446,6 @@ ud_flush(ud_sock_t sock)
 
 		us->send.hdr.cno = (uint16_t)us->cno;
 		us->send.hdr.pno = (uint16_t)us->pno;
-		us->send.hdr.cmd = 0U;
 		us->send.hdr.magic = htons(0xda7a);
 
 		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
@@ -497,15 +496,21 @@ __msg_fits_p(__sock_t s, size_t len)
 	return s->npk + 2U + len <= plen;
 }
 
+static inline bool
+__svc_same_p(__sock_t s, ud_svc_t svc)
+{
+	return s->send.hdr.cmd == 0U || svc == s->send.hdr.cmd;
+}
+
 int
-ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg)
+ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 {
 	__sock_t us = (__sock_t)sock;
-	uint8_t z = (uint8_t)msg->dlen;
-	const char *d = msg->data;
+	uint8_t z = (uint8_t)msg.dlen;
+	const char *d = msg.data;
 	char *p;
 
-	if (UNLIKELY(!__msg_fits_p(us, z))) {
+	if (UNLIKELY(!__msg_fits_p(us, z) || !__svc_same_p(us, msg.svc))) {
 		/* send what we've got */
 		if (UNLIKELY(ud_flush(sock)) < 0) {
 			/* nah, don't pack up new stuff,
@@ -523,16 +528,19 @@ ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg)
 	memcpy(p, d, z);
 	p += z;
 
+	/* update header */
+	us->send.hdr.cmd = msg.svc;
+
 	/* and update counters */
 	us->npk = p - us->send.pl;
 	return 0;
 }
 
 int
-ud_pack(ud_sock_t sock, const void *data, size_t dlen)
+ud_pack(ud_sock_t sock, ud_svc_t svc, const void *data, size_t dlen)
 {
-	return ud_pack_msg(sock, &(struct ud_msg_s){
-				.dlen = dlen, .data = data});
+	return ud_pack_msg(sock, (struct ud_msg_s){
+				.svc = svc, .data = data, .dlen = dlen});
 }
 
 int
@@ -560,13 +568,16 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	tgt->dlen = *p++;
 	tgt->data = p;
 
+	/* and the message service */
+	tgt->svc = us->recv.hdr.cmd;
+
 	/* and update counters */
 	us->nck += tgt->dlen;
 	return 0;
 }
 
 ssize_t
-ud_chck(void *restrict tgt, size_t tsz, ud_sock_t sock)
+ud_chck(ud_svc_t *svc, void *restrict tgt, size_t tsz, ud_sock_t sock)
 {
 	struct ud_msg_s msg = {0};
 
@@ -577,6 +588,7 @@ ud_chck(void *restrict tgt, size_t tsz, ud_sock_t sock)
 	if (UNLIKELY(msg.dlen > tsz)) {
 		msg.dlen = tsz;
 	}
+	*svc = msg.svc;
 	memcpy(tgt, msg.data, msg.dlen);
 	return msg.dlen;
 }

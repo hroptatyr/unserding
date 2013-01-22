@@ -72,7 +72,7 @@ extern "C" {
 typedef struct ud_sock_s *restrict ud_sock_t;
 typedef const struct ud_sock_s *ud_const_sock_t;
 
-typedef union ud_svc_u ud_svc_t;
+typedef uint16_t ud_svc_t;
 
 /**
  * Public type for unserding sockets. */
@@ -90,7 +90,11 @@ struct ud_sock_s {
 /**
  * Message for packing and unpacking unserding packets. */
 struct ud_msg_s {
+	/** service channel, user negotiated, 0xff00 - 0xffff are reserved */
+	ud_svc_t svc;
+	/** pointer to data to serialise */
 	const void *data;
+	/** length of data block to serialise */
 	size_t dlen;
 };
 
@@ -114,14 +118,6 @@ struct ud_sockopt_s {
 	short unsigned int port;
 };
 
-union ud_svc_u {
-	struct {
-		uint8_t chn;
-		uint8_t svc;
-	};
-	uint16_t svcu;
-};
-
 
 /* first up socket ctoring and dtoring */
 /**
@@ -143,11 +139,11 @@ extern int ud_close(ud_sock_t sock);
 /* next up packing/unpacking messages */
 /**
  * Produce wire-representation of P (of size Z) in SOCK. */
-extern int ud_pack(ud_sock_t sock, const void *p, size_t z);
+extern int ud_pack(ud_sock_t sock, ud_svc_t svc, const void *p, size_t z);
 
 /**
  * Produce wire-representation of MSG in SOCK. */
-extern int ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg);
+extern int ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg);
 
 /**
  * Flush buffered packs immediately. */
@@ -155,7 +151,8 @@ extern int ud_flush(ud_sock_t sock);
 
 /**
  * Read messages from SOCK and return a deserialised version in TGT. */
-extern ssize_t ud_chck(void *restrict tgt, size_t tsz, ud_sock_t sock);
+extern ssize_t
+ud_chck(ud_svc_t *restrict svc, void *restrict tgt, size_t tsz, ud_sock_t sock);
 
 /**
  * Read messages from SOCK and return a deserialised version in TGT. */

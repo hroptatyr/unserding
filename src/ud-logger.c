@@ -112,8 +112,8 @@ ud_rotlog(void)
 	return;
 }
 
-__attribute__((format(printf, 2, 3))) void
-error(int eno, const char *fmt, ...)
+__attribute__((format(printf, 3, 4))) void
+ud_logout(int UNUSED(facil), int eno, const char *fmt, ...)
 {
 	va_list vap;
 	va_start(vap, fmt);

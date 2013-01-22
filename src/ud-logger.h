@@ -61,15 +61,23 @@ extern void ud_rotlog(void);
 
 /**
  * Like perror() but for our log file. */
-extern __attribute__((format(printf, 2, 3))) void
-error(int eno, const char *fmt, ...);
+extern __attribute__((format(printf, 3, 4))) void
+ud_logout(int facil, int eno, const char *fmt, ...);
+
+/**
+ * Like perror() but for our log file. */
+#if !defined __cplusplus
+# define error(eno, args...)	ud_logout(LOG_ERR, eno, args)
+#else  /* __cplusplus */
+# define error(eno, args...)	::ud_logout(LOG_ERR, eno, args)
+#endif	/* __cplusplus */
 
 /**
  * For generic logging without errno indication. */
 #if !defined __cplusplus
-# define logger(args...)	error(0, args)
+# define logger(facil, args...)	ud_logout(facil, 0, args)
 #else  /* __cplusplus */
-# define logger(args...)	::error(0, args)
+# define logger(facil, args...)	::ud_logout(facil, 0, args)
 #endif	/* __cplusplus */
 
 #if defined __cplusplus

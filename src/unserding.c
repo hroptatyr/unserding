@@ -625,6 +625,8 @@ ud_chck(ud_svc_t *svc, void *restrict tgt, size_t tsz, ud_sock_t sock)
 
 
 /* control packs */
+#include "svc-pong.h"
+
 int
 ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 {
@@ -668,6 +670,47 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 		/* update our counters and stuff */
 		us->pno++;
 	}
+	return 0;
+}
+
+int
+ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+	ud_svc_t svc;
+	char *p;
+
+	/* check for control messages */
+	if (UNLIKELY(((svc = be16toh(us->recv.hdr.cmd)) & 0xff00) != 0xff00)) {
+		/* don't discard or update */
+		return -1;
+	}
+
+	/* check what they want */
+	switch (svc & 0x00ff) {
+	case UD_SVC_CMD:
+	case UD_SVC_TIME:
+	default:
+		break;
+	case UD_SVC_PING:
+		ud_pack_pong(sock, 1);
+		break;
+	}
+
+	/* now copy the blob */
+	p = us->recv.pl + us->nck;
+	if ((*p++ != UDPC_TYPE_DATA)) {
+		us->nrd = us->nck = 0U;
+		return -1;
+	}
+	tgt->dlen = *p++;
+	tgt->data = p;
+
+	/* and the message service */
+	tgt->svc = svc;
+
+	/* and update counters */
+	us->nck = us->nrd;
 	return 0;
 }
 

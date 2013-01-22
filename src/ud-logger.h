@@ -1,6 +1,6 @@
-/*** logger.h -- unserding loggin service
+/*** ud-logger.h -- unserding logging service
  *
- * Copyright (C) 2011 Sebastian Freundt
+ * Copyright (C) 2011-2013 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -34,29 +34,46 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
+#if !defined INCLUDED_ud_logger_h_
+#define INCLUDED_ud_logger_h_
 
-#if !defined INCLUDED_logger_h_
-#define INCLUDED_logger_h_
+#include <stdarg.h>
 
-#include <syslog.h>
+#if defined __cplusplus
+extern "C" {
+#endif	/* __cplusplus */
 
-#define UD_LOG_FLAGS		(LOG_PID | LOG_NDELAY)
-#define UD_FACILITY		(LOG_LOCAL4)
-#define UD_MAKEPRI(x)		(x)
-#define UD_SYSLOG(x, args...)	syslog(UD_MAKEPRI(x), args)
+/* this really is a FILE* */
+extern void *logout;
 
-static inline void
-ud_openlog(void)
-{
-	openlog("unserdingd", UD_LOG_FLAGS, UD_FACILITY);
-	return;
+/**
+ * Open the logfile with pathname LOGFN. */
+extern int ud_openlog(const char *logfn);
+
+/**
+ * Close logging facility. */
+extern int ud_closelog(void);
+
+/**
+ * Rotate the log file.
+ * This actually just closes and opens the file again. */
+extern void ud_rotlog(void);
+
+/**
+ * Like perror() but for our log file. */
+extern __attribute__((format(printf, 2, 3))) void
+error(int eno, const char *fmt, ...);
+
+/**
+ * For generic logging without errno indication. */
+#if !defined __cplusplus
+# define logger(args...)	error(0, args)
+#else  /* __cplusplus */
+# define logger(args...)	::error(0, args)
+#endif	/* __cplusplus */
+
+#if defined __cplusplus
 }
+#endif	/* __cplusplus */
 
-static inline void
-ud_closelog(void)
-{
-	closelog();
-	return;
-}
-
-#endif	/* INCLUDED_logger_h_ */
+#endif	/* INCLUDED_ud_logger_h_ */

@@ -257,9 +257,12 @@ static int
 mc6_set_pub(int s)
 {
 	union ud_sockaddr_u sa = {
-		.sa6.sin6_family = AF_INET6,
-		.sa6.sin6_addr = IN6ADDR_ANY_INIT,
-		.sa6.sin6_port = 0,
+		.sa6 = {
+			.sin6_family = AF_INET6,
+			.sin6_addr = IN6ADDR_ANY_INIT,
+			.sin6_port = 0,
+			.sin6_scope_id = 0,
+		},
 	};
 
 	/* as a courtesy to tools bind the channel */
@@ -270,9 +273,12 @@ static int
 mc6_set_sub(int s, short unsigned int port)
 {
 	union ud_sockaddr_u sa = {
-		.sa6.sin6_family = AF_INET6,
-		.sa6.sin6_addr = IN6ADDR_ANY_INIT,
-		.sa6.sin6_port = htons(port),
+		.sa6 = {
+			.sin6_family = AF_INET6,
+			.sin6_addr = IN6ADDR_ANY_INIT,
+			.sin6_port = htons(port),
+			.sin6_scope_id = 0,
+		},
 	};
 	int opt;
 

@@ -54,9 +54,7 @@
 #if defined HAVE_SYS_UN_H
 # include <sys/un.h>
 #endif
-#if defined HAVE_ERRNO_H
-# include <errno.h>
-#endif
+#include <errno.h>
 #if defined HAVE_EV_H
 # include <ev.h>
 # undef EV_P
@@ -89,6 +87,8 @@
 
 #define USE_COROUTINES		1
 
+#define UD_SYSLOG(x, args...)	ud_logout(x, errno, args)
+
 #if defined DEBUG_FLAG
 # define UD_CRITICAL_MCAST(args...)					\
 	do {								\
@@ -113,7 +113,6 @@
 # define UD_DEBUG_MCAST(args...)
 #endif	/* DEBUG_FLAG */
 
-FILE *logout;
 static FILE *monout;
 
 #define UD_LOG_CRIT(args...)						\
@@ -562,9 +561,8 @@ main(int argc, char *argv[])
 	struct gengetopt_args_info argi[1];
 
 	/* whither to log */
-	logout = stderr;
 	monout = stdout;
-	ud_openlog();
+	ud_openlog(NULL);
 	/* wipe stack pollution */
 	memset(&__ctx, 0, sizeof(__ctx));
 
@@ -637,9 +635,7 @@ main(int argc, char *argv[])
 
 	/* close our log output */
 	fflush(monout);
-	fflush(logout);
 	fclose(monout);
-	fclose(logout);
 	ud_closelog();
 	/* unloop was called, so exit */
 	return 0;

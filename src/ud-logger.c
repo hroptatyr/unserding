@@ -1,6 +1,6 @@
-/*** logger.h -- unserding loggin service
+/*** ud-logger.c -- unserding logging service
  *
- * Copyright (C) 2011 Sebastian Freundt
+ * Copyright (C) 2011-2013 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -34,29 +34,98 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
-#if !defined INCLUDED_logger_h_
-#define INCLUDED_logger_h_
-
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
 #include <syslog.h>
+
+#include "ud-logger.h"
+#include "unserding-nifty.h"
 
 #define UD_LOG_FLAGS		(LOG_PID | LOG_NDELAY)
 #define UD_FACILITY		(LOG_LOCAL4)
 #define UD_MAKEPRI(x)		(x)
 #define UD_SYSLOG(x, args...)	syslog(UD_MAKEPRI(x), args)
 
-static inline void
-ud_openlog(void)
+static const char *glogfn;
+void *logout;
+
+static int
+__open_logout(const char logfn[static 1])
 {
-	openlog("unserdingd", UD_LOG_FLAGS, UD_FACILITY);
+	if (UNLIKELY((logout = fopen(logfn, "a")) == NULL)) {
+		int errno_sv = errno;
+
+		/* backup plan */
+		logout = fopen("/dev/null", "w");
+		errno = errno_sv;
+		return -1;
+	}
+	return 0;
+}
+
+static void
+__close_logout(void)
+{
+	if (logout != NULL) {
+		fflush(logout);
+		fclose(logout);
+	}
+	logout = NULL;
 	return;
 }
 
-static inline void
+int
+ud_openlog(const char *logfn)
+{
+	int res = 0;
+
+	if (((glogfn = logfn) == NULL && (logout = stderr)) ||
+	    (res = __open_logout(logfn)) < 0) {
+		;
+	} else {
+		atexit(__close_logout);
+	}
+	return res;
+}
+
+int
 ud_closelog(void)
 {
-	closelog();
+	__close_logout();
+	return 0;
+}
+
+void
+ud_rotlog(void)
+{
+	if (glogfn == NULL) {
+		return;
+	}
+	/* otherwise close and open again */
+	__close_logout();
+	(void)__open_logout(glogfn);
 	return;
 }
 
-#endif	/* INCLUDED_logger_h_ */
+__attribute__((format(printf, 3, 4))) void
+ud_logout(int UNUSED(facil), int eno, const char *fmt, ...)
+{
+	va_list vap;
+	va_start(vap, fmt);
+	vfprintf(logout, fmt, vap);
+	va_end(vap);
+	if (eno) {
+		fputc(':', logout);
+		fputc(' ', logout);
+		fputs(strerror(eno), logout);
+	}
+	fputc('\n', logout);
+	return;
+}
+
+/* logger.c ends here */

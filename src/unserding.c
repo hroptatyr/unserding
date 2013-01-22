@@ -491,9 +491,7 @@ ud_dscrd(ud_sock_t sock)
 static inline bool
 __msg_fits_p(__sock_t s, size_t len)
 {
-	const size_t smtu = sizeof(s->send.buf);
-	const size_t plen = smtu - (s->send.pl - s->send.buf);
-	return s->npk + 2U + len <= plen;
+	return s->npk + 2U + len <= sizeof(s->send.buf) - sizeof(s->send.hdr);
 }
 
 static inline bool

@@ -589,7 +589,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	tgt->data = p;
 
 	/* and the message service */
-	tgt->svc = us->recv.hdr.cmd;
+	tgt->svc = be16toh(us->recv.hdr.cmd);
 
 	/* and update counters */
 	us->nck += tgt->dlen;

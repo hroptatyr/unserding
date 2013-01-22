@@ -71,6 +71,8 @@
 #include "ud-sock.h"
 #include "unserding-dbg.h"
 
+#define UD_SYSLOG(x, args...)	ud_logout(x, errno, args)
+
 #if defined UNSERLIB
 /* no output at all in lib mode */
 # define UD_CRITICAL_MCAST(args...)

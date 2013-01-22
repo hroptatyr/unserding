@@ -59,12 +59,10 @@
 #include <stdio.h>
 
 /* our own logger facility */
-#include "logger.h"
+#include "ud-logger.h"
 
 
 /* logging */
-extern FILE *logout;
-
 #define UD_LOGOUT(args...)	fprintf(logout, args)
 
 #if defined UNSERSRV && defined DEBUG_FLAG

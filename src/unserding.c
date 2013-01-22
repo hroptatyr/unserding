@@ -720,4 +720,18 @@ ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	return 0;
 }
 
+int
+ud_chck_sa(struct ud_samsg_s *restrict tgt, ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+
+	if (UNLIKELY(us->nrd == 0UL)) {
+		return -1;
+	}
+	/* zero-copy */
+	tgt->sa = &us->src->sa;
+	tgt->sz = us->src->sz;
+	return 0;
+}
+
 /* unserding.c ends here */

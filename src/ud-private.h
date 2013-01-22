@@ -38,9 +38,17 @@
 #define INCLUDED_ud_private_h_
 
 #include "unserding.h"
+#include "ud-sockaddr.h"
+
+struct ud_samsg_s {
+	ud_const_sockaddr_t sa;
+	socklen_t sz;
+};
 
 extern int ud_pack_cmsg(ud_sock_t s, struct ud_msg_s msg);
 extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
+
+extern int ud_chck_sa(struct ud_samsg_s *restrict tgt, ud_sock_t s);
 
 
 /* specific services */

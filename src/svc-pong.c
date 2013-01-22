@@ -169,6 +169,9 @@ ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock)
 		return -1;
 	} else if (msg->dlen > sizeof(__msg)) {
 		return -1;
+	} else if ((msg->svc & ~0x01) != UD_CTRL_SVC(UD_SVC_PING)) {
+		/* not a PING nor a PONG */
+		return -1;
 	}
 	/* otherwise memcpy to static buffer for inspection */
 	memcpy(__msg.buf, msg->data, msg->dlen);
@@ -178,6 +181,7 @@ ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock)
 	tgt->hostnlen = __msg.wire.hnz;
 	tgt->hostname = __msg.wire.hn;
 	tgt->pid = be32toh(__msg.wire.pid);
+	tgt->what = msg->svc & 0x01 ? SVC_PING_PONG : SVC_PING_PING;
 	/* as a service, \nul terminate the hostname */
 	__msg.wire.hn[__msg.wire.hnz] = '\0';
 	return 0;

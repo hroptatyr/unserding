@@ -111,10 +111,10 @@ ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1])
 
 	switch (msg->what) {
 	case SVC_PING_PING:
-		cmd = UD_SVC(UD_CHN_CTRL, UD_SVC_PING);
+		cmd = UD_CTRL_SVC(UD_SVC_PING);
 		break;
 	case SVC_PING_PONG:
-		cmd = UD_SVC(UD_CHN_CTRL, UD_SVC_PING + 1/*reply*/);
+		cmd = UD_CTRL_SVC(UD_SVC_PING + 1/*reply*/);
 		break;
 	default:
 		return -1;
@@ -128,10 +128,10 @@ ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1])
 	memcpy(__msg.wire.hn, msg->hostname, __msg.wire.hnz);
 
 	(void)ud_flush(sock);
-	return ud_pack_cmsg(sock, &(struct ud_cmsg_s){
+	return ud_pack_cmsg(sock, (struct ud_msg_s){
 			.svc = cmd,
-			.msg.data = __msg.buf,
-			.msg.dlen = sizeof(__msg.buf),
+			.data = __msg.buf,
+			.dlen = sizeof(__msg.buf),
 		});
 }
 

@@ -465,6 +465,8 @@ ud_flush(ud_sock_t sock)
 		/* update our counters and stuff */
 		us->cno++;
 	}
+	/* definitely reset svc field */
+	us->svc = 0U;
 	return 0;
 }
 
@@ -519,6 +521,9 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 			 * actually this should be configurable behaviour */
 			return -1;
 		}
+
+		/* update service slot */
+		us->svc = msg.svc;
 	}
 
 	/* now copy the blob */
@@ -528,9 +533,6 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 	*p++ = z;
 	memcpy(p, d, z);
 	p += z;
-
-	/* update service slot */
-	us->svc = msg.svc;
 
 	/* and update counters */
 	us->npk = p - us->send.pl;

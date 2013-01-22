@@ -39,13 +39,8 @@
 
 #include "unserding.h"
 
-struct ud_cmsg_s {
-	ud_svc_t svc;
-	struct ud_msg_s msg;
-};
-
-extern int ud_pack_cmsg(ud_sock_t s, struct ud_cmsg_s *msg);
-extern int ud_chck_cmsg(struct ud_cmsg_s *restrict tgt, ud_sock_t s);
+extern int ud_pack_cmsg(ud_sock_t s, struct ud_msg_s msg);
+extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
 
 
 /* specific services */
@@ -53,7 +48,9 @@ extern int ud_chck_cmsg(struct ud_cmsg_s *restrict tgt, ud_sock_t s);
  * Control channel with no user defined messages. */
 #define UD_CHN_CTRL	0xffU
 
-#define UD_SVC(c, s)	((ud_svc_t){c, s})
+#define UD_SVC(c, s)	((c) * 0x100U + (s))
+
+#define UD_CTRL_SVC(s)	UD_SVC(UD_CHN_CTRL, s)
 
 enum chn_ctrl_e {
 	/** command request/announce service to discover new commands */

@@ -11,10 +11,12 @@ main(void)
 	if ((s = ud_socket((struct ud_sockopt_s){
 				   UD_PUB, .addr = UD_MCAST6_NODE_LOCAL,
 					   .port = 8378/*TEST*/}))) {
+		ud_svc_t svc;
+
 		assert(s->fd > 0);
 
 		/* testing the reader  */
-		if (ud_chck(NULL, 0, s) > 0) {
+		if (ud_chck(&svc, NULL, 0, s) > 0) {
 			res = 1;
 		}
 		res += ud_close(s);

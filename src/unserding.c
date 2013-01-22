@@ -583,6 +583,9 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 			 * we need to get rid of the old shit first
 			 * actually this should be configurable behaviour */
 			return -1;
+		} else if (us->nck >= us->nrd) {
+			/* no more data, just fuck off */
+			return -1;
 		}
 	}
 

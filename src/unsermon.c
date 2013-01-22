@@ -78,63 +78,22 @@
 
 /* our master include file */
 #include "unserding.h"
-/* context goodness, passed around internally */
-#include "unserding-ctx.h"
-/* our private bits */
-#include "protocore-private.h"
 #include "unserding-nifty.h"
-#include "unserding-dbg.h"
+#include "ud-logger.h"
+#include "boobs.h"
 
 #define USE_COROUTINES		1
 
-#define UD_SYSLOG(x, args...)	ud_logout(x, errno, args)
-
 #if defined DEBUG_FLAG
-# define UD_CRITICAL_MCAST(args...)					\
-	do {								\
-		UD_LOGOUT("[unserding/input/mcast] CRITICAL " args);	\
-		UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args);	\
-	} while (0)
-# define UD_DEBUG_MCAST(args...)					\
-	do {								\
-		UD_LOGOUT("[unserding/input/mcast] " args);		\
-		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
-	} while (0)
-# define UD_INFO_MCAST(args...)						\
-	do {								\
-		UD_LOGOUT("[unserding/input/mcast] " args);		\
-		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
-	} while (0)
-#else  /* !DEBUG_FLAG */
-# define UD_CRITICAL_MCAST(args...)				\
-	UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args)
-# define UD_INFO_MCAST(args...)					\
-	UD_SYSLOG(LOG_INFO, "[input/mcast] " args)
-# define UD_DEBUG_MCAST(args...)
+# include <stdio.h>
+# define UDEBUG(args...)	fprintf(stderr, args)
+# else	/* !DEBUG_FLAG */
+# define UDEBUG(args...)
 #endif	/* DEBUG_FLAG */
 
-static FILE *monout;
+#define UD_SYSLOG(x, args...)	ud_logout(x, errno, args)
 
-#define UD_LOG_CRIT(args...)						\
-	do {								\
-		UD_LOGOUT("[unsermon] CRITICAL " args);		\
-		UD_SYSLOG(LOG_CRIT, "CRITICAL " args);			\
-	} while (0)
-#define UD_LOG_INFO(args...)						\
-	do {								\
-		UD_LOGOUT("[unsermon] " args);				\
-		UD_SYSLOG(LOG_INFO, args);				\
-	} while (0)
-#define UD_LOG_ERR(args...)						\
-	do {								\
-		UD_LOGOUT("[unsermon] ERROR " args);			\
-		UD_SYSLOG(LOG_ERR, "ERROR " args);			\
-	} while (0)
-#define UD_LOG_NOTI(args...)						\
-	do {								\
-		UD_LOGOUT("[unsermon] NOTICE " args);			\
-		UD_SYSLOG(LOG_NOTICE, args);				\
-	} while (0)
+static FILE *monout;
 
 
 typedef struct ud_ev_async_s ud_ev_async;
@@ -206,7 +165,7 @@ pr_ttf(char *restrict buf, uint16_t ttf)
 
 	case SCOM_TTF_UNK:
 	default:
-		ttf = '0' + ttf;
+		*buf++ = '?';
 		break;
 	}
 	return 1;
@@ -283,6 +242,7 @@ hrclock_print(char *buf, size_t len)
 
 
 /* the actual worker function */
+#if 0
 static void
 mon_pkt_cb(job_t j)
 {
@@ -424,37 +384,51 @@ mon_pkt_cb(job_t j)
 	}
 	return;
 }
+#endif
 
 static void
 mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
-	ssize_t nread;
-	char buf[INET6_ADDRSTRLEN];
+#if defined DEBUG_FLAG
 	/* the address in human readable form */
+	char buf[INET6_ADDRSTRLEN];
 	const char *a;
 	/* the port (in host-byte order) */
 	uint16_t p;
-	/* a job */
-	struct job_s j[1];
-	socklen_t lsa = sizeof(j->sa);
+	union ud_sockaddr_u sa;
+	socklen_t lsa = sizeof(sa);
+	uint16_t peek[4];
+	ssize_t nrd;
+#endif	/* DEBUG_FLAG */
+	ud_sock_t s = w->data;
+	struct ud_msg_s msg[1];
 
-	j->sock = w->fd;
-	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa.sa, &lsa);
+#if defined DEBUG_FLAG
+	/* for the debugging */
+	if ((nrd = recvfrom(
+		     w->fd, peek, sizeof(peek), MSG_PEEK, &sa.sa, &lsa)) < 0) {
+		/* no need to bother our deserialiser */
+		return;
+	}
+	/* de-big-endian-ify the peek */
+	peek[0] = be16toh(peek[0]);
+	peek[1] = be16toh(peek[1]);
+	peek[2] = be16toh(peek[2]);
+	peek[3] = be16toh(peek[3]);
 	/* obtain the address in human readable form */
-	a = inet_ntop(
-		ud_sockaddr_fam(&j->sa), ud_sockaddr_addr(&j->sa),
-		buf, sizeof(buf));
-	p = ud_sockaddr_port(&j->sa);
+	{
+		int fam = ud_sockaddr_fam(&sa);
+		a = inet_ntop(fam, ud_sockaddr_addr(&sa), buf, sizeof(buf));
+		p = ud_sockaddr_port(&sa);
+	}
 	/* in debugging mode give it full blast */
-	UD_DEBUG_MCAST(
-		":sock %d connect :from [%s]:%d  "
-		":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-		w->fd, a, p,
-		(unsigned int)nread,
-		udpc_pkt_cno(JOB_PACKET(j)),
-		udpc_pkt_pno(JOB_PACKET(j)),
-		udpc_pkt_cmd(JOB_PACKET(j)),
-		ntohs(((const uint16_t*)j->buf)[3]));
+	UDEBUG(
+		":sock %d connect :from [%s]:%hu  "
+		":len %04zd :ini %04hx :pno %04hx :cmd %04hx :mag %04hx\n",
+		w->fd, a, p, nrd,
+		peek[0], peek[1], peek[2], peek[3]);
+#endif	/* DEBUG_FLAG */
+
 	/* otherwise just report activity */
 	{
 		static time_t last_act;
@@ -462,18 +436,23 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		time_t this_act = time(NULL);
 
 		if (last_act + 1 < this_act) {
-			UD_INFO_MCAST(":sock %d shows activity\n", w->fd);
+			logger(LOG_INFO, ":sock %d shows activity", s->fd);
 			last_rpt = this_act;
 		} else if (last_rpt + 60 < this_act) {
-			UD_INFO_MCAST(
+			logger(LOG_INFO, 
 				":sock %d (still) shows activity ... "
-				"1 minute reminder\n", w->fd);
+				"1 minute reminder\n", s->fd);
 			last_rpt = this_act;
 		}
 		last_act = this_act;
 	}
 
 	/* handle the reading */
+	if (ud_chck_msg(msg, s) < 0) {
+		/* buggered */
+		return;
+	}
+#if 0
 	if (UNLIKELY(nread < 0)) {
 		UD_CRITICAL_MCAST("could not handle incoming connection\n");
 		goto out_revok;
@@ -482,11 +461,10 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		goto out_revok;
 	}
 
-	j->blen = nread;
-
 	/* decode the guy */
 	(void)mon_pkt_cb(j);
 out_revok:
+#endif
 	return;
 }
 
@@ -501,7 +479,7 @@ ev_async *glob_notify;
 static void
 sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
-	UD_DEBUG("C-c caught, unrolling everything\n");
+	UDEBUG("C-c caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
 }
@@ -509,14 +487,14 @@ sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 static void
 sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
-	UD_DEBUG("SIGPIPE caught, doing nothing\n");
+	UDEBUG("SIGPIPE caught, doing nothing\n");
 	return;
 }
 
 static void
 sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
-	UD_DEBUG("SIGHUP caught, unrolling everything\n");
+	UDEBUG("SIGHUP caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
 }
@@ -555,16 +533,13 @@ main(int argc, char *argv[])
 	ev_signal *sigterm_watcher = &__sigterm_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 	ev_io *beef = NULL;
-	size_t nbeef = 0;
-	struct ud_ctx_s __ctx;
+	size_t nbeef;
 	/* args */
 	struct gengetopt_args_info argi[1];
 
 	/* whither to log */
 	monout = stdout;
 	ud_openlog(NULL);
-	/* wipe stack pollution */
-	memset(&__ctx, 0, sizeof(__ctx));
 
 	/* parse the command line */
 	if (cmdline_parser(argc, argv, argi)) {
@@ -573,7 +548,6 @@ main(int argc, char *argv[])
 
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);
-	__ctx.mainloop = loop;
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
@@ -594,7 +568,7 @@ main(int argc, char *argv[])
 	ev_async_start(EV_A_ glob_notify);
 
 	/* make some room for the control channel and the beef chans */
-	nbeef = argi->beef_given + 1;
+	nbeef = (argi->beef_given + 1);
 	beef = malloc(nbeef * sizeof(*beef));
 
 	/* attach a multicast listener
@@ -602,29 +576,42 @@ main(int argc, char *argv[])
 	 * events has already been injected into our precious queue
 	 * causing the libev main loop to crash. */
 	{
-		int s = ud_mcast_init(UD_NETWORK_SERVICE);
-		ev_io_init(beef, mon_beef_cb, s, EV_READ);
-		ev_io_start(EV_A_ beef);
+		ud_sock_t s;
+
+		if ((s = ud_socket((struct ud_sockopt_s){UD_SUB})) != NULL) {
+			beef->data = s;
+			ev_io_init(beef, mon_beef_cb, s->fd, EV_READ);
+			ev_io_start(EV_A_ beef);
+		}
 	}
 
 	/* go through all beef channels */
-	for (unsigned int i = 0; i < argi->beef_given; i++) {
-		int s = ud_mcast_init(argi->beef_arg[i]);
-		ev_io_init(beef + i + 1, mon_beef_cb, s, EV_READ);
-		ev_io_start(EV_A_ beef + i + 1);
+	for (unsigned int i = 0, j = 0; i < argi->beef_given; i++) {
+		ud_sock_t s;
+
+		if ((s = ud_socket((struct ud_sockopt_s){
+				UD_SUB,
+				.port = (uint16_t)argi->beef_arg[i],
+				})) == NULL) {
+			continue;
+		}
+		beef[++j].data = s;
+		ev_io_init(beef + j, mon_beef_cb, s->fd, EV_READ);
+		ev_io_start(EV_A_ beef + j);
+		nbeef = j;
 	}
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
-	UD_LOG_NOTI("shutting down unsermon\n");
+	logger(LOG_NOTICE, "shutting down unsermon\n");
 
 	/* detaching beef channels */
 
-	for (unsigned int i = 0; i < nbeef; i++) {
-		int s = beef[i].fd;
+	for (unsigned int i = 0; i <= nbeef; i++) {
+		ud_sock_t s = beef[i].data;
 		ev_io_stop(EV_A_ beef + i);
-		ud_mcast_fini(s);
+		ud_close(s);
 	}
 
 	/* destroy the default evloop */

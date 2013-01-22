@@ -594,13 +594,13 @@ ud_chck(ud_svc_t *svc, void *restrict tgt, size_t tsz, ud_sock_t sock)
 
 /* control packs */
 int
-ud_pack_cmsg(ud_sock_t sock, struct ud_cmsg_s *msg)
+ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 {
 	static union ud_ctrl_u ALGN16(ctrl);
 	__sock_t us = (__sock_t)sock;
 	char *p;
 
-	if (UNLIKELY(msg->msg.dlen > sizeof(ctrl) - sizeof(ctrl.hdr))) {
+	if (UNLIKELY(msg.dlen + 2U > sizeof(ctrl) - sizeof(ctrl.hdr))) {
 		/* this would be a protocol deficiency */
 		return -1;
 	}
@@ -609,9 +609,9 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_cmsg_s *msg)
 #define UDPC_TYPE_DATA	(0x0c)
 	p = ctrl.pl;
 	*p++ = UDPC_TYPE_DATA;
-	*p++ = (uint8_t)msg->msg.dlen;
-	memcpy(p, msg->msg.data, msg->msg.dlen);
-	p += msg->msg.dlen;
+	*p++ = (uint8_t)msg.dlen;
+	memcpy(p, msg.data, msg.dlen);
+	p += msg.dlen;
 
 	/* and flush */
 	{
@@ -623,7 +623,7 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_cmsg_s *msg)
 
 		ctrl.hdr.cno = (uint16_t)us->cno;
 		ctrl.hdr.pno = (uint16_t)us->pno;
-		ctrl.hdr.cmd = msg->svc.svcu;
+		ctrl.hdr.cmd = msg.svc;
 		ctrl.hdr.magic = htons(0xda7a);
 
 		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {

@@ -44,8 +44,8 @@ struct ud_cmsg_s {
 	struct ud_msg_s msg;
 };
 
-extern int ud_pack_cmsg(ud_sock_t s, struct ud_cmsg_s *msg);
-extern int ud_chck_cmsg(struct ud_cmsg_s *restrict tgt, ud_sock_t s);
+extern int ud_pack_cmsg(ud_sock_t s, struct ud_msg_s msg);
+extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
 
 
 /* specific services */

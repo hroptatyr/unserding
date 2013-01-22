@@ -131,6 +131,8 @@ struct __sock_s {
 	int cno;
 	/* packet within */
 	int pno;
+	/* service we're after */
+	ud_svc_t svc;
 
 	struct ud_sockaddr_s src[1];
 	struct ud_sockaddr_s dst[1];
@@ -446,6 +448,7 @@ ud_flush(ud_sock_t sock)
 
 		us->send.hdr.cno = (uint16_t)us->cno;
 		us->send.hdr.pno = (uint16_t)us->pno;
+		us->send.hdr.cmd = us->svc;
 		us->send.hdr.magic = htons(0xda7a);
 
 		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
@@ -497,7 +500,7 @@ __msg_fits_p(__sock_t s, size_t len)
 static inline bool
 __svc_same_p(__sock_t s, ud_svc_t svc)
 {
-	return s->send.hdr.cmd == 0U || svc == s->send.hdr.cmd;
+	return s->svc == 0U || svc == s->svc;
 }
 
 int
@@ -526,8 +529,8 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 	memcpy(p, d, z);
 	p += z;
 
-	/* update header */
-	us->send.hdr.cmd = msg.svc;
+	/* update service slot */
+	us->svc = msg.svc;
 
 	/* and update counters */
 	us->npk = p - us->send.pl;

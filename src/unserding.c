@@ -70,6 +70,13 @@
 # error system not fit for ipv6 transport
 #endif	/* IPPROTO_IPV6 */
 
+#if defined DEBUG_FLAG
+# include <stdio.h>
+# define UDEBUG(args...)	fprintf(stderr, args)
+# else	/* !DEBUG_FLAG */
+# define UDEBUG(args...)
+#endif	/* DEBUG_FLAG */
+
 /* guaranteed by IPv6 */
 #define MIN_MTU		(1280U)
 /* mtu for ethernet */
@@ -567,16 +574,25 @@ int
 ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
+	ud_svc_t svc;
 	char *p;
 
-	if (us->nrd == 0U) {
-		/* we need a dose */
+	if (UNLIKELY(us->nck >= us->nrd)) {
+		/* we need another dose */
 		if (UNLIKELY(ud_dscrd(sock)) < 0) {
 			/* nah, don't pack up new stuff,
 			 * we need to get rid of the old shit first
 			 * actually this should be configurable behaviour */
 			return -1;
+		} else if (us->nck >= us->nrd) {
+			/* no more data, just fuck off */
+			return -1;
 		}
+	}
+
+	/* check for control messages */
+	if (((svc = be16toh(us->recv.hdr.cmd)) & 0xff00) == 0xff00) {
+		return ud_chck_cmsg(tgt, sock);
 	}
 
 	/* now copy the blob */
@@ -589,7 +605,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	tgt->data = p;
 
 	/* and the message service */
-	tgt->svc = be16toh(us->recv.hdr.cmd);
+	tgt->svc = svc;
 
 	/* and update counters */
 	us->nck += tgt->dlen;
@@ -615,6 +631,8 @@ ud_chck(ud_svc_t *svc, void *restrict tgt, size_t tsz, ud_sock_t sock)
 
 
 /* control packs */
+#include "svc-pong.h"
+
 int
 ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 {
@@ -658,6 +676,47 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 		/* update our counters and stuff */
 		us->pno++;
 	}
+	return 0;
+}
+
+int
+ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+	ud_svc_t svc;
+	char *p;
+
+	/* check for control messages */
+	if (UNLIKELY(((svc = be16toh(us->recv.hdr.cmd)) & 0xff00) != 0xff00)) {
+		/* don't discard or update */
+		return -1;
+	}
+
+	/* check what they want */
+	switch (svc & 0x00ff) {
+	case UD_SVC_CMD:
+	case UD_SVC_TIME:
+	default:
+		break;
+	case UD_SVC_PING:
+		ud_pack_pong(sock, 1);
+		break;
+	}
+
+	/* now copy the blob */
+	p = us->recv.pl + us->nck;
+	if ((*p++ != UDPC_TYPE_DATA)) {
+		us->nrd = us->nck = 0U;
+		return -1;
+	}
+	tgt->dlen = *p++;
+	tgt->data = p;
+
+	/* and the message service */
+	tgt->svc = svc;
+
+	/* and update counters */
+	us->nck = us->nrd;
 	return 0;
 }
 

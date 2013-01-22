@@ -64,6 +64,9 @@ sub_cb(EV_P_ ev_io *w, int UNUSED(rev))
 	if (ud_chck_ping(po, s) < 0) {
 		/* don't care */
 		return;
+	} else if (po->what != SVC_PING_PONG) {
+		/* not a pong */
+		return;
 	}
 
 	/* otherwise inspect packet */

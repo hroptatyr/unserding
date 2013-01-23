@@ -54,6 +54,7 @@
 #include "unserding-nifty.h"
 
 struct ctx_s {
+	unsigned int cnt;
 	ud_sock_t s;
 };
 
@@ -82,6 +83,12 @@ static void
 ptm_cb(EV_P_ ev_timer *w, int UNUSED(rev))
 {
 	struct ctx_s *ctx = w->data;
+
+	if (!ctx->cnt--) {
+		ev_timer_stop(EV_A_ w);
+		ev_unloop(EV_A_ EVUNLOOP_ALL);
+		return;
+	}
 
 	(void)ud_pack_pong(ctx->s, 0/*ping*/);
 	return;
@@ -131,6 +138,12 @@ main(int argc, char *argv[])
 		res = 1;
 		goto out;
 	}
+	if (argi->count_given) {
+		ctx->cnt = (unsigned int)argi->count_arg;
+	} else {
+		ctx->cnt = -1U;
+	}
+
 	/* obtain a new handle */
 	if ((ctx->s = ud_socket((struct ud_sockopt_s){UD_PUBSUB})) == NULL) {
 		perror("cannot initialise ud socket");

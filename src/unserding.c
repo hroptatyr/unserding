@@ -600,7 +600,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 
 	/* check for control messages */
 	if (__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd))) {
-		return ud_chck_cmsg(tgt, sock);
+		(void)ud_chck_cmsg(tgt, sock);
 	}
 
 	/* now copy the blob */

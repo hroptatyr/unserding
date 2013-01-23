@@ -1,8 +1,8 @@
 /*** unsermon.c -- unserding network monitor
  *
- * Copyright (C) 2008 Sebastian Freundt
+ * Copyright (C) 2008-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -34,14 +34,14 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
-#include "config.h"
+#if defined HAVE_CONFIG_H
+# include "config.h"
+#endif	/* HAVE_CONFIG_H */
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <unistd.h>
 #include <stdbool.h>
-
 #if defined HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
 #endif
@@ -78,63 +78,24 @@
 
 /* our master include file */
 #include "unserding.h"
-/* context goodness, passed around internally */
-#include "unserding-ctx.h"
-/* our private bits */
-#include "protocore-private.h"
+#include "ud-sockaddr.h"
+#include "ud-private.h"
 #include "unserding-nifty.h"
-#include "unserding-dbg.h"
+#include "ud-logger.h"
+#include "boobs.h"
 
 #define USE_COROUTINES		1
 
-#define UD_SYSLOG(x, args...)	ud_logout(x, errno, args)
-
 #if defined DEBUG_FLAG
-# define UD_CRITICAL_MCAST(args...)					\
-	do {								\
-		UD_LOGOUT("[unserding/input/mcast] CRITICAL " args);	\
-		UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args);	\
-	} while (0)
-# define UD_DEBUG_MCAST(args...)					\
-	do {								\
-		UD_LOGOUT("[unserding/input/mcast] " args);		\
-		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
-	} while (0)
-# define UD_INFO_MCAST(args...)						\
-	do {								\
-		UD_LOGOUT("[unserding/input/mcast] " args);		\
-		UD_SYSLOG(LOG_INFO, "[input/mcast] " args);		\
-	} while (0)
-#else  /* !DEBUG_FLAG */
-# define UD_CRITICAL_MCAST(args...)				\
-	UD_SYSLOG(LOG_CRIT, "[input/mcast] CRITICAL " args)
-# define UD_INFO_MCAST(args...)					\
-	UD_SYSLOG(LOG_INFO, "[input/mcast] " args)
-# define UD_DEBUG_MCAST(args...)
+# include <stdio.h>
+# define UDEBUG(args...)	fprintf(stderr, args)
+# else	/* !DEBUG_FLAG */
+# define UDEBUG(args...)
 #endif	/* DEBUG_FLAG */
 
-static FILE *monout;
+#define UD_SYSLOG(x, args...)	ud_logout(x, errno, args)
 
-#define UD_LOG_CRIT(args...)						\
-	do {								\
-		UD_LOGOUT("[unsermon] CRITICAL " args);		\
-		UD_SYSLOG(LOG_CRIT, "CRITICAL " args);			\
-	} while (0)
-#define UD_LOG_INFO(args...)						\
-	do {								\
-		UD_LOGOUT("[unsermon] " args);				\
-		UD_SYSLOG(LOG_INFO, args);				\
-	} while (0)
-#define UD_LOG_ERR(args...)						\
-	do {								\
-		UD_LOGOUT("[unsermon] ERROR " args);			\
-		UD_SYSLOG(LOG_ERR, "ERROR " args);			\
-	} while (0)
-#define UD_LOG_NOTI(args...)						\
-	do {								\
-		UD_LOGOUT("[unsermon] NOTICE " args);			\
-		UD_SYSLOG(LOG_NOTICE, args);				\
-	} while (0)
+static FILE *monout;
 
 
 typedef struct ud_ev_async_s ud_ev_async;
@@ -152,126 +113,8 @@ struct ud_loopclo_s {
 };
 
 
-#if defined HAVE_UTERUS
-/* helpers */
-static inline size_t
-pr_tsmstz(char *restrict buf, time_t sec, uint32_t msec, char sep)
-{
-	struct tm *tm;
-
-	tm = gmtime(&sec);
-	strftime(buf, 32, "%F %T", tm);
-	buf[10] = sep;
-	buf[19] = '.';
-	buf[20] = (char)(((msec / 100) % 10) + '0');
-	buf[21] = (char)(((msec / 10) % 10) + '0');
-	buf[22] = (char)(((msec / 1) % 10) + '0');
-	buf[23] = '+';
-	buf[24] = '0';
-	buf[25] = '0';
-	buf[26] = ':';
-	buf[27] = '0';
-	buf[28] = '0';
-	return 29;
-}
-
-static inline size_t
-pr_ttf(char *restrict buf, uint16_t ttf)
-{
-	switch (ttf & ~(SCOM_FLAG_LM | SCOM_FLAG_L2M)) {
-	case SL1T_TTF_BID:
-		*buf = 'b';
-		break;
-	case SL1T_TTF_ASK:
-		*buf = 'a';
-		break;
-	case SL1T_TTF_TRA:
-		*buf = 't';
-		break;
-	case SL1T_TTF_FIX:
-		*buf = 'f';
-		break;
-	case SL1T_TTF_STL:
-		*buf = 'x';
-		break;
-	case SL1T_TTF_AUC:
-		*buf = 'k';
-		break;
-
-	case SBAP_FLAVOUR:
-		*buf++ = 'b';
-		*buf++ = 'a';
-		*buf++ = 'p';
-		return 3;
-
-	case SCOM_TTF_UNK:
-	default:
-		ttf = '0' + ttf;
-		break;
-	}
-	return 1;
-}
-
-static size_t
-__pr_snap(char *tgt, scom_t st)
-{
-	const_ssnp_t snp = (const void*)st;
-	char *p = tgt;
-
-	/* bid price */
-	p += ffff_m30_s(p, (m30_t)snp->bp);
-	*p++ = '\t';
-	/* ask price */
-	p += ffff_m30_s(p, (m30_t)snp->ap);
-	if (scom_thdr_ttf(st) == SSNP_FLAVOUR) {
-		/* real snaps reach out further */
-		*p++ = '\t';
-		/* bid quantity */
-		p += ffff_m30_s(p, (m30_t)snp->bq);
-		*p++ = '\t';
-		/* ask quantity */
-		p += ffff_m30_s(p, (m30_t)snp->aq);
-		*p++ = '\t';
-		/* volume-weighted trade price */
-		p += ffff_m30_s(p, (m30_t)snp->tvpr);
-		*p++ = '\t';
-		/* trade quantity */
-		p += ffff_m30_s(p, (m30_t)snp->tq);
-	}
-	return p - tgt;
-}
-
-static size_t
-__attribute__((noinline))
-__pr_cdl(char *tgt, scom_t st)
-{
-	const_scdl_t cdl = (const void*)st;
-	char *p = tgt;
-
-	/* h(igh) */
-	p += ffff_m30_s(p, (m30_t)cdl->h);
-	*p++ = '\t';
-	/* l(ow) */
-	p += ffff_m30_s(p, (m30_t)cdl->l);
-	*p++ = '\t';
-	/* o(pen) */
-	p += ffff_m30_s(p, (m30_t)cdl->o);
-	*p++ = '\t';
-	/* c(lose) */
-	p += ffff_m30_s(p, (m30_t)cdl->c);
-	*p++ = '\t';
-	/* start of the candle */
-	p += sprintf(p, "%08x", cdl->sta_ts);
-	*p++ = '|';
-	p += pr_tsmstz(p, cdl->sta_ts, 0, 'T');
-	*p++ = '\t';
-	/* event count in candle, print 3 times */
-	p += sprintf(p, "%08x", cdl->cnt);
-	*p++ = '|';
-	p += ffff_m30_s(p, (m30_t)cdl->cnt);
-	return p - tgt;
-}
-#endif	/* HAVE_UTERUS */
+/* decoders */
+#include "svc-pong.h"
 
 static inline size_t
 hrclock_print(char *buf, size_t len)
@@ -281,22 +124,72 @@ hrclock_print(char *buf, size_t len)
 	return snprintf(buf, len, "%ld.%09li", tsp.tv_sec, tsp.tv_nsec);
 }
 
+static size_t
+mon_dec_ping(
+	char *restrict p, size_t z, ud_svc_t svc,
+	const struct ud_msg_s m[static 1])
+{
+	static const char ping[] = "PING";
+	static const char pong[] = "PONG";
+	char *restrict q = p;
+
+	switch (svc) {
+	case UD_CTRL_SVC(UD_SVC_PING):
+		memcpy(q, ping, sizeof(ping));
+		break;
+	case UD_CTRL_SVC(UD_SVC_PING + 1):
+		memcpy(q, pong, sizeof(pong));
+		break;
+	default:
+		return 0UL;
+	}
+	(q += sizeof(ping))[-1] = '\t';
+
+	/* decipher the actual message */
+	const union {
+		struct {
+			uint32_t pid;
+			uint8_t hnz;
+			char hn[];
+		};
+		char buf[64];
+	} *pm;
+
+	if (UNLIKELY((pm = m->data) == NULL || m->dlen != sizeof(*pm))) {
+		*q++ = '?';
+	} else {
+		q += snprintf(q, z - (q - p), "%u\t", be32toh(pm->pid));
+		memcpy(q, pm->hn, pm->hnz);
+		q += pm->hnz;
+	}
+	return q - p;
+}
+
 
-/* the actual worker function */
+/* the actual packet decoder */
 static void
-mon_pkt_cb(job_t j)
+mon_pkt_cb(ud_sock_t s, const struct ud_msg_s msg[static 1])
 {
 	char buf[8192], *epi = buf;
+	struct ud_auxmsg_s aux[1];
 
 	/* print a time stamp */
 	epi += hrclock_print(buf, sizeof(buf));
 	*epi++ = '\t';
 
-	/* obtain the address in human readable form */
+	if (ud_chck_aux(aux, s) < 0) {
+		/* uh oh */
+		*epi++ = '?';
+		goto bang;
+	}
+
+	/* otherwise */
 	{
-		int fam = ud_sockaddr_fam(&j->sa);
-		const struct sockaddr *sa = ud_sockaddr_addr(&j->sa);
-		uint16_t port = ud_sockaddr_port(&j->sa);
+		/* obtain the address in human readable form */
+		ud_const_sockaddr_t udsa = &aux->src->sa;
+		int fam = ud_sockaddr_fam(udsa);
+		const struct sockaddr *sa = ud_sockaddr_addr(udsa);
+		uint16_t port = ud_sockaddr_port(udsa);
 
 		*epi++ = '[';
 		if (inet_ntop(fam, sa, epi, 128)) {
@@ -305,122 +198,50 @@ mon_pkt_cb(job_t j)
 		*epi++ = ']';
 		epi += snprintf(epi, 16, ":%hu", port);
 	}
-	*epi++ = '\t';
 
-	{
-		unsigned int nrd = j->blen;
-		unsigned int cno = udpc_pkt_cno(JOB_PACKET(j));
-		unsigned int pno = udpc_pkt_pno(JOB_PACKET(j));
-		unsigned int cmd = udpc_pkt_cmd(JOB_PACKET(j));
-		unsigned int mag = ntohs(((const uint16_t*)j->buf)[3]);
+	/* next up, size */
+	epi += snprintf(
+		epi, 256, "\t%04x\t%04hx\t%04hx\t",
+		aux->len, aux->pno, aux->svc);
 
-		epi += snprintf(
-			epi, 256,
-			/*len*/"%04x\t"
-			/*cno*/"%02x\t"
-			/*pno*/"%06x\t"
-			/*cmd*/"%04x\t"
-			/*mag*/"%04x\t",
-			nrd, cno, pno, cmd, mag);
-	}
-
+	/* go for the actual message */
 	/* intercept special channels */
-	switch (udpc_pkt_cmd(JOB_PACKET(j))) {
-	case 0x7574:
-	case 0x7575: {
-#if defined HAVE_UTERUS
-		char *pbuf = UDPC_PAYLOAD(JOB_PACKET(j).pbuf);
-		size_t plen = UDPC_PAYLLEN(JOB_PACKET(j).plen);
+	switch (aux->svc) {
+	case UD_CTRL_SVC(UD_SVC_CMD):
+		epi += snprintf(epi, 256, "CMD request");
+		break;
+	case UD_CTRL_SVC(UD_SVC_CMD + 1):
+		epi += snprintf(epi, 256, "CMD announce");
+		break;
 
-		for (scom_t sp = (void*)pbuf, ep = (void*)(pbuf + plen);
-		     sp < ep;
-		     sp += scom_tick_size(sp) *
-			     (sizeof(struct sndwch_s) / sizeof(*sp))) {
-			uint32_t sec = scom_thdr_sec(sp);
-			uint16_t msec = scom_thdr_msec(sp);
-			uint16_t ttf = scom_thdr_ttf(sp);
-			char *p = epi;
+	case UD_CTRL_SVC(UD_SVC_TIME):
+		epi += snprintf(epi, 256, "TIME request");
+		break;
 
-			p += pr_tsmstz(p, sec, msec, 'T');
-			*p++ = '\t';
-			/* index into the sym table */
-			p += sprintf(p, "%x", scom_thdr_tblidx(sp));
-			*p++ = '\t';
-			/* tick type */
-			p += pr_ttf(p, ttf);
-			*p++ = '\t';
-			switch (ttf) {
-				const_sl1t_t l1t;
+	case UD_CTRL_SVC(UD_SVC_TIME + 1):
+		epi += snprintf(epi, 256, "TIME announce");
+		break;
 
-			case SL1T_TTF_BID:
-			case SL1T_TTF_ASK:
-			case SL1T_TTF_TRA:
-			case SL1T_TTF_FIX:
-			case SL1T_TTF_STL:
-			case SL1T_TTF_AUC:
-				l1t = (const void*)sp;
-				/* price value */
-				p += ffff_m30_s(p, (m30_t)l1t->v[0]);
-				*p++ = '\t';
-				/* size value */
-				p += ffff_m30_s(p, (m30_t)l1t->v[1]);
-				break;
-			case SL1T_TTF_VOL:
-			case SL1T_TTF_VPR:
-			case SL1T_TTF_OI:
-				/* just one huge value, will there be a m62? */
-				l1t = (const void*)sp;
-				p += ffff_m62_s(p, (m62_t)l1t->w[0]);
-				break;
+	case UD_CTRL_SVC(UD_SVC_PING):
+	case UD_CTRL_SVC(UD_SVC_PING + 1):
+		epi += mon_dec_ping(epi, 256, aux->svc, msg);
+		break;
 
-				/* snaps */
-			case SSNP_FLAVOUR:
-			case SBAP_FLAVOUR:
-				p += __pr_snap(p, sp);
-				break;
-
-				/* candles */
-			case SL1T_TTF_BID | SCOM_FLAG_LM:
-			case SL1T_TTF_ASK | SCOM_FLAG_LM:
-			case SL1T_TTF_TRA | SCOM_FLAG_LM:
-			case SL1T_TTF_FIX | SCOM_FLAG_LM:
-			case SL1T_TTF_STL | SCOM_FLAG_LM:
-			case SL1T_TTF_AUC | SCOM_FLAG_LM:
-				p += __pr_cdl(p, sp);
-				break;
-
-			case SCOM_TTF_UNK:
-			default:
-				break;
-			}
-			*p++ = '\n';
-			*p = '\0';
-			fwrite(buf, sizeof(char), p - buf, monout);
-		}
-#else  /* !HAVE_UTERUS */
-		fwrite(buf, sizeof(char), epi - buf, monout);
-		fputs("UTE/le message, no decoding support\n", monout);
-#endif	/* HAVE_UTERUS */
+	default:
+		epi += snprintf(epi, 256, "UNK");
 		break;
 	}
-	case 0x5554:
-	case 0x5555:
-		fwrite(buf, sizeof(char), epi - buf, monout);
-		fputs("UTE/be message, no decoding support\n", monout);
-		break;
-	default:
-		if (ud_sprint_pkt_pretty(epi, JOB_PACKET(j))) {
-			for (char *p = epi, *np;
-			     (np = strchr(p, '\n'));
-			     p = np + 1) {
-				fwrite(buf, sizeof(char), epi - buf, monout);
-				fwrite(p, sizeof(char), np - p + 1, monout);
-			}
-		} else {
-			fwrite(buf, sizeof(char), epi - buf, monout);
-			fputs("NAUGHT message\n", monout);
+
+bang:
+	/* print the whole shebang */
+	*epi++ = '\n';
+	*epi = '\0';
+	{
+		size_t bsz = epi - buf;
+		if (fwrite(buf, sizeof(char), bsz, monout) < bsz) {
+			/* uh oh */
+			abort();
 		}
-		break;
 	}
 	return;
 }
@@ -428,33 +249,45 @@ mon_pkt_cb(job_t j)
 static void
 mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
-	ssize_t nread;
-	char buf[INET6_ADDRSTRLEN];
+#if defined MON_BEEF_PEEK
 	/* the address in human readable form */
+	char buf[INET6_ADDRSTRLEN];
 	const char *a;
 	/* the port (in host-byte order) */
 	uint16_t p;
-	/* a job */
-	struct job_s j[1];
-	socklen_t lsa = sizeof(j->sa);
+	union ud_sockaddr_u sa;
+	socklen_t lsa = sizeof(sa);
+	uint16_t peek[4];
+	ssize_t nrd;
+#endif	/* MON_BEEF_PEEK */
+	ud_sock_t s = w->data;
 
-	j->sock = w->fd;
-	nread = recvfrom(w->fd, j->buf, JOB_BUF_SIZE, 0, &j->sa.sa, &lsa);
+#if defined MON_BEEF_PEEK
+	/* for the debugging */
+	if ((nrd = recvfrom(
+		     w->fd, peek, sizeof(peek), MSG_PEEK, &sa.sa, &lsa)) < 0) {
+		/* no need to bother our deserialiser */
+		return;
+	}
+	/* de-big-endian-ify the peek */
+	peek[0] = be16toh(peek[0]);
+	peek[1] = be16toh(peek[1]);
+	peek[2] = be16toh(peek[2]);
+	peek[3] = be16toh(peek[3]);
 	/* obtain the address in human readable form */
-	a = inet_ntop(
-		ud_sockaddr_fam(&j->sa), ud_sockaddr_addr(&j->sa),
-		buf, sizeof(buf));
-	p = ud_sockaddr_port(&j->sa);
+	{
+		int fam = ud_sockaddr_fam(&sa);
+		a = inet_ntop(fam, ud_sockaddr_addr(&sa), buf, sizeof(buf));
+		p = ud_sockaddr_port(&sa);
+	}
 	/* in debugging mode give it full blast */
-	UD_DEBUG_MCAST(
-		":sock %d connect :from [%s]:%d  "
-		":len %04x :cno %02x :pno %06x :cmd %04x :mag %04x\n",
-		w->fd, a, p,
-		(unsigned int)nread,
-		udpc_pkt_cno(JOB_PACKET(j)),
-		udpc_pkt_pno(JOB_PACKET(j)),
-		udpc_pkt_cmd(JOB_PACKET(j)),
-		ntohs(((const uint16_t*)j->buf)[3]));
+	UDEBUG(
+		":sock %d connect :from [%s]:%hu  "
+		":len %04zd :ini %04hx :pno %04hx :cmd %04hx :mag %04hx\n",
+		w->fd, a, p, nrd,
+		peek[0], peek[1], peek[2], peek[3]);
+#endif	/* MON_BEEF_PEEK */
+
 	/* otherwise just report activity */
 	{
 		static time_t last_act;
@@ -462,31 +295,21 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 		time_t this_act = time(NULL);
 
 		if (last_act + 1 < this_act) {
-			UD_INFO_MCAST(":sock %d shows activity\n", w->fd);
+			logger(LOG_INFO, ":sock %d shows activity", s->fd);
 			last_rpt = this_act;
 		} else if (last_rpt + 60 < this_act) {
-			UD_INFO_MCAST(
+			logger(LOG_INFO, 
 				":sock %d (still) shows activity ... "
-				"1 minute reminder\n", w->fd);
+				"1 minute reminder\n", s->fd);
 			last_rpt = this_act;
 		}
 		last_act = this_act;
 	}
 
 	/* handle the reading */
-	if (UNLIKELY(nread < 0)) {
-		UD_CRITICAL_MCAST("could not handle incoming connection\n");
-		goto out_revok;
-	} else if (nread == 0) {
-		/* no need to bother */
-		goto out_revok;
+	for (struct ud_msg_s msg[1]; ud_chck_msg(msg, s) == 0;) {
+		mon_pkt_cb(s, msg);
 	}
-
-	j->blen = nread;
-
-	/* decode the guy */
-	(void)mon_pkt_cb(j);
-out_revok:
 	return;
 }
 
@@ -501,7 +324,7 @@ ev_async *glob_notify;
 static void
 sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
-	UD_DEBUG("C-c caught, unrolling everything\n");
+	UDEBUG("C-c caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
 }
@@ -509,14 +332,14 @@ sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 static void
 sigpipe_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
-	UD_DEBUG("SIGPIPE caught, doing nothing\n");
+	UDEBUG("SIGPIPE caught, doing nothing\n");
 	return;
 }
 
 static void
 sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
-	UD_DEBUG("SIGHUP caught, unrolling everything\n");
+	UDEBUG("SIGHUP caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 	return;
 }
@@ -555,16 +378,13 @@ main(int argc, char *argv[])
 	ev_signal *sigterm_watcher = &__sigterm_watcher;
 	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
 	ev_io *beef = NULL;
-	size_t nbeef = 0;
-	struct ud_ctx_s __ctx;
+	size_t nbeef;
 	/* args */
 	struct gengetopt_args_info argi[1];
 
 	/* whither to log */
 	monout = stdout;
 	ud_openlog(NULL);
-	/* wipe stack pollution */
-	memset(&__ctx, 0, sizeof(__ctx));
 
 	/* parse the command line */
 	if (cmdline_parser(argc, argv, argi)) {
@@ -573,7 +393,6 @@ main(int argc, char *argv[])
 
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);
-	__ctx.mainloop = loop;
 
 	/* initialise a sig C-c handler */
 	ev_signal_init(sigint_watcher, sigint_cb, SIGINT);
@@ -594,7 +413,7 @@ main(int argc, char *argv[])
 	ev_async_start(EV_A_ glob_notify);
 
 	/* make some room for the control channel and the beef chans */
-	nbeef = argi->beef_given + 1;
+	nbeef = (argi->beef_given + 1);
 	beef = malloc(nbeef * sizeof(*beef));
 
 	/* attach a multicast listener
@@ -602,29 +421,42 @@ main(int argc, char *argv[])
 	 * events has already been injected into our precious queue
 	 * causing the libev main loop to crash. */
 	{
-		int s = ud_mcast_init(UD_NETWORK_SERVICE);
-		ev_io_init(beef, mon_beef_cb, s, EV_READ);
-		ev_io_start(EV_A_ beef);
+		ud_sock_t s;
+
+		if ((s = ud_socket((struct ud_sockopt_s){UD_SUB})) != NULL) {
+			beef->data = s;
+			ev_io_init(beef, mon_beef_cb, s->fd, EV_READ);
+			ev_io_start(EV_A_ beef);
+		}
 	}
 
 	/* go through all beef channels */
-	for (unsigned int i = 0; i < argi->beef_given; i++) {
-		int s = ud_mcast_init(argi->beef_arg[i]);
-		ev_io_init(beef + i + 1, mon_beef_cb, s, EV_READ);
-		ev_io_start(EV_A_ beef + i + 1);
+	for (unsigned int i = 0, j = 0; i < argi->beef_given; i++) {
+		ud_sock_t s;
+
+		if ((s = ud_socket((struct ud_sockopt_s){
+				UD_SUB,
+				.port = (uint16_t)argi->beef_arg[i],
+				})) == NULL) {
+			continue;
+		}
+		beef[++j].data = s;
+		ev_io_init(beef + j, mon_beef_cb, s->fd, EV_READ);
+		ev_io_start(EV_A_ beef + j);
+		nbeef = j;
 	}
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
-	UD_LOG_NOTI("shutting down unsermon\n");
+	logger(LOG_NOTICE, "shutting down unsermon\n");
 
 	/* detaching beef channels */
 
-	for (unsigned int i = 0; i < nbeef; i++) {
-		int s = beef[i].fd;
+	for (unsigned int i = 0; i <= nbeef; i++) {
+		ud_sock_t s = beef[i].data;
 		ev_io_stop(EV_A_ beef + i);
-		ud_mcast_fini(s);
+		ud_close(s);
 	}
 
 	/* destroy the default evloop */

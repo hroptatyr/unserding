@@ -402,6 +402,8 @@ ud_socket(struct ud_sockopt_s opt)
 
 	/* destination address now, use SILO by default for now */
 	mc6_set_dest(res->dst, opt.addr, opt.port);
+	/* set the length of the storage for the source address */
+	res->src->sz = sizeof(res->src->sa);
 
 	/* join the mcast group(s) */
 	if (MODE_SUBP(opt.mode) && mc6_join_group(s, res->dst, res->memb) < 0) {
@@ -570,6 +572,12 @@ ud_pack(ud_sock_t sock, ud_svc_t svc, const void *data, size_t dlen)
 				.svc = svc, .data = data, .dlen = dlen});
 }
 
+static inline __attribute__((pure)) bool
+__ctrl_msg_p(ud_svc_t svc)
+{
+	return UD_CHN(svc) == UD_CHN_CTRL;
+}
+
 int
 ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 {
@@ -591,7 +599,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	}
 
 	/* check for control messages */
-	if (((svc = be16toh(us->recv.hdr.cmd)) & 0xff00) == 0xff00) {
+	if (__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd))) {
 		return ud_chck_cmsg(tgt, sock);
 	}
 
@@ -630,9 +638,12 @@ ud_chck(ud_svc_t *svc, void *restrict tgt, size_t tsz, ud_sock_t sock)
 }
 
 
-/* control packs */
+/* now come private bits of the API, touch'n'go:
+ * these may or may not disappear, change, reappear, or even go in the
+ * public API one day */
 #include "svc-pong.h"
 
+/* control packs */
 int
 ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 {
@@ -687,7 +698,7 @@ ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	char *p;
 
 	/* check for control messages */
-	if (UNLIKELY(((svc = be16toh(us->recv.hdr.cmd)) & 0xff00) != 0xff00)) {
+	if (UNLIKELY(!__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd)))) {
 		/* don't discard or update */
 		return -1;
 	}
@@ -717,6 +728,22 @@ ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 
 	/* and update counters */
 	us->nck = us->nrd;
+	return 0;
+}
+
+int
+ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+
+	if (UNLIKELY(us->nrd == 0UL)) {
+		return -1;
+	}
+	/* zero-copy */
+	tgt->src = us->src;
+	tgt->pno = be16toh(us->recv.hdr.pno);
+	tgt->svc = be16toh(us->recv.hdr.cmd);
+	tgt->len = us->nrd;
 	return 0;
 }
 

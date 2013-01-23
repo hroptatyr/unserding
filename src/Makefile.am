@@ -31,13 +31,10 @@ EXTRA_DIST += dso-pong.c
 
 bin_PROGRAMS += unsermon
 unsermon_SOURCES = unsermon.c unsermon-clo.ggo
-unsermon_SOURCES += mcast.c mcast.h
-unsermon_SOURCES += protocore.c protocore.h protocore-private.h
 unsermon_SOURCES += ud-logger.c ud-logger.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
 unsermon_CPPFLAGS += $(libev_CFLAGS)
 unsermon_CPPFLAGS += $(uterus_CFLAGS)
-unsermon_CPPFLAGS += -DUD_COMPAT
 unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(libev_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)

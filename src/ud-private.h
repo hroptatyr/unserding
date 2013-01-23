@@ -37,10 +37,24 @@
 #if !defined INCLUDED_ud_private_h_
 #define INCLUDED_ud_private_h_
 
+#include <stdint.h>
 #include "unserding.h"
+#include "ud-sockaddr.h"
 
+/**
+ * Message for auxiliary data. */
+struct ud_auxmsg_s {
+	const struct ud_sockaddr_s *src;
+	uint16_t pno;
+	ud_svc_t svc;
+	uint32_t len;
+};
+
+
 extern int ud_pack_cmsg(ud_sock_t s, struct ud_msg_s msg);
 extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
+
+extern int ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t s);
 
 
 /* specific services */
@@ -48,6 +62,7 @@ extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
  * Control channel with no user defined messages. */
 #define UD_CHN_CTRL	0xffU
 
+#define UD_CHN(s)	((s) / 0x100U)
 #define UD_SVC(c, s)	((c) * 0x100U + (s))
 
 #define UD_CTRL_SVC(s)	UD_SVC(UD_CHN_CTRL, s)

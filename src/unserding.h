@@ -41,8 +41,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>
-#include "ud-sockaddr.h"
 #if defined UD_COMPAT
+# include "ud-sockaddr.h"
 # include "mcast.h"
 #endif	/* UD_COMPAT */
 

@@ -572,6 +572,12 @@ ud_pack(ud_sock_t sock, ud_svc_t svc, const void *data, size_t dlen)
 				.svc = svc, .data = data, .dlen = dlen});
 }
 
+static inline __attribute__((pure)) bool
+__ctrl_msg_p(ud_svc_t svc)
+{
+	return UD_CHN(svc) == UD_CHN_CTRL;
+}
+
 int
 ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 {
@@ -593,7 +599,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	}
 
 	/* check for control messages */
-	if (((svc = be16toh(us->recv.hdr.cmd)) & 0xff00) == 0xff00) {
+	if (__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd))) {
 		return ud_chck_cmsg(tgt, sock);
 	}
 
@@ -689,7 +695,7 @@ ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	char *p;
 
 	/* check for control messages */
-	if (UNLIKELY(((svc = be16toh(us->recv.hdr.cmd)) & 0xff00) != 0xff00)) {
+	if (UNLIKELY(!__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd)))) {
 		/* don't discard or update */
 		return -1;
 	}

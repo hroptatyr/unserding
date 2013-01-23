@@ -47,6 +47,11 @@ TESTS += test_pubsub_06
 test_pubsub_06_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
 test_pubsub_06_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
 
+check_PROGRAMS += test_pubsub_07
+TESTS += test_pubsub_07
+test_pubsub_07_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
+test_pubsub_07_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
+
 .NOTPARALLEL:
 
 ## Makefile.am ends here

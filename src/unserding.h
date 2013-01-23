@@ -41,10 +41,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>
-#if defined UD_COMPAT
+#if !defined UD_NEW_API || defined UD_COMPAT
 # include "ud-sockaddr.h"
 # include "mcast.h"
-#endif	/* UD_COMPAT */
+#endif	/* !UD_NEW_API || UD_COMPAT */
 
 #if defined __cplusplus
 extern "C" {
@@ -55,6 +55,7 @@ extern "C" {
 # endif
 #endif /* __cplusplus */
 
+#if defined UD_NEW_API
 #define UD_NETWORK_SERVICE	8364/*UDNG on the phone*/
 
 /* http://www.iana.org/assignments/ipv6-multicast-addresses/ lists us 
@@ -162,8 +163,10 @@ extern int ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock);
  * Discard buffered packs from previous `ud_chck()'. */
 extern int ud_dscrd(ud_sock_t sock);
 
+#endif	/* UD_NEW_API */
+
 
-#if defined UD_COMPAT
+#if !defined UD_NEW_API || defined UD_COMPAT
 /* old api */
 /**
  * Flags. */
@@ -283,7 +286,7 @@ extern ud_chan_t ud_chan_init(short unsigned int port);
 /**
  * Free resources associated with a connection. */
 extern void ud_chan_fini(ud_chan_t);
-#endif	/* UD_COMPAT */
+#endif	/* !UD_NEW_API || UD_COMPAT */
 
 #ifdef __cplusplus
 }

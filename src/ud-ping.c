@@ -53,15 +53,20 @@
 #include "ud-time.h"
 #include "unserding-nifty.h"
 
+struct ctx_s {
+	unsigned int cnt;
+	ud_sock_t s;
+};
+
 
 /* callbacks for libev */
 static void
 sub_cb(EV_P_ ev_io *w, int UNUSED(rev))
 {
-	ud_sock_t s = w->data;
+	struct ctx_s *ctx = w->data;
 	struct svc_ping_s po[1];
 
-	if (ud_chck_ping(po, s) < 0) {
+	if (ud_chck_ping(po, ctx->s) < 0) {
 		/* don't care */
 		return;
 	} else if (po->what != SVC_PING_PONG) {
@@ -70,16 +75,22 @@ sub_cb(EV_P_ ev_io *w, int UNUSED(rev))
 	}
 
 	/* otherwise inspect packet */
-	fprintf(stdout, "%jd\t%s\n", (intmax_t)po->pid, po->hostname);
+	fprintf(stdout, "%d\t%s\n", (int)po->pid, po->hostname);
 	return;
 }
 
 static void
 ptm_cb(EV_P_ ev_timer *w, int UNUSED(rev))
 {
-	ud_sock_t s = w->data;
+	struct ctx_s *ctx = w->data;
 
-	(void)ud_pack_pong(s, 0/*ping*/);
+	if (!ctx->cnt--) {
+		ev_timer_stop(EV_A_ w);
+		ev_unloop(EV_A_ EVUNLOOP_ALL);
+		return;
+	}
+
+	(void)ud_pack_pong(ctx->s, 0/*ping*/);
 	return;
 }
 
@@ -112,14 +123,14 @@ int
 main(int argc, char *argv[])
 {
 	struct ud_args_info argi[1];
+	/* our own context */
+	struct ctx_s ctx[1];
 	/* ev io */
 	struct ev_loop *loop;
 	ev_signal sigint_watcher[1];
 	ev_signal sigterm_watcher[1];
 	ev_io sub[1];
 	ev_timer ptm[1];
-	/* unserding specific */
-	ud_sock_t s;
 	int res = 0;
 
 	/* parse the command line */
@@ -127,8 +138,14 @@ main(int argc, char *argv[])
 		res = 1;
 		goto out;
 	}
+	if (argi->count_given) {
+		ctx->cnt = (unsigned int)argi->count_arg;
+	} else {
+		ctx->cnt = -1U;
+	}
+
 	/* obtain a new handle */
-	if ((s = ud_socket((struct ud_sockopt_s){UD_PUBSUB})) == NULL) {
+	if ((ctx->s = ud_socket((struct ud_sockopt_s){UD_PUBSUB})) == NULL) {
 		perror("cannot initialise ud socket");
 		return 1;
 	}
@@ -142,11 +159,11 @@ main(int argc, char *argv[])
 	ev_signal_init(sigterm_watcher, sigall_cb, SIGTERM);
 	ev_signal_start(EV_A_ sigterm_watcher);
 
-	sub->data = s;
-	ev_io_init(sub, sub_cb, s->fd, EV_READ);
+	sub->data = ctx;
+	ev_io_init(sub, sub_cb, ctx->s->fd, EV_READ);
 	ev_io_start(EV_A_ sub);
 
-	ptm->data = s;
+	ptm->data = ctx;
 	ev_timer_init(ptm, ptm_cb, 0., argi->interval_arg);
 	ev_timer_start(EV_A_ ptm);
 
@@ -157,7 +174,7 @@ main(int argc, char *argv[])
 	ev_loop(EV_A_ 0);
 
 	ev_io_stop(EV_A_ sub);
-	ud_close(s);
+	ud_close(ctx->s);
 
 	/* destroy the default evloop */
 	ev_default_destroy();

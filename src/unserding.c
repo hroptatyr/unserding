@@ -80,7 +80,7 @@
 /* guaranteed by IPv6 */
 #define MIN_MTU		(1280U)
 /* mtu for ethernet */
-#define ETH_MTU		(1500U)
+#define ETH_MTU		(1492U)
 /* high-3-bits MTU, 1024 + 512 + 256 */
 #define H3B_MTU		(1024U + 512U + 256U)
 /* control messages are shorter */
@@ -547,10 +547,10 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 			 * actually this should be configurable behaviour */
 			return -1;
 		}
-
-		/* update service slot */
-		us->svc = msg.svc;
 	}
+
+	/* update service slot, always */
+	us->svc = msg.svc;
 
 	/* now copy the blob */
 #define UDPC_TYPE_DATA	(0x0c)
@@ -599,8 +599,8 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	}
 
 	/* check for control messages */
-	if (__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd))) {
-		return ud_chck_cmsg(tgt, sock);
+	if (UNLIKELY(__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd)))) {
+		(void)ud_chck_cmsg(tgt, sock);
 	}
 
 	/* now copy the blob */
@@ -616,7 +616,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	tgt->svc = svc;
 
 	/* and update counters */
-	us->nck += tgt->dlen;
+	us->nck += tgt->dlen + 1U/*for UDPC_TYPE_DATA*/ + 1U/*for length*/;
 	return 0;
 }
 
@@ -691,11 +691,10 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 }
 
 int
-ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
+ud_chck_cmsg(struct ud_msg_s *restrict UNUSED(tgt), ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
 	ud_svc_t svc;
-	char *p;
 
 	/* check for control messages */
 	if (UNLIKELY(!__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd)))) {
@@ -713,21 +712,6 @@ ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 		ud_pack_pong(sock, 1);
 		break;
 	}
-
-	/* now copy the blob */
-	p = us->recv.pl + us->nck;
-	if ((*p++ != UDPC_TYPE_DATA)) {
-		us->nrd = us->nck = 0U;
-		return -1;
-	}
-	tgt->dlen = *p++;
-	tgt->data = p;
-
-	/* and the message service */
-	tgt->svc = svc;
-
-	/* and update counters */
-	us->nck = us->nrd;
 	return 0;
 }
 

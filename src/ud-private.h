@@ -51,9 +51,16 @@ struct ud_auxmsg_s {
 };
 
 
+/**
+ * Pack a control message for instant transmission in S. */
 extern int ud_pack_cmsg(ud_sock_t s, struct ud_msg_s msg);
+
+/**
+ * Scan messages in S for control messages and take actions. */
 extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
 
+/**
+ * For current messages in S fill in the auxmsg object TGT. */
 extern int ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t s);
 
 

@@ -8,7 +8,7 @@ AM_CPPFLAGS = -D_XOPEN_SOURCE=600 -D_POSIX_C_SOURCE=201001L
 AM_LDFLAGS =
 
 ## mimick pkg-config values later on
-unserding_CFLAGS = -I$(abs_top_srcdir)/src
+unserding_CFLAGS = -I$(abs_top_srcdir)/src -DUD_NEW_API
 unserding_LIBS = -L$(abs_top_builddir)/src -lunserding
 
 EXTRA_DIST = $(BUILT_SOURCES)
@@ -41,6 +41,16 @@ check_PROGRAMS += test_pub_05
 TESTS += test_pub_05
 test_pub_05_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
 test_pub_05_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
+
+check_PROGRAMS += test_pubsub_06
+TESTS += test_pubsub_06
+test_pubsub_06_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
+test_pubsub_06_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
+
+check_PROGRAMS += test_pubsub_07
+TESTS += test_pubsub_07
+test_pubsub_07_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
+test_pubsub_07_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
 
 .NOTPARALLEL:
 

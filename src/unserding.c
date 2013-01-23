@@ -723,7 +723,7 @@ ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 }
 
 int
-ud_chck_sa(struct ud_samsg_s *restrict tgt, ud_sock_t sock)
+ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
 
@@ -731,8 +731,10 @@ ud_chck_sa(struct ud_samsg_s *restrict tgt, ud_sock_t sock)
 		return -1;
 	}
 	/* zero-copy */
-	tgt->sa = &us->src->sa;
-	tgt->sz = us->src->sz;
+	tgt->src = us->src;
+	tgt->pno = be16toh(us->recv.hdr.pno);
+	tgt->svc = be16toh(us->recv.hdr.cmd);
+	tgt->len = us->nrd;
 	return 0;
 }
 

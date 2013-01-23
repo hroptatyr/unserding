@@ -55,7 +55,6 @@ extern "C" {
 # endif
 #endif /* __cplusplus */
 
-#if defined UD_NEW_API
 #define UD_NETWORK_SERVICE	8364/*UDNG on the phone*/
 
 /* http://www.iana.org/assignments/ipv6-multicast-addresses/ lists us 
@@ -70,6 +69,7 @@ extern "C" {
 /* just offer a default address for some tools */
 #define UD_MCAST6_ADDR		UD_MCAST6_SITE_LOCAL
 
+#if defined UD_NEW_API
 typedef struct ud_sock_s *ud_sock_t;
 typedef const struct ud_sock_s *ud_const_sock_t;
 

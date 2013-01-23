@@ -691,11 +691,10 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 }
 
 int
-ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
+ud_chck_cmsg(struct ud_msg_s *restrict UNUSED(tgt), ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
 	ud_svc_t svc;
-	char *p;
 
 	/* check for control messages */
 	if (UNLIKELY(!__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd)))) {
@@ -713,21 +712,6 @@ ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 		ud_pack_pong(sock, 1);
 		break;
 	}
-
-	/* now copy the blob */
-	p = us->recv.pl + us->nck;
-	if ((*p++ != UDPC_TYPE_DATA)) {
-		us->nrd = us->nck = 0U;
-		return -1;
-	}
-	tgt->dlen = *p++;
-	tgt->data = p;
-
-	/* and the message service */
-	tgt->svc = svc;
-
-	/* and update counters */
-	us->nck = us->nrd;
 	return 0;
 }
 

@@ -74,7 +74,7 @@ sub_cb(EV_P_ ev_io *w, int UNUSED(rev))
 	}
 
 	/* otherwise inspect packet */
-	fprintf(stdout, "%jd\t%s\n", (intmax_t)po->pid, po->hostname);
+	fprintf(stdout, "%d\t%s\n", (int)po->pid, po->hostname);
 	return;
 }
 

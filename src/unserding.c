@@ -80,7 +80,7 @@
 /* guaranteed by IPv6 */
 #define MIN_MTU		(1280U)
 /* mtu for ethernet */
-#define ETH_MTU		(1500U)
+#define ETH_MTU		(1492U)
 /* high-3-bits MTU, 1024 + 512 + 256 */
 #define H3B_MTU		(1024U + 512U + 256U)
 /* control messages are shorter */

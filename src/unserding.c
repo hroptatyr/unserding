@@ -616,7 +616,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	tgt->svc = svc;
 
 	/* and update counters */
-	us->nck += tgt->dlen;
+	us->nck += tgt->dlen + 1U/*for UDPC_TYPE_DATA*/ + 1U/*for length*/;
 	return 0;
 }
 

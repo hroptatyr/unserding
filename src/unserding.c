@@ -638,9 +638,12 @@ ud_chck(ud_svc_t *svc, void *restrict tgt, size_t tsz, ud_sock_t sock)
 }
 
 
-/* control packs */
+/* now come private bits of the API, touch'n'go:
+ * these may or may not disappear, change, reappear, or even go in the
+ * public API one day */
 #include "svc-pong.h"
 
+/* control packs */
 int
 ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 {

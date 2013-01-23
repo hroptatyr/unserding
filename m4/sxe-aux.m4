@@ -698,7 +698,7 @@ AC_DEFUN([SXE_EXPAND_VAR], [dnl
 AC_DEFUN([PKG_CHECK_MODULES_HEADERS], [
 dnl Usage: PKG_CHECK_MODULES_HEADERS([PKG], [VERSION], [HEADERS], [FOUND], [NOT_FOUND])
 
-	PKG_CHECK_MODULES($1, $2, [
+	PKG_CHECK_MODULES([$1], [$2], [
 		## now for the header
 		hdr_fnd="no"
 		SXE_DUMP_LIBS
@@ -710,7 +710,7 @@ dnl Usage: PKG_CHECK_MODULES_HEADERS([PKG], [VERSION], [HEADERS], [FOUND], [NOT_
 			:
 			$4
 		else
-			m4_default($5, [AC_MSG_ERROR([dnl
+			m4_default([$5], [AC_MSG_ERROR([dnl
 Package ]$1[ was found but its headers are missing.
 Make sure the devel package (along with its header files) is installed
 correctly, or fiddle with ]$1[_CFLAGS if its location is non-standard.
@@ -718,7 +718,7 @@ correctly, or fiddle with ]$1[_CFLAGS if its location is non-standard.
 		fi
 
 		unset hdr_fnd
-		], $5)
+		], [$5])
 ])dnl PKG_CHECK_MODULES_HEADERS
 
 dnl sxe-aux.m4 ends here

@@ -47,7 +47,7 @@ dnl   def: sxe_cv_feat_libev yes|no
 			AC_CHECK_HEADERS([ev.h])
 
 			if test "${ac_cv_header_ev_h}" = "yes"; then
-				## assume expat is out there somewhere
+				## assume libev is out there somewhere
 				sxe_cv_feat_libev="yes"
 				libev_LIBS="-lev"
 				libev_CFLAGS=""

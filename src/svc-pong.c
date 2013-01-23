@@ -111,10 +111,10 @@ ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1])
 
 	switch (msg->what) {
 	case SVC_PING_PING:
-		cmd = UD_SVC(UD_CHN_CTRL, UD_SVC_PING);
+		cmd = UD_CTRL_SVC(UD_SVC_PING);
 		break;
 	case SVC_PING_PONG:
-		cmd = UD_SVC(UD_CHN_CTRL, UD_SVC_PING + 1/*reply*/);
+		cmd = UD_CTRL_SVC(UD_SVC_PING + 1/*reply*/);
 		break;
 	default:
 		return -1;
@@ -128,10 +128,10 @@ ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1])
 	memcpy(__msg.wire.hn, msg->hostname, __msg.wire.hnz);
 
 	(void)ud_flush(sock);
-	return ud_pack_cmsg(sock, &(struct ud_cmsg_s){
+	return ud_pack_cmsg(sock, (struct ud_msg_s){
 			.svc = cmd,
-			.msg.data = __msg.buf,
-			.msg.dlen = sizeof(__msg.buf),
+			.data = __msg.buf,
+			.dlen = sizeof(__msg.buf),
 		});
 }
 
@@ -169,6 +169,9 @@ ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock)
 		return -1;
 	} else if (msg->dlen > sizeof(__msg)) {
 		return -1;
+	} else if ((msg->svc & ~0x01) != UD_CTRL_SVC(UD_SVC_PING)) {
+		/* not a PING nor a PONG */
+		return -1;
 	}
 	/* otherwise memcpy to static buffer for inspection */
 	memcpy(__msg.buf, msg->data, msg->dlen);
@@ -178,6 +181,7 @@ ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock)
 	tgt->hostnlen = __msg.wire.hnz;
 	tgt->hostname = __msg.wire.hn;
 	tgt->pid = be32toh(__msg.wire.pid);
+	tgt->what = msg->svc & 0x01 ? SVC_PING_PONG : SVC_PING_PING;
 	/* as a service, \nul terminate the hostname */
 	__msg.wire.hn[__msg.wire.hnz] = '\0';
 	return 0;

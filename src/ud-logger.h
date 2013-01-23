@@ -1,6 +1,6 @@
-/*** ud-private.h -- private API definitions
+/*** ud-logger.h -- unserding logging service
  *
- * Copyright (C) 2008-2013 Sebastian Freundt
+ * Copyright (C) 2011-2013 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -34,46 +34,55 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-#if !defined INCLUDED_ud_private_h_
-#define INCLUDED_ud_private_h_
+#if !defined INCLUDED_ud_logger_h_
+#define INCLUDED_ud_logger_h_
 
-#include <stdint.h>
-#include "unserding.h"
-#include "ud-sockaddr.h"
+#include <stdarg.h>
+#include <syslog.h>
+
+#if defined __cplusplus
+extern "C" {
+#endif	/* __cplusplus */
+
+/* this really is a FILE* */
+extern void *logout;
 
 /**
- * Message for auxiliary data. */
-struct ud_auxmsg_s {
-	const struct ud_sockaddr_s *src;
-	uint16_t pno;
-	ud_svc_t svc;
-	uint32_t len;
-};
+ * Open the logfile with pathname LOGFN. */
+extern int ud_openlog(const char *logfn);
 
-
-extern int ud_pack_cmsg(ud_sock_t s, struct ud_msg_s msg);
-extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
-
-extern int ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t s);
-
-
-/* specific services */
 /**
- * Control channel with no user defined messages. */
-#define UD_CHN_CTRL	0xffU
+ * Close logging facility. */
+extern int ud_closelog(void);
 
-#define UD_CHN(s)	((s) / 0x100U)
-#define UD_SVC(c, s)	((c) * 0x100U + (s))
+/**
+ * Rotate the log file.
+ * This actually just closes and opens the file again. */
+extern void ud_rotlog(void);
 
-#define UD_CTRL_SVC(s)	UD_SVC(UD_CHN_CTRL, s)
+/**
+ * Like perror() but for our log file. */
+extern __attribute__((format(printf, 3, 4))) void
+ud_logout(int facil, int eno, const char *fmt, ...);
 
-enum chn_ctrl_e {
-	/** command request/announce service to discover new commands */
-	UD_SVC_CMD = 0x00U,
-	/** time request/reply service to get an idea about network lags */
-	UD_SVC_TIME = 0x02U,
-	/** Ping/pong service to determine neighbours */
-	UD_SVC_PING = 0x04U,
-};
+/**
+ * Like perror() but for our log file. */
+#if !defined __cplusplus
+# define error(eno, args...)	ud_logout(LOG_ERR, eno, args)
+#else  /* __cplusplus */
+# define error(eno, args...)	::ud_logout(LOG_ERR, eno, args)
+#endif	/* __cplusplus */
 
-#endif	/* INCLUDED_ud_private_h_ */
+/**
+ * For generic logging without errno indication. */
+#if !defined __cplusplus
+# define logger(facil, args...)	ud_logout(facil, 0, args)
+#else  /* __cplusplus */
+# define logger(facil, args...)	::ud_logout(facil, 0, args)
+#endif	/* __cplusplus */
+
+#if defined __cplusplus
+}
+#endif	/* __cplusplus */
+
+#endif	/* INCLUDED_ud_logger_h_ */

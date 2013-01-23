@@ -64,10 +64,18 @@
 #include "ud-sock.h"
 #include "ud-sockaddr.h"
 #include "ud-private.h"
+#include "boobs.h"
 
 #if !defined IPPROTO_IPV6
 # error system not fit for ipv6 transport
 #endif	/* IPPROTO_IPV6 */
+
+#if defined DEBUG_FLAG
+# include <stdio.h>
+# define UDEBUG(args...)	fprintf(stderr, args)
+# else	/* !DEBUG_FLAG */
+# define UDEBUG(args...)
+#endif	/* DEBUG_FLAG */
 
 /* guaranteed by IPv6 */
 #define MIN_MTU		(1280U)
@@ -80,10 +88,13 @@
 
 #define UDP_MULTICAST_TTL	64
 
+/* magic string to identify unserding packets */
+#define UD_PROTO_INI	0x5544/*UD*/
+
 typedef struct __sock_s *__sock_t;
 
 struct ud_hdr_s {
-	uint16_t cno;
+	uint16_t ini;
 	uint16_t pno;
 	uint16_t cmd;
 	uint16_t magic;
@@ -127,10 +138,10 @@ struct __sock_s {
 	/* stuff used to configure the thing */
 	struct ud_sockopt_s opt;
 
-	/* conversation */
-	int cno;
 	/* packet within */
 	int pno;
+	/* service we're after */
+	ud_svc_t svc;
 
 	struct ud_sockaddr_s src[1];
 	struct ud_sockaddr_s dst[1];
@@ -253,9 +264,12 @@ static int
 mc6_set_pub(int s)
 {
 	union ud_sockaddr_u sa = {
-		.sa6.sin6_family = AF_INET6,
-		.sa6.sin6_addr = IN6ADDR_ANY_INIT,
-		.sa6.sin6_port = 0,
+		.sa6 = {
+			.sin6_family = AF_INET6,
+			.sin6_addr = IN6ADDR_ANY_INIT,
+			.sin6_port = 0,
+			.sin6_scope_id = 0,
+		},
 	};
 
 	/* as a courtesy to tools bind the channel */
@@ -266,9 +280,12 @@ static int
 mc6_set_sub(int s, short unsigned int port)
 {
 	union ud_sockaddr_u sa = {
-		.sa6.sin6_family = AF_INET6,
-		.sa6.sin6_addr = IN6ADDR_ANY_INIT,
-		.sa6.sin6_port = htons(port),
+		.sa6 = {
+			.sin6_family = AF_INET6,
+			.sin6_addr = IN6ADDR_ANY_INIT,
+			.sin6_port = htons(port),
+			.sin6_scope_id = 0,
+		},
 	};
 	int opt;
 
@@ -385,6 +402,8 @@ ud_socket(struct ud_sockopt_s opt)
 
 	/* destination address now, use SILO by default for now */
 	mc6_set_dest(res->dst, opt.addr, opt.port);
+	/* set the length of the storage for the source address */
+	res->src->sz = sizeof(res->src->sa);
 
 	/* join the mcast group(s) */
 	if (MODE_SUBP(opt.mode) && mc6_join_group(s, res->dst, res->memb) < 0) {
@@ -444,10 +463,10 @@ ud_flush(ud_sock_t sock)
 		const struct sockaddr *sa = &us->dst->sa.sa;
 		socklen_t sz = us->dst->sz;
 
-		us->send.hdr.cno = (uint16_t)us->cno;
-		us->send.hdr.pno = (uint16_t)us->pno;
-		us->send.hdr.cmd = 0U;
-		us->send.hdr.magic = htons(0xda7a);
+		us->send.hdr.ini = htobe16(UD_PROTO_INI);
+		us->send.hdr.pno = htobe16(us->pno);
+		us->send.hdr.cmd = htobe16(us->svc);
+		us->send.hdr.magic = htobe16(0xda7a);
 
 		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
 			return -1;
@@ -461,8 +480,10 @@ ud_flush(ud_sock_t sock)
 		us->nwr = 0U;
 
 		/* update our counters and stuff */
-		us->cno++;
+		us->pno++;
 	}
+	/* definitely reset svc field */
+	us->svc = 0U;
 	return 0;
 }
 
@@ -470,7 +491,6 @@ int
 ud_dscrd(ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
-	ssize_t nrd = 0;
 
 	if (UNLIKELY(us->nrd == 0U)) {
 		/* oh, we shall read the shebang off the wire innit? */
@@ -478,13 +498,23 @@ ud_dscrd(ud_sock_t sock)
 		size_t z = sizeof(us->recv.buf);
 		struct sockaddr *restrict sa = &us->src->sa.sa;
 		socklen_t *restrict sz = &us->src->sz;
+		ssize_t nrd;
 
 		if ((nrd = recvfrom(us->fd, b, z, 0, sa, sz)) < 0) {
 			return -1;
+		} else if ((nrd -= sizeof(us->recv.hdr)) < 0) {
+			return -1;
+		} else if (be16toh(us->recv.hdr.ini) != UD_PROTO_INI) {
+			return -1;
 		}
+
+		/* update indexes */
+		us->nrd = nrd;
+	} else {
+		/* update indexes */
+		us->nrd = 0U;
 	}
-	/* update indexes */
-	us->nrd = nrd;
+	/* pretend we haven't checked anything */
 	us->nck = 0U;
 	return 0;
 }
@@ -492,20 +522,24 @@ ud_dscrd(ud_sock_t sock)
 static inline bool
 __msg_fits_p(__sock_t s, size_t len)
 {
-	const size_t smtu = sizeof(s->send.buf);
-	const size_t plen = smtu - (s->send.pl - s->send.buf);
-	return s->npk + 2U + len <= plen;
+	return s->npk + 2U + len <= sizeof(s->send.buf) - sizeof(s->send.hdr);
+}
+
+static inline bool
+__svc_same_p(__sock_t s, ud_svc_t svc)
+{
+	return s->svc == 0U || svc == s->svc;
 }
 
 int
-ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg)
+ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 {
 	__sock_t us = (__sock_t)sock;
-	uint8_t z = (uint8_t)msg->dlen;
-	const char *d = msg->data;
+	uint8_t z = (uint8_t)msg.dlen;
+	const char *d = msg.data;
 	char *p;
 
-	if (UNLIKELY(!__msg_fits_p(us, z))) {
+	if (UNLIKELY(!__msg_fits_p(us, z) || !__svc_same_p(us, msg.svc))) {
 		/* send what we've got */
 		if (UNLIKELY(ud_flush(sock)) < 0) {
 			/* nah, don't pack up new stuff,
@@ -513,6 +547,9 @@ ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg)
 			 * actually this should be configurable behaviour */
 			return -1;
 		}
+
+		/* update service slot */
+		us->svc = msg.svc;
 	}
 
 	/* now copy the blob */
@@ -529,26 +566,41 @@ ud_pack_msg(ud_sock_t sock, const struct ud_msg_s *msg)
 }
 
 int
-ud_pack(ud_sock_t sock, const void *data, size_t dlen)
+ud_pack(ud_sock_t sock, ud_svc_t svc, const void *data, size_t dlen)
 {
-	return ud_pack_msg(sock, &(struct ud_msg_s){
-				.dlen = dlen, .data = data});
+	return ud_pack_msg(sock, (struct ud_msg_s){
+				.svc = svc, .data = data, .dlen = dlen});
+}
+
+static inline __attribute__((pure)) bool
+__ctrl_msg_p(ud_svc_t svc)
+{
+	return UD_CHN(svc) == UD_CHN_CTRL;
 }
 
 int
 ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
+	ud_svc_t svc;
 	char *p;
 
-	if (us->nrd == 0U) {
-		/* we need a dose */
+	if (UNLIKELY(us->nck >= us->nrd)) {
+		/* we need another dose */
 		if (UNLIKELY(ud_dscrd(sock)) < 0) {
 			/* nah, don't pack up new stuff,
 			 * we need to get rid of the old shit first
 			 * actually this should be configurable behaviour */
 			return -1;
+		} else if (us->nck >= us->nrd) {
+			/* no more data, just fuck off */
+			return -1;
 		}
+	}
+
+	/* check for control messages */
+	if (__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd))) {
+		return ud_chck_cmsg(tgt, sock);
 	}
 
 	/* now copy the blob */
@@ -560,13 +612,16 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 	tgt->dlen = *p++;
 	tgt->data = p;
 
+	/* and the message service */
+	tgt->svc = svc;
+
 	/* and update counters */
 	us->nck += tgt->dlen;
 	return 0;
 }
 
 ssize_t
-ud_chck(void *restrict tgt, size_t tsz, ud_sock_t sock)
+ud_chck(ud_svc_t *svc, void *restrict tgt, size_t tsz, ud_sock_t sock)
 {
 	struct ud_msg_s msg = {0};
 
@@ -577,20 +632,26 @@ ud_chck(void *restrict tgt, size_t tsz, ud_sock_t sock)
 	if (UNLIKELY(msg.dlen > tsz)) {
 		msg.dlen = tsz;
 	}
+	*svc = msg.svc;
 	memcpy(tgt, msg.data, msg.dlen);
 	return msg.dlen;
 }
 
 
+/* now come private bits of the API, touch'n'go:
+ * these may or may not disappear, change, reappear, or even go in the
+ * public API one day */
+#include "svc-pong.h"
+
 /* control packs */
 int
-ud_pack_cmsg(ud_sock_t sock, struct ud_cmsg_s *msg)
+ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 {
 	static union ud_ctrl_u ALGN16(ctrl);
 	__sock_t us = (__sock_t)sock;
 	char *p;
 
-	if (UNLIKELY(msg->msg.dlen > sizeof(ctrl) - sizeof(ctrl.hdr))) {
+	if (UNLIKELY(msg.dlen + 2U > sizeof(ctrl) - sizeof(ctrl.hdr))) {
 		/* this would be a protocol deficiency */
 		return -1;
 	}
@@ -599,9 +660,9 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_cmsg_s *msg)
 #define UDPC_TYPE_DATA	(0x0c)
 	p = ctrl.pl;
 	*p++ = UDPC_TYPE_DATA;
-	*p++ = (uint8_t)msg->msg.dlen;
-	memcpy(p, msg->msg.data, msg->msg.dlen);
-	p += msg->msg.dlen;
+	*p++ = (uint8_t)msg.dlen;
+	memcpy(p, msg.data, msg.dlen);
+	p += msg.dlen;
 
 	/* and flush */
 	{
@@ -611,10 +672,10 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_cmsg_s *msg)
 		const struct sockaddr *sa = &us->dst->sa.sa;
 		socklen_t sz = us->dst->sz;
 
-		ctrl.hdr.cno = (uint16_t)us->cno;
-		ctrl.hdr.pno = (uint16_t)us->pno;
-		ctrl.hdr.cmd = msg->svc.svcu;
-		ctrl.hdr.magic = htons(0xda7a);
+		ctrl.hdr.ini = htobe16(UD_PROTO_INI);
+		ctrl.hdr.pno = htobe16(us->pno);
+		ctrl.hdr.cmd = htobe16(msg.svc);
+		ctrl.hdr.magic = htobe16(0xda7a);
 
 		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
 			return -1;
@@ -624,8 +685,65 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_cmsg_s *msg)
 		}
 
 		/* update our counters and stuff */
-		us->cno++;
+		us->pno++;
 	}
+	return 0;
+}
+
+int
+ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+	ud_svc_t svc;
+	char *p;
+
+	/* check for control messages */
+	if (UNLIKELY(!__ctrl_msg_p(svc = be16toh(us->recv.hdr.cmd)))) {
+		/* don't discard or update */
+		return -1;
+	}
+
+	/* check what they want */
+	switch (svc & 0x00ff) {
+	case UD_SVC_CMD:
+	case UD_SVC_TIME:
+	default:
+		break;
+	case UD_SVC_PING:
+		ud_pack_pong(sock, 1);
+		break;
+	}
+
+	/* now copy the blob */
+	p = us->recv.pl + us->nck;
+	if ((*p++ != UDPC_TYPE_DATA)) {
+		us->nrd = us->nck = 0U;
+		return -1;
+	}
+	tgt->dlen = *p++;
+	tgt->data = p;
+
+	/* and the message service */
+	tgt->svc = svc;
+
+	/* and update counters */
+	us->nck = us->nrd;
+	return 0;
+}
+
+int
+ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+
+	if (UNLIKELY(us->nrd == 0UL)) {
+		return -1;
+	}
+	/* zero-copy */
+	tgt->src = us->src;
+	tgt->pno = be16toh(us->recv.hdr.pno);
+	tgt->svc = be16toh(us->recv.hdr.cmd);
+	tgt->len = us->nrd;
 	return 0;
 }
 

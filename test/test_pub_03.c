@@ -13,7 +13,7 @@ main(void)
 					   .port = 8378/*TEST*/}))) {
 		assert(s->fd > 0);
 
-		res += ud_pack(s, "TEST", 4);
+		res += ud_pack(s, 0, "TEST", 4);
 		res += ud_flush(s);
 		res += ud_close(s);
 	}

@@ -547,10 +547,10 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 			 * actually this should be configurable behaviour */
 			return -1;
 		}
-
-		/* update service slot */
-		us->svc = msg.svc;
 	}
+
+	/* update service slot, always */
+	us->svc = msg.svc;
 
 	/* now copy the blob */
 #define UDPC_TYPE_DATA	(0x0c)

@@ -64,6 +64,7 @@ libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_SOURCES += ud-logger.c ud-logger.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
+libunserding_la_CPPFLAGS += -DUD_NEW_API
 libunserding_la_CPPFLAGS += -DUD_COMPAT
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
 libunserding_la_LDFLAGS += -version-info 1:0:1

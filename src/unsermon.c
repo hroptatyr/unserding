@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
 #if defined HAVE_SYS_SOCKET_H
@@ -55,6 +56,7 @@
 # include <sys/un.h>
 #endif
 #include <errno.h>
+#include <sys/mman.h>
 #if defined HAVE_EV_H
 # include <ev.h>
 # undef EV_P
@@ -62,19 +64,6 @@
 #endif	/* HAVE_EV_H */
 /* for clock_gettime() */
 #include <time.h>
-/* to get a take on them m30s and m62s */
-# define DEFINE_GORY_STUFF
-#if defined HAVE_UTERUS_UTERUS_H
-# include <uterus/uterus.h>
-# include <uterus/m30.h>
-# include <uterus/m62.h>
-# define HAVE_UTERUS
-#elif defined HAVE_UTERUS_H
-# include <uterus.h>
-# include <m30.h>
-# include <m62.h>
-# define HAVE_UTERUS
-#endif	/* HAVE_UTERUS_UTERUS_H || HAVE_UTERUS_H */
 
 /* our master include file */
 #include "unserding.h"
@@ -82,7 +71,9 @@
 #include "ud-private.h"
 #include "unserding-nifty.h"
 #include "ud-logger.h"
+#include "ud-module.h"
 #include "boobs.h"
+#include "unsermon.h"
 
 #define USE_COROUTINES		1
 
@@ -116,53 +107,71 @@ struct ud_loopclo_s {
 /* decoders */
 #include "svc-pong.h"
 
+/* we organise decoders in channels
+ * every second channel gets a decoder map */
+typedef ud_mondec_f *__decmap_t;
+
+static __decmap_t decmap[128];
+
+int
+ud_mondec_reg(ud_svc_t svc, ud_mondec_f cb)
+{
+	/* singleton valley */
+	unsigned int chn = UD_CHN(svc);
+	__decmap_t dm;
+
+	if ((dm = decmap[chn / 2]) == NULL) {
+		size_t z = 512 * sizeof(cb);
+		void *p;
+
+		p = mmap(NULL, z, PROT_MEM, MAP_MEM, -1, 0);
+		if (UNLIKELY(p == MAP_FAILED)) {
+			return -1;
+		}
+		dm = decmap[chn / 2] = p;
+	}
+	/* first 9 bits */
+	dm[svc & ((1U << 9U) - 1)] = cb;
+	return 0;
+}
+
+int
+ud_mondec_dereg(ud_svc_t svc)
+{
+	/* singleton valley */
+	unsigned int chn = UD_CHN(svc);
+	__decmap_t dm;
+
+	if ((dm = decmap[chn / 2]) == NULL) {
+		return -1;
+	} else if (dm[svc & ((1U << 9U) - 1)] == NULL) {
+		return -1;
+	}
+	dm[svc & ((1U << 9U) - 1)] = NULL;
+	return 0;
+}
+
+static ud_mondec_f
+__mondec(ud_svc_t svc)
+{
+	unsigned int chn = UD_CHN(svc);
+	__decmap_t dm;
+	ud_mondec_f res;
+
+	if ((dm = decmap[chn / 2]) == NULL) {
+		res = NULL;
+	} else if ((res = dm[svc & ((1U << 9U) - 1)]) == NULL) {
+		;
+	}
+	return res;
+}
+
 static inline size_t
 hrclock_print(char *buf, size_t len)
 {
 	struct timespec tsp;
 	clock_gettime(CLOCK_REALTIME, &tsp);
 	return snprintf(buf, len, "%ld.%09li", tsp.tv_sec, tsp.tv_nsec);
-}
-
-static size_t
-mon_dec_ping(
-	char *restrict p, size_t z, ud_svc_t svc,
-	const struct ud_msg_s m[static 1])
-{
-	static const char ping[] = "PING";
-	static const char pong[] = "PONG";
-	char *restrict q = p;
-
-	switch (svc) {
-	case UD_CTRL_SVC(UD_SVC_PING):
-		memcpy(q, ping, sizeof(ping));
-		break;
-	case UD_CTRL_SVC(UD_SVC_PING + 1):
-		memcpy(q, pong, sizeof(pong));
-		break;
-	default:
-		return 0UL;
-	}
-	(q += sizeof(ping))[-1] = '\t';
-
-	/* decipher the actual message */
-	const union {
-		struct {
-			uint32_t pid;
-			uint8_t hnz;
-			char hn[];
-		};
-		char buf[64];
-	} *pm;
-
-	if (UNLIKELY((pm = m->data) == NULL || m->dlen != sizeof(*pm))) {
-		*q++ = '?';
-	} else {
-		q += snprintf(q, z - (q - p), "%u\t", be32toh(pm->pid));
-		memcpy(q, pm->hn, pm->hnz);
-		q += pm->hnz;
-	}
-	return q - p;
 }
 
 
@@ -172,6 +181,7 @@ mon_pkt_cb(ud_sock_t s, const struct ud_msg_s msg[static 1])
 {
 	char buf[8192], *epi = buf;
 	struct ud_auxmsg_s aux[1];
+	ud_mondec_f cb;
 
 	/* print a time stamp */
 	epi += hrclock_print(buf, sizeof(buf));
@@ -205,31 +215,37 @@ mon_pkt_cb(ud_sock_t s, const struct ud_msg_s msg[static 1])
 		aux->len, aux->pno, aux->svc);
 
 	/* go for the actual message */
-	/* intercept special channels */
-	switch (aux->svc) {
-	case UD_CTRL_SVC(UD_SVC_CMD):
-		epi += snprintf(epi, 256, "CMD request");
-		break;
-	case UD_CTRL_SVC(UD_SVC_CMD + 1):
-		epi += snprintf(epi, 256, "CMD announce");
-		break;
+	if ((cb = __mondec(aux->svc)) != NULL) {
+		epi += cb(epi, 512, aux->svc, msg);
+	} else {
+		/* intercept special channels */
+		switch (aux->svc) {
+		case UD_CTRL_SVC(UD_SVC_CMD):
+			epi += snprintf(epi, 256, "CMD request");
+			break;
+		case UD_CTRL_SVC(UD_SVC_CMD + 1):
+			epi += snprintf(epi, 256, "CMD announce");
+			break;
 
-	case UD_CTRL_SVC(UD_SVC_TIME):
-		epi += snprintf(epi, 256, "TIME request");
-		break;
+		case UD_CTRL_SVC(UD_SVC_TIME):
+			epi += snprintf(epi, 256, "TIME request");
+			break;
 
-	case UD_CTRL_SVC(UD_SVC_TIME + 1):
-		epi += snprintf(epi, 256, "TIME announce");
-		break;
+		case UD_CTRL_SVC(UD_SVC_TIME + 1):
+			epi += snprintf(epi, 256, "TIME announce");
+			break;
 
-	case UD_CTRL_SVC(UD_SVC_PING):
-	case UD_CTRL_SVC(UD_SVC_PING + 1):
-		epi += mon_dec_ping(epi, 256, aux->svc, msg);
-		break;
+		case UD_CTRL_SVC(UD_SVC_PING):
+			epi += snprintf(epi, 256, "PING");
+			break;
 
-	default:
-		epi += snprintf(epi, 256, "UNK");
-		break;
+		case UD_CTRL_SVC(UD_SVC_PING + 1):
+			epi += snprintf(epi, 256, "PONG");
+			break;
+
+		default:
+			break;
+		}
 	}
 
 bang:
@@ -246,8 +262,8 @@ bang:
 	return;
 }
 
-static void
-mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
+static int
+mon_beef_peek(int fd)
 {
 #if defined MON_BEEF_PEEK
 	/* the address in human readable form */
@@ -259,15 +275,12 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	socklen_t lsa = sizeof(sa);
 	uint16_t peek[4];
 	ssize_t nrd;
-#endif	/* MON_BEEF_PEEK */
-	ud_sock_t s = w->data;
 
-#if defined MON_BEEF_PEEK
 	/* for the debugging */
 	if ((nrd = recvfrom(
-		     w->fd, peek, sizeof(peek), MSG_PEEK, &sa.sa, &lsa)) < 0) {
+		     fd, peek, sizeof(peek), MSG_PEEK, &sa.sa, &lsa)) < 0) {
 		/* no need to bother our deserialiser */
-		return;
+		return -1;
 	}
 	/* de-big-endian-ify the peek */
 	peek[0] = be16toh(peek[0]);
@@ -284,27 +297,114 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	UDEBUG(
 		":sock %d connect :from [%s]:%hu  "
 		":len %04zd :ini %04hx :pno %04hx :cmd %04hx :mag %04hx\n",
-		w->fd, a, p, nrd,
+		fd, a, p, nrd,
 		peek[0], peek[1], peek[2], peek[3]);
+#else  /* !MON_BEEF_PEEK */
+	if (UNLIKELY(fd < 0)) {
+		return -1;
+	}
 #endif	/* MON_BEEF_PEEK */
+	return 0;
+}
+
+static void
+mon_beef_actvty(ud_sock_t s)
+{
+	static time_t last_act;
+	static time_t last_rpt;
+	time_t this_act = time(NULL);
+	/* pretty printing */
+	char a[INET6_ADDRSTRLEN];
+	uint16_t p;
+	ud_const_sockaddr_t sa;
+
+	if (LIKELY(last_rpt + 60 > this_act || last_act + 1 > this_act)) {
+		goto out;
+	}
+
+	if (LIKELY((sa = ud_socket_addr(s)) != NULL)) {
+		ud_sockaddr_ntop(a, sizeof(a), sa);
+		p = ud_sockaddr_port(sa);
+	}
 
 	/* otherwise just report activity */
-	{
-		static time_t last_act;
-		static time_t last_rpt;
-		time_t this_act = time(NULL);
-
-		if (last_act + 1 < this_act) {
-			logger(LOG_INFO, ":sock %d shows activity", s->fd);
-			last_rpt = this_act;
-		} else if (last_rpt + 60 < this_act) {
-			logger(LOG_INFO, 
-				":sock %d (still) shows activity ... "
-				"1 minute reminder\n", s->fd);
-			last_rpt = this_act;
+	if (last_act + 1 < this_act) {
+		if (LIKELY(sa != NULL)) {
+			logger(LOG_INFO,
+				"network [%s]:%hu shows activity", a, p);
+		} else {
+			logger(LOG_INFO,
+				"network associated with %d shows activity",
+				s->fd);
 		}
-		last_act = this_act;
+		last_rpt = this_act;
+	} else if (last_rpt + 60 < this_act) {
+		if (LIKELY(sa != NULL)) {
+			logger(LOG_INFO,
+				"network [%s]:%hu (still) shows activity ... "
+				"1 minute reminder\n", a, p);
+		} else {
+			logger(LOG_INFO,
+				"network associated with %d (still) "
+				"shows activity ... 1 minute reminder", s->fd);
+		}
+		last_rpt = this_act;
 	}
+out:
+	last_act = this_act;
+	return;
+}
+
+static void
+log_rgstr(ud_sock_t s)
+{
+	/* pretty printing */
+	char a[INET6_ADDRSTRLEN];
+	uint16_t p;
+	ud_const_sockaddr_t sa;
+
+	if (UNLIKELY((sa = ud_socket_addr(s)) == NULL)) {
+		return;
+	}
+	/* otherwise ... */
+	ud_sockaddr_ntop(a, sizeof(a), sa);
+	p = ud_sockaddr_port(sa);
+
+	logger(LOG_INFO, "monitoring network [%s]:%hu", a, p);
+	return;
+}
+
+static void
+log_dergstr(ud_sock_t s)
+{
+	/* pretty printing */
+	char a[INET6_ADDRSTRLEN];
+	uint16_t p;
+	ud_const_sockaddr_t sa;
+
+	if (UNLIKELY((sa = ud_socket_addr(s)) == NULL)) {
+		return;
+	}
+	/* otherwise ... */
+	ud_sockaddr_ntop(a, sizeof(a), sa);
+	p = ud_sockaddr_port(sa);
+
+	logger(LOG_INFO, "monitoring of network [%s]:%hu halted", a, p);
+	return;
+}
+
+
+/* EV callbacks */
+static void
+mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
+{
+	ud_sock_t s = w->data;
+
+	/* see if we need peeking */
+	(void)mon_beef_peek(w->fd);
+
+	/* report activity */
+	mon_beef_actvty(s);
 
 	/* handle the reading */
 	for (struct ud_msg_s msg[1]; ud_chck_msg(msg, s) == 0;) {
@@ -312,14 +412,6 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	}
 	return;
 }
-
-
-static ev_signal ALGN16(__sigint_watcher);
-static ev_signal ALGN16(__sighup_watcher);
-static ev_signal ALGN16(__sigterm_watcher);
-static ev_signal ALGN16(__sigpipe_watcher);
-static ev_async ALGN16(__wakeup_watcher);
-ev_async *glob_notify;
 
 static void
 sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
@@ -344,12 +436,6 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 	return;
 }
 
-static void
-triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
-{
-	return;
-}
-
 
 #if defined __INTEL_COMPILER
 # pragma warning (disable:593)
@@ -368,15 +454,21 @@ triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
 # pragma GCC diagnostic warning "-Wswitch-enum"
 #endif	/* __INTEL_COMPILER */
 
+#include "svc-pong.h"
+#if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
+# include "svc-uterus.h"
+#endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
+
 int
 main(int argc, char *argv[])
 {
 	/* use the default event loop unless you have special needs */
 	struct ev_loop *loop;
-	ev_signal *sigint_watcher = &__sigint_watcher;
-	ev_signal *sighup_watcher = &__sighup_watcher;
-	ev_signal *sigterm_watcher = &__sigterm_watcher;
-	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+	ev_signal sigint_watcher[1];
+	ev_signal sighup_watcher[1];
+	ev_signal sigterm_watcher[1];
+	ev_signal sigpipe_watcher[1];
+	ev_async wakeup_watcher[1];
 	ev_io *beef = NULL;
 	size_t nbeef;
 	/* args */
@@ -384,12 +476,14 @@ main(int argc, char *argv[])
 
 	/* whither to log */
 	monout = stdout;
-	ud_openlog(NULL);
 
 	/* parse the command line */
 	if (cmdline_parser(argc, argv, argi)) {
 		exit(1);
 	}
+
+	/* open the log file */
+	ud_openlog(argi->log_arg);
 
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);
@@ -407,11 +501,6 @@ main(int argc, char *argv[])
 	ev_signal_init(sighup_watcher, sighup_cb, SIGHUP);
 	ev_signal_start(EV_A_ sighup_watcher);
 
-	/* initialise a wakeup handler */
-	glob_notify = &__wakeup_watcher;
-	ev_async_init(glob_notify, triv_cb);
-	ev_async_start(EV_A_ glob_notify);
-
 	/* make some room for the control channel and the beef chans */
 	nbeef = (argi->beef_given + 1);
 	beef = malloc(nbeef * sizeof(*beef));
@@ -427,6 +516,7 @@ main(int argc, char *argv[])
 			beef->data = s;
 			ev_io_init(beef, mon_beef_cb, s->fd, EV_READ);
 			ev_io_start(EV_A_ beef);
+			log_rgstr(s);
 		}
 	}
 
@@ -443,20 +533,49 @@ main(int argc, char *argv[])
 		beef[++j].data = s;
 		ev_io_init(beef + j, mon_beef_cb, s->fd, EV_READ);
 		ev_io_start(EV_A_ beef + j);
+		log_rgstr(s);
 		nbeef = j;
+	}
+
+	svc_pong_LTX_ud_mondec_init();
+#if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
+	svc_uterus_LTX_ud_mondec_init();
+#endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
+
+	/* load DSOs */
+	for (unsigned int i = 0; i < argi->inputs_num; i++) {
+		ud_mod_t m;
+		ud_mod_f inif;
+
+		if ((m = ud_mod_open(argi->inputs[i])) == NULL) {
+			;
+		} else if ((inif = ud_mod_sym(m, "ud_mondec_init")) == NULL) {
+			;
+		} else {
+			/* everything in order, call the initter */
+			(void)((int(*)(void))inif)();
+		}
 	}
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
-	logger(LOG_NOTICE, "shutting down unsermon\n");
+	logger(LOG_NOTICE, "shutting down unsermon");
 
 	/* detaching beef channels */
-
 	for (unsigned int i = 0; i <= nbeef; i++) {
 		ud_sock_t s = beef[i].data;
+
+		log_dergstr(s);
 		ev_io_stop(EV_A_ beef + i);
 		ud_close(s);
+	}
+
+	/* clearing decmap */
+	for (size_t i = 0; i < countof(decmap); i++) {
+		if (decmap[i] != NULL) {
+			munmap(decmap[i], 512 * sizeof(ud_mondec_f));
+		}
 	}
 
 	/* destroy the default evloop */

@@ -1,6 +1,6 @@
-/*** ud-private.h -- private API definitions
+/*** svc-uterus.h -- uterus service goodies
  *
- * Copyright (C) 2008-2013 Sebastian Freundt
+ * Copyright (C) 2013 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -34,57 +34,14 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-#if !defined INCLUDED_ud_private_h_
-#define INCLUDED_ud_private_h_
+#if !defined INCLUDED_svc_uterus_h_
+#define INCLUDED_svc_uterus_h_
 
+#include <unistd.h>
+#include <stdbool.h>
 #include <stdint.h>
-#include "unserding.h"
-#include "ud-sockaddr.h"
 
-/**
- * Message for auxiliary data. */
-struct ud_auxmsg_s {
-	const struct ud_sockaddr_s *src;
-	uint16_t pno;
-	ud_svc_t svc;
-	uint32_t len;
-};
+/* for unsermon */
+extern int svc_uterus_LTX_ud_mondec_init(void);
 
-
-/**
- * Pack a control message for instant transmission in S. */
-extern int ud_pack_cmsg(ud_sock_t s, struct ud_msg_s msg);
-
-/**
- * Scan messages in S for control messages and take actions. */
-extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
-
-/**
- * For current messages in S fill in the auxmsg object TGT. */
-extern int ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t s);
-
-/**
- * Return the network SOCK is pubbing or subbed to. */
-extern ud_const_sockaddr_t ud_socket_addr(ud_sock_t);
-
-
-/* specific services */
-/**
- * Control channel with no user defined messages. */
-#define UD_CHN_CTRL	0xffU
-
-#define UD_CHN(s)	((s) / 0x100U)
-#define UD_SVC(c, s)	((c) * 0x100U + (s))
-
-#define UD_CTRL_SVC(s)	UD_SVC(UD_CHN_CTRL, s)
-
-enum chn_ctrl_e {
-	/** command request/announce service to discover new commands */
-	UD_SVC_CMD = 0x00U,
-	/** time request/reply service to get an idea about network lags */
-	UD_SVC_TIME = 0x02U,
-	/** Ping/pong service to determine neighbours */
-	UD_SVC_PING = 0x04U,
-};
-
-#endif	/* INCLUDED_ud_private_h_ */
+#endif	/* INCLUDED_svc_uterus_h_ */

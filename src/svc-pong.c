@@ -38,6 +38,8 @@
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
 #include <limits.h>
+#include <string.h>
+#include <stdio.h>
 #include "unserding.h"
 #include "unserding-nifty.h"
 #include "svc-pong.h"
@@ -45,9 +47,12 @@
 #include "boobs.h"
 
 #if defined UD_COMPAT
-#include "seria-proto-glue.h"
-#include "ud-time.h"
+# include "seria-proto-glue.h"
+# include "ud-time.h"
 #endif	/* UD_COMPAT */
+#if defined UNSERMON_DSO
+# include "unsermon.h"
+#endif	/* UNSERMON_DSO */
 
 struct __ping_s {
 	uint32_t pid;
@@ -97,6 +102,7 @@ ud_svc_update_mart(ud_handle_t hdl, struct timeval then)
 
 
 /* packing service */
+#if !defined UNSERMON_DSO
 static union {
 	struct __ping_s wire;
 	char buf[64];
@@ -186,6 +192,7 @@ ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock)
 	__msg.wire.hn[__msg.wire.hnz] = '\0';
 	return 0;
 }
+#endif	/* UNSERMON_DSO */
 
 #if defined UD_COMPAT
 /* conforms to ud_subscr_f */
@@ -233,5 +240,57 @@ ud_svc_nego_score(ud_handle_t hdl, int timeout)
 	return hdl->score = ud_find_score(clo.seen);
 }
 #endif	/* UD_COMPAT */
+
+
+/* monitor service */
+#if defined UNSERMON_DSO
+static size_t
+mon_dec_ping(
+	char *restrict p, size_t z, ud_svc_t svc,
+	const struct ud_msg_s m[static 1])
+{
+	static const char ping[] = "PING";
+	static const char pong[] = "PONG";
+	char *restrict q = p;
+
+	switch (svc) {
+	case UD_CTRL_SVC(UD_SVC_PING):
+		memcpy(q, ping, sizeof(ping));
+		break;
+	case UD_CTRL_SVC(UD_SVC_PING + 1):
+		memcpy(q, pong, sizeof(pong));
+		break;
+	default:
+		return 0UL;
+	}
+	(q += sizeof(ping))[-1] = '\t';
+
+	/* decipher the actual message */
+	const union {
+		struct __ping_s wire;
+		char buf[64];
+	} *pm;
+
+	if (UNLIKELY((pm = m->data) == NULL || m->dlen != sizeof(*pm))) {
+		*q++ = '?';
+	} else {
+		q += snprintf(q, z - (q - p), "%u\t", be32toh(pm->wire.pid));
+		memcpy(q, pm->wire.hn, pm->wire.hnz);
+		q += pm->wire.hnz;
+	}
+	return q - p;
+}
+
+int
+svc_pong_LTX_ud_mondec_init(void)
+{
+	ud_mondec_reg(UD_CTRL_SVC(UD_SVC_PING), mon_dec_ping);
+	ud_mondec_reg(UD_CTRL_SVC(UD_SVC_PING + 1), mon_dec_ping);
+	return 0;
+}
+
+int ud_mondec_init(void)
+	__attribute__((alias("svc_pong_LTX_ud_mondec_init")));
+#endif	/* UNSERMON_DSO */
 
 /* svc-pong.c ends here */

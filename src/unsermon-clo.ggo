@@ -3,6 +3,11 @@ package "unsermon"
 usage "unsermon [OPTION]..."
 description "monitor unserding traffic"
 
+option "log" l
+	"Log to specified file FILE (or stderr if `-').  \
+By default syslog is used"
+	string typestr="FILE" optional 
+
 section "Network options"
 option "port" p
 	"Multicast control channel port"

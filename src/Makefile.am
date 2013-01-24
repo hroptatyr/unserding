@@ -5,6 +5,7 @@ AM_CFLAGS =
 AM_LDFLAGS =
 
 headerdir = $(includedir)/unserding
+moddir = $(libexecdir)/unserding
 
 noinst_PROGRAMS =
 bin_PROGRAMS =
@@ -12,12 +13,13 @@ sbin_PROGRAMS =
 lib_LTLIBRARIES =
 noinst_HEADERS =
 header_HEADERS =
+mod_LTLIBRARIES =
 
 BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
-header_HEADERS += protocore.h seria.h module.h
+header_HEADERS += protocore.h seria.h
 header_HEADERS += mcast.h
 header_HEADERS += unserding-ctx.h
 noinst_HEADERS += protocore-private.h
@@ -30,8 +32,9 @@ EXTRA_DIST += btea.c
 EXTRA_DIST += dso-pong.c
 
 bin_PROGRAMS += unsermon
-unsermon_SOURCES = unsermon.c unsermon-clo.ggo
+unsermon_SOURCES = unsermon.c unsermon.h unsermon-clo.ggo
 unsermon_SOURCES += ud-logger.c ud-logger.h
+unsermon_SOURCES += ud-module.c ud-module.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
 unsermon_CPPFLAGS += $(libev_CFLAGS)
 unsermon_CPPFLAGS += $(uterus_CFLAGS)
@@ -39,7 +42,12 @@ unsermon_CPPFLAGS += -DUD_NEW_API
 unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(libev_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)
+unsermon_LDFLAGS += $(LIBLTDL)
 unsermon_LDADD = $(unserding_LIBS)
+unsermon_LDADD += svc-pong.la
+if HAVE_UTERUS
+unsermon_LDADD += svc-uterus.la
+endif  HAVE_UTERUS
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 
 bin_PROGRAMS += ud-ping
@@ -71,6 +79,22 @@ libunserding_la_CPPFLAGS += -DUD_COMPAT
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
 libunserding_la_LDFLAGS += -version-info 1:0:1
 unserding_LIBS = libunserding.la
+
+## ping/pong decoder for unsermon
+mod_LTLIBRARIES += svc-pong.la
+svc_pong_la_SOURCES = svc-pong.c
+svc_pong_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
+svc_pong_la_CPPFLAGS += -DUD_NEW_API
+svc_pong_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) -module
+
+## uterus decoder for unsermon, will disappear
+if HAVE_UTERUS
+mod_LTLIBRARIES += svc-uterus.la
+svc_uterus_la_SOURCES = svc-uterus.c
+svc_uterus_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
+svc_uterus_la_CPPFLAGS += -DUD_NEW_API
+svc_uterus_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) -module
+endif  HAVE_UTERUS
 
 
 ## our rule for gengetopt

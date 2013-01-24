@@ -1,4 +1,4 @@
-/*** ud-private.h -- private API definitions
+/*** unsermon.h -- unserding network monitor
  *
  * Copyright (C) 2008-2013 Sebastian Freundt
  *
@@ -34,57 +34,34 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-#if !defined INCLUDED_ud_private_h_
-#define INCLUDED_ud_private_h_
+#if !defined INCLUDED_unsermon_h_
+#define INCLUDED_unsermon_h_
 
-#include <stdint.h>
 #include "unserding.h"
-#include "ud-sockaddr.h"
+
+#if defined __cplusplus
+extern "C" {
+# if defined __GNUC__
+#  define restrict	__restrict__
+# else
+#  define restrict
+# endif
+#endif /* __cplusplus */
 
 /**
- * Message for auxiliary data. */
-struct ud_auxmsg_s {
-	const struct ud_sockaddr_s *src;
-	uint16_t pno;
-	ud_svc_t svc;
-	uint32_t len;
-};
-
-
-/**
- * Pack a control message for instant transmission in S. */
-extern int ud_pack_cmsg(ud_sock_t s, struct ud_msg_s msg);
+ * Entry point for pluggable monitor decodes. */
+extern int ud_mondec_init(void);
 
 /**
- * Scan messages in S for control messages and take actions. */
-extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
+ * The actual decoder function. */
+typedef size_t(*ud_mondec_f)(
+	char *restrict, size_t, ud_svc_t, const struct ud_msg_s[static 1]);
 
-/**
- * For current messages in S fill in the auxmsg object TGT. */
-extern int ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t s);
+extern int ud_mondec_reg(ud_svc_t svc, ud_mondec_f cb);
+extern int ud_mondec_dereg(ud_svc_t svc);
 
-/**
- * Return the network SOCK is pubbing or subbed to. */
-extern ud_const_sockaddr_t ud_socket_addr(ud_sock_t);
+#if defined __cplusplus
+}
+#endif	/* __cplusplus */
 
-
-/* specific services */
-/**
- * Control channel with no user defined messages. */
-#define UD_CHN_CTRL	0xffU
-
-#define UD_CHN(s)	((s) / 0x100U)
-#define UD_SVC(c, s)	((c) * 0x100U + (s))
-
-#define UD_CTRL_SVC(s)	UD_SVC(UD_CHN_CTRL, s)
-
-enum chn_ctrl_e {
-	/** command request/announce service to discover new commands */
-	UD_SVC_CMD = 0x00U,
-	/** time request/reply service to get an idea about network lags */
-	UD_SVC_TIME = 0x02U,
-	/** Ping/pong service to determine neighbours */
-	UD_SVC_PING = 0x04U,
-};
-
-#endif	/* INCLUDED_ud_private_h_ */
+#endif	/* INCLUDED_unsermon_h_ */

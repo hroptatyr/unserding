@@ -71,26 +71,34 @@ __open_logout(const char logfn[static 1])
 static void
 __close_logout(void)
 {
+	if (glogfn == NULL) {
+		/* could be a syslog thing */
+		closelog();
+	}
 	if (logout != NULL) {
 		fflush(logout);
 		fclose(logout);
 	}
 	logout = NULL;
+	glogfn = NULL;
 	return;
 }
 
 int
 ud_openlog(const char *logfn)
 {
-	int res = 0;
-
-	if (((glogfn = logfn) == NULL && (logout = stderr)) ||
-	    (res = __open_logout(logfn)) < 0) {
-		;
+	if (logfn == NULL) {
+		openlog("unserding", UD_LOG_FLAGS, UD_FACILITY);
+	} else if (logfn[0] == '-' && logfn[1] == '\0') {
+		logout = stderr;
+	} else if (__open_logout(logfn) >= 0) {
+		glogfn = logfn;
 	} else {
-		atexit(__close_logout);
+		return -1;
 	}
-	return res;
+	/* make sure we close the bugger */
+	atexit(__close_logout);
+	return 0;
 }
 
 int
@@ -104,6 +112,7 @@ void
 ud_rotlog(void)
 {
 	if (glogfn == NULL) {
+		/* either stderr or syslog, can't be rotated anyway */
 		return;
 	}
 	/* otherwise close and open again */

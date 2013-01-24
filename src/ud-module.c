@@ -1,8 +1,8 @@
-/*** module.c -- the module loader
+/*** module.c -- module stuff
  *
- * Copyright (C) 2005 - 2009 Sebastian Freundt
+ * Copyright (C) 2005-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  * 

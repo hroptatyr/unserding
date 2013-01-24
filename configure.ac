@@ -77,6 +77,7 @@ dnl must come after all AC_LINK_IFELSE clauses
 ## check for the ldflags
 SXE_CHECK_LDFLAGS
 SXE_CHECK_LIBTOOL
+SXE_CHECK_LIBLTDL
 
 dnl -------------------------------------------------------------------------
 dnl final output

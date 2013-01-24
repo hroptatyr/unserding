@@ -81,6 +81,16 @@ svc_pong_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
 svc_pong_la_CPPFLAGS += -DUD_NEW_API
 svc_pong_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) -module
 
+## uterus decoder for unsermon, will disappear
+if HAVE_UTERUS
+mod_LTLIBRARIES += svc-uterus.la
+svc_uterus_la_SOURCES = svc-uterus.c
+svc_uterus_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
+svc_uterus_la_CPPFLAGS += -DUD_NEW_API
+svc_uterus_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) -module
+endif  HAVE_UTERUS
+
+
 ## our rule for gengetopt
 %.c %.h: %.ggo
 	$(AM_V_GEN) gengetopt -l -i $< -F $*

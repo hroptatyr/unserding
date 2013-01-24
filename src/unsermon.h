@@ -50,7 +50,7 @@ extern "C" {
 
 /**
  * Entry point for pluggable monitor decodes. */
-extern int umodec_init(void);
+extern int ud_mondec_init(void);
 
 /**
  * The actual decoder function. */

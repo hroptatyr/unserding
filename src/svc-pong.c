@@ -282,7 +282,7 @@ mon_dec_ping(
 }
 
 int
-umodec_init(void)
+ud_mondec_init(void)
 {
 	ud_mondec_reg(UD_CTRL_SVC(UD_SVC_PING), mon_dec_ping);
 	ud_mondec_reg(UD_CTRL_SVC(UD_SVC_PING + 1), mon_dec_ping);

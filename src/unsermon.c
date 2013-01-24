@@ -83,6 +83,7 @@
 #include "unserding-nifty.h"
 #include "ud-logger.h"
 #include "boobs.h"
+#include "unsermon.h"
 
 #define USE_COROUTINES		1
 

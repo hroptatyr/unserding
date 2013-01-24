@@ -79,7 +79,7 @@ mod_LTLIBRARIES += svc-pong.la
 svc_pong_la_SOURCES = svc-pong.c
 svc_pong_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
 svc_pong_la_CPPFLAGS += -DUD_NEW_API
-svc_pong_la_LDFLAGS = -module
+svc_pong_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) -module
 
 ## our rule for gengetopt
 %.c %.h: %.ggo

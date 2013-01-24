@@ -731,4 +731,11 @@ ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t sock)
 	return 0;
 }
 
+ud_const_sockaddr_t
+ud_socket_addr(ud_sock_t s)
+{
+	__sock_t us = (__sock_t)s;
+	return &us->dst->sa;
+}
+
 /* unserding.c ends here */

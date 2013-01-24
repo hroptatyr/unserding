@@ -63,6 +63,10 @@ extern int ud_chck_cmsg(struct ud_msg_s *restrict tgt, ud_sock_t s);
  * For current messages in S fill in the auxmsg object TGT. */
 extern int ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t s);
 
+/**
+ * Return the network SOCK is pubbing or subbed to. */
+extern ud_const_sockaddr_t ud_socket_addr(ud_sock_t);
+
 
 /* specific services */
 /**

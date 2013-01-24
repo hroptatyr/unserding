@@ -339,6 +339,44 @@ out:
 	return;
 }
 
+static void
+log_rgstr(ud_sock_t s)
+{
+	/* pretty printing */
+	char a[INET6_ADDRSTRLEN];
+	uint16_t p;
+	ud_const_sockaddr_t sa;
+
+	if (UNLIKELY((sa = ud_socket_addr(s)) == NULL)) {
+		return;
+	}
+	/* otherwise ... */
+	ud_sockaddr_ntop(a, sizeof(a), sa);
+	p = ud_sockaddr_port(sa);
+
+	logger(LOG_INFO, "monitoring network [%s]:%hu", a, p);
+	return;
+}
+
+static void
+log_dergstr(ud_sock_t s)
+{
+	/* pretty printing */
+	char a[INET6_ADDRSTRLEN];
+	uint16_t p;
+	ud_const_sockaddr_t sa;
+
+	if (UNLIKELY((sa = ud_socket_addr(s)) == NULL)) {
+		return;
+	}
+	/* otherwise ... */
+	ud_sockaddr_ntop(a, sizeof(a), sa);
+	p = ud_sockaddr_port(sa);
+
+	logger(LOG_INFO, "monitoring of network [%s]:%hu halted", a, p);
+	return;
+}
+
 
 /* EV callbacks */
 static void
@@ -475,6 +513,7 @@ main(int argc, char *argv[])
 			beef->data = s;
 			ev_io_init(beef, mon_beef_cb, s->fd, EV_READ);
 			ev_io_start(EV_A_ beef);
+			log_rgstr(s);
 		}
 	}
 
@@ -491,6 +530,7 @@ main(int argc, char *argv[])
 		beef[++j].data = s;
 		ev_io_init(beef + j, mon_beef_cb, s->fd, EV_READ);
 		ev_io_start(EV_A_ beef + j);
+		log_rgstr(s);
 		nbeef = j;
 	}
 
@@ -503,6 +543,8 @@ main(int argc, char *argv[])
 
 	for (unsigned int i = 0; i <= nbeef; i++) {
 		ud_sock_t s = beef[i].data;
+
+		log_dergstr(s);
 		ev_io_stop(EV_A_ beef + i);
 		ud_close(s);
 	}

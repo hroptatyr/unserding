@@ -544,7 +544,7 @@ main(int argc, char *argv[])
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
-	logger(LOG_NOTICE, "shutting down unsermon\n");
+	logger(LOG_NOTICE, "shutting down unsermon");
 
 	/* detaching beef channels */
 	for (unsigned int i = 0; i <= nbeef; i++) {

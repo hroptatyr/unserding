@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
 #if defined HAVE_SYS_SOCKET_H
@@ -55,6 +56,7 @@
 # include <sys/un.h>
 #endif
 #include <errno.h>
+#include <sys/mman.h>
 #if defined HAVE_EV_H
 # include <ev.h>
 # undef EV_P
@@ -62,19 +64,6 @@
 #endif	/* HAVE_EV_H */
 /* for clock_gettime() */
 #include <time.h>
-/* to get a take on them m30s and m62s */
-# define DEFINE_GORY_STUFF
-#if defined HAVE_UTERUS_UTERUS_H
-# include <uterus/uterus.h>
-# include <uterus/m30.h>
-# include <uterus/m62.h>
-# define HAVE_UTERUS
-#elif defined HAVE_UTERUS_H
-# include <uterus.h>
-# include <m30.h>
-# include <m62.h>
-# define HAVE_UTERUS
-#endif	/* HAVE_UTERUS_UTERUS_H || HAVE_UTERUS_H */
 
 /* our master include file */
 #include "unserding.h"
@@ -83,6 +72,7 @@
 #include "unserding-nifty.h"
 #include "ud-logger.h"
 #include "boobs.h"
+#include "unsermon.h"
 
 #define USE_COROUTINES		1
 
@@ -113,130 +103,67 @@ struct ud_loopclo_s {
 };
 
 
-#if defined HAVE_UTERUS
-/* helpers */
-static inline size_t
-pr_tsmstz(char *restrict buf, time_t sec, uint32_t msec, char sep)
-{
-	struct tm *tm;
-
-	tm = gmtime(&sec);
-	strftime(buf, 32, "%F %T", tm);
-	buf[10] = sep;
-	buf[19] = '.';
-	buf[20] = (char)(((msec / 100) % 10) + '0');
-	buf[21] = (char)(((msec / 10) % 10) + '0');
-	buf[22] = (char)(((msec / 1) % 10) + '0');
-	buf[23] = '+';
-	buf[24] = '0';
-	buf[25] = '0';
-	buf[26] = ':';
-	buf[27] = '0';
-	buf[28] = '0';
-	return 29;
-}
-
-static inline size_t
-pr_ttf(char *restrict buf, uint16_t ttf)
-{
-	switch (ttf & ~(SCOM_FLAG_LM | SCOM_FLAG_L2M)) {
-	case SL1T_TTF_BID:
-		*buf = 'b';
-		break;
-	case SL1T_TTF_ASK:
-		*buf = 'a';
-		break;
-	case SL1T_TTF_TRA:
-		*buf = 't';
-		break;
-	case SL1T_TTF_FIX:
-		*buf = 'f';
-		break;
-	case SL1T_TTF_STL:
-		*buf = 'x';
-		break;
-	case SL1T_TTF_AUC:
-		*buf = 'k';
-		break;
-
-	case SBAP_FLAVOUR:
-		*buf++ = 'b';
-		*buf++ = 'a';
-		*buf++ = 'p';
-		return 3;
-
-	case SCOM_TTF_UNK:
-	default:
-		*buf++ = '?';
-		break;
-	}
-	return 1;
-}
-
-static size_t
-__pr_snap(char *tgt, scom_t st)
-{
-	const_ssnp_t snp = (const void*)st;
-	char *p = tgt;
-
-	/* bid price */
-	p += ffff_m30_s(p, (m30_t)snp->bp);
-	*p++ = '\t';
-	/* ask price */
-	p += ffff_m30_s(p, (m30_t)snp->ap);
-	if (scom_thdr_ttf(st) == SSNP_FLAVOUR) {
-		/* real snaps reach out further */
-		*p++ = '\t';
-		/* bid quantity */
-		p += ffff_m30_s(p, (m30_t)snp->bq);
-		*p++ = '\t';
-		/* ask quantity */
-		p += ffff_m30_s(p, (m30_t)snp->aq);
-		*p++ = '\t';
-		/* volume-weighted trade price */
-		p += ffff_m30_s(p, (m30_t)snp->tvpr);
-		*p++ = '\t';
-		/* trade quantity */
-		p += ffff_m30_s(p, (m30_t)snp->tq);
-	}
-	return p - tgt;
-}
-
-static size_t
-__attribute__((noinline))
-__pr_cdl(char *tgt, scom_t st)
-{
-	const_scdl_t cdl = (const void*)st;
-	char *p = tgt;
-
-	/* h(igh) */
-	p += ffff_m30_s(p, (m30_t)cdl->h);
-	*p++ = '\t';
-	/* l(ow) */
-	p += ffff_m30_s(p, (m30_t)cdl->l);
-	*p++ = '\t';
-	/* o(pen) */
-	p += ffff_m30_s(p, (m30_t)cdl->o);
-	*p++ = '\t';
-	/* c(lose) */
-	p += ffff_m30_s(p, (m30_t)cdl->c);
-	*p++ = '\t';
-	/* start of the candle */
-	p += sprintf(p, "%08x", cdl->sta_ts);
-	*p++ = '|';
-	p += pr_tsmstz(p, cdl->sta_ts, 0, 'T');
-	*p++ = '\t';
-	/* event count in candle, print 3 times */
-	p += sprintf(p, "%08x", cdl->cnt);
-	*p++ = '|';
-	p += ffff_m30_s(p, (m30_t)cdl->cnt);
-	return p - tgt;
-}
-#endif	/* HAVE_UTERUS */
-
-
 /* decoders */
 #include "svc-pong.h"
+
+/* we organise decoders in channels
+ * every second channel gets a decoder map */
+typedef ud_mondec_f *__decmap_t;
+
+static __decmap_t decmap[128];
+
+int
+ud_mondec_reg(ud_svc_t svc, ud_mondec_f cb)
+{
+	/* singleton valley */
+	unsigned int chn = UD_CHN(svc);
+	__decmap_t dm;
+
+	if ((dm = decmap[chn / 2]) == NULL) {
+		size_t z = 512 * sizeof(cb);
+		void *p;
+
+		p = mmap(NULL, z, PROT_MEM, MAP_MEM, -1, 0);
+		if (UNLIKELY(p == MAP_FAILED)) {
+			return -1;
+		}
+		dm = decmap[chn / 2] = p;
+	}
+	/* first 9 bits */
+	dm[svc & ((1U << 9U) - 1)] = cb;
+	return 0;
+}
+
+int
+ud_mondec_dereg(ud_svc_t svc)
+{
+	/* singleton valley */
+	unsigned int chn = UD_CHN(svc);
+	__decmap_t dm;
+
+	if ((dm = decmap[chn / 2]) == NULL) {
+		return -1;
+	} else if (dm[svc & ((1U << 9U) - 1)] == NULL) {
+		return -1;
+	}
+	dm[svc & ((1U << 9U) - 1)] = NULL;
+	return 0;
+}
+
+static ud_mondec_f
+__mondec(ud_svc_t svc)
+{
+	unsigned int chn = UD_CHN(svc);
+	__decmap_t dm;
+	ud_mondec_f res;
+
+	if ((dm = decmap[chn / 2]) == NULL) {
+		res = NULL;
+	} else if ((res = dm[svc & ((1U << 9U) - 1)]) == NULL) {
+		;
+	}
+	return res;
+}
 
 static inline size_t
 hrclock_print(char *buf, size_t len)
@@ -246,161 +173,6 @@ hrclock_print(char *buf, size_t len)
 	return snprintf(buf, len, "%ld.%09li", tsp.tv_sec, tsp.tv_nsec);
 }
 
-static size_t
-mon_dec_ping(
-	char *restrict p, size_t z, ud_svc_t svc,
-	const struct ud_msg_s m[static 1])
-{
-	static const char ping[] = "PING";
-	static const char pong[] = "PONG";
-	char *restrict q = p;
-
-	switch (svc) {
-	case UD_CTRL_SVC(UD_SVC_PING):
-		memcpy(q, ping, sizeof(ping));
-		break;
-	case UD_CTRL_SVC(UD_SVC_PING + 1):
-		memcpy(q, pong, sizeof(pong));
-		break;
-	default:
-		return 0UL;
-	}
-	(q += sizeof(ping))[-1] = '\t';
-
-	/* decipher the actual message */
-	const union {
-		struct {
-			uint32_t pid;
-			uint8_t hnz;
-			char hn[];
-		};
-		char buf[64];
-	} *pm;
-
-	if (UNLIKELY((pm = m->data) == NULL || m->dlen != sizeof(*pm))) {
-		*q++ = '?';
-	} else {
-		q += snprintf(q, z - (q - p), "%u\t", be32toh(pm->pid));
-		memcpy(q, pm->hn, pm->hnz);
-		q += pm->hnz;
-	}
-	return q - p;
-}
-
-static size_t
-mon_dec_7572(
-	char *restrict p, size_t z, ud_svc_t UNUSED(svc),
-	const struct ud_msg_s m[static 1])
-{
-	struct __brag_wire_s {
-		uint16_t idx;
-		uint8_t syz;
-		uint8_t urz;
-		char symuri[256 - sizeof(uint32_t)];
-	};
-	const struct __brag_wire_s *msg = m->data;
-	char *restrict q = p;
-
-	if ((size_t)msg->syz + (size_t)msg->urz > sizeof(msg->symuri)) {
-		/* shouldn't be */
-		return 0;
-	}
-
-	q += snprintf(q, z - (q - p), "%hu\t", htons(msg->idx));
-	memcpy(q, msg->symuri, msg->syz);
-	q += msg->syz;
-
-	*q++ = '\t';
-	memcpy(q, msg->symuri + msg->syz, msg->urz);
-	q += msg->urz;
-	return q - p;
-}
-
-static size_t
-mon_dec_7574(
-	char *restrict p, size_t UNUSED(z), ud_svc_t UNUSED(svc),
-	const struct ud_msg_s m[static 1])
-{
-	char *restrict q = p;
-#if defined HAVE_UTERUS
-	scom_t sp = m->data;
-	uint32_t sec = scom_thdr_sec(sp);
-	uint16_t msec = scom_thdr_msec(sp);
-	uint16_t tidx = scom_thdr_tblidx(sp);
-	uint16_t ttf = scom_thdr_ttf(sp);
-
-	/* big time stamp upfront */
-	q += pr_tsmstz(q, sec, msec, 'T');
-	*q++ = '\t';
-	/* index into symtable */
-	q += snprintf(q, z - (q - p), "%x", tidx);
-	*q++ = '\t';
-	/* tick type */
-	q += pr_ttf(q, ttf);
-	*q++ = '\t';
-	switch (ttf) {
-	case SL1T_TTF_BID:
-	case SL1T_TTF_ASK:
-	case SL1T_TTF_TRA:
-	case SL1T_TTF_FIX:
-	case SL1T_TTF_STL:
-	case SL1T_TTF_AUC:
-#if defined SL1T_TTF_G32
-	case SL1T_TTF_G32:
-#endif	/* SL1T_TTF_G32 */
-	case SL2T_TTF_BID:
-	case SL2T_TTF_ASK:
-		/* just 2 generic m30s */
-		if (LIKELY(m->dlen == sizeof(struct sl1t_s))) {
-			const_sl1t_t t = m->data;
-			q += ffff_m30_s(q, (m30_t)t->v[0]);
-			*q++ = '\t';
-			q += ffff_m30_s(q, (m30_t)t->v[1]);
-		}
-		break;
-	case SL1T_TTF_VOL:
-	case SL1T_TTF_VPR:
-	case SL1T_TTF_VWP:
-	case SL1T_TTF_OI:
-#if defined SL1T_TTF_G64
-	case SL1T_TTF_G64:
-#endif	/* SL1T_TTF_G64 */
-		/* one giant m62 */
-		if (LIKELY(m->dlen == sizeof(struct sl1t_s))) {
-			const_sl1t_t t = m->data;
-			q += ffff_m62_s(q, (m62_t)t->w[0]);
-		}
-		break;
-
-		/* snaps */
-	case SSNP_FLAVOUR:
-	case SBAP_FLAVOUR:
-		if (LIKELY(m->dlen == sizeof(struct ssnp_s))) {
-			q += __pr_snap(q, sp);
-		}
-		break;
-
-		/* candles */
-	case SL1T_TTF_BID | SCOM_FLAG_LM:
-	case SL1T_TTF_ASK | SCOM_FLAG_LM:
-	case SL1T_TTF_TRA | SCOM_FLAG_LM:
-	case SL1T_TTF_FIX | SCOM_FLAG_LM:
-	case SL1T_TTF_STL | SCOM_FLAG_LM:
-	case SL1T_TTF_AUC | SCOM_FLAG_LM:
-		if (LIKELY(m->dlen == sizeof(struct scdl_s))) {
-			q += __pr_cdl(q, sp);
-		}
-		break;
-
-	case SCOM_TTF_UNK:
-	default:
-		break;
-	}
-#endif	/* HAVE_UTERUS */
-
-	return q - p;
-}
-
 
 /* the actual packet decoder */
 static void
@@ -408,6 +180,7 @@ mon_pkt_cb(ud_sock_t s, const struct ud_msg_s msg[static 1])
 {
 	char buf[8192], *epi = buf;
 	struct ud_auxmsg_s aux[1];
+	ud_mondec_f cb;
 
 	/* print a time stamp */
 	epi += hrclock_print(buf, sizeof(buf));
@@ -441,39 +214,37 @@ mon_pkt_cb(ud_sock_t s, const struct ud_msg_s msg[static 1])
 		aux->len, aux->pno, aux->svc);
 
 	/* go for the actual message */
-	/* intercept special channels */
-	switch (aux->svc) {
-	case UD_CTRL_SVC(UD_SVC_CMD):
-		epi += snprintf(epi, 256, "CMD request");
-		break;
-	case UD_CTRL_SVC(UD_SVC_CMD + 1):
-		epi += snprintf(epi, 256, "CMD announce");
-		break;
+	if ((cb = __mondec(aux->svc)) != NULL) {
+		epi += cb(epi, 512, aux->svc, msg);
+	} else {
+		/* intercept special channels */
+		switch (aux->svc) {
+		case UD_CTRL_SVC(UD_SVC_CMD):
+			epi += snprintf(epi, 256, "CMD request");
+			break;
+		case UD_CTRL_SVC(UD_SVC_CMD + 1):
+			epi += snprintf(epi, 256, "CMD announce");
+			break;
 
-	case UD_CTRL_SVC(UD_SVC_TIME):
-		epi += snprintf(epi, 256, "TIME request");
-		break;
+		case UD_CTRL_SVC(UD_SVC_TIME):
+			epi += snprintf(epi, 256, "TIME request");
+			break;
 
-	case UD_CTRL_SVC(UD_SVC_TIME + 1):
-		epi += snprintf(epi, 256, "TIME announce");
-		break;
+		case UD_CTRL_SVC(UD_SVC_TIME + 1):
+			epi += snprintf(epi, 256, "TIME announce");
+			break;
 
-	case UD_CTRL_SVC(UD_SVC_PING):
-	case UD_CTRL_SVC(UD_SVC_PING + 1):
-		epi += mon_dec_ping(epi, 256, aux->svc, msg);
-		break;
+		case UD_CTRL_SVC(UD_SVC_PING):
+			epi += snprintf(epi, 256, "PING");
+			break;
 
-	case 0x7572:
-		epi += mon_dec_7572(epi, 512, aux->svc, msg);
-		break;
+		case UD_CTRL_SVC(UD_SVC_PING + 1):
+			epi += snprintf(epi, 256, "PONG");
+			break;
 
-	case 0x7574:
-		epi += mon_dec_7574(epi, 512, aux->svc, msg);
-		break;
-
-	default:
-		epi += snprintf(epi, 256, "UNK");
-		break;
+		default:
+			break;
+		}
 	}
 
 bang:
@@ -682,6 +453,11 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 # pragma GCC diagnostic warning "-Wswitch-enum"
 #endif	/* __INTEL_COMPILER */
 
+#include "svc-pong.h"
+#if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
+# include "svc-uterus.h"
+#endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
+
 int
 main(int argc, char *argv[])
 {
@@ -760,13 +536,17 @@ main(int argc, char *argv[])
 		nbeef = j;
 	}
 
+	svc_pong_LTX_ud_mondec_init();
+#if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
+	svc_uterus_LTX_ud_mondec_init();
+#endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
+
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
 	logger(LOG_NOTICE, "shutting down unsermon\n");
 
 	/* detaching beef channels */
-
 	for (unsigned int i = 0; i <= nbeef; i++) {
 		ud_sock_t s = beef[i].data;
 

@@ -384,12 +384,14 @@ main(int argc, char *argv[])
 
 	/* whither to log */
 	monout = stdout;
-	ud_openlog(NULL);
 
 	/* parse the command line */
 	if (cmdline_parser(argc, argv, argi)) {
 		exit(1);
 	}
+
+	/* open the log file */
+	ud_openlog(argi->log_arg);
 
 	/* initialise the main loop */
 	loop = ev_default_loop(EVFLAG_AUTO);

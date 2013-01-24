@@ -55,6 +55,7 @@
 # include <sys/un.h>
 #endif
 #include <errno.h>
+#include <sys/mman.h>
 #if defined HAVE_EV_H
 # include <ev.h>
 # undef EV_P
@@ -400,6 +401,50 @@ mon_dec_7574(
 #endif	/* HAVE_UTERUS */
 
 	return q - p;
+}
+
+/* we organise decoders in channels
+ * every second channel gets a decoder map */
+typedef ud_mondec_f *__decmap_t;
+
+static __decmap_t decmap[128];
+
+int
+ud_mondec_reg(ud_svc_t svc, ud_mondec_f cb)
+{
+	/* singleton valley */
+	unsigned int chn = UD_CHN(svc);
+	__decmap_t dm;
+
+	if ((dm = decmap[chn / 2]) == NULL) {
+		size_t z = 512 * sizeof(cb);
+		void *p;
+
+		p = mmap(NULL, z, PROT_MEM, MAP_MEM, -1, 0);
+		if (UNLIKELY(p == MAP_FAILED)) {
+			return -1;
+		}
+		dm = decmap[chn / 2] = p;
+	}
+	/* first 9 bits */
+	dm[svc & ((1U << 9U) - 1)] = cb;
+	return 0;
+}
+
+int
+ud_mondec_dereg(ud_svc_t svc)
+{
+	/* singleton valley */
+	unsigned int chn = UD_CHN(svc);
+	__decmap_t dm;
+
+	if ((dm = decmap[chn / 2]) == NULL) {
+		return -1;
+	} else if (dm[svc & ((1U << 9U) - 1)] == NULL) {
+		return -1;
+	}
+	dm[svc & ((1U << 9U) - 1)] = NULL;
+	return 0;
 }
 
 

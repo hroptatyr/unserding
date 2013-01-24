@@ -453,6 +453,11 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 # pragma GCC diagnostic warning "-Wswitch-enum"
 #endif	/* __INTEL_COMPILER */
 
+#include "svc-pong.h"
+#if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
+# include "svc-uterus.h"
+#endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
+
 int
 main(int argc, char *argv[])
 {
@@ -531,13 +536,17 @@ main(int argc, char *argv[])
 		nbeef = j;
 	}
 
+	svc_pong_LTX_ud_mondec_init();
+#if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
+	svc_uterus_LTX_ud_mondec_init();
+#endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
+
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
 	logger(LOG_NOTICE, "shutting down unsermon\n");
 
 	/* detaching beef channels */
-
 	for (unsigned int i = 0; i <= nbeef; i++) {
 		ud_sock_t s = beef[i].data;
 

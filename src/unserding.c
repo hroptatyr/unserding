@@ -505,7 +505,22 @@ ud_dscrd(ud_sock_t sock)
 		} else if ((nrd -= sizeof(us->recv.hdr)) < 0) {
 			return -1;
 		} else if (be16toh(us->recv.hdr.ini) != UD_PROTO_INI) {
-			return -1;
+			/* for transition purposes we don't fuck off
+			 * right here but instead we check if the magic
+			 * matches to ease migrating from older setups */
+			uint16_t magic = be16toh(us->recv.hdr.magic);
+
+			switch (magic) {
+			case 0xbeef/*UDPC_PKTFLO_NOW_ONE*/:
+			case 0xbeee/*UDPC_PKTFLO_NOW_MANY*/:
+			case 0xcaff/*UDPC_PKTFLO_SOON_ONE*/:
+			case 0xcafe/*UDPC_PKTFLO_SOON_MANY*/:
+			case 0xda7a/*UDPC_PKTFLO_DATA*/:
+				break;
+			default:
+				UDEBUG("magic fucked %04hx\n", magic);
+				return -1;
+			}
 		}
 
 		/* update indexes */

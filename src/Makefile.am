@@ -5,6 +5,7 @@ AM_CFLAGS =
 AM_LDFLAGS =
 
 headerdir = $(includedir)/unserding
+moddir = $(libexecdir)/unserding
 
 noinst_PROGRAMS =
 bin_PROGRAMS =
@@ -12,6 +13,7 @@ sbin_PROGRAMS =
 lib_LTLIBRARIES =
 noinst_HEADERS =
 header_HEADERS =
+mod_LTLIBRARIES =
 
 BUILT_SOURCES =
 CLEANFILES =
@@ -72,6 +74,12 @@ libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
 libunserding_la_LDFLAGS += -version-info 1:0:1
 unserding_LIBS = libunserding.la
 
+## ping/pong decoder for unsermon
+mod_LTLIBRARIES += svc-pong.la
+svc_pong_la_SOURCES = svc-pong.c
+svc_pong_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
+svc_pong_la_CPPFLAGS += -DUD_NEW_API
+svc_pong_la_LDFLAGS = -module
 
 ## our rule for gengetopt
 %.c %.h: %.ggo

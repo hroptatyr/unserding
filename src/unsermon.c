@@ -301,6 +301,10 @@ mon_beef_actvty(ud_sock_t s)
 	char a[INET6_ADDRSTRLEN];
 	uint16_t p;
 
+	if (LIKELY(last_rpt + 60 > this_act || last_act + 1 > this_act)) {
+		goto out;
+	}
+
 	if (LIKELY(s->data != NULL)) {
 		ud_const_sockaddr_t sa = s->data;
 
@@ -331,6 +335,7 @@ mon_beef_actvty(ud_sock_t s)
 		}
 		last_rpt = this_act;
 	}
+out:
 	last_act = this_act;
 	return;
 }

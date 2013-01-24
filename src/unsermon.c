@@ -397,14 +397,6 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	return;
 }
 
-
-static ev_signal ALGN16(__sigint_watcher);
-static ev_signal ALGN16(__sighup_watcher);
-static ev_signal ALGN16(__sigterm_watcher);
-static ev_signal ALGN16(__sigpipe_watcher);
-static ev_async ALGN16(__wakeup_watcher);
-ev_async *glob_notify;
-
 static void
 sigint_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
@@ -425,12 +417,6 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 {
 	UDEBUG("SIGHUP caught, unrolling everything\n");
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
-	return;
-}
-
-static void
-triv_cb(EV_P_ ev_async *UNUSED(w), int UNUSED(revents))
-{
 	return;
 }
 
@@ -457,10 +443,11 @@ main(int argc, char *argv[])
 {
 	/* use the default event loop unless you have special needs */
 	struct ev_loop *loop;
-	ev_signal *sigint_watcher = &__sigint_watcher;
-	ev_signal *sighup_watcher = &__sighup_watcher;
-	ev_signal *sigterm_watcher = &__sigterm_watcher;
-	ev_signal *sigpipe_watcher = &__sigpipe_watcher;
+	ev_signal sigint_watcher[1];
+	ev_signal sighup_watcher[1];
+	ev_signal sigterm_watcher[1];
+	ev_signal sigpipe_watcher[1];
+	ev_async wakeup_watcher[1];
 	ev_io *beef = NULL;
 	size_t nbeef;
 	/* args */
@@ -492,11 +479,6 @@ main(int argc, char *argv[])
 	/* initialise a SIGHUP handler */
 	ev_signal_init(sighup_watcher, sighup_cb, SIGHUP);
 	ev_signal_start(EV_A_ sighup_watcher);
-
-	/* initialise a wakeup handler */
-	glob_notify = &__wakeup_watcher;
-	ev_async_init(glob_notify, triv_cb);
-	ev_async_start(EV_A_ glob_notify);
 
 	/* make some room for the control channel and the beef chans */
 	nbeef = (argi->beef_given + 1);

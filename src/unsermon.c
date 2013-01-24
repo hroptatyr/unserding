@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
 #if defined HAVE_SYS_SOCKET_H

@@ -249,47 +249,6 @@ hrclock_print(char *buf, size_t len)
 }
 
 static size_t
-mon_dec_ping(
-	char *restrict p, size_t z, ud_svc_t svc,
-	const struct ud_msg_s m[static 1])
-{
-	static const char ping[] = "PING";
-	static const char pong[] = "PONG";
-	char *restrict q = p;
-
-	switch (svc) {
-	case UD_CTRL_SVC(UD_SVC_PING):
-		memcpy(q, ping, sizeof(ping));
-		break;
-	case UD_CTRL_SVC(UD_SVC_PING + 1):
-		memcpy(q, pong, sizeof(pong));
-		break;
-	default:
-		return 0UL;
-	}
-	(q += sizeof(ping))[-1] = '\t';
-
-	/* decipher the actual message */
-	const union {
-		struct {
-			uint32_t pid;
-			uint8_t hnz;
-			char hn[];
-		};
-		char buf[64];
-	} *pm;
-
-	if (UNLIKELY((pm = m->data) == NULL || m->dlen != sizeof(*pm))) {
-		*q++ = '?';
-	} else {
-		q += snprintf(q, z - (q - p), "%u\t", be32toh(pm->pid));
-		memcpy(q, pm->hn, pm->hnz);
-		q += pm->hnz;
-	}
-	return q - p;
-}
-
-static size_t
 mon_dec_7572(
 	char *restrict p, size_t z, ud_svc_t UNUSED(svc),
 	const struct ud_msg_s m[static 1])
@@ -447,6 +406,21 @@ ud_mondec_dereg(ud_svc_t svc)
 	return 0;
 }
 
+static ud_mondec_f
+__mondec(ud_svc_t svc)
+{
+	unsigned int chn = UD_CHN(svc);
+	__decmap_t dm;
+	ud_mondec_f res;
+
+	if ((dm = decmap[chn / 2]) == NULL) {
+		res = NULL;
+	} else if ((res = dm[svc & ((1U << 9U) - 1)]) == NULL) {
+		;
+	}
+	return res;
+}
+
 
 /* the actual packet decoder */
 static void
@@ -454,6 +428,7 @@ mon_pkt_cb(ud_sock_t s, const struct ud_msg_s msg[static 1])
 {
 	char buf[8192], *epi = buf;
 	struct ud_auxmsg_s aux[1];
+	ud_mondec_f cb;
 
 	/* print a time stamp */
 	epi += hrclock_print(buf, sizeof(buf));
@@ -487,39 +462,37 @@ mon_pkt_cb(ud_sock_t s, const struct ud_msg_s msg[static 1])
 		aux->len, aux->pno, aux->svc);
 
 	/* go for the actual message */
-	/* intercept special channels */
-	switch (aux->svc) {
-	case UD_CTRL_SVC(UD_SVC_CMD):
-		epi += snprintf(epi, 256, "CMD request");
-		break;
-	case UD_CTRL_SVC(UD_SVC_CMD + 1):
-		epi += snprintf(epi, 256, "CMD announce");
-		break;
+	if ((cb = __mondec(aux->svc)) != NULL) {
+		epi += cb(epi, 512, aux->svc, msg);
+	} else {
+		/* intercept special channels */
+		switch (aux->svc) {
+		case UD_CTRL_SVC(UD_SVC_CMD):
+			epi += snprintf(epi, 256, "CMD request");
+			break;
+		case UD_CTRL_SVC(UD_SVC_CMD + 1):
+			epi += snprintf(epi, 256, "CMD announce");
+			break;
 
-	case UD_CTRL_SVC(UD_SVC_TIME):
-		epi += snprintf(epi, 256, "TIME request");
-		break;
+		case UD_CTRL_SVC(UD_SVC_TIME):
+			epi += snprintf(epi, 256, "TIME request");
+			break;
 
-	case UD_CTRL_SVC(UD_SVC_TIME + 1):
-		epi += snprintf(epi, 256, "TIME announce");
-		break;
+		case UD_CTRL_SVC(UD_SVC_TIME + 1):
+			epi += snprintf(epi, 256, "TIME announce");
+			break;
 
-	case UD_CTRL_SVC(UD_SVC_PING):
-	case UD_CTRL_SVC(UD_SVC_PING + 1):
-		epi += mon_dec_ping(epi, 256, aux->svc, msg);
-		break;
+		case UD_CTRL_SVC(UD_SVC_PING):
+			epi += snprintf(epi, 256, "PING");
+			break;
 
-	case 0x7572:
-		epi += mon_dec_7572(epi, 512, aux->svc, msg);
-		break;
+		case UD_CTRL_SVC(UD_SVC_PING + 1):
+			epi += snprintf(epi, 256, "PONG");
+			break;
 
-	case 0x7574:
-		epi += mon_dec_7574(epi, 512, aux->svc, msg);
-		break;
-
-	default:
-		epi += snprintf(epi, 256, "UNK");
-		break;
+		default:
+			break;
+		}
 	}
 
 bang:

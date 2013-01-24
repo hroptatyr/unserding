@@ -122,18 +122,28 @@ ud_rotlog(void)
 }
 
 __attribute__((format(printf, 3, 4))) void
-ud_logout(int UNUSED(facil), int eno, const char *fmt, ...)
+ud_logout(int facil, int eno, const char *fmt, ...)
 {
 	va_list vap;
+
 	va_start(vap, fmt);
-	vfprintf(logout, fmt, vap);
-	va_end(vap);
-	if (eno) {
-		fputc(':', logout);
-		fputc(' ', logout);
-		fputs(strerror(eno), logout);
+
+	if (logout == NULL) {
+		/* goes to syslog aye */
+		vsyslog(facil, fmt, vap);
+		if (eno) {
+			syslog(facil, strerror(eno));
+		}
+	} else {
+		vfprintf(logout, fmt, vap);
+		if (eno) {
+			fputc(':', logout);
+			fputc(' ', logout);
+			fputs(strerror(eno), logout);
+		}
+		fputc('\n', logout);
 	}
-	fputc('\n', logout);
+	va_end(vap);
 	return;
 }
 

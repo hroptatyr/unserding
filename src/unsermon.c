@@ -246,8 +246,8 @@ bang:
 	return;
 }
 
-static void
-mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
+static int
+mon_beef_peek(int fd)
 {
 #if defined MON_BEEF_PEEK
 	/* the address in human readable form */
@@ -259,15 +259,12 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	socklen_t lsa = sizeof(sa);
 	uint16_t peek[4];
 	ssize_t nrd;
-#endif	/* MON_BEEF_PEEK */
-	ud_sock_t s = w->data;
 
-#if defined MON_BEEF_PEEK
 	/* for the debugging */
 	if ((nrd = recvfrom(
-		     w->fd, peek, sizeof(peek), MSG_PEEK, &sa.sa, &lsa)) < 0) {
+		     fd, peek, sizeof(peek), MSG_PEEK, &sa.sa, &lsa)) < 0) {
 		/* no need to bother our deserialiser */
-		return;
+		return -1;
 	}
 	/* de-big-endian-ify the peek */
 	peek[0] = be16toh(peek[0]);
@@ -284,27 +281,72 @@ mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	UDEBUG(
 		":sock %d connect :from [%s]:%hu  "
 		":len %04zd :ini %04hx :pno %04hx :cmd %04hx :mag %04hx\n",
-		w->fd, a, p, nrd,
+		fd, a, p, nrd,
 		peek[0], peek[1], peek[2], peek[3]);
+#else  /* !MON_BEEF_PEEK */
+	if (UNLIKELY(fd < 0)) {
+		return -1;
+	}
 #endif	/* MON_BEEF_PEEK */
+	return 0;
+}
+
+static void
+mon_beef_actvty(ud_sock_t s)
+{
+	static time_t last_act;
+	static time_t last_rpt;
+	time_t this_act = time(NULL);
+	/* pretty printing */
+	char a[INET6_ADDRSTRLEN];
+	uint16_t p;
+
+	if (LIKELY(s->data != NULL)) {
+		ud_const_sockaddr_t sa = s->data;
+
+		ud_sockaddr_ntop(a, sizeof(a), sa);
+		p = ud_sockaddr_port(sa);
+	}
 
 	/* otherwise just report activity */
-	{
-		static time_t last_act;
-		static time_t last_rpt;
-		time_t this_act = time(NULL);
-
-		if (last_act + 1 < this_act) {
-			logger(LOG_INFO, ":sock %d shows activity", s->fd);
-			last_rpt = this_act;
-		} else if (last_rpt + 60 < this_act) {
-			logger(LOG_INFO, 
-				":sock %d (still) shows activity ... "
-				"1 minute reminder\n", s->fd);
-			last_rpt = this_act;
+	if (last_act + 1 < this_act) {
+		if (LIKELY(s->data != NULL)) {
+			logger(LOG_INFO,
+				"network [%s]:%hu shows activity", a, p);
+		} else {
+			logger(LOG_INFO,
+				"network associated with %d shows activity",
+				s->fd);
 		}
-		last_act = this_act;
+		last_rpt = this_act;
+	} else if (last_rpt + 60 < this_act) {
+		if (LIKELY(s->data != NULL)) {
+			logger(LOG_INFO,
+				"network [%s]:%hu (still) shows activity ... "
+				"1 minute reminder\n", a, p);
+		} else {
+			logger(LOG_INFO,
+				"network associated with %d (still) "
+				"shows activity ... 1 minute reminder", s->fd);
+		}
+		last_rpt = this_act;
 	}
+	last_act = this_act;
+	return;
+}
+
+
+/* EV callbacks */
+static void
+mon_beef_cb(EV_P_ ev_io *w, int UNUSED(revents))
+{
+	ud_sock_t s = w->data;
+
+	/* see if we need peeking */
+	(void)mon_beef_peek(w->fd);
+
+	/* report activity */
+	mon_beef_actvty(s);
 
 	/* handle the reading */
 	for (struct ud_msg_s msg[1]; ud_chck_msg(msg, s) == 0;) {

@@ -71,6 +71,7 @@
 #include "ud-private.h"
 #include "unserding-nifty.h"
 #include "ud-logger.h"
+#include "ud-module.h"
 #include "boobs.h"
 #include "unsermon.h"
 
@@ -540,6 +541,21 @@ main(int argc, char *argv[])
 #if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
 	svc_uterus_LTX_ud_mondec_init();
 #endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
+
+	/* load DSOs */
+	for (unsigned int i = 0; i < argi->inputs_num; i++) {
+		ud_mod_t m;
+		ud_mod_f inif;
+
+		if ((m = ud_mod_open(argi->inputs[i])) == NULL) {
+			;
+		} else if ((inif = ud_mod_sym(m, "ud_mondec_init")) == NULL) {
+			;
+		} else {
+			/* everything in order, call the initter */
+			(void)((int(*)(void))inif)();
+		}
+	}
 
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);

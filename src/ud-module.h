@@ -1,8 +1,8 @@
 /*** module.h -- module stuff
  *
- * Copyright (C) 2005 - 2009 Sebastian Freundt
+ * Copyright (C) 2005-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  * 
@@ -35,26 +35,14 @@
  *
  ***/
 
-#if !defined INCLUDED_module_h_
-#define INCLUDED_module_h_
+#if !defined INCLUDED_ud_module_h_
+#define INCLUDED_ud_module_h_
 
-#if defined UNSERSRV
-extern void *open_aux(const char *file, void *clo);
-extern void close_aux(void *handle, void *clo);
-extern void *find_sym(void *handle, const char *sym_name);
+typedef void *ud_mod_t;
+typedef void(*ud_mod_f)();
 
-extern void ud_mod_dump(void *file);
+extern ud_mod_t ud_mod_open(const char *file);
+extern void ud_mod_close(ud_mod_t);
+extern ud_mod_f ud_mod_sym(ud_mod_t, const char *sym_name);
 
-extern void ud_init_modules(char *const args[], size_t nargs, void *clo);
-extern void ud_deinit_modules(void *clo);
-
-extern void ud_defer_dso(const char *name, void *cfgset);
-#endif	/* UNSERSRV */
-
-/**
- * Entry point for repeated work. */
-extern void init(void *clo);
-extern void deinit(void *clo);
-extern void reinit(void *clo);
-
-#endif	/* INCLUDED_module_h_ */
+#endif	/* INCLUDED_ud_module_h_ */

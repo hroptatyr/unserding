@@ -71,6 +71,7 @@
 #include "ud-private.h"
 #include "unserding-nifty.h"
 #include "ud-logger.h"
+#include "ud-module.h"
 #include "boobs.h"
 #include "unsermon.h"
 
@@ -541,10 +542,25 @@ main(int argc, char *argv[])
 	svc_uterus_LTX_ud_mondec_init();
 #endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
 
+	/* load DSOs */
+	for (unsigned int i = 0; i < argi->inputs_num; i++) {
+		ud_mod_t m;
+		ud_mod_f inif;
+
+		if ((m = ud_mod_open(argi->inputs[i])) == NULL) {
+			;
+		} else if ((inif = ud_mod_sym(m, "ud_mondec_init")) == NULL) {
+			;
+		} else {
+			/* everything in order, call the initter */
+			(void)((int(*)(void))inif)();
+		}
+	}
+
 	/* now wait for events to arrive */
 	ev_loop(EV_A_ 0);
 
-	logger(LOG_NOTICE, "shutting down unsermon\n");
+	logger(LOG_NOTICE, "shutting down unsermon");
 
 	/* detaching beef channels */
 	for (unsigned int i = 0; i <= nbeef; i++) {
@@ -553,6 +569,13 @@ main(int argc, char *argv[])
 		log_dergstr(s);
 		ev_io_stop(EV_A_ beef + i);
 		ud_close(s);
+	}
+
+	/* clearing decmap */
+	for (size_t i = 0; i < countof(decmap); i++) {
+		if (decmap[i] != NULL) {
+			munmap(decmap[i], 512 * sizeof(ud_mondec_f));
+		}
 	}
 
 	/* destroy the default evloop */

@@ -19,7 +19,7 @@ BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
-header_HEADERS += protocore.h seria.h module.h
+header_HEADERS += protocore.h seria.h
 header_HEADERS += mcast.h
 header_HEADERS += unserding-ctx.h
 noinst_HEADERS += protocore-private.h
@@ -32,8 +32,9 @@ EXTRA_DIST += btea.c
 EXTRA_DIST += dso-pong.c
 
 bin_PROGRAMS += unsermon
-unsermon_SOURCES = unsermon.c unsermon-clo.ggo
+unsermon_SOURCES = unsermon.c unsermon.h unsermon-clo.ggo
 unsermon_SOURCES += ud-logger.c ud-logger.h
+unsermon_SOURCES += ud-module.c ud-module.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
 unsermon_CPPFLAGS += $(libev_CFLAGS)
 unsermon_CPPFLAGS += $(uterus_CFLAGS)
@@ -41,6 +42,7 @@ unsermon_CPPFLAGS += -DUD_NEW_API
 unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(libev_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)
+unsermon_LDFLAGS += $(LIBLTDL)
 unsermon_LDADD = $(unserding_LIBS)
 unsermon_LDADD += svc-pong.la
 if HAVE_UTERUS

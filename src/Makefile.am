@@ -32,7 +32,7 @@ EXTRA_DIST += btea.c
 EXTRA_DIST += dso-pong.c
 
 bin_PROGRAMS += unsermon
-unsermon_SOURCES = unsermon.c unsermon-clo.ggo
+unsermon_SOURCES = unsermon.c unsermon.h unsermon-clo.ggo
 unsermon_SOURCES += ud-logger.c ud-logger.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
 unsermon_CPPFLAGS += $(libev_CFLAGS)

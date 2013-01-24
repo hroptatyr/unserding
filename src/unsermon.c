@@ -555,6 +555,13 @@ main(int argc, char *argv[])
 		ud_close(s);
 	}
 
+	/* clearing decmap */
+	for (size_t i = 0; i < countof(decmap); i++) {
+		if (decmap[i] != NULL) {
+			munmap(decmap[i], 512 * sizeof(ud_mondec_f));
+		}
+	}
+
 	/* destroy the default evloop */
 	ev_default_destroy();
 

@@ -19,7 +19,7 @@ BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
-header_HEADERS += protocore.h seria.h module.h
+header_HEADERS += protocore.h seria.h
 header_HEADERS += mcast.h
 header_HEADERS += unserding-ctx.h
 noinst_HEADERS += protocore-private.h

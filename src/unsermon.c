@@ -300,21 +300,20 @@ mon_beef_actvty(ud_sock_t s)
 	/* pretty printing */
 	char a[INET6_ADDRSTRLEN];
 	uint16_t p;
+	ud_const_sockaddr_t sa;
 
 	if (LIKELY(last_rpt + 60 > this_act || last_act + 1 > this_act)) {
 		goto out;
 	}
 
-	if (LIKELY(s->data != NULL)) {
-		ud_const_sockaddr_t sa = s->data;
-
+	if (LIKELY((sa = ud_socket_addr(s)) != NULL)) {
 		ud_sockaddr_ntop(a, sizeof(a), sa);
 		p = ud_sockaddr_port(sa);
 	}
 
 	/* otherwise just report activity */
 	if (last_act + 1 < this_act) {
-		if (LIKELY(s->data != NULL)) {
+		if (LIKELY(sa != NULL)) {
 			logger(LOG_INFO,
 				"network [%s]:%hu shows activity", a, p);
 		} else {
@@ -324,7 +323,7 @@ mon_beef_actvty(ud_sock_t s)
 		}
 		last_rpt = this_act;
 	} else if (last_rpt + 60 < this_act) {
-		if (LIKELY(s->data != NULL)) {
+		if (LIKELY(sa != NULL)) {
 			logger(LOG_INFO,
 				"network [%s]:%hu (still) shows activity ... "
 				"1 minute reminder\n", a, p);

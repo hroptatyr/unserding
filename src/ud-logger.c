@@ -132,7 +132,7 @@ ud_logout(int facil, int eno, const char *fmt, ...)
 		/* goes to syslog aye */
 		vsyslog(facil, fmt, vap);
 		if (eno) {
-			syslog(facil, strerror(eno));
+			syslog(facil, "%s", strerror(eno));
 		}
 	} else {
 		vfprintf(logout, fmt, vap);

@@ -81,7 +81,7 @@ SXE_CHECK_LIBLTDL
 
 moddir="${libexecdir}/unserding"
 AC_SUBST([moddir])
-AC_DEFINE_UNQUOTED([moddir], ["${moddir}"], [where modules reside])
+AC_DEFINE_UNQUOTED([MODDIR], ["${moddir}"], [where modules reside])
 
 dnl -------------------------------------------------------------------------
 dnl final output

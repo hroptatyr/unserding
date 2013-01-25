@@ -79,9 +79,10 @@ SXE_CHECK_LDFLAGS
 SXE_CHECK_LIBTOOL
 SXE_CHECK_LIBLTDL
 
-moddir="${libexecdir}/unserding"
-AC_SUBST([moddir])
-AC_DEFINE_UNQUOTED([MODDIR], ["${moddir}"], [where modules reside])
+## mimic automake on this one
+pkglibdir="${libdir}/unserding"
+AC_SUBST([pkglibdir])
+AC_DEFINE_UNQUOTED([PKGLIBDIR], ["${pkglibdir}"], [where modules reside])
 
 dnl -------------------------------------------------------------------------
 dnl final output

@@ -39,11 +39,12 @@ unsermon_SOURCES += ud-module.c ud-module.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
 unsermon_CPPFLAGS += $(libev_CFLAGS)
 unsermon_CPPFLAGS += $(uterus_CFLAGS)
+unsermon_CPPFLAGS += $(INCLTDL)
 unsermon_CPPFLAGS += -DUD_NEW_API
 unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(libev_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)
-unsermon_LDFLAGS += $(LIBLTDL) $(LD_EXPORT_DYNAMIC)
+unsermon_LDFLAGS += $(LIBLTDL) $(LIBADD_DL) $(LD_EXPORT_DYNAMIC)
 unsermon_LDADD = $(unserding_LIBS)
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 

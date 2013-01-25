@@ -71,7 +71,7 @@ static void
 add_myself(void)
 {
 	static const char myself[] = "/proc/self/exe";
-	static const char moddir[] = MODDIR;
+	static const char moddir[] = PKGLIBDIR;
 	static const char eprefix[] = "${exec_prefix}";
 	static const char prefix[] = "${prefix}";
 	const char *relmoddir;

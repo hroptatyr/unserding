@@ -42,7 +42,7 @@ unsermon_CPPFLAGS += -DUD_NEW_API
 unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(libev_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)
-unsermon_LDFLAGS += $(LIBLTDL)
+unsermon_LDFLAGS += $(LIBLTDL) $(LD_EXPORT_DYNAMIC)
 unsermon_LDADD = $(unserding_LIBS)
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 

@@ -3,6 +3,7 @@
 AM_CPPFLAGS = -D_BSD_SOURCE -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=600
 AM_CFLAGS =
 AM_LDFLAGS =
+AM_MODFLAGS = -module -avoid-version
 
 headerdir = $(includedir)/unserding
 moddir = $(libexecdir)/unserding
@@ -38,11 +39,12 @@ unsermon_SOURCES += ud-module.c ud-module.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
 unsermon_CPPFLAGS += $(libev_CFLAGS)
 unsermon_CPPFLAGS += $(uterus_CFLAGS)
+unsermon_CPPFLAGS += $(INCLTDL)
 unsermon_CPPFLAGS += -DUD_NEW_API
 unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(libev_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)
-unsermon_LDFLAGS += $(LIBLTDL) $(LD_EXPORT_DYNAMIC)
+unsermon_LDFLAGS += $(LIBLTDL) $(LIBADD_DL) $(LD_EXPORT_DYNAMIC)
 unsermon_LDADD = $(unserding_LIBS)
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 
@@ -81,7 +83,7 @@ mod_LTLIBRARIES += svc-pong.la
 svc_pong_la_SOURCES = svc-pong.c svc-pong.h
 svc_pong_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
 svc_pong_la_CPPFLAGS += -DUD_NEW_API
-svc_pong_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) -module
+svc_pong_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) $(AM_MODFLAGS)
 
 ## uterus decoder for unsermon, will disappear
 if HAVE_UTERUS
@@ -89,7 +91,7 @@ mod_LTLIBRARIES += svc-uterus.la
 svc_uterus_la_SOURCES = svc-uterus.c svc-uterus.h
 svc_uterus_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
 svc_uterus_la_CPPFLAGS += -DUD_NEW_API
-svc_uterus_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) -module
+svc_uterus_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) $(AM_MODFLAGS)
 endif  HAVE_UTERUS
 
 

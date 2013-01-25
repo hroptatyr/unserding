@@ -3,6 +3,7 @@ exec_prefix=@exec_prefix@
 includedir=@includedir@
 libdir=@libdir@
 libexecdir=@libexecdir@
+unsermoddir=@moddir@
 
 Name: unserding
 Description: Ubiquitous Network Service to Enquire Real or Deduced Information

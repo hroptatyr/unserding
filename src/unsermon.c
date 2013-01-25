@@ -104,6 +104,26 @@ struct ud_loopclo_s {
 };
 
 
+/* DSO handling */
+static int
+open_aux(const char *file)
+{
+	ud_mod_t m;
+	ud_mod_f inif;
+	int res = -1;
+
+	if ((m = ud_mod_open(file)) == NULL) {
+		logger(LOG_ERR, "cannot open dso %s", file);
+	} else if ((inif = ud_mod_sym(m, "ud_mondec_init")) == NULL) {
+		logger(LOG_ERR, "cannot init dso %s", file);
+	} else {
+		/* everything in order, call the initter */
+		res = ((int(*)(void))inif)();
+	}
+	return res;
+}
+
+
 /* decoders */
 #include "svc-pong.h"
 
@@ -537,24 +557,12 @@ main(int argc, char *argv[])
 		nbeef = j;
 	}
 
-	svc_pong_LTX_ud_mondec_init();
-#if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
-	svc_uterus_LTX_ud_mondec_init();
-#endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
+	/* load some default services here, this might vanish at any time */
+	open_aux("svc-pong");
 
 	/* load DSOs */
 	for (unsigned int i = 0; i < argi->inputs_num; i++) {
-		ud_mod_t m;
-		ud_mod_f inif;
-
-		if ((m = ud_mod_open(argi->inputs[i])) == NULL) {
-			;
-		} else if ((inif = ud_mod_sym(m, "ud_mondec_init")) == NULL) {
-			;
-		} else {
-			/* everything in order, call the initter */
-			(void)((int(*)(void))inif)();
-		}
+		open_aux(argi->inputs[i]);
 	}
 
 	/* now wait for events to arrive */

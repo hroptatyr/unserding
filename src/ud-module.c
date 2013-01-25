@@ -70,8 +70,11 @@
 static void
 add_myself(void)
 {
-	const char myself[] = "/proc/self/exe";
-	const char libdir[] = moddir;
+	static const char myself[] = "/proc/self/exe";
+	static const char moddir[] = MODDIR;
+	static const char eprefix[] = "${exec_prefix}";
+	static const char prefix[] = "${prefix}";
+	const char *relmoddir;
 	char wd[PATH_MAX], *dp;
 	size_t sz;
 
@@ -85,11 +88,34 @@ add_myself(void)
 	UDEBUG("adding %s\n", wd);
 	lt_dladdsearchdir(wd);
 
-	if ((dp = strrchr(wd, '/')) == NULL) {
+#define MEMCMPLIT(a, b)	memcmp((a), (b), sizeof(b) - 1)
+	if (moddir[0] == '/') {
+		/* absolute libdir, add him */
+		lt_dladdsearchdir(moddir);
+	} else if (moddir[0] == '.') {
+		/* relative libdir? relative to what? */
+		return;
+	} else if (memcmp(moddir, eprefix, sizeof(eprefix) - 1) == 0) {
+		/* take the bit after EPREFIX for catting later on */
+		relmoddir = moddir + sizeof(eprefix) - 1;
+	} else if (memcmp(moddir, prefix, sizeof(prefix) - 1) == 0) {
+		/* take the bit after PREFIX for catting later on */
+		relmoddir = moddir + sizeof(prefix) - 1;
+	} else {
+		/* don't know, i guess i'll leave ya to it */
 		return;
 	}
-	/* add the path where the binary resides + ../lib/unserding/ */
-	strncpy(dp, libdir, sizeof(libdir));
+
+	/* go back one level in dp */
+	if ((dp = strrchr(wd, '/')) == NULL) {
+		return;
+	} else if (strcmp(dp, "/bin") && strcmp(dp, "/sbin")) {
+		/* dp doesn't end in /bin nor /sbin */
+		return;
+	}
+
+	/* good, now we're ready to cat relmoddir to dp */
+	strncpy(dp, relmoddir, sizeof(wd) - (dp - wd));
 	UDEBUG("adding %s\n", wd);
 	lt_dladdsearchdir(wd);
 	return;

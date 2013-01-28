@@ -76,6 +76,7 @@ libunserding_la_CPPFLAGS += -DUD_NEW_API
 libunserding_la_CPPFLAGS += -DUD_COMPAT
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
 libunserding_la_LDFLAGS += -version-info 1:0:1
+libunserding_la_LDFLAGS += $(LD_EXPORT_DYNAMIC)
 unserding_LIBS = libunserding.la
 
 ## ping/pong decoder for unsermon

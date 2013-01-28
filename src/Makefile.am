@@ -6,7 +6,6 @@ AM_LDFLAGS =
 AM_MODFLAGS = -module -avoid-version
 
 headerdir = $(includedir)/unserding
-moddir = $(libexecdir)/unserding
 
 noinst_PROGRAMS =
 bin_PROGRAMS =
@@ -14,7 +13,7 @@ sbin_PROGRAMS =
 lib_LTLIBRARIES =
 noinst_HEADERS =
 header_HEADERS =
-mod_LTLIBRARIES =
+unsermod_LTLIBRARIES =
 
 BUILT_SOURCES =
 CLEANFILES =
@@ -23,6 +22,7 @@ EXTRA_DIST = $(BUILT_SOURCES)
 header_HEADERS += protocore.h seria.h
 header_HEADERS += mcast.h
 header_HEADERS += unserding-ctx.h
+header_HEADERS += unsermon.h
 noinst_HEADERS += protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
@@ -76,23 +76,15 @@ libunserding_la_CPPFLAGS += -DUD_NEW_API
 libunserding_la_CPPFLAGS += -DUD_COMPAT
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
 libunserding_la_LDFLAGS += -version-info 1:0:1
+libunserding_la_LDFLAGS += $(LD_EXPORT_DYNAMIC)
 unserding_LIBS = libunserding.la
 
 ## ping/pong decoder for unsermon
-mod_LTLIBRARIES += svc-pong.la
+unsermod_LTLIBRARIES += svc-pong.la
 svc_pong_la_SOURCES = svc-pong.c svc-pong.h
 svc_pong_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
 svc_pong_la_CPPFLAGS += -DUD_NEW_API
 svc_pong_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) $(AM_MODFLAGS)
-
-## uterus decoder for unsermon, will disappear
-if HAVE_UTERUS
-mod_LTLIBRARIES += svc-uterus.la
-svc_uterus_la_SOURCES = svc-uterus.c svc-uterus.h
-svc_uterus_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
-svc_uterus_la_CPPFLAGS += -DUD_NEW_API
-svc_uterus_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) $(AM_MODFLAGS)
-endif  HAVE_UTERUS
 
 
 ## our rule for gengetopt

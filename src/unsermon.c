@@ -207,7 +207,7 @@ mon_pkt_cb(ud_sock_t s, const struct ud_msg_s msg[static 1])
 	epi += hrclock_print(buf, sizeof(buf));
 	*epi++ = '\t';
 
-	if (ud_chck_aux(aux, s) < 0) {
+	if (ud_get_aux(aux, s) < 0) {
 		/* uh oh */
 		*epi++ = '?';
 		goto bang;
@@ -216,7 +216,7 @@ mon_pkt_cb(ud_sock_t s, const struct ud_msg_s msg[static 1])
 	/* otherwise */
 	{
 		/* obtain the address in human readable form */
-		ud_const_sockaddr_t udsa = &aux->src->sa;
+		ud_const_sockaddr_t udsa = (const void*)aux->src;
 		int fam = ud_sockaddr_fam(udsa);
 		const struct sockaddr *sa = ud_sockaddr_addr(udsa);
 		uint16_t port = ud_sockaddr_port(udsa);
@@ -342,7 +342,7 @@ mon_beef_actvty(ud_sock_t s)
 		goto out;
 	}
 
-	if (LIKELY((sa = ud_socket_addr(s)) != NULL)) {
+	if (LIKELY((sa = (const void*)ud_socket_addr(s)) != NULL)) {
 		ud_sockaddr_ntop(a, sizeof(a), sa);
 		p = ud_sockaddr_port(sa);
 	}
@@ -381,14 +381,14 @@ log_rgstr(ud_sock_t s)
 	/* pretty printing */
 	char a[INET6_ADDRSTRLEN];
 	uint16_t p;
-	ud_const_sockaddr_t sa;
+	const struct sockaddr *sa;
 
 	if (UNLIKELY((sa = ud_socket_addr(s)) == NULL)) {
 		return;
 	}
 	/* otherwise ... */
-	ud_sockaddr_ntop(a, sizeof(a), sa);
-	p = ud_sockaddr_port(sa);
+	ud_sockaddr_ntop(a, sizeof(a), (ud_const_sockaddr_t)sa);
+	p = ud_sockaddr_port((ud_const_sockaddr_t)sa);
 
 	logger(LOG_INFO, "monitoring network [%s]:%hu", a, p);
 	return;
@@ -400,14 +400,14 @@ log_dergstr(ud_sock_t s)
 	/* pretty printing */
 	char a[INET6_ADDRSTRLEN];
 	uint16_t p;
-	ud_const_sockaddr_t sa;
+	const struct sockaddr *sa;
 
 	if (UNLIKELY((sa = ud_socket_addr(s)) == NULL)) {
 		return;
 	}
 	/* otherwise ... */
-	ud_sockaddr_ntop(a, sizeof(a), sa);
-	p = ud_sockaddr_port(sa);
+	ud_sockaddr_ntop(a, sizeof(a), (ud_const_sockaddr_t)sa);
+	p = ud_sockaddr_port((ud_const_sockaddr_t)sa);
 
 	logger(LOG_INFO, "monitoring of network [%s]:%hu halted", a, p);
 	return;

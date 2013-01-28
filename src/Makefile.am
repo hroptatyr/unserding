@@ -23,6 +23,7 @@ EXTRA_DIST = $(BUILT_SOURCES)
 header_HEADERS += protocore.h seria.h
 header_HEADERS += mcast.h
 header_HEADERS += unserding-ctx.h
+header_HEADERS += unsermon.h
 noinst_HEADERS += protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
@@ -84,15 +85,6 @@ svc_pong_la_SOURCES = svc-pong.c svc-pong.h
 svc_pong_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
 svc_pong_la_CPPFLAGS += -DUD_NEW_API
 svc_pong_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) $(AM_MODFLAGS)
-
-## uterus decoder for unsermon, will disappear
-if HAVE_UTERUS
-mod_LTLIBRARIES += svc-uterus.la
-svc_uterus_la_SOURCES = svc-uterus.c svc-uterus.h
-svc_uterus_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
-svc_uterus_la_CPPFLAGS += -DUD_NEW_API
-svc_uterus_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) $(AM_MODFLAGS)
-endif  HAVE_UTERUS
 
 
 ## our rule for gengetopt

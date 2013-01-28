@@ -68,11 +68,6 @@ dnl -------------------------------------------------------------------------
 ## event lib
 SXE_CHECK_LIBEV
 
-## check for ute
-PKG_CHECK_MODULES_HEADERS([uterus], [uterus >= 0.2.3],
-	[uterus.h uterus/uterus.h], [have_uterus="yes"], [have_uterus="no"])
-AM_CONDITIONAL([HAVE_UTERUS], [test "${have_uterus}" = "yes"])
-
 dnl must come after all AC_LINK_IFELSE clauses
 ## check for the ldflags
 SXE_CHECK_LDFLAGS

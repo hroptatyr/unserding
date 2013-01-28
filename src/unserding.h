@@ -100,6 +100,15 @@ struct ud_msg_s {
 };
 
 /**
+ * Message with auxiliary data. */
+struct ud_auxmsg_s {
+	const struct sockaddr *src;
+	uint16_t pno;
+	ud_svc_t svc;
+	uint32_t len;
+};
+
+/**
  * Options to be handed to `ud_socket()'. */
 struct ud_sockopt_s {
 	enum {
@@ -162,6 +171,14 @@ extern int ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock);
 /**
  * Discard buffered packs from previous `ud_chck()'. */
 extern int ud_dscrd(ud_sock_t sock);
+
+/**
+ * For current messages in S fill in the auxmsg object TGT. */
+extern int ud_get_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t s);
+
+/**
+ * Return the network SOCK is pubbing or subbed to. */
+extern const struct sockaddr *ud_socket_addr(ud_sock_t);
 
 #endif	/* UD_NEW_API */
 

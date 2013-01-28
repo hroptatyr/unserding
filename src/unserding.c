@@ -652,6 +652,29 @@ ud_chck(ud_svc_t *svc, void *restrict tgt, size_t tsz, ud_sock_t sock)
 	return msg.dlen;
 }
 
+const struct sockaddr*
+ud_socket_addr(ud_sock_t s)
+{
+	__sock_t us = (__sock_t)s;
+	return (const struct sockaddr*)&us->dst->sa;
+}
+
+int
+ud_get_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t sock)
+{
+	__sock_t us = (__sock_t)sock;
+
+	if (UNLIKELY(us->nrd == 0UL)) {
+		return -1;
+	}
+	/* zero-copy */
+	tgt->src = (const struct sockaddr*)&us->src->sa;
+	tgt->pno = be16toh(us->recv.hdr.pno);
+	tgt->svc = be16toh(us->recv.hdr.cmd);
+	tgt->len = us->nrd;
+	return 0;
+}
+
 
 /* now come private bits of the API, touch'n'go:
  * these may or may not disappear, change, reappear, or even go in the
@@ -728,29 +751,6 @@ ud_chck_cmsg(struct ud_msg_s *restrict UNUSED(tgt), ud_sock_t sock)
 		break;
 	}
 	return 0;
-}
-
-int
-ud_chck_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t sock)
-{
-	__sock_t us = (__sock_t)sock;
-
-	if (UNLIKELY(us->nrd == 0UL)) {
-		return -1;
-	}
-	/* zero-copy */
-	tgt->src = us->src;
-	tgt->pno = be16toh(us->recv.hdr.pno);
-	tgt->svc = be16toh(us->recv.hdr.cmd);
-	tgt->len = us->nrd;
-	return 0;
-}
-
-ud_const_sockaddr_t
-ud_socket_addr(ud_sock_t s)
-{
-	__sock_t us = (__sock_t)s;
-	return &us->dst->sa;
 }
 
 /* unserding.c ends here */

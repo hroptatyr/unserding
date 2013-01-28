@@ -203,7 +203,7 @@ mc6_join_group(int s, struct ud_sockaddr_s *sa, struct ipv6_mreq *r)
 	}
 	/* set up the multicast group and join it */
 	r->ipv6mr_multiaddr = sa->sa.sa6.sin6_addr;
-	r->ipv6mr_interface = 0;
+	r->ipv6mr_interface = sa->sa.sa6.sin6_scope_id;
 
 	/* now truly join */
 	return setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, r, sizeof(*r));

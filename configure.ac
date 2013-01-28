@@ -78,6 +78,8 @@ SXE_CHECK_LIBLTDL
 pkglibdir="${libdir}/unserding"
 AC_SUBST([pkglibdir])
 AC_DEFINE_UNQUOTED([PKGLIBDIR], ["${pkglibdir}"], [where modules reside])
+unsermoddir="${pkglibdir}"
+AC_SUBST([unsermoddir])
 
 dnl -------------------------------------------------------------------------
 dnl final output

@@ -23,6 +23,7 @@ EXTRA_DIST = $(BUILT_SOURCES)
 header_HEADERS += protocore.h seria.h
 header_HEADERS += mcast.h
 header_HEADERS += unserding-ctx.h
+header_HEADERS += unsermon.h
 noinst_HEADERS += protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h

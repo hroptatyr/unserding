@@ -3,7 +3,7 @@
 AM_CPPFLAGS = -D_BSD_SOURCE -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=600
 AM_CFLAGS =
 AM_LDFLAGS =
-AM_MODFLAGS = -module -avoid-version
+AM_MODFLAGS = -module -shared -avoid-version
 
 headerdir = $(includedir)/unserding
 

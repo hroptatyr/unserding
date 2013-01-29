@@ -61,6 +61,7 @@ AC_CHECK_HEADERS([netinet/in.h])
 AC_CHECK_HEADERS([netinet/tcp.h])
 AC_CHECK_HEADERS([arpa/inet.h])
 AC_CHECK_HEADERS([netdb.h])
+AC_CHECK_HEADERS([net/if.h])
 
 dnl -------------------------------------------------------------------------
 dnl packages we allow/support
@@ -75,11 +76,16 @@ SXE_CHECK_LIBTOOL
 SXE_CHECK_LIBLTDL
 
 ## mimic automake on this one
-pkglibdir="${libdir}/unserding"
+pkglibdir="${libdir}/${PACKAGE}"
+pkgincludedir="${includedir}/${PACKAGE}"
 AC_SUBST([pkglibdir])
+AC_SUBST([pkgincludedir])
 AC_DEFINE_UNQUOTED([PKGLIBDIR], ["${pkglibdir}"], [where modules reside])
+AC_DEFINE_UNQUOTED([PKGINCLUDEDIR], ["${pkgincludedir}"], [where headers reside])
 unsermoddir="${pkglibdir}"
 AC_SUBST([unsermoddir])
+unserincdir="${pkgincludedir}"
+AC_SUBST([unserincdir])
 
 dnl -------------------------------------------------------------------------
 dnl final output

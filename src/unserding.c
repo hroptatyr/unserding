@@ -416,7 +416,7 @@ ud_socket(struct ud_sockopt_s opt)
 	res->opt = opt;
 
 	/* destination address now, use SILO by default for now */
-	mc6_set_dest(res->dst, opt.addr, opt.port, NULL);
+	mc6_set_dest(res->dst, opt.addr, opt.port, opt.intf);
 	/* set the length of the storage for the source address */
 	res->src->sz = sizeof(res->src->sa);
 

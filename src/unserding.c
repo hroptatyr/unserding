@@ -53,6 +53,9 @@
 #if defined HAVE_ARPA_INET_H
 # include <arpa/inet.h>
 #endif	/* HAVE_ARPA_INET_H */
+#if defined HAVE_NET_IF_H
+# include <net/if.h>
+#endif	/* HAVE_NET_IF_H */
 #if defined HAVE_ERRNO_H
 # include <errno.h>
 #endif	/* HAVE_ERRNO_H */
@@ -241,7 +244,9 @@ mc6_socket(void)
 }
 
 static int
-mc6_set_dest(struct ud_sockaddr_s *s, const char *addr, short unsigned int port)
+mc6_set_dest(
+	struct ud_sockaddr_s *restrict s,
+	const char *addr, short unsigned int port, const char *nicn)
 {
 	sa_family_t fam = AF_INET6;
 
@@ -255,6 +260,16 @@ mc6_set_dest(struct ud_sockaddr_s *s, const char *addr, short unsigned int port)
 	s->sa.sa6.sin6_port = htons(port);
 	/* set the flowinfo */
 	s->sa.sa6.sin6_flowinfo = 0;
+	/* scope id */
+#if defined HAVE_NET_IF_H
+	if (nicn != NULL) {
+		s->sa.sa6.sin6_scope_id = if_nametoindex(nicn);
+	} else {
+		s->sa.sa6.sin6_scope_id = 0U;
+	}
+#else  /* !HAVE_NET_IF_H */
+	s->sa.sa6.sin6_scope_id = 0U;
+#endif	/* HAVE_NET_IF_H */
 	/* also store the length */
 	s->sz = sizeof(s->sa.sa6);
 	return 0;
@@ -401,7 +416,7 @@ ud_socket(struct ud_sockopt_s opt)
 	res->opt = opt;
 
 	/* destination address now, use SILO by default for now */
-	mc6_set_dest(res->dst, opt.addr, opt.port);
+	mc6_set_dest(res->dst, opt.addr, opt.port, NULL);
 	/* set the length of the storage for the source address */
 	res->src->sz = sizeof(res->src->sa);
 

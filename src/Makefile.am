@@ -5,24 +5,22 @@ AM_CFLAGS =
 AM_LDFLAGS =
 AM_MODFLAGS = -module -shared -avoid-version
 
-headerdir = $(includedir)/unserding
-
 noinst_PROGRAMS =
 bin_PROGRAMS =
 sbin_PROGRAMS =
 lib_LTLIBRARIES =
 noinst_HEADERS =
-header_HEADERS =
+pkginclude_HEADERS =
 unsermod_LTLIBRARIES =
 
 BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
-header_HEADERS += protocore.h seria.h
-header_HEADERS += mcast.h
-header_HEADERS += unserding-ctx.h
-header_HEADERS += unsermon.h
+pkginclude_HEADERS += protocore.h seria.h
+pkginclude_HEADERS += mcast.h
+pkginclude_HEADERS += unserding-ctx.h
+pkginclude_HEADERS += unsermon.h
 noinst_HEADERS += protocore-private.h
 noinst_HEADERS += ud-sock.h epoll-helpers.h
 noinst_HEADERS += unserding-nifty.h unserding-dbg.h
@@ -64,8 +62,8 @@ BUILT_SOURCES += ud-ping-clo.c ud-ping-clo.h
 ## the lib, or its archive counterpart
 lib_LTLIBRARIES += libunserding.la
 libunserding_la_SOURCES = unserding.c
-header_HEADERS += unserding.h
-header_HEADERS += ud-sockaddr.h
+pkginclude_HEADERS += unserding.h
+pkginclude_HEADERS += ud-sockaddr.h
 libunserding_la_SOURCES += libstuff.c
 libunserding_la_SOURCES += ud-private.h
 libunserding_la_SOURCES += svc-pong.c svc-pong.h

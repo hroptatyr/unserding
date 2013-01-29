@@ -578,6 +578,8 @@ main(int argc, char *argv[])
 		ev_io_stop(EV_A_ beef + i);
 		ud_close(s);
 	}
+	/* free beef resources */
+	free(beef);
 
 	/* clearing decmap */
 	for (size_t i = 0; i < countof(decmap); i++) {

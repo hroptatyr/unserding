@@ -124,6 +124,8 @@ struct ud_sockopt_s {
 	} mode_opt;
 	/** address to send/subscribe to, UD_MCAST6_SITE_LOCAL if NULL */
 	const char *addr;
+	/** interface name for link local addresses, or NULL for auto */
+	const char *intf;
 	/** service to send/subscribe to, UD_NETWORK_SERVICE if 0 */
 	short unsigned int port;
 };

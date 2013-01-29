@@ -5,6 +5,7 @@ libdir=@libdir@
 libexecdir=@libexecdir@
 pkglibdir=@pkglibdir@
 unsermoddir=@pkglibdir@
+unserincdir=@pkgincludedir@
 
 Name: unserding
 Description: Ubiquitous Network Service to Enquire Real or Deduced Information

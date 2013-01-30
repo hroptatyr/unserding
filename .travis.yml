@@ -4,12 +4,15 @@ compiler:
   - gcc
   - clang
 
-before_script:
-  - autoreconf -vfi
+before_install:
+  - sudo apt-get -qq update
   - sudo apt-get install -qq gengetopt
   - sudo apt-get install -qq libev-dev
   - sudo apt-get install -qq texinfo
   - sudo apt-get install -qq texlive
+
+before_script:
+  - autoreconf -vfi
 
 env:
   - OPTIONS=""

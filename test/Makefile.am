@@ -27,6 +27,7 @@ TESTS += test_pub_02
 test_pub_02_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
 test_pub_02_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
 
+if HAVE_MC6_DEVICES
 check_PROGRAMS += test_pub_03
 TESTS += test_pub_03
 test_pub_03_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
@@ -76,6 +77,7 @@ check_PROGRAMS += test_pubsub_12
 TESTS += test_pubsub_12
 test_pubsub_12_CPPFLAGS = $(AM_CPPFLAGS) $(unserding_CFLAGS)
 test_pubsub_12_LDFLAGS = $(AM_LDFLAGS) $(unserding_LIBS)
+endif  HAVE_MC6_DEVICES
 
 .NOTPARALLEL:
 

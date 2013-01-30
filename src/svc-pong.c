@@ -282,15 +282,12 @@ mon_dec_ping(
 }
 
 int
-svc_pong_LTX_ud_mondec_init(void)
+ud_mondec_init(void)
 {
 	ud_mondec_reg(UD_CTRL_SVC(UD_SVC_PING), mon_dec_ping);
 	ud_mondec_reg(UD_CTRL_SVC(UD_SVC_PING + 1), mon_dec_ping);
 	return 0;
 }
-
-int ud_mondec_init(void)
-	__attribute__((alias("svc_pong_LTX_ud_mondec_init")));
 #endif	/* UNSERMON_DSO */
 
 /* svc-pong.c ends here */

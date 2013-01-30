@@ -129,6 +129,6 @@ extern int ud_pack_pong(ud_sock_t sock, unsigned int pongp);
 extern int ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock);
 
 /* for unsermon */
-extern int svc_pong_LTX_ud_mondec_init(void);
+extern int ud_mondec_init(void);
 
 #endif	/* INCLUDED_svc_pong_h_ */

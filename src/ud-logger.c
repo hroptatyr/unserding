@@ -44,7 +44,7 @@
 #include <syslog.h>
 
 #include "ud-logger.h"
-#include "unserding-nifty.h"
+#include "ud-nifty.h"
 
 #define UD_LOG_FLAGS		(LOG_PID | LOG_NDELAY)
 #define UD_FACILITY		(LOG_LOCAL4)

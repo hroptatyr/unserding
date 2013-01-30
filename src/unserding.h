@@ -41,10 +41,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>
-#if !defined UD_NEW_API || defined UD_COMPAT
-# include "ud-sockaddr.h"
-# include "mcast.h"
-#endif	/* !UD_NEW_API || UD_COMPAT */
 
 #if defined __cplusplus
 extern "C" {
@@ -69,7 +65,6 @@ extern "C" {
 /* just offer a default address for some tools */
 #define UD_MCAST6_ADDR		UD_MCAST6_SITE_LOCAL
 
-#if defined UD_NEW_API
 typedef struct ud_sock_s *ud_sock_t;
 typedef const struct ud_sock_s *ud_const_sock_t;
 
@@ -181,131 +176,6 @@ extern int ud_get_aux(struct ud_auxmsg_s *restrict tgt, ud_sock_t s);
 /**
  * Return the network SOCK is pubbing or subbed to. */
 extern const struct sockaddr *ud_socket_addr(ud_sock_t);
-
-#endif	/* UD_NEW_API */
-
-
-#if !defined UD_NEW_API || defined UD_COMPAT
-/* old api */
-/**
- * Flags. */
-typedef long unsigned int ud_flags_t;
-
-
-/**
- * Connexion handle to an unserding network.
- * Carries the current conversation id which is incremented upon each query
- * and hence one handle may not be used concurrently, or IOW it is not
- * thread-safe.
- * For multiple concurrent connexions obtain multiple handles. */
-typedef struct ud_handle_s *ud_handle_t;
-
-/**
- * Simple packet structure.
- * Attention, this is a structure passed by value. */
-typedef struct {
-	size_t plen;
-	char *pbuf;
-} ud_packet_t;
-
-/**
- * Structure to chain several packets. */
-typedef ud_packet_t *ud_pktchn_t;
-
-/**
- * Conversation id. */
-typedef uint8_t ud_convo_t;
-/**
- * Packet command. */
-typedef uint16_t ud_pkt_cmd_t;
-/**
- * Packet number. */
-typedef uint32_t ud_pkt_no_t;
-/**
- * Callback function for subscriptions. */
-typedef bool(*ud_subscr_f)(const ud_packet_t, ud_const_sockaddr_t, void *clo);
-
-/**
- * Struct to handle conversations. */
-struct ud_handle_s {
-	/** Conversation number. */
-	ud_convo_t convo:8;
-	/** Socket. */
-	int sock:24;
-	ud_pktchn_t pktchn;
-	/* our connexion later on */
-	union ud_sockaddr_u sa;
-	/* moving average roundtrip time (in nano seconds) */
-	int mart;
-	/* system score */
-	int score;
-};
-
-
-/* connexion stuff */
-/**
- * Initialise a handle into what's behind HDL. */
-extern void init_unserding_handle(ud_handle_t hdl, int pref_fam, bool negop);
-/**
- * Free a handle and all resources. */
-extern void free_unserding_handle(ud_handle_t);
-/**
- * Send packet PKT through the handle HDL.
- * Block until there is an answer. */
-extern ssize_t ud_send_raw(ud_handle_t hdl, ud_packet_t pkt);
-/**
- * Send a CMD-packet through the handle HDL. */
-extern ud_convo_t ud_send_simple(ud_handle_t hdl, ud_pkt_cmd_t cmd);
-/**
- * Wait (read block) until packets arrive or TIMEOUT millisecs have passed.
- * If packets were found this routine returns exactly one packet and
- * their content is copied into PKT. */
-extern ssize_t
-ud_recv_raw(ud_handle_t hdl, ud_packet_t pkt, int timeout);
-/**
- * Like ud_recv_raw() but only receive packets that belong to convo CNO. */
-extern void
-ud_recv_convo(ud_handle_t hdl, ud_packet_t *pkt, int timeout, ud_convo_t cno);
-
-/**
- * Subscribe to all traffic.
- * For each packet on the network call CB with the packet's buffer in PKT
- * and a user closure CLO.  After TIMEOUT milliseconds the callback is
- * called with an empty PACKET.  The function CB should return `true' if
- * it wishes to continue receiving packets, and should return `false' if
- * the subscription is annulled. */
-extern void
-ud_subscr_raw(ud_handle_t hdl, int timeout, ud_subscr_f cb, void *clo);
-
-/**
- * Send packet to channel. */
-extern ssize_t ud_chan_send(ud_chan_t, ud_packet_t);
-
-/* inlines */
-/**
- * Return the current conversation id of HDL. */
-static inline ud_convo_t __attribute__((always_inline))
-ud_handle_convo(ud_handle_t hdl)
-{
-	return hdl->convo;
-}	
-
-/**
- * Return the connexion socket stored inside HDL. */
-static inline int __attribute__((always_inline))
-ud_handle_sock(ud_handle_t hdl)
-{
-	return hdl->sock;
-}	
-
-/* lower level connexion stuff */
-/**
- * Get a socket to communicate with service PORT. */
-extern ud_chan_t ud_chan_init(short unsigned int port);
-/**
- * Free resources associated with a connection. */
-extern void ud_chan_fini(ud_chan_t);
-#endif	/* !UD_NEW_API || UD_COMPAT */
 
 #ifdef __cplusplus
 }

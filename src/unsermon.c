@@ -69,7 +69,7 @@
 #include "unserding.h"
 #include "ud-sockaddr.h"
 #include "ud-private.h"
-#include "unserding-nifty.h"
+#include "ud-nifty.h"
 #include "ud-logger.h"
 #include "ud-module.h"
 #include "boobs.h"

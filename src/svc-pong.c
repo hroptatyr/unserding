@@ -148,7 +148,7 @@ ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock)
 	__msg.wire.hn[__msg.wire.hnz] = '\0';
 	return 0;
 }
-#endif	/* UNSERMON_DSO */
+#endif	/* !UNSERMON_DSO */
 
 
 /* monitor service */

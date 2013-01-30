@@ -47,9 +47,11 @@ poll_recv(ud_sock_t s)
 	fds->fd = s->fd;
 	fds->events = POLLIN;
 
-	if ((rc = poll(fds, countof(fds), timeout)) <= 0) {
+	if ((rc = poll(fds, countof(fds), timeout)) < 0) {
 		perror("socket not ready for recving");
 		return -1;
+	} else if (rc == 0) {
+		perror("socket timed out");
 	} else if (!(fds->revents & POLLIN)) {
 		perror("socket not ready for recving, despite poll");
 		return -1;

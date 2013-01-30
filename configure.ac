@@ -88,6 +88,27 @@ unserincdir="${pkgincludedir}"
 AC_SUBST([unserincdir])
 
 dnl -------------------------------------------------------------------------
+dnl diagnostics for the test suite
+dnl -------------------------------------------------------------------------
+
+AC_PATH_PROG([IP], [ip], [/bin/true],
+	[${PATH}]dnl
+	[${PATH_SEPARATOR}/usr/local/sbin]dnl
+	[${PATH_SEPARATOR}/usr/sbin]dnl
+	[${PATH_SEPARATOR}/sbin]dnl
+	[${PATH_SEPARATOR}/usr/local/bin]dnl
+	[${PATH_SEPARATOR}/usr/bin]dnl
+	[${PATH_SEPARATOR}/bin])
+
+AC_MSG_CHECKING([for multicast6-capable adapters])
+sxe_cv_ip_mc6_devlines=`"${IP}" -6 -o l | grep "state UP" | grep "MULTICAST"`
+sxe_cv_ip_mc6_devices=`echo ${sxe_cv_ip_mc6_devlines} | \
+	awk 'BEGIN{FS=": "} {x=x $2 " "} END{print x}'`
+AM_CONDITIONAL([HAVE_MC6_DEVICES], [test -n "${sxe_cv_ip_mc6_devices}"])
+AC_MSG_RESULT([${sxe_cv_ip_mc6_devices}])
+
+
+dnl -------------------------------------------------------------------------
 dnl final output
 dnl -------------------------------------------------------------------------
 AC_CONFIG_FILES([Makefile])

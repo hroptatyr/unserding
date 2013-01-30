@@ -69,7 +69,7 @@
 #include "unserding.h"
 #include "ud-sockaddr.h"
 #include "ud-private.h"
-#include "unserding-nifty.h"
+#include "ud-nifty.h"
 #include "ud-logger.h"
 #include "ud-module.h"
 #include "boobs.h"
@@ -488,7 +488,6 @@ main(int argc, char *argv[])
 	ev_signal sighup_watcher[1];
 	ev_signal sigterm_watcher[1];
 	ev_signal sigpipe_watcher[1];
-	ev_async wakeup_watcher[1];
 	ev_io *beef = NULL;
 	size_t nbeef;
 	/* args */

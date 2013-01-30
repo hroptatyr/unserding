@@ -108,13 +108,6 @@ ud_find_score(ud_pong_set_t ps)
 	return __nright_zeroes(~ps);
 }
 
-
-#if defined UD_COMPAT
-/* exports, will be in libunserding */
-extern ud_pong_score_t
-ud_svc_nego_score(ud_handle_t hdl, int timeout);
-#endif	/* UD_COMPAT */
-
 /* packing service */
 /**
  * Pack an svc_ping_s object MSG into S. */
@@ -129,6 +122,6 @@ extern int ud_pack_pong(ud_sock_t sock, unsigned int pongp);
 extern int ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock);
 
 /* for unsermon */
-extern int svc_pong_LTX_ud_mondec_init(void);
+extern int ud_mondec_init(void);
 
 #endif	/* INCLUDED_svc_pong_h_ */

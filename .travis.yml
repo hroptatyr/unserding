@@ -4,12 +4,19 @@ compiler:
   - gcc
   - clang
 
-before_script:
-  - autoreconf -vfi
+before_install:
+  - sudo apt-get -qq update
+
+install:
   - sudo apt-get install -qq gengetopt
   - sudo apt-get install -qq libev-dev
   - sudo apt-get install -qq texinfo
   - sudo apt-get install -qq texlive
+
+before_script:
+  - ip -6 a
+  - ip -6 ma
+  - autoreconf -vfi
 
 env:
   - OPTIONS=""
@@ -20,9 +27,6 @@ script:
   - cd \=build
   - ../configure $OPTIONS
   - make clean all check distcheck
-
-after_failure:
-  - cat test/test-suite.log
 
 ## whitelist
 branches:

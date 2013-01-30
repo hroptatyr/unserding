@@ -63,7 +63,7 @@
 
 /* our master include */
 #include "unserding.h"
-#include "unserding-nifty.h"
+#include "ud-nifty.h"
 #include "ud-sock.h"
 #include "ud-sockaddr.h"
 #include "ud-private.h"

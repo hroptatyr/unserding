@@ -17,28 +17,19 @@ BUILT_SOURCES =
 CLEANFILES =
 EXTRA_DIST = $(BUILT_SOURCES)
 
-pkginclude_HEADERS += protocore.h seria.h
-pkginclude_HEADERS += mcast.h
-pkginclude_HEADERS += unserding-ctx.h
-pkginclude_HEADERS += unsermon.h
-noinst_HEADERS += protocore-private.h
-noinst_HEADERS += ud-sock.h epoll-helpers.h
-noinst_HEADERS += unserding-nifty.h unserding-dbg.h
-noinst_HEADERS += seria-proto-glue.h
-noinst_HEADERS += boobs.h
 ## stuff that really does not belong here, expect this to be kicked
 EXTRA_DIST += btea.c
-EXTRA_DIST += dso-pong.c
 
 bin_PROGRAMS += unsermon
 unsermon_SOURCES = unsermon.c unsermon.h unsermon-clo.ggo
+pkginclude_HEADERS += unsermon.h
 unsermon_SOURCES += ud-logger.c ud-logger.h
 unsermon_SOURCES += ud-module.c ud-module.h
+unsermon_SOURCES += ud-nifty.h
 unsermon_CPPFLAGS = $(AM_CPPFLAGS)
 unsermon_CPPFLAGS += $(libev_CFLAGS)
 unsermon_CPPFLAGS += $(uterus_CFLAGS)
 unsermon_CPPFLAGS += $(INCLTDL)
-unsermon_CPPFLAGS += -DUD_NEW_API
 unsermon_LDFLAGS = $(AM_LDFLAGS) -lrt
 unsermon_LDFLAGS += $(libev_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)
@@ -49,10 +40,10 @@ BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 bin_PROGRAMS += ud-ping
 ud_ping_SOURCES = ud-ping.c ud-ping-clo.ggo
 ud_ping_SOURCES += svc-pong.h
+ud_ping_SOURCES += ud-nifty.h
 ud_ping_SOURCES += ud-time.h
 ud_ping_CPPFLAGS = $(AM_CPPFLAGS)
 ud_ping_CPPFLAGS += $(libev_CFLAGS)
-ud_ping_CPPFLAGS += -DUD_NEW_API
 ud_ping_LDFLAGS = $(AM_LDFLAGS) -static
 ud_ping_LDFLAGS += -lrt
 ud_ping_LDFLAGS += $(libev_LIBS)
@@ -64,24 +55,23 @@ lib_LTLIBRARIES += libunserding.la
 libunserding_la_SOURCES = unserding.c
 pkginclude_HEADERS += unserding.h
 pkginclude_HEADERS += ud-sockaddr.h
-libunserding_la_SOURCES += libstuff.c
 libunserding_la_SOURCES += ud-private.h
+libunserding_la_SOURCES += ud-nifty.h
+libunserding_la_SOURCES += ud-sock.h
+libunserding_la_SOURCES += boobs.h
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
-libunserding_la_SOURCES += mcast.c mcast.h
 libunserding_la_SOURCES += ud-logger.c ud-logger.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)
-libunserding_la_CPPFLAGS += -DUD_NEW_API
-libunserding_la_CPPFLAGS += -DUD_COMPAT
 libunserding_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS)
-libunserding_la_LDFLAGS += -version-info 1:0:1
+libunserding_la_LDFLAGS += -version-info 2:0:0
 libunserding_la_LDFLAGS += $(LD_EXPORT_DYNAMIC)
 unserding_LIBS = libunserding.la
 
 ## ping/pong decoder for unsermon
 unsermod_LTLIBRARIES += svc-pong.la
 svc_pong_la_SOURCES = svc-pong.c svc-pong.h
+svc_pong_la_SOURCES += ud-nifty.h
 svc_pong_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
-svc_pong_la_CPPFLAGS += -DUD_NEW_API
 svc_pong_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) $(AM_MODFLAGS)
 
 

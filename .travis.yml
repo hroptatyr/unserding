@@ -24,9 +24,6 @@ script:
   - ../configure $OPTIONS
   - make clean all check distcheck
 
-after_failure:
-  - if test -f test/test-suite.log; then test/test-suite.log; fi
-
 ## whitelist
 branches:
   only:

@@ -6,16 +6,16 @@ compiler:
 
 before_install:
   - sudo apt-get -qq update
+
+install:
   - sudo apt-get install -qq gengetopt
   - sudo apt-get install -qq libev-dev
   - sudo apt-get install -qq texinfo
   - sudo apt-get install -qq texlive
 
-after_install:
+before_script:
   - ip -6 a
   - ip -6 ma
-
-before_script:
   - autoreconf -vfi
 
 env:

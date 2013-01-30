@@ -11,6 +11,10 @@ before_install:
   - sudo apt-get install -qq texinfo
   - sudo apt-get install -qq texlive
 
+after_install:
+  - ip -6 a
+  - ip -6 ma
+
 before_script:
   - autoreconf -vfi
 

@@ -72,7 +72,6 @@ unsermod_LTLIBRARIES += svc-pong.la
 svc_pong_la_SOURCES = svc-pong.c svc-pong.h
 svc_pong_la_SOURCES += ud-nifty.h
 svc_pong_la_CPPFLAGS = $(AM_CPPFLAGS) -DUNSERMON_DSO
-svc_pong_la_CPPFLAGS += -DUD_NEW_API
 svc_pong_la_LDFLAGS = $(AM_LDFLAGS) $(XCCLDFLAGS) $(AM_MODFLAGS)
 
 

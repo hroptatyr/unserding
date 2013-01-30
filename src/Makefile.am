@@ -57,6 +57,7 @@ pkginclude_HEADERS += unserding.h
 pkginclude_HEADERS += ud-sockaddr.h
 libunserding_la_SOURCES += ud-private.h
 libunserding_la_SOURCES += ud-nifty.h
+libunserding_la_SOURCES += ud-sock.h
 libunserding_la_SOURCES += svc-pong.c svc-pong.h
 libunserding_la_SOURCES += ud-logger.c ud-logger.h
 libunserding_la_CPPFLAGS = -DUNSERLIB $(AM_CPPFLAGS)

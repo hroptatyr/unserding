@@ -46,10 +46,6 @@
 #include "ud-private.h"
 #include "boobs.h"
 
-#if defined UD_COMPAT
-# include "seria-proto-glue.h"
-# include "ud-time.h"
-#endif	/* UD_COMPAT */
 #if defined UNSERMON_DSO
 # include "unsermon.h"
 #endif	/* UNSERMON_DSO */
@@ -59,46 +55,6 @@ struct __ping_s {
 	uint8_t hnz;
 	char hn[];
 };
-
-#if defined UD_COMPAT
-typedef struct __clo_s {
-	ud_handle_t hdl;
-	ud_pong_set_t seen;
-	ud_convo_t cno;
-	struct timeval rtref;
-} *__clo_t;
-#endif	/* UD_COMPAT */
-
-
-#if defined UD_COMPAT
-static void
-seria_skip_str(udpc_seria_t sctx)
-{
-	const char *p;
-	(void)udpc_seria_des_str(sctx, &p);
-	return;
-}
-
-static void
-seria_skip_ui32(udpc_seria_t sctx)
-{
-	(void)udpc_seria_des_ui32(sctx);
-	return;
-}
-
-static void
-ud_svc_update_mart(ud_handle_t hdl, struct timeval then)
-{
-	struct timeval rtts = __ulapse(then);
-	if (rtts.tv_sec != 0) {
-		/* more than a second difference?! ignore */
-		return;
-	}
-	/* update hdl->mart */
-	hdl->mart = 1 + (hdl->mart + rtts.tv_usec / 1000U) / 2;
-	return;
-}
-#endif	/* UD_COMPAT */
 
 
 /* packing service */
@@ -193,53 +149,6 @@ ud_chck_ping(struct svc_ping_s *restrict tgt, ud_sock_t sock)
 	return 0;
 }
 #endif	/* UNSERMON_DSO */
-
-#if defined UD_COMPAT
-/* conforms to ud_subscr_f */
-static bool
-cb(ud_packet_t pkt, ud_const_sockaddr_t UNUSED(sa), void *clo)
-{
-	__clo_t nclo = clo;
-	struct udpc_seria_s sctx;
-	uint8_t score;
-
-	if (pkt.plen == 0 || pkt.plen > UDPC_PKTLEN) {
-		/* means we've seen a timeout or a signal */
-		return false;
-	}
-	/* otherwise the packet is meaningful */
-	ud_svc_update_mart(nclo->hdl, nclo->rtref);
-	/* fetch fields */
-	udpc_seria_init(&sctx, UDPC_PAYLOAD(pkt.pbuf), UDPC_PAYLLEN(pkt.plen));
-	/* first thing is a string which contains the hostname, just skip it */
-	seria_skip_str(&sctx);
-	/* next is a remote time stamp, skip it too */
-	seria_skip_ui32(&sctx);
-	seria_skip_ui32(&sctx);
-	/* finally! */
-	score = udpc_seria_des_byte(&sctx);
-	/* keep track of seen scores */
-	nclo->seen = ud_pong_set(nclo->seen, score);
-	return true;
-}
-
-ud_pong_score_t
-ud_svc_nego_score(ud_handle_t hdl, int timeout)
-{
-	struct __clo_s clo;
-
-	/* fill in the closure */
-	clo.seen = ud_empty_pong_set();
-	clo.rtref = __ustamp();
-	clo.hdl = hdl;
-	/* send off the bugger */
-	clo.cno = ud_send_simple(hdl, UD_SVC_PING);
-	/* wait for replies */
-	ud_subscr_raw(hdl, timeout, cb, &clo);
-	/* after they're all through, try and get a proper score */
-	return hdl->score = ud_find_score(clo.seen);
-}
-#endif	/* UD_COMPAT */
 
 
 /* monitor service */

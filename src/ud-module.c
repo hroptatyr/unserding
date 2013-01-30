@@ -57,8 +57,8 @@
 #include <ltdl.h>
 #include <limits.h>
 
-#include "unserding-nifty.h"
 #include "ud-module.h"
+#include "ud-nifty.h"
 
 #if defined DEBUG_FLAG
 # include <stdio.h>

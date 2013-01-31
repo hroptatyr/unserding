@@ -249,11 +249,40 @@ rtr_cb(EV_P_ ev_io *w, int UNUSED(revents))
 	return;
 }
 
+#define MAX_RETR	(3)
+#define RETR_SLEEP	(4U)
+
+#if defined HAVE_UDP_SPLICE
+static void
+sub_cb_splc(EV_P_ ev_io *w, int UNUSED(revents))
+{
+	static int pfd[2];
+	ud_sock_t s = w->data;
+	ctx_t ctx = s->data;
+	int dst = ctx->dst;
+	ssize_t nsp;
+
+	UD_DEBUG("sub_cb_splc\n");
+	if (UNLIKELY(!pfd[0] && pipe(pfd) < 0)) {
+		abort();
+	}
+
+	if ((nsp = splice(
+		     w->fd, NULL, pfd[1], NULL, ETH_MTU, SPLICE_F_MOVE)) <= 0) {
+		/* don't even bother */
+		return;
+	}
+	/* onto the target */
+	if (splice(pfd[0], NULL, dst, NULL, nsp, SPLICE_F_MOVE) != nsp) {
+		perror("splice failed");
+	}
+	return;
+}
+#endif	/* HAVE_UDP_SPLICE */
+
 static void
 sub_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
-#define MAX_RETR	(3)
-#define RETR_SLEEP	(4U)
 	char buf[ETH_MTU];
 	ud_sock_t s = w->data;
 	ctx_t ctx = s->data;

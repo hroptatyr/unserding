@@ -62,6 +62,7 @@ AC_CHECK_HEADERS([netinet/tcp.h])
 AC_CHECK_HEADERS([arpa/inet.h])
 AC_CHECK_HEADERS([netdb.h])
 AC_CHECK_HEADERS([net/if.h])
+AC_CHECK_HEADERS([errno.h])
 
 dnl -------------------------------------------------------------------------
 dnl packages we allow/support

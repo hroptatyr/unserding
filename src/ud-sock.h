@@ -1,8 +1,8 @@
 /*** ud-sock.h -- socket helpers
  *
- * Copyright (C) 2009, 2010 Sebastian Freundt
+ * Copyright (C) 2009-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -34,7 +34,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
 #if !defined INCLUDED_ud_sock_h_
 #define INCLUDED_ud_sock_h_
 
@@ -43,6 +42,27 @@
 #include <netinet/tcp.h>
 #include <fcntl.h>
 
+/* some (possibly) missing goodness */
+#if !defined SOCK_DCCP
+# define SOCK_DCCP		6
+#endif	/* !SOCK_DCCP */
+#if !defined IPPROTO_DCCP
+# define IPPROTO_DCCP		33
+#endif	/* !IPPROTO_DCCP */
+#if !defined SOL_DCCP
+# define SOL_DCCP		269
+#endif	/* !SOL_DCCP */
+#if !defined DCCP_SOCKOPT_SERVICE
+# define DCCP_SOCKOPT_SERVICE	2
+#endif	/* !DCCP_SOCKOPT_SERVICE */
+#if !defined MAX_DCCP_CONNECTION_BACK_LOG
+# define MAX_DCCP_CONNECTION_BACK_LOG	5
+#endif	/* !MAX_DCCP_CONNECTION_BACK_LOG */
+#if !defined DCCP_SOCKOPT_PACKET_SIZE
+# define DCCP_SOCKOPT_PACKET_SIZE 1
+#endif	/* !DCCP_SOCKOPT_PACKET_SIZE */
+
+
 static inline int
 getsockopt_int(int s, int level, int optname)
 {
@@ -77,7 +97,7 @@ setsock_linger(int s, int ltime)
 
 /**
  * Mark address behind socket S as reusable. */
-static inline int
+static __attribute__((unused)) int
 setsock_reuseaddr(int s)
 {
 #if defined SO_REUSEADDR
@@ -88,7 +108,7 @@ setsock_reuseaddr(int s)
 }
 
 /* probably only available on BSD */
-static inline int
+static __attribute__((unused)) int
 setsock_reuseport(int __attribute__((unused)) s)
 {
 #if defined SO_REUSEPORT
@@ -132,6 +152,17 @@ setsock_nonblock(int sock)
 	(void)fcntl(sock, F_SETFL, opts);
 	return;
 }
+
+static inline int
+setsock_rcvz(int s, int z)
+{
+#if defined SO_RCVBUF
+	return setsockopt(s, SOL_SOCKET, SO_RCVBUF, &z, sizeof(z));
+#else  /* !SO_RCVBUF */
+	return 0;
+#endif	/* SO_RCVBUF */
+}
+
 
 static inline int
 tcp_cork(int s)

@@ -1,0 +1,25 @@
+args "--unamed-opts --no-handle-error --long-help -a ud_args_info -f ud_parser"
+package "ud-router"
+usage "ud-router [OPTION]... PROTO://REMOTE:PORT"
+description "Subscribe to beef channels and publish to a remote dealer \
+at REMOTE:PORT using PROTO.
+
+Supported protocols:
+- udp  for udp forwarding (default)
+- tcp  for tcp forwarding.
+"
+
+option "daemonise" d
+	"Detach from tty and runs as daemon"
+	optional
+
+option "log" l
+	"Log to specified file FILE (or stderr if `-').  \
+By default syslog is used"
+	string typestr="FILE" optional 
+
+section "Network options"
+
+option "beef" -
+	"Multicast payload channels, can be used multiple times"
+	int optional multiple

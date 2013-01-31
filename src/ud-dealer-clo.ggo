@@ -1,0 +1,24 @@
+args "--unamed-opts --no-handle-error --long-help -a ud_args_info -f ud_parser"
+package "ud-dealer"
+usage "ud-dealer [OPTION]... PROTO://PORT"
+description "Fetch router messages on PORT and publish to unserding network.
+
+Supported protocols:
+- udp  for udp forwarding (default)
+- tcp  for tcp forwarding.
+"
+
+option "log" l
+	"Log to specified file FILE (or stderr if `-').  \
+By default syslog is used"
+	string typestr="FILE" optional 
+
+option "daemonise" d
+	"Detach from tty and runs as daemon"
+	optional
+
+section "Network options"
+
+option "beef" -
+	"Multicast payload channel"
+	int optional

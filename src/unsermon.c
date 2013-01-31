@@ -521,8 +521,8 @@ main(int argc, char *argv[])
 	ev_signal_start(EV_A_ sighup_watcher);
 
 	/* make some room for the control channel and the beef chans */
-	nbeef = (argi->beef_given + 1);
-	beef = malloc(nbeef * sizeof(*beef));
+	nbeef = argi->beef_given;
+	beef = calloc(nbeef + 1, sizeof(*beef));
 
 	/* attach a multicast listener
 	 * we add this quite late so that it's unlikely that a plethora of

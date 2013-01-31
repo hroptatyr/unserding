@@ -420,8 +420,6 @@ ud_socket(struct ud_sockopt_s opt)
 	/* set the length of the storage for the source address */
 	res->src->sz = sizeof(res->src->sa);
 
-	/* service for tools like ud-dealer */
-	(void)connect(res->fd_send, &res->dst->sa.sa, res->dst->sz);
 	/* join the mcast group(s) */
 	if (MODE_SUBP(opt.mode) && mc6_join_group(s, res->dst, res->memb) < 0) {
 		goto munm_out;

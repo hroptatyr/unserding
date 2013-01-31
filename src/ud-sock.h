@@ -133,6 +133,17 @@ setsock_nonblock(int sock)
 }
 
 static inline int
+setsock_rcvz(int s, int z)
+{
+#if defined SO_RCVBUF
+	return setsockopt(s, SOL_SOCKET, SO_RCVBUF, &z, sizeof(z));
+#else  /* !SO_RCVBUF */
+	return 0;
+#endif	/* SO_RCVBUF */
+}
+
+
+static inline int
 tcp_cork(int s)
 {
 #if defined TCP_CORK && defined SOL_TCP

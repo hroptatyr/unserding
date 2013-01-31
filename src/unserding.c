@@ -423,6 +423,9 @@ ud_socket(struct ud_sockopt_s opt)
 	/* join the mcast group(s) */
 	if (MODE_SUBP(opt.mode) && mc6_join_group(s, res->dst, res->memb) < 0) {
 		goto munm_out;
+	} else if (MODE_PUBP(opt.mode)) {
+		/* service for tools like ud-dealer */
+		(void)connect(res->fd_send, &res->dst->sa.sa, res->dst->sz);
 	}
 	return (ud_sock_t)res;
 

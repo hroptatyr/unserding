@@ -60,6 +60,16 @@ ud_router_LDFLAGS += $(libev_LIBS)
 ud_router_LDADD = libunserding.la
 BUILT_SOURCES += ud-router-clo.c ud-router-clo.h
 
+bin_PROGRAMS += ud-dealer
+ud_dealer_SOURCES = ud-dealer.c ud-dealer-clo.ggo
+ud_dealer_SOURCES += daemonise.c daemonise.h
+ud_dealer_CPPFLAGS = $(AM_CPPFLAGS)
+ud_dealer_CPPFLAGS += $(libev_CFLAGS)
+ud_dealer_LDFLAGS = $(AM_LDFLAGS) -static
+ud_dealer_LDFLAGS += $(libev_LIBS)
+ud_dealer_LDADD = libunserding.la
+BUILT_SOURCES += ud-dealer-clo.c ud-dealer-clo.h
+
 ## the lib, or its archive counterpart
 lib_LTLIBRARIES += libunserding.la
 libunserding_la_SOURCES = unserding.c

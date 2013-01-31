@@ -477,13 +477,15 @@ ud_flush(ud_sock_t sock)
 		ssize_t nwr;
 		const void *b = us->send.buf;
 		size_t z = us->npk + sizeof(us->send.hdr);
+		const struct sockaddr *sa = &us->dst->sa.sa;
+		socklen_t sz = us->dst->sz;
 
 		us->send.hdr.ini = htobe16(UD_PROTO_INI);
 		us->send.hdr.pno = htobe16(us->pno);
 		us->send.hdr.cmd = htobe16(us->svc);
 		us->send.hdr.magic = htobe16(0xda7a);
 
-		if ((nwr = send(us->fd_send, b, z, 0)) < 0) {
+		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
 			return -1;
 		} else if ((size_t)nwr < z) {
 			/* should we try a resend? */
@@ -722,13 +724,15 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 		ssize_t nwr;
 		const void *b = ctrl.buf;
 		size_t z = p - ctrl.pl + sizeof(ctrl.hdr);
+		const struct sockaddr *sa = &us->dst->sa.sa;
+		socklen_t sz = us->dst->sz;
 
 		ctrl.hdr.ini = htobe16(UD_PROTO_INI);
 		ctrl.hdr.pno = htobe16(us->pno);
 		ctrl.hdr.cmd = htobe16(msg.svc);
 		ctrl.hdr.magic = htobe16(0xda7a);
 
-		if ((nwr = send(us->fd_send, b, z, 0)) < 0) {
+		if ((nwr = sendto(us->fd_send, b, z, 0, sa, sz)) < 0) {
 			return -1;
 		} else if ((size_t)nwr < z) {
 			/* should we try a resend? */

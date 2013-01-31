@@ -351,7 +351,7 @@ main(int argc, char *argv[])
 		ud_parser_print_help();
 		res = 1;
 		goto out;
-	} else if (massage_conn(ctx, argi->inputs[argi->inputs_num - 1]) < 0) {
+	} else if (massage_conn(ctx, argi->inputs[0]) < 0) {
 		res = 1;
 		goto out;
 	} else if (argi->daemonise_given && detach() < 0) {
@@ -376,33 +376,30 @@ main(int argc, char *argv[])
 	ev_signal_start(EV_A_ sigterm_watcher);
 
 	/* make some room for the control channel and the beef chans */
-	nbeef = (argi->inputs_num);
-	beef = calloc(nbeef, sizeof(*beef));
+	nbeef = (argi->beef_given);
+	beef = calloc(nbeef + 1, sizeof(*beef));
 
 	{
 		ud_sock_t s;
 
 		if ((s = ud_socket((struct ud_sockopt_s){UD_SUB})) != NULL) {
-			beef[nbeef - 1].data = s;
+			beef[nbeef].data = s;
 			s->data = ctx;
-			ev_io_init(beef + nbeef - 1, sub_cb, s->fd, EV_READ);
-			ev_io_start(EV_A_ beef + nbeef - 1);
+			ev_io_init(beef + nbeef, sub_cb, s->fd, EV_READ);
+			ev_io_start(EV_A_ beef + nbeef);
 		}
 	}
 
 	/* set up the one end, sub to unserding network */
-	for (unsigned int i = 0; i < argi->inputs_num - 1; i++) {
-		char *p;
-		long int port = strtol(argi->inputs[i], &p, 10);
+	for (unsigned int i = 0; i < argi->beef_given; i++) {
+		uint16_t port = (uint16_t)argi->beef_arg[i];
 		ud_sock_t s;
 
-		if (UNLIKELY(port == 0 || *p)) {
-			continue;
-		} else if ((s = ud_socket((struct ud_sockopt_s){
+		if ((s = ud_socket((struct ud_sockopt_s){
 					UD_SUB,
-					.port = (uint16_t)port})) == NULL) {
+					.port = port})) == NULL) {
 			error(errno, "\
-cannot initialise unserding socket, channel %ld", port);
+cannot initialise unserding socket, channel %hu", port);
 			continue;
 		}
 		/* otherwise */
@@ -426,7 +423,7 @@ cannot initialise unserding socket, channel %ld", port);
 	ev_check_stop(EV_A_ chk);
 
 	/* detaching beef channels */
-	for (unsigned int i = 0; i < nbeef; i++) {
+	for (unsigned int i = 0; i <= nbeef; i++) {
 		ud_sock_t s;
 
 		if (LIKELY((s = beef[i].data) != NULL)) {

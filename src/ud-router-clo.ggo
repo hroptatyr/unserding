@@ -1,7 +1,7 @@
 args "--unamed-opts --no-handle-error --long-help -a ud_args_info -f ud_parser"
 package "ud-router"
-usage "ud-router [OPTION]... [CHANNEL]... PROTO://REMOTE:PORT"
-description "Subscribe to CHANNELs and publish to a remote dealer \
+usage "ud-router [OPTION]... PROTO://REMOTE:PORT"
+description "Subscribe to beef channels and publish to a remote dealer \
 at REMOTE:PORT using PROTO.
 
 Supported protocols:
@@ -17,3 +17,9 @@ option "log" l
 	"Log to specified file FILE (or stderr if `-').  \
 By default syslog is used"
 	string typestr="FILE" optional 
+
+section "Network options"
+
+option "beef" -
+	"Multicast payload channels, can be used multiple times"
+	int optional multiple

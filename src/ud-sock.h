@@ -1,8 +1,8 @@
 /*** ud-sock.h -- socket helpers
  *
- * Copyright (C) 2009, 2010 Sebastian Freundt
+ * Copyright (C) 2009-2013 Sebastian Freundt
  *
- * Author:  Sebastian Freundt <sebastian.freundt@ga-group.nl>
+ * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
  * This file is part of unserding.
  *
@@ -34,7 +34,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ***/
-
 #if !defined INCLUDED_ud_sock_h_
 #define INCLUDED_ud_sock_h_
 

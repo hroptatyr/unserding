@@ -93,7 +93,7 @@ ud_pack_ping(ud_sock_t sock, const struct svc_ping_s msg[static 1])
 	return ud_pack_cmsg(sock, (struct ud_msg_s){
 			.svc = cmd,
 			.data = __msg.buf,
-			.dlen = sizeof(__msg.buf),
+			.dlen = __msg.wire.hn - __msg.buf + __msg.wire.hnz,
 		});
 }
 

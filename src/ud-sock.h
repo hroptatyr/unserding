@@ -97,7 +97,7 @@ setsock_linger(int s, int ltime)
 
 /**
  * Mark address behind socket S as reusable. */
-static inline int
+static __attribute__((unused)) int
 setsock_reuseaddr(int s)
 {
 #if defined SO_REUSEADDR
@@ -108,7 +108,7 @@ setsock_reuseaddr(int s)
 }
 
 /* probably only available on BSD */
-static inline int
+static __attribute__((unused)) int
 setsock_reuseport(int __attribute__((unused)) s)
 {
 #if defined SO_REUSEPORT

@@ -42,7 +42,7 @@
 #include <stdio.h>
 
 #include "daemonise.h"
-#include "nifty.h"
+#include "ud-nifty.h"
 
 pid_t
 detach(void)

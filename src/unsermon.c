@@ -522,7 +522,7 @@ main(int argc, char *argv[])
 
 	/* make some room for the control channel and the beef chans */
 	nbeef = (argi->beef_given + 1);
-	beef = malloc(nbeef * sizeof(*beef));
+	beef = calloc(nbeef, sizeof(*beef));
 
 	/* attach a multicast listener
 	 * we add this quite late so that it's unlikely that a plethora of

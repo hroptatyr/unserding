@@ -42,6 +42,27 @@
 #include <netinet/tcp.h>
 #include <fcntl.h>
 
+/* some (possibly) missing goodness */
+#if !defined SOCK_DCCP
+# define SOCK_DCCP		6
+#endif	/* !SOCK_DCCP */
+#if !defined IPPROTO_DCCP
+# define IPPROTO_DCCP		33
+#endif	/* !IPPROTO_DCCP */
+#if !defined SOL_DCCP
+# define SOL_DCCP		269
+#endif	/* !SOL_DCCP */
+#if !defined DCCP_SOCKOPT_SERVICE
+# define DCCP_SOCKOPT_SERVICE	2
+#endif	/* !DCCP_SOCKOPT_SERVICE */
+#if !defined MAX_DCCP_CONNECTION_BACK_LOG
+# define MAX_DCCP_CONNECTION_BACK_LOG	5
+#endif	/* !MAX_DCCP_CONNECTION_BACK_LOG */
+#if !defined DCCP_SOCKOPT_PACKET_SIZE
+# define DCCP_SOCKOPT_PACKET_SIZE 1
+#endif	/* !DCCP_SOCKOPT_PACKET_SIZE */
+
+
 static inline int
 getsockopt_int(int s, int level, int optname)
 {

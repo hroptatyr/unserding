@@ -50,6 +50,16 @@ ud_ping_LDFLAGS += $(libev_LIBS)
 ud_ping_LDADD = $(unserding_LIBS)
 BUILT_SOURCES += ud-ping-clo.c ud-ping-clo.h
 
+bin_PROGRAMS += ud-router
+ud_router_SOURCES = ud-router.c ud-router-clo.ggo
+ud_router_SOURCES += daemonise.c daemonise.h
+ud_router_CPPFLAGS = $(AM_CPPFLAGS)
+ud_router_CPPFLAGS += $(libev_CFLAGS)
+ud_router_LDFLAGS = $(AM_LDFLAGS) -static
+ud_router_LDFLAGS += $(libev_LIBS)
+ud_router_LDADD = libunserding.la
+BUILT_SOURCES += ud-router-clo.c ud-router-clo.h
+
 ## the lib, or its archive counterpart
 lib_LTLIBRARIES += libunserding.la
 libunserding_la_SOURCES = unserding.c

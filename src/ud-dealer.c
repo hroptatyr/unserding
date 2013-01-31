@@ -55,6 +55,9 @@
 #if defined HAVE_NETDB_H
 # include <netdb.h>
 #endif	/* HAVE_NETDB_H */
+#if defined HAVE_FCNTL_H
+# include <fcntl.h>
+#endif	/* HAVE_FCNTL_H */
 #if defined HAVE_EV_H
 # include <ev.h>
 # undef EV_P
@@ -224,11 +227,44 @@ out:
 }
 
 
+#define MAX_RETR	(3U)
+#define RETR_SLEEP	(4U)
+
+#if defined HAVE_TCP_SPLICE || defined HAVE_UDP_SPLICE
+static void
+dlr_splc_cb(EV_P_ ev_io *w, int UNUSED(revents))
+{
+	static int pfd[2];
+	ctx_t ctx = w->data;
+	ud_sock_t s = ctx->dst;
+	int dst = s->fd;
+	ssize_t nsp;
+
+	UD_DEBUG("dlr_splc_cb\n");
+	if (!pfd[0] && pipe(pfd) < 0) {
+		abort();
+	}
+
+	if ((nsp = splice(
+		     w->fd, NULL, pfd[1], NULL, ETH_MTU, SPLICE_F_MOVE)) <= 0) {
+		/* don't even bother */
+		goto clo;
+	}
+	/* onto the target */
+	if (splice(pfd[0], NULL, dst, NULL, nsp, SPLICE_F_MOVE) != nsp) {
+		perror("splice failed");
+	}
+clo:
+	if (UNLIKELY(ctx->proto == PROTO_TCP)) {
+		ev_io_shut(EV_A_ w);
+	}
+	return;
+}
+#endif	/* HAVE_TCP_SPLICE || HAVE_UDP_SPLICE */
+
 static void
 dlr_data_cb(EV_P_ ev_io *w, int UNUSED(revents))
 {
-#define MAX_RETR	(3U)
-#define RETR_SLEEP	(4U)
 	char buf[ETH_MTU];
 	ctx_t ctx = w->data;
 	ud_sock_t s = ctx->dst;
@@ -283,7 +319,11 @@ dlr_tcp_cb(EV_P_ ev_io *w, int rev)
 	}
 
 	conns[next].io->data = ctx;
+#if defined HAVE_TCP_SPLICE
+	ev_io_init(conns[next].io, dlr_splc_cb, s, EV_READ);
+#else  /* !HAVE_TCP_SPLICE */
 	ev_io_init(conns[next].io, dlr_data_cb, s, EV_READ);
+#endif	/* HAVE_TCP_SPLICE */
 	ev_io_start(EV_A_ conns[next].io);
 	if (++next >= countof(conns)) {
 		next = 0;
@@ -380,7 +420,11 @@ main(int argc, char *argv[])
 		dlr->data = ctx;
 		switch (ctx->proto) {
 		case PROTO_UDP:
+#if defined HAVE_UDP_SPLICE
+			ev_io_init(dlr, dlr_splc_cb, s, EV_READ);
+#else  /* !HAVE_UDP_SPLICE */
 			ev_io_init(dlr, dlr_data_cb, s, EV_READ);
+#endif	/* HAVE_UDP_SPLICE */
 			break;
 		case PROTO_TCP:
 			ev_io_init(dlr, dlr_tcp_cb, s, EV_READ);

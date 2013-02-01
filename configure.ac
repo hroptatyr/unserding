@@ -68,7 +68,7 @@ dnl -------------------------------------------------------------------------
 dnl packages we allow/support
 dnl -------------------------------------------------------------------------
 ## event lib
-SXE_CHECK_LIBEV
+AC_CHECK_LIBEV
 
 dnl must come after all AC_LINK_IFELSE clauses
 ## check for the ldflags
@@ -87,6 +87,13 @@ unsermoddir="${pkglibdir}"
 AC_SUBST([unsermoddir])
 unserincdir="${pkgincludedir}"
 AC_SUBST([unserincdir])
+
+dnl -------------------------------------------------------------------------
+dnl check splicing features
+dnl -------------------------------------------------------------------------
+
+SXE_CHECK_TCP_SPLICE
+SXE_CHECK_UDP_SPLICE
 
 dnl -------------------------------------------------------------------------
 dnl diagnostics for the test suite

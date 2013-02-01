@@ -68,7 +68,7 @@ dnl -------------------------------------------------------------------------
 dnl packages we allow/support
 dnl -------------------------------------------------------------------------
 ## event lib
-SXE_CHECK_LIBEV
+AC_CHECK_LIBEV
 
 dnl must come after all AC_LINK_IFELSE clauses
 ## check for the ldflags

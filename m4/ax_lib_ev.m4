@@ -34,10 +34,14 @@ dnl   defs: ax_cv_header_ev_h yes|no
 	saved_CPPFLAGS="${CPPFLAGS}"
 	CPPFLAGS="${CPPFLAGS} ${libev_CFLAGS}"
 	## not so fast, we need ev.h checks
-	AC_CHECK_HEADER([ev.h], [
+	AC_CHECK_HEADERS([ev.h])
+	if test "${ac_cv_header_ev_h}" = "yes"; then
 		ax_cv_header_ev_h="yes"
 		$1
-	], [$2])
+	else
+		ax_cv_header_ev_h="no"
+		$2
+	fi
 	CPPFLAGS="${saved_CPPFLAGS}"
 ])
 

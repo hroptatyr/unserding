@@ -287,7 +287,8 @@ dnl SXE_CHECK_COMPILER_FLAGS([flag], [do-if-works], [do-if-not-works])
 	AC_MSG_CHECKING([whether _AC_LANG compiler accepts $1])
 
 	dnl Some hackery here since AC_CACHE_VAL can't handle a non-literal varname:
-	AC_LANG_WERROR([on])
+	save_ac_c_werror_flag="${ac_c_werror_flag}"
+	AC_LANG_WERROR
 	AS_LITERAL_IF([$1], [
 		AC_CACHE_VAL(AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flags_$1), [
 			sxe_save_FLAGS=$[]_AC_LANG_PREFIX[]FLAGS
@@ -303,7 +304,7 @@ dnl SXE_CHECK_COMPILER_FLAGS([flag], [do-if-works], [do-if-not-works])
 			eval AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flags_$1)="no")
 		_AC_LANG_PREFIX[]FLAGS=$sxe_save_FLAGS])
 	eval sxe_check_compiler_flags=$AS_TR_SH(sxe_cv_[]_AC_LANG_ABBREV[]_flags_$1)
-	AC_LANG_WERROR([off])
+	ac_c_werror_flag="${save_ac_c_werror_flag}"
 
 	AC_MSG_RESULT([$sxe_check_compiler_flags])
 	if test "$sxe_check_compiler_flags" = "yes"; then
@@ -339,8 +340,7 @@ AC_DEFUN([SXE_CHECK_CFLAGS], [dnl
 	SXE_FEATFLAGS
 	SXE_CFLAGS="$SXE_CFLAGS $featflags"
 
-	## unset the werror flag again
-	AC_LANG_WERROR([off])
+	save_ac_c_werror_flag="${ac_c_werror_flag}"
 
 	CFLAGS="${SXE_CFLAGS} ${ac_cv_env_CFLAGS_value}"
 	AC_MSG_CHECKING([for preferred CFLAGS])
@@ -358,6 +358,8 @@ or
   make CFLAGS=<your-own-flags> [target]
 respectively
 		])
+
+	ac_c_werror_flag="${save_ac_c_werror_flag}"
 ])dnl SXE_CHECK_CFLAGS
 
 AC_DEFUN([SXE_CHECK_CC], [dnl

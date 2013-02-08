@@ -105,34 +105,28 @@ designed for networks that require extension headers must therefore cope
 with all offset layouts, in practice this is equivalent with dealing
 with different maximum packet sizes.
 
-A packet is at most 1280 bytes long, that in the simplest case (no
-extension headers, no fragment header) leaves 1232 bytes gross payload,
-that is IPv6 minimum MTU - 48 bytes for the IPv6 UDP pseudo header (as
-defined in rfc 2460), and 1224 bytes net payload (which is 1232 gross
+An ethernet fram is at most 1500 bytes long, that in the simplest case
+(no extension headers, no fragment header) leaves 1452 bytes gross
+payload, that is 1500 - 48 bytes for the IPv6 UDP pseudo header (as
+defined in rfc 2460), and 1444 bytes net payload (which is 1452 gross
 payload minus 8 bytes headers).
 
 The simple case offset diagram looks like:
 
 0x000 ipv6 header	(payload <= 0x500, next header = 0x11 (UDP))
 0x028 udp header	(src port, dst port, length <= 0x500, chksum)
-0x030 uint8_t  CONVO	conversation id, can be set by the client
-0x031 uint24_t PKTNO	packet number wrt to the conversation
+0x030 uint16_t INDICAT	our indicator 0x5544 in network byte order
+0x031 uint16_t PKTNO	packet number, possibly overflowing
 0x034 uint16_t CMD	command to issue, see below
 0x036 uint16_t FLAGS	flags related to flow control etc.
 0x038 char *PAYLOAD
 ...
-0x500 
+0x5a0
 
-Remark:
-The uint24_t is just descriptive, in real-world implementations, the
-CONVO and PKTNO slots make up a uint32_t.
-
-CONVO:
-The traffic is divided into conversations, a client can thus request
-multiple conversations at the same time.
-A reply has the same conversation number as the request itself, it is
-the client's responsibility to pick conversation numbers not currently
-in use, or to employ other means to keep track of conversations.
+INDICAT:
+0x5544 is hex for ``UD'', which stands for unserding.  Also, this is to
+distinguish new API users from the old API users which used this field
+as conversation number.
 
 PKTNO:
 A new conversation always starts with packet number 0, subsequent
@@ -140,12 +134,25 @@ packets are denoted by increasing the PKTNO slot.  This facilitates
 the detection of lost packets or provides information on how to
 reassemble a bigger unit that has been fragmented into several packets.
 
+However, unserding will not help in such cases and implementing a
+retransmission scheme is left to the user.
+
 CMD:
 Conversations are usually the result of a client or server requesting a
 service on the network.  To distinguish between the services present on
 the network the command slot (CMD) takes the service number.
 As a general rule, request commands are even, the corresponding reply
 (if any) is odd (LOR'd with 0x0001).
+
+The CMD itself can be divided into channel and service, each one octet
+long.  The special channel 0xff (commands from 0xff00 to 0xffff) is
+reserved for administrative purposes.
+
+The CMD 0xffff is guaranteed not to be replied to (internally), and can
+be used for the purposes of testing the network.
+
+The CMD 0xff04 is the PING command.  Any new API unserding sub(scribed)
+socket will respond to it with 0xff05 (PONG).
 
 FLAGS:
 Flags are used both as magic cookies and to encode simple flow control
@@ -180,12 +187,9 @@ idea of how many packets constitute the response, current values are:
 		or a 0xee packet storm begins 
 
 PAYLOAD:
-The payload is a priori not restricted in any way but its size.  The
-unserding packet protocol (UPP) recommends the payload to be made up
-from TLV (tag-length-value) tuples but services may define their own
-implicit payload format, see section `Services (aka CMDs)' below.
-For information about the TLV wire format see section `TLV on the wire'
-below.
+The payload is a priori not restricted in any way but its size.  There's
+a tiny wrapper around user data on the wire consisting of 0x0c (to
+indicate data), and the size of the data blob (one octet).
 
 @verbatim
 Example conversation
@@ -193,7 +197,7 @@ Example conversation
 0000  60 00 00 00 00 10 11 40  fe 80 00 00 00 00 00 00   `......@ ........
 0010  80 6e 7c ff fe 0f 7d 3a  fe 80 00 00 00 00 00 00   .n|...}: ........
 0020  80 6e 7c ff fe 0f 7d 3a  8b 35 21 cd 00 10 14 12   .n|...}: !..5....
-0030  36 00 00 00 00 04 be ef                            6.......
+0030  55 44 00 00 ff 04 be ef                            UD......
 
 0x06 -> IPv6
 0x00 -> traffic class 0
@@ -207,9 +211,9 @@ Example conversation
 0x21cd -> destination port 8653
 0x0010 -> length 16 bytes
 0x1412 -> checksum 0x1412
-0x36 -> conversation 54
-0x000000 -> packet number 0
-0x0004 -> command 4 (UD_SVC_PING)
+0x5544 -> indicator
+0x0000 -> packet number 0
+0xff04 -> command 0xff04 (UD_SVC_PING)
 0xbe -> payload immediate
 0xef -> last packet in conversation
 @end verbatim
@@ -219,8 +223,8 @@ Reply could be:
 0000  60 00 00 00 00 26 11 40  fe 80 00 00 00 00 00 00   `....&.@ ........
 0010  80 6e 7c ff fe 0f 7d 3a  fe 80 00 00 00 00 00 00   .n|...}: ........
 0020  80 6e 7c ff fe 0f 7d 3a  21 cd 8b 35 00 26 80 13   .n|...}: !..5.&..
-0030  36 00 00 01 00 05 be ef  81 05 73 65 67 65 6e 04   6....... ..segen.
-0040  73 04 86 4d 04 00 00 00  d3 e9 53 13 01 00         s..M.... ..S...  
+0030  55 44 00 01 ff 05 be ef  0c 0a 00 00 00 01 05 73   UD...... .......s
+0040  65 67 65 6e                                        egen
 
 0x06 -> IPv6
 0x00 -> traffic class 0
@@ -234,27 +238,22 @@ Reply could be:
 0x8b35 -> destination port 35637
 0x0026 -> length 38 bytes
 0x8013 -> checksum 0x8013
-0x36 -> conversation 54
-0x000001 -> packet number 1
-0x0005 -> command 5 (UD_SVC_PING + 1 = UD_SVC_PONG)
+0x5544 -> indicator UD
+0x0001 -> packet number 1
+0xff05 -> command 0xff05 (UD_SVC_PING + 1 = UD_SVC_PONG)
 0xbe -> payload immediate
 0xef -> last packet in conversation
-0x81 -> string
-0x05 -> length 5
-0x736567656e -> "segen"
-0x04 -> uint32 (length 4, host byte-order)
-0x7304864d -> 1300628595 (seconds since epoch)
-0x04000000 -> uint32 (length 4, host byte-order, alignment pad 3 bytes)
-0xd3e95313 -> 324266451 (nano-second part of the time stamp)
-0x01 -> uint8 (length 1)
-0x00 -> 0 (score value)
+0x0c -> data
+0x0a -> length 10 bytes
+<SVC-PONG specific data>
 @end verbatim
 
 Remark:
 The base network of unserding servers is ff0x::134 as assigned by IANA,
-the base port for network-wide communication is 8653.  See the service
-section on how to obtain specific services, their hosts and port
-numbers.
+the base port for network-wide administrative commands is 8364.
+
+See the service section on how to obtain specific services, their hosts
+and port numbers.
 
 
 @heading Services
@@ -264,55 +263,29 @@ sense that it does not restrict the payload.  However, some services
 have been classified as infrastructural and hence may not be used for
 other purposes.
 
-@subheading 0x0004 (UD_SVC_PING)
+@subheading 0xff00 (UD_SVC_CMD)
 
-Replying to this command is mandatory for all unserding servers.  The
-request is a CMD 0x0004 with FLAGS set to 0xbeef and empty payload.
+To be sketched.
 
-The reply is 0x0005 with FLAGS set to 0xbeef, the payload looks as
+@subheading 0xff02 (UD_SVC_TIME)
+
+To be sketched.
+
+@subheading 0xff04 (UD_SVC_PING)
+
+Replying to this command is mandatory for all unserding participants.
+The request is a CMD 0xff04 with FLAGS set to 0xbeef, the payload can
+either be empty or look like a PONG.
+
+The reply is 0xff05 with FLAGS set to 0xbeef, the payload looks as
 follows:
+
 ...
-0x038	TLV(string, LEN(<hostname>), <hostname>)
-	TLV(ui32, 4, <current-time second part>)
-	TLV(ui32, 4, <current-time nanosecond part>)
-	TLV(ui8, 1, <score>)
-
-Remark:
-For information about the TLV wire format see section `TLV on the wire'
-below.
-
-Remark:
-The score is part of the score negotiation process that facilitates load
-sharing between several servers that offer identical or similar
-services.  Essentially the lower the score the less important the node.
-
-@subheading 0x0006 (UD_SVC_LIST_SVCS)
-
-Replying to this command is optional (at the moment).  The request is a
-CMD 0x0006 with FLAGS set to 0xbeef and payload as follows:
-
-0x038	TLV(seqof(ui16), LEN(<svc-list>), [svc, svc, ...])
-
-An empty service list shall be interpreted as a list of all registered
-services.  The reply is 0x0007 with FLAGS set to 0xbeef and payload as
-follows:
-
-0x038	TLV(string, LEN(<hostname>), <hostname>)
-	TLV(ui32, 4, <current-time second part>)
-	TLV(ui32, 4, <current-time nanosecond part>)
-	TLV(ui8, 1, <score>)
-	TLV(seqof(ui16), LEN(<svc-list>), [svc, svc, svc, ...])
-
-This service is for service detection within the unserding network, each
-participating server replies with its hostname, a time stamp and a list
-of services registered with this server (out of the list the client
-requested).
-
-This service can be seen as a more general ping with and is used to
-detect similar servers on the network as well as renegotiate scores
-between servers that are capable of registering further services at
-run-time to keep an optimal number of provided services relative to the
-current load.
+0x038 uint8_t data indicator, must be 0x0c
+0x039 uint8_t length of data
+0x040 uint32_t pid of program issuing reply, informative
+0x044 uint8_t length of hostname
+0x045 char* hostname
 
 
 @subheading TLV on the wire

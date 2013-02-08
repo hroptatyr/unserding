@@ -89,21 +89,6 @@
 static FILE *monout;
 
 
-typedef struct ud_ev_async_s ud_ev_async;
-
-/* our version of the async event, cdr-coding */
-struct ud_ev_async_s {
-	struct ev_async super;
-};
-
-struct ud_loopclo_s {
-	/** loop lock */
-	pthread_mutex_t lolo;
-	/** just a cond */
-	pthread_cond_t loco;
-};
-
-
 /* DSO handling */
 static int
 open_aux(const char *file)
@@ -475,9 +460,6 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 #endif	/* __INTEL_COMPILER */
 
 #include "svc-pong.h"
-#if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
-# include "svc-uterus.h"
-#endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
 
 int
 main(int argc, char *argv[])

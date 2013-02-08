@@ -475,9 +475,6 @@ sighup_cb(EV_P_ ev_signal *UNUSED(w), int UNUSED(revents))
 #endif	/* __INTEL_COMPILER */
 
 #include "svc-pong.h"
-#if defined HAVE_UTERUS_H || defined HAVE_UTERUS_UTERUS_H
-# include "svc-uterus.h"
-#endif	/* HAVE_UTERUS_H || HAVE_UTERUS_UTERUS_H */
 
 int
 main(int argc, char *argv[])

@@ -19,8 +19,8 @@ before_script:
   - autoreconf -vfi
 
 env:
-  - OPTIONS=""
-  - OPTIONS="CPPFLAGS=-DDEBUG_FLAG"
+  matrix:
+    - OPTIONS=""
 
 script:
   - mkdir \=build

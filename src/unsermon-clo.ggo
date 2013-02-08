@@ -9,10 +9,6 @@ By default syslog is used"
 	string typestr="FILE" optional 
 
 section "Network options"
-option "port" p
-	"Multicast control channel port"
-	int default="8653" optional
-
 option "beef" -
 	"Multicast payload channels, can be used multiple times"
 	int optional multiple

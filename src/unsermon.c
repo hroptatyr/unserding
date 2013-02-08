@@ -89,21 +89,6 @@
 static FILE *monout;
 
 
-typedef struct ud_ev_async_s ud_ev_async;
-
-/* our version of the async event, cdr-coding */
-struct ud_ev_async_s {
-	struct ev_async super;
-};
-
-struct ud_loopclo_s {
-	/** loop lock */
-	pthread_mutex_t lolo;
-	/** just a cond */
-	pthread_cond_t loco;
-};
-
-
 /* DSO handling */
 static int
 open_aux(const char *file)

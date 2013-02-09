@@ -99,7 +99,7 @@ dnl -------------------------------------------------------------------------
 dnl diagnostics for the test suite
 dnl -------------------------------------------------------------------------
 
-AC_PATH_PROG([IP], [ip], [/bin/true],
+AC_PATH_PROG([IP], [ip], [:],
 	[${PATH}]dnl
 	[${PATH_SEPARATOR}/usr/local/sbin]dnl
 	[${PATH_SEPARATOR}/usr/sbin]dnl

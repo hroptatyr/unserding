@@ -101,25 +101,25 @@ struct ud_hdr_s {
 	uint16_t pno;
 	uint16_t cmd;
 	uint16_t magic;
-	char pl[];
+	unsigned char pl[];
 };
 
 union ud_buf_u {
 	struct {
 		struct ud_hdr_s hdr;
 		/* payload */
-		char pl[];
+		unsigned char pl[];
 	};
-	char buf[ETH_MTU];
+	unsigned char buf[ETH_MTU];
 };
 
 union ud_ctrl_u {
 	struct {
 		struct ud_hdr_s hdr;
 		/* payload */
-		char pl[];
+		unsigned char pl[];
 	};
-	char buf[CTRL_MTU];
+	unsigned char buf[CTRL_MTU];
 };
 
 /* our private view on ud_sock_s */
@@ -570,7 +570,7 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 	__sock_t us = (__sock_t)sock;
 	uint8_t z = (uint8_t)msg.dlen;
 	const char *d = msg.data;
-	char *p;
+	unsigned char *p;
 
 	if (UNLIKELY(!__msg_fits_p(us, z) || !__svc_same_p(us, msg.svc))) {
 		/* send what we've got */
@@ -616,7 +616,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
 	ud_svc_t svc;
-	char *p;
+	unsigned char *p;
 
 	if (UNLIKELY(us->nck >= us->nrd)) {
 		/* we need another dose */
@@ -705,7 +705,7 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 {
 	static union ud_ctrl_u ALGN16(ctrl);
 	__sock_t us = (__sock_t)sock;
-	char *p;
+	unsigned char *p;
 
 	if (UNLIKELY(msg.dlen + 2U > sizeof(ctrl) - sizeof(ctrl.hdr))) {
 		/* this would be a protocol deficiency */

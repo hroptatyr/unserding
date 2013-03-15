@@ -569,8 +569,8 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 {
 	__sock_t us = (__sock_t)sock;
 	uint8_t z = (uint8_t)msg.dlen;
-	const char *d = msg.data;
-	unsigned char *p;
+	const uint8_t *d = msg.data;
+	uint8_t *restrict p;
 
 	if (UNLIKELY(!__msg_fits_p(us, z) || !__svc_same_p(us, msg.svc))) {
 		/* send what we've got */
@@ -586,10 +586,15 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 	us->svc = msg.svc;
 
 	/* now copy the blob */
-#define UDPC_TYPE_DATA	(0x0c)
+#define UDPC_TYPE_DATA	(0x0cU)
 	p = us->send.pl + us->npk;
-	*p++ = UDPC_TYPE_DATA;
-	*p++ = z;
+	{
+		uint8_t rs = (uint8_t)(z % 256U);
+		uint8_t xc = (uint8_t)(z / 256U);
+
+		*p++ = (uint8_t)(UDPC_TYPE_DATA | (xc << 4U));
+		*p++ = rs;
+	}
 	memcpy(p, d, z);
 	p += z;
 

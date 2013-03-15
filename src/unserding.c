@@ -711,7 +711,7 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 {
 	static union ud_ctrl_u ALGN16(ctrl);
 	__sock_t us = (__sock_t)sock;
-	unsigned char *p;
+	uint8_t *p;
 
 	if (UNLIKELY(msg.dlen + 2U > sizeof(ctrl) - sizeof(ctrl.hdr))) {
 		/* this would be a protocol deficiency */

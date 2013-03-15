@@ -41,6 +41,7 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdint.h>
 #if defined HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif	/* HAVE_SYS_TYPES_H */
@@ -101,25 +102,25 @@ struct ud_hdr_s {
 	uint16_t pno;
 	uint16_t cmd;
 	uint16_t magic;
-	unsigned char pl[];
+	uint8_t pl[];
 };
 
 union ud_buf_u {
 	struct {
 		struct ud_hdr_s hdr;
 		/* payload */
-		unsigned char pl[];
+		uint8_t pl[];
 	};
-	unsigned char buf[ETH_MTU];
+	uint8_t buf[ETH_MTU];
 };
 
 union ud_ctrl_u {
 	struct {
 		struct ud_hdr_s hdr;
 		/* payload */
-		unsigned char pl[];
+		uint8_t pl[];
 	};
-	unsigned char buf[CTRL_MTU];
+	uint8_t buf[CTRL_MTU];
 };
 
 /* our private view on ud_sock_s */

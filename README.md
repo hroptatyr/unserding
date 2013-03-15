@@ -52,7 +52,22 @@ ud_flush(s);
 ud_close(s);
 ```
 
+Examples
+--------
+Several dedicated projects utilise unserding networks to pass on
+messages, typically in the field of financial trading systems.
+
+Most notable among these is [unsermarkt][4], which in turn uses the tick
+encoding capabilities of [uterus][5] to provide real-time tick data
+streaming.  And moreover it defines a service (that can be plugged into
+unsermon) to encode and decode such streams.
+
+The [unsermarkt project][4] (aided by e.g. [twsgluum][6]) also
+demonstrates how to send or receive FIX messages in unserding networks.
 
   [1]: https://github.com/zeromq/libzmq
   [2]: https://github.com/250bpm/nanomsg
   [3]: https://github.com/hroptatyr/pimmel
+  [4]: https://github.com/hroptatyr/unsermarkt
+  [5]: https://github.com/hroptatyr/uterus
+  [6]: https://github.com/hroptatyr/twsgluum

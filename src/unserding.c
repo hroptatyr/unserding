@@ -41,6 +41,7 @@
 #include <stddef.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdint.h>
 #if defined HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif	/* HAVE_SYS_TYPES_H */
@@ -101,25 +102,25 @@ struct ud_hdr_s {
 	uint16_t pno;
 	uint16_t cmd;
 	uint16_t magic;
-	unsigned char pl[];
+	uint8_t pl[];
 };
 
 union ud_buf_u {
 	struct {
 		struct ud_hdr_s hdr;
 		/* payload */
-		unsigned char pl[];
+		uint8_t pl[];
 	};
-	unsigned char buf[ETH_MTU];
+	uint8_t buf[ETH_MTU];
 };
 
 union ud_ctrl_u {
 	struct {
 		struct ud_hdr_s hdr;
 		/* payload */
-		unsigned char pl[];
+		uint8_t pl[];
 	};
-	unsigned char buf[CTRL_MTU];
+	uint8_t buf[CTRL_MTU];
 };
 
 /* our private view on ud_sock_s */
@@ -569,8 +570,8 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 {
 	__sock_t us = (__sock_t)sock;
 	uint8_t z = (uint8_t)msg.dlen;
-	const char *d = msg.data;
-	unsigned char *p;
+	const uint8_t *d = msg.data;
+	uint8_t *restrict p;
 
 	if (UNLIKELY(!__msg_fits_p(us, z) || !__svc_same_p(us, msg.svc))) {
 		/* send what we've got */
@@ -586,10 +587,15 @@ ud_pack_msg(ud_sock_t sock, struct ud_msg_s msg)
 	us->svc = msg.svc;
 
 	/* now copy the blob */
-#define UDPC_TYPE_DATA	(0x0c)
+#define UDPC_TYPE_DATA	(0x0cU)
 	p = us->send.pl + us->npk;
-	*p++ = UDPC_TYPE_DATA;
-	*p++ = z;
+	{
+		uint8_t rs = (uint8_t)(z % 256U);
+		uint8_t xc = (uint8_t)(z / 256U);
+
+		*p++ = (uint8_t)(UDPC_TYPE_DATA | (xc << 4U));
+		*p++ = rs;
+	}
 	memcpy(p, d, z);
 	p += z;
 
@@ -616,7 +622,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
 	ud_svc_t svc;
-	unsigned char *p;
+	uint8_t *restrict p;
 
 	if (UNLIKELY(us->nck >= us->nrd)) {
 		/* we need another dose */
@@ -638,12 +644,13 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 
 	/* now copy the blob */
 	p = us->recv.pl + us->nck;
-	if ((*p++ != UDPC_TYPE_DATA)) {
+	if (UNLIKELY((*p & 0x0fU) != UDPC_TYPE_DATA)) {
 		us->nrd = us->nck = 0U;
 		return -1;
 	}
-	tgt->dlen = *p++;
-	tgt->data = p;
+	/* the length comes from 12 bits, the upper 4 of p[0] and 8 of p[1] */
+	tgt->dlen = ((p[0] & 0xf0U) >> 4U) + p[1];
+	tgt->data = p + 2;
 
 	/* and the message service */
 	tgt->svc = svc;
@@ -705,7 +712,7 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 {
 	static union ud_ctrl_u ALGN16(ctrl);
 	__sock_t us = (__sock_t)sock;
-	unsigned char *p;
+	uint8_t *p;
 
 	if (UNLIKELY(msg.dlen + 2U > sizeof(ctrl) - sizeof(ctrl.hdr))) {
 		/* this would be a protocol deficiency */
@@ -713,7 +720,7 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 	}
 
 	/* now copy the blob */
-#define UDPC_TYPE_DATA	(0x0c)
+#define UDPC_TYPE_DATA	(0x0cU)
 	p = ctrl.pl;
 	*p++ = UDPC_TYPE_DATA;
 	*p++ = (uint8_t)msg.dlen;

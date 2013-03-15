@@ -621,7 +621,7 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 {
 	__sock_t us = (__sock_t)sock;
 	ud_svc_t svc;
-	unsigned char *p;
+	uint8_t *p;
 
 	if (UNLIKELY(us->nck >= us->nrd)) {
 		/* we need another dose */
@@ -643,12 +643,13 @@ ud_chck_msg(struct ud_msg_s *restrict tgt, ud_sock_t sock)
 
 	/* now copy the blob */
 	p = us->recv.pl + us->nck;
-	if ((*p++ != UDPC_TYPE_DATA)) {
+	if (UNLIKELY((*p & 0x0f) != UDPC_TYPE_DATA)) {
 		us->nrd = us->nck = 0U;
 		return -1;
 	}
-	tgt->dlen = *p++;
-	tgt->data = p;
+	/* the length comes from 12 bits, the upper 4 of p[0] and 8 of p[1] */
+	tgt->dlen = (p[0] & 0xf0) >> 4U + p[1];
+	tgt->data = p + 2;
 
 	/* and the message service */
 	tgt->svc = svc;
@@ -718,7 +719,7 @@ ud_pack_cmsg(ud_sock_t sock, struct ud_msg_s msg)
 	}
 
 	/* now copy the blob */
-#define UDPC_TYPE_DATA	(0x0c)
+#define UDPC_TYPE_DATA	(0x0cU)
 	p = ctrl.pl;
 	*p++ = UDPC_TYPE_DATA;
 	*p++ = (uint8_t)msg.dlen;

@@ -5,7 +5,7 @@ dnl -------------------------------------------------------------------------
 AC_PREREQ([2.63])
 m4_define([GIT_VERSION_GEN], [dnl
 pushdef([version], [m4_esyscmd([./git-version-gen])])dnl
-ifelse([]version[], [], [0.4.0], []version[])[]dnl
+ifelse([]version[], [], [0.4.1], []version[])[]dnl
 popdef([version])dnl
 ])
 AC_INIT([unserding], [GIT_VERSION_GEN], [https://github.com/hroptatyr/unserding])

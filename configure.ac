@@ -71,9 +71,7 @@ dnl -------------------------------------------------------------------------
 ## event lib
 AC_CHECK_LIBEV
 
-dnl must come after all AC_LINK_IFELSE clauses
-## check for the ldflags
-SXE_CHECK_LDFLAGS
+## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
 LT_CONFIG_LTDL_DIR([libltdl])
 LTDL_INIT([recursive])

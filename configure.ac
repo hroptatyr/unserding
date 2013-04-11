@@ -37,6 +37,7 @@ AC_PROG_CC([icc gcc tcc cc])
 SXE_CHECK_CC([c11 c1x c99 gnu99])
 AC_C_BIGENDIAN
 SXE_CHECK_CFLAGS
+AC_CHECK_TOOLS([AR], [xiar ar], [false])
 
 ## check for working c11 features
 SXE_CHECK_ANON_STRUCTS_DECL

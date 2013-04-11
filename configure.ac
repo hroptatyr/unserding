@@ -10,7 +10,7 @@ popdef([version])dnl
 ])
 AC_INIT([unserding], [GIT_VERSION_GEN], [https://github.com/hroptatyr/unserding])
 AC_CONFIG_AUX_DIR([.])
-AC_CONFIG_HEADER([src/config.h])
+AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/])
 

@@ -10,7 +10,7 @@ popdef([version])dnl
 ])
 AC_INIT([unserding], [GIT_VERSION_GEN], [https://github.com/hroptatyr/unserding])
 AC_CONFIG_AUX_DIR([.])
-AC_CONFIG_HEADER([src/config.h])
+AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/])
 
@@ -74,6 +74,8 @@ dnl must come after all AC_LINK_IFELSE clauses
 ## check for the ldflags
 SXE_CHECK_LDFLAGS
 SXE_CHECK_LIBTOOL
+LT_CONFIG_LTDL_DIR([libltdl])
+LTDL_INIT([recursive])
 SXE_CHECK_LIBLTDL
 
 ## mimic automake on this one
@@ -120,6 +122,7 @@ dnl -------------------------------------------------------------------------
 dnl final output
 dnl -------------------------------------------------------------------------
 AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([libltdl/Makefile])
 AC_CONFIG_FILES([src/Makefile])
 AC_CONFIG_FILES([info/Makefile])
 AC_CONFIG_FILES([test/Makefile])

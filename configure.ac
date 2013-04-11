@@ -37,6 +37,7 @@ AC_PROG_CC([icc gcc tcc cc])
 SXE_CHECK_CC([c11 c1x c99 gnu99])
 AC_C_BIGENDIAN
 SXE_CHECK_CFLAGS
+AC_CHECK_TOOLS([AR], [xiar ar], [false])
 
 ## check for working c11 features
 SXE_CHECK_ANON_STRUCTS_DECL
@@ -70,9 +71,7 @@ dnl -------------------------------------------------------------------------
 ## event lib
 AC_CHECK_LIBEV
 
-dnl must come after all AC_LINK_IFELSE clauses
-## check for the ldflags
-SXE_CHECK_LDFLAGS
+## libtool goddess^Wgoodness
 SXE_CHECK_LIBTOOL
 LT_CONFIG_LTDL_DIR([libltdl])
 LTDL_INIT([recursive])

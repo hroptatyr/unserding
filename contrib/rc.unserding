@@ -8,19 +8,21 @@
 #
 #   and symbolic its link
 #
-# /(usr/)sbin/rcunserding
+# /usr/sbin/rcunserding
 #
 # LSB compliant service control script; see http://www.linuxbase.org/spec/
 #
-# System startup script for the unserding service
+# System startup script for unserding daemon
 #
 ### BEGIN INIT INFO
 # Provides: unserding
 # Required-Start: $local_fs $remote_fs $syslog $network
+# Should-Start:   $named $time sendmail ypclient dhcp radiusd
+# Should-Stop:    $named $time sendmail ypclient dhcp radiusd
 # Required-Stop:  $local_fs $remote_fs $syslog $network
 # Default-Start:  3 5
 # Default-Stop:   0 1 2 6
-# Description:    Start the unserding service
+# Description:    Start unserding server
 ### END INIT INFO
 #
 # Note on Required-Start: It does specify the init script ordering,
@@ -31,15 +33,13 @@
 test -r /etc/rc.config && . /etc/rc.config
 
 # Check for missing binaries (stale symlinks should not happen)
-UNSERDING_BIN=/usr/sbin/unserdingd
+UNSERDING_BIN=/usr/local/sbin/unserdingd
 test -x "${UNSERDING_BIN}" || exit 5
 
 # Check for existence of needed config file and read it
-## we expect the variable CONFFILE to be set and point at a
-## lua config file suitable for unserding, see example.unserding.lua
-UNSERDING_CONFIG=/etc/sysconfig/unserding
-test -r "${UNSERDING_CONFIG}" || exit 6
-. "${UNSERDING_CONFIG}"
+#UNSERDING_CONFIG=/etc/sysconfig/unserding
+#test -r "${UNSERDING_CONFIG}" || exit 6
+#. "${UNSERDING_CONFIG}"
 
 # Shell functions sourced from /etc/rc.status:
 #      rc_check         check and set local and overall rc status
@@ -71,8 +71,10 @@ rc_reset
 # with force-reload (in case signalling is not supported) are
 # considered a success.
 
+
 PIDFILE=/var/run/unserding/unserding.pid
-UNSERUSER=unser
+DAEMON_USER=unser
+CONFFILE=/etc/gandalf
 
 case "$1" in
     start)
@@ -82,8 +84,7 @@ case "$1" in
 
 	# NOTE: startproc returns 0, even if service is
 	# already running to match LSB spec.
-	startproc -f -u "${UNSERUSER}" \
-		"${UNSERDING_BIN}" -d -c "${CONFFILE}" -p "${PIDFILE}"
+	startproc -f -u ${DAEMON_USER} "${UNSERDING_BIN}" -d -c "${CONFFILE}" -p ${PIDFILE}
 
 	# Remember status and be verbose
 	rc_status -v
@@ -93,7 +94,7 @@ case "$1" in
 	## Stop daemon with killproc(8) and if this fails
 	## set echo the echo return value.
 
-	killproc -TERM -p "${PIDFILE}" "${UNSERDING_BIN}"
+	killproc -TERM -p ${PIDFILE} "${UNSERDING_BIN}"
 
 	# Remember status and be verbose
 	rc_status -v
@@ -119,7 +120,7 @@ case "$1" in
 	# 3 - service not running
 
 	# NOTE: checkproc returns LSB compliant status values.
-	checkproc -p "${PIDFILE}" "${UNSERDING_BIN}"
+	checkproc -p ${PIDFILE} "${UNSERDING_BIN}"
 	rc_status -v
 	;;
     *)

@@ -104,11 +104,11 @@ ud_pack_pong(ud_sock_t sock, unsigned int pongp)
 	static struct svc_ping_s po;
 
 	if (UNLIKELY(po.hostnlen == 0U)) {
-		static char hname[HOST_NAME_MAX];
+		static char hname[_POSIX_HOST_NAME_MAX];
 		if (gethostname(hname, sizeof(hname)) < 0) {
 			return -1;
 		}
-		hname[HOST_NAME_MAX - 1] = '\0';
+		hname[_POSIX_HOST_NAME_MAX - 1] = '\0';
 		po.hostnlen = strlen(hname);
 		po.hostname = hname;
 		po.pid = getpid();

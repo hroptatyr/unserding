@@ -37,6 +37,7 @@
 #if !defined INCLUDED_ud_sockaddr_h_
 #define INCLUDED_ud_sockaddr_h_
 
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 

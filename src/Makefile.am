@@ -35,7 +35,7 @@ unsermon_LDFLAGS += $(libev_LIBS)
 unsermon_LDFLAGS += $(uterus_LIBS)
 unsermon_LDFLAGS += $(LIBLTDL) $(LIBADD_DL) $(LD_EXPORT_DYNAMIC)
 unsermon_LDADD = $(unserding_LIBS)
-unsermon_DEPENDENCIES = $(LTDLDEPS)
+EXTRA_unsermon_DEPENDENCIES = $(LTDLDEPS)
 BUILT_SOURCES += unsermon-clo.c unsermon-clo.h
 
 bin_PROGRAMS += ud-ping
